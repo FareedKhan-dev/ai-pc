@@ -3,10 +3,10 @@
 ## The one AI PC chat: everything from one conversation, typed or a voice note
 
 ```
-ai-pc                                       talk here (a line that is a file path sends it; 'voice <file>' sends a voice note)
-ai-pc -m "add a glow effect to my video" --file me.mp4 -m "send it to slack #team" -m yes
-ai-pc --voice note.m4a                      a voice note from your phone or a recorder
-ai-pc --resume                              carry on the last chat ('it' still means what it meant)
+ai-pc chat                                  talk here (a line that is a file path sends it; 'voice <file>' sends a voice note)
+ai-pc chat -m "add a glow effect to my video" --file me.mp4 -m "send it to slack #team" -m yes
+ai-pc chat --voice note.m4a                 a voice note from your phone or a recorder
+ai-pc chat --resume                         carry on the last chat ('it' still means what it meant)
 ai-pc telegram                              your phone as the remote: messages, voice notes, photos, videos and documents
                                               you send your own Telegram bot come here, and the replies and files go back
 ai-pc web                                   the chat as a page in your browser on this PC: type, attach, hold the mic to talk

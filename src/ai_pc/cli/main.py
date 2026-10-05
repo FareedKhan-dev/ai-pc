@@ -39,7 +39,7 @@ def usage():
     width = max(map(len, COMMANDS))
     lines = [f"ai-pc {__version__}: the AI PC from the command line", "", "usage: ai-pc <command> [options]   (ai-pc <command> --help for its options)", ""]
     lines += [f"  {name.ljust(width)}  {doc}" for name, (_, _, doc) in COMMANDS.items()]
-    lines += ["", "With no command, 'ai-pc' starts the chat."]
+    lines += ["", "With no command, 'ai-pc' starts the chat ('ai-pc -m \"...\"' sends it a message)."]
     return "\n".join(lines)
 
 
@@ -54,8 +54,8 @@ def _utf8_console():
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     _utf8_console()
-    if not argv:
-        argv = ["chat"]
+    if not argv or (argv[0].startswith("-") and argv[0] not in ("-h", "--help", "-V", "--version")):
+        argv = ["chat", *argv]  # 'ai-pc -m "..."' is the chat with a message
     cmd, rest = argv[0], argv[1:]
     if cmd in ("-h", "--help", "help"):
         print(usage())
