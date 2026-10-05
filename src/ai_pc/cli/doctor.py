@@ -422,9 +422,14 @@ TOOL_LIST = [
     Tool("Vocaela click model", M, "desktop agent (vision)", vocaela_file("-m"), size),
     Tool("Vocaela image projector", M, "desktop agent (vision)", vocaela_file("--mmproj"), size),
     Tool("Vocaela prompt", M, "desktop agent (vision)", attr("ai_pc.desktop.vocaela", "SYSTEM_FILE"), size),
-    Tool("TinyClick", M, "desktop agent (vision, alternative)", under(MODELS / "hf" / "hub", "models--*TinyClick*"), size, optional=True),
+    Tool("TinyClick", M, "desktop agent (vision, alternative)", under(MODELS, "tinyclick"), size, optional=True),
     Tool(
-        "Florence-2 code", M, "desktop agent (TinyClick's model code)", under(MODELS / "hf" / "hub", "models--*Florence-2-base*"), size, optional=True
+        "TinyClick download",
+        M,
+        "the source services/tinyclick/convert.py reads",
+        under(MODELS / "hf" / "hub", "models--*TinyClick*"),
+        size,
+        optional=True,
     ),
     # environments and developer tools
     Tool("Python environment (.venv)", E, "everything", venv_python(".venv"), run_version("--version")),

@@ -33,9 +33,15 @@ All notable changes to this project are written down here. The format follows
 - `THIRD_PARTY_NOTICES.md` says where the logos in `docs/assets/` come from.
 - `packaging` is a direct dependency (the doctor compares installed versions with the requirements); it was already
   installed through matplotlib.
+- The TinyClick server runs on transformers 5.10.1 (was 4.45.2), which fixes the 18 security advisories GitHub listed
+  for the old version. TinyClick now loads through the Florence-2 code built into transformers:
+  `services/tinyclick/convert.py` converts the downloaded weights once, so no code from the model's repository runs.
+  It gives the same 12 test clicks, point for point, and the GPU path answers about three times faster. `timm` and
+  `einops` are no longer needed.
 
 ### Fixed
 
+- CI's secret scan failed on every pull request: it needs permission to read the request's commits.
 - On a PC with no default printer (or with the print spooler off), "print it" went to the Office program instead of
   printing. Printing now takes it and names the printers to choose from; CI caught this on GitHub's Windows runner.
 

@@ -1,9 +1,11 @@
 """TinyClick (Florence-2-base fine-tuned to predict a click point) on a CapCut screenshot.
 
   python services/tinyclick/model.py --download-only   # fetch weights into ./models/hf (shows progress)
+  python services/tinyclick/convert.py                 # into transformers' built-in Florence-2: ./models/tinyclick
   python services/tinyclick/model.py                   # run the 12-query test, score hits, time it
 
-Everything (weights, HF cache, remote code) stays inside this project folder.
+Everything (weights, HF cache) stays inside this project folder, and no downloaded code runs: the model is the
+converted copy, loaded by the Florence-2 code that ships with transformers.
 Input/output format follows the authors' tinyclick_utils.py:
   prompt = ("what to do to execute the command? " + command).lower(); image resized to 768x768
   output = "click <loc_X><loc_Y>" with X,Y in 0..1000 (relative to the original image)
@@ -21,6 +23,7 @@ os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
 REPO = "Krystianz/TinyClick"  # community mirror of Samsung/TinyClick (the original repo is offline)
+MODEL = os.path.join(ROOT, "models", "tinyclick")  # written by convert.py
 IMAGE = os.path.join(ROOT, "shots", "state4.png")  # clean CapCut home page, 1920x1140
 
 # (command, ground-truth box x0,y0,x1,y1 in image pixels, measured by eye from the screenshot)
@@ -53,19 +56,14 @@ def download():
 
 
 def load():
-    from unittest.mock import patch
-
     import torch
-    from transformers import AutoModelForCausalLM, AutoProcessor
-    from transformers.dynamic_module_utils import get_imports
+    from transformers import AutoProcessor, Florence2ForConditionalGeneration
 
-    def no_flash(filename):  # Florence-2's remote code lists flash_attn, which is not installable on Windows
-        return [i for i in get_imports(filename) if i != "flash_attn"]
-
+    if not os.path.exists(os.path.join(MODEL, "config.json")):
+        sys.exit("TinyClick is not converted yet: run services/tinyclick/convert.py (after model.py --download-only)")
     t = time.perf_counter()
-    with patch("transformers.dynamic_module_utils.get_imports", no_flash):
-        processor = AutoProcessor.from_pretrained(REPO, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_pretrained(REPO, trust_remote_code=True).eval()
+    processor = AutoProcessor.from_pretrained(MODEL, backend="pil")  # PIL resizing, as TinyClick was trained with
+    model = Florence2ForConditionalGeneration.from_pretrained(MODEL).eval()
     print(
         f"model loaded in {time.perf_counter() - t:.1f}s | params: {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M | threads: {torch.get_num_threads()}",
         flush=True,
@@ -76,7 +74,7 @@ def load():
 def click_point(torch, processor, model, img, command):
     t0 = time.perf_counter()
     text = ("What to do to execute the command? " + command.strip()).lower()
-    enc = processor(images=img, text=text, return_tensors="pt", do_resize=True)
+    enc = processor(images=img, text=text, return_tensors="pt")
     t1 = time.perf_counter()
     with torch.inference_mode():
         out = model.generate(**enc)
