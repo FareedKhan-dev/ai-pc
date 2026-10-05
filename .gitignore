@@ -12,6 +12,7 @@ wheels/
 # test, lint and type-check caches
 .pytest_cache/
 .ruff_cache/
+.cache/
 .mypy_cache/
 .coverage
 .coverage.*
