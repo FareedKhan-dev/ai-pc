@@ -34,6 +34,11 @@ All notable changes to this project are written down here. The format follows
 - `packaging` is a direct dependency (the doctor compares installed versions with the requirements); it was already
   installed through matplotlib.
 
+### Fixed
+
+- On a PC with no default printer (or with the print spooler off), "print it" went to the Office program instead of
+  printing. Printing now takes it and names the printers to choose from; CI caught this on GitHub's Windows runner.
+
 ## [0.1.0] - 2026-10-05
 
 ### Added

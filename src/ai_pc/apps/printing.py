@@ -16,12 +16,28 @@ PICTURES = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".gif", ".webp"}
 OFFICE = {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".rtf", ".odt"}
 
 
-def printers():
+def default_printer():
+    """The default printer's name, or None when the PC has none."""
+    import pywintypes
     import win32print
 
-    default = win32print.GetDefaultPrinter()
+    try:
+        return win32print.GetDefaultPrinter()
+    except pywintypes.error:  # no default printer set, or the print spooler is off
+        return None
+
+
+def printers():
+    import pywintypes
+    import win32print
+
+    default = default_printer()
     flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
-    return [{"name": p[2], "default": p[2] == default} for p in win32print.EnumPrinters(flags)]
+    try:
+        found = win32print.EnumPrinters(flags)
+    except pywintypes.error:  # the print spooler is off: no printers to offer
+        return []
+    return [{"name": p[2], "default": p[2] == default} for p in found]
 
 
 def queue(printer=None):
@@ -64,11 +80,12 @@ def pages_of(path, work, dpi=300):
 def print_file(path, printer=None, copies=1, output=None, work=None):
     """Print through Windows (GDI), each page fitted to the printable area; `output` is the file a 'Print to PDF' printer
     writes (no Save dialog)."""
-    import win32print
     import win32ui
     from PIL import ImageWin
 
-    printer = printer or win32print.GetDefaultPrinter()
+    printer = printer or default_printer()
+    if not printer:
+        raise RuntimeError("this PC has no default printer: name one, for example 'print it on Microsoft Print to PDF'")
     imgs = pages_of(path, Path(work or Path(path).parent))
     hdc = win32ui.CreateDC()
     hdc.CreatePrinterDC(printer)
@@ -109,9 +126,13 @@ def parse(text, ctx):
 
 
 def preview(op, ctx):
-    import win32print
-
-    printer = op.get("printer") or win32print.GetDefaultPrinter()
+    printer = op.get("printer") or default_printer()
+    if not printer:
+        op["blocked"] = True  # nothing to confirm until a printer is named
+        names = [p["name"] for p in printers()]
+        if not names:
+            return "This PC has no printer, so there is nothing to print on."
+        return f"This PC has no default printer. Say which one, for example 'print it on {names[0]}'. Printers: {'; '.join(names)}."
     op["printer"] = printer
     return (
         f"Ready to print {Path(op['file']).name}, {op.get('copies', 1)} cop{'y' if op.get('copies', 1) == 1 else 'ies'}, on {printer}"
