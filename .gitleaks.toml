@@ -1,0 +1,11 @@
+# Secret scanning with gitleaks (pre-commit and CI): all of the default rules, except for the made-up values the test
+# suites use against their fake servers. Allow exact values only, never whole folders.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Made-up credentials in the test suites"
+regexes = [
+  '''^xoxb-ROUNDTRIP-\d+$''',
+  '''^TESTabcdef123456$''',
+]
