@@ -16,7 +16,8 @@ All notable changes to this project are written down here. The format follows
 - Programs: video (JianYing / CapCut), Word / PowerPoint / Excel / PDF, photos, sound, design, CAD, 3D (Blender),
   converter, Windows files and settings, coding, designs to code, accounts, work apps, social media, and 88 more
   programs; the desktop agent for any program's user interface.
-- The `ai-pc` command, with a subcommand per program, and `ai-pc keys` for the encrypted key vault.
+- The `ai-pc` command, with a subcommand per program, and `ai-pc keys` for the encrypted key vault; options with no
+  command go to the chat (`ai-pc -m "make my photo brighter" --file car.jpg`).
 - Keys from the environment, a `.env` file or the vault; all data paths in one place with `AI_PC_HOME`.
 - Packaging (`pyproject.toml`, `uv.lock`), pytest (unit and integration suites), ruff, pre-commit, GitHub Actions
   (lint, tests, build, releases), Dependabot, documentation in `docs/`.
