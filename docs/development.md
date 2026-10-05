@@ -45,6 +45,13 @@ They write only under `out/_tests/` and never touch the real Desktop, Documents 
 5. Put its executable in `tools/<name>/`. Download it from the publisher and check the hash (and signature, if there
    is one) before unpacking. Python wheels go through `scripts/safe_wheels.py`.
 
+## The README's pictures
+
+The hero picture and the logo tiles in `docs/assets/` are built by `uv run python scripts/readme_assets.py` from the
+logos in `docs/assets/logos/` (their sources are in `SOURCES.md` there). To add a program, put its logo there as a
+256 px PNG, add it to the hero's lists in the script if it belongs there, and run the script again. The command bar
+pictures in `docs/assets/screens/` come from `tests/integration/test_bar.py`.
+
 ## Dependencies
 
 Direct dependencies are listed in `pyproject.toml`, and `uv.lock` pins every version. To change one, run

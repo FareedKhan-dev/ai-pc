@@ -12,3 +12,4 @@ Maintenance and measurement scripts. They are not part of the `ai-pc` command. R
 | `stress_video_batch.py` | Runs ten one-minute edits in ten genres back to back |
 | `safe_wheels.py` | Downloads exact wheels from PyPI, checks their hashes and lists what is inside, for offline installs |
 | `third_party_notices.py` | Regenerates `THIRD_PARTY_NOTICES.md` from `uv.lock` |
+| `readme_assets.py` | Rebuilds the README's hero picture (light and dark) and the logo tiles from `docs/assets/logos/` |
