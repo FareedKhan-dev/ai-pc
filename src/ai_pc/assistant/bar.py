@@ -194,6 +194,22 @@ def shown_text(text):
     return PATHS.sub(lambda m: Path(m.group(0)).name, t)
 
 
+def first_page_jpg(pdf, out, width=640):
+    """Page 1 of a PDF as a JPEG about `width` pixels wide: the picture for a document, deck or drawing result."""
+    import pypdfium2 as pdfium
+
+    doc = pdfium.PdfDocument(str(pdf))
+    try:
+        page = doc[0]
+        im = page.render(scale=width / page.get_width()).to_pil().convert("RGB")
+    finally:
+        doc.close()
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    im.save(out, quality=88)
+    return out
+
+
 def spark_image(size, color, bg):
     """The AI PC spark (the tray icon's shape), drawn smooth at any size."""
     from PIL import Image, ImageDraw, ImageTk
@@ -1004,6 +1020,9 @@ class Bar:
         vids = [p for p in files if kind_of(p) == "video"]
         if vids and not pics:
             self._video_still(vids[-1])
+        pdfs = [p for p in files if Path(p).suffix.lower() == ".pdf"]
+        if pdfs and not pics and not vids:
+            self._page_still(pdfs[-1])
         if files:
             row = tk.Frame(T, bg=P["bg"])
             for p in files[:6]:
@@ -1084,12 +1103,12 @@ class Bar:
         except Exception as e:  # noqa: BLE001
             self._say_status(f"Could not copy it: {e}", warn=True)
 
-    def _rounded_photo(self, im):
+    def _rounded_photo(self, im, box=(320, 180)):
         from PIL import Image, ImageDraw, ImageTk
 
         s = self.s
         im = im.convert("RGB")
-        im.thumbnail((round(320 * s), round(180 * s)))
+        im.thumbnail((round(box[0] * s), round(box[1] * s)))
         k, (w, h) = 4, im.size
         mask = Image.new("L", (w * k, h * k), 0)
         ImageDraw.Draw(mask).rounded_rectangle((0, 0, w * k - 1, h * k - 1), radius=round(8 * s) * k, fill=255)
@@ -1135,12 +1154,28 @@ class Bar:
 
         threading.Thread(target=grab, daemon=True, name="aipc-still").start()
 
+    def _page_still(self, p):
+        """A document, deck or drawing shows its first page, drawn in the background (the file chip is below it)."""
+        holder = tk.Frame(self.convo, bg=self.P["bg"])
+        self.convo.window_create("end", window=holder)
+        self.convo.insert("end", "\n")
+        out = HOME / "stills" / (Path(p).stem + "_p1.jpg")
+
+        def draw():
+            try:
+                first_page_jpg(p, out)
+                self.q.put(("still", holder, str(out), p))
+            except Exception:  # noqa: BLE001 - the picture is a nicety; the file is still there to open
+                pass
+
+        threading.Thread(target=draw, daemon=True, name="aipc-page").start()
+
     def _show_still(self, holder, img_path, video):
         try:
             from PIL import Image
 
-            with Image.open(img_path) as im:
-                ph = self._rounded_photo(im)
+            with Image.open(img_path) as im:  # a page is shown taller, so a portrait page is still readable at a glance
+                ph = self._rounded_photo(im, (320, 260) if str(video).lower().endswith(".pdf") else (320, 180))
         except Exception:  # noqa: BLE001
             return
         lab = tk.Label(holder, image=ph, bg=self.P["bg"], bd=0, cursor="hand2")

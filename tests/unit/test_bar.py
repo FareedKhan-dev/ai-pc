@@ -9,7 +9,7 @@ import pytest
 from ai_pc.assistant import mic
 from ai_pc.assistant import shell as S
 from ai_pc.assistant.agent import split_reply
-from ai_pc.assistant.bar import lum, palette, shown_text
+from ai_pc.assistant.bar import first_page_jpg, lum, palette, shown_text
 
 
 def test_a_combo_is_modifiers_and_one_key():
@@ -38,6 +38,21 @@ def test_each_programs_part_of_a_reply_keeps_its_name():
 
 def test_long_paths_are_shown_as_file_names():
     assert shown_text(r"Edited: C:\Users\me\out\video\agent_x.mp4 (6 of 9 checks)") == "Edited: agent_x.mp4 (6 of 9 checks)"
+
+
+def test_a_pdf_result_is_shown_by_its_first_page(tmp_path):
+    import pypdfium2 as pdfium
+    from PIL import Image
+
+    pdf = pdfium.PdfDocument.new()
+    pdf.new_page(595, 842)  # A4, portrait
+    pdf.new_page(842, 595)
+    pdf.save(str(tmp_path / "report.pdf"))
+    pdf.close()
+    out = first_page_jpg(tmp_path / "report.pdf", tmp_path / "stills" / "report_p1.jpg")
+    with Image.open(out) as im:
+        assert im.width == 640 and 900 < im.height < 920  # the first page, portrait, at the width asked
+        assert im.convert("L").getextrema()[0] > 240  # a blank page is white
 
 
 def test_the_accent_stays_readable_on_dark_and_light():
