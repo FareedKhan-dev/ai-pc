@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TinyClick Tester</title>
+<style>
+  :root { --bg:#f6f7f9; --panel:#ffffff; --text:#16181d; --muted:#667085; --line:#dfe3ea; --accent:#2563eb; --pred:#e11d48; --you:#2563eb; --chip:#eef1f6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0e1116; --panel:#171b22; --text:#e8ebf0; --muted:#9aa4b2; --line:#2a313c; --accent:#60a5fa; --pred:#fb7185; --you:#60a5fa; --chip:#222a35; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:baseline; padding:14px 20px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { margin:0; font-size:18px; }
+  header .status { color:var(--muted); font-size:13px; }
+  header .note { margin-left:auto; color:var(--muted); font-size:13px; }
+  main { display:grid; grid-template-columns: minmax(0, 1fr) 360px; gap:16px; padding:16px 20px; max-width:1500px; margin:0 auto; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .card h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:600; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  button, select, input[type=text] { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 11px; }
+  button { cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button:disabled { opacity:.55; cursor:default; }
+  input[type=text] { flex:1; min-width:180px; }
+  .stage { position:relative; margin-top:12px; border:1px dashed var(--line); border-radius:8px; min-height:240px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:var(--bg); }
+  .stage.drag { border-color:var(--accent); }
+  .stage .empty { color:var(--muted); text-align:center; padding:40px 20px; }
+  .wrap { position:relative; display:none; line-height:0; max-width:100%; }
+  .wrap img { max-width:100%; height:auto; display:block; cursor:crosshair; }
+  .pin { position:absolute; width:30px; height:30px; margin:-15px 0 0 -15px; border:3px solid var(--pred); border-radius:50%; pointer-events:none; box-shadow:0 0 0 2px rgba(0,0,0,.35); }
+  .pin::after { content:""; position:absolute; left:50%; top:50%; width:6px; height:6px; margin:-3px 0 0 -3px; background:var(--pred); border-radius:50%; }
+  .pin.old { opacity:.45; width:18px; height:18px; margin:-9px 0 0 -9px; border-width:2px; }
+  .pin.you { border-color:var(--you); }
+  .pin.you::after { background:var(--you); }
+  .pin span { position:absolute; left:100%; top:-8px; margin-left:4px; font:600 12px/1 system-ui; color:#fff; background:rgba(0,0,0,.65); padding:2px 5px; border-radius:4px; white-space:nowrap; }
+  .caption { margin-top:8px; color:var(--muted); font-size:13px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .chip { background:var(--chip); border:none; border-radius:999px; padding:4px 10px; font-size:13px; }
+  .big { font-size:22px; font-weight:650; margin:2px 0 6px; }
+  .kv { display:grid; grid-template-columns: 110px 1fr; gap:4px 10px; font-size:13px; }
+  .kv div:nth-child(odd) { color:var(--muted); }
+  code { font:12.5px ui-monospace, Consolas, monospace; background:var(--chip); padding:1px 5px; border-radius:4px; word-break:break-all; }
+  canvas#zoom { width:100%; max-width:220px; aspect-ratio:1; border:1px solid var(--line); border-radius:8px; image-rendering:pixelated; background:var(--bg); }
+  .hist { max-height:240px; overflow:auto; margin:0; padding:0; list-style:none; font-size:13px; }
+  .hist li { padding:6px 4px; border-bottom:1px solid var(--line); cursor:pointer; display:flex; gap:8px; }
+  .hist li:hover { background:var(--chip); }
+  .hist .n { color:var(--muted); width:18px; }
+  .hist .t { margin-left:auto; color:var(--muted); white-space:nowrap; }
+  .err { color:var(--pred); font-size:13px; margin-top:8px; }
+  .stack { display:flex; flex-direction:column; gap:16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>TinyClick Tester</h1>
+  <span class="status" id="status">loading…</span>
+  <span class="note">Prediction only: this page never clicks or moves anything on your screen.</span>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1 · Screenshot</h2>
+    <div class="row">
+      <label><input type="file" id="file" accept="image/*" hidden><button id="pick">Choose file…</button></label>
+      <select id="shots" title="screenshots in the project's shots folder"></select>
+      <button id="useShot">Use</button>
+      <span style="color:var(--muted)">or</span>
+      <button id="capture">Capture my screen in 5 s</button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="empty" id="empty">Drop a screenshot here, paste one with Ctrl+V,<br>or pick one above.</div>
+      <div class="wrap" id="wrap"><img id="shot" alt="screenshot"><div id="pins"></div></div>
+    </div>
+    <div class="caption" id="caption">Click anywhere on the image to mark where <em>you</em> would click, and compare it with the model.</div>
+  </section>
+
+  <aside class="stack">
+    <section class="card">
+      <h2>2 · Command</h2>
+      <div class="row">
+        <input type="text" id="cmd" placeholder="e.g. click Sign in" autocomplete="off">
+        <button class="primary" id="go" disabled>Find</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label style="color:var(--muted);font-size:13px">Decoding</label>
+        <select id="beams">
+          <option value="3">Accurate (3 beams)</option>
+          <option value="1">Fast (greedy, less accurate)</option>
+        </select>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="err" id="err"></div>
+    </section>
+
+    <section class="card">
+      <h2>3 · Result</h2>
+      <div class="big" id="big">–</div>
+      <div class="kv">
+        <div>Model said</div><div><code id="raw">–</code></div>
+        <div>Scale 0–1000</div><div id="norm">–</div>
+        <div>Time</div><div id="time">–</div>
+        <div>Prompt sent</div><div><code id="prompt">–</code></div>
+        <div>You vs model</div><div id="diff">–</div>
+      </div>
+      <div style="margin-top:10px"><canvas id="zoom" width="220" height="220"></canvas>
+        <div class="caption">What the model pointed at (zoom).</div></div>
+    </section>
+
+    <section class="card">
+      <h2>History</h2>
+      <ul class="hist" id="hist"><li style="cursor:default;color:var(--muted)">nothing yet</li></ul>
+    </section>
+  </aside>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let info = null;            // {id,width,height,...} of the loaded screenshot
+let history = [];           // {n, command, point, ms}
+let youPin = null;
+const EXAMPLES = ["click Sign in", "click the Create project button", "click Templates", "click Library", "click Trash", "click the search icon"];
+
+async function api(path, body, raw) {
+  const r = await fetch(path, body === undefined ? {} : { method: "POST", body: raw ? body : JSON.stringify(body) });
+  const j = await r.json();
+  if (j.error || j.ok === false) throw new Error(j.error || "failed");
+  return j;
+}
+function setErr(m) { $("err").textContent = m || ""; }
+
+async function boot() {
+  const i = await api("/api/info");
+  $("status").textContent = `${i.device} · ${i.dtype} · ${i.params_m}M parameters`;
+  $("shots").innerHTML = i.shots.map(n => `<option>${n}</option>`).join("") || "<option value=''>(no screenshots in shots/)</option>";
+  $("chips").innerHTML = EXAMPLES.map(t => `<button class="chip">${t}</button>`).join("");
+  $("chips").querySelectorAll(".chip").forEach(b => b.onclick = () => { $("cmd").value = b.textContent; find(); });
+}
+
+function showImage(i) {
+  info = i; history = []; youPin = null;
+  $("shot").onload = () => { $("empty").style.display = "none"; $("wrap").style.display = "block"; };
+  $("shot").src = "/current.png?id=" + i.id;
+  $("pins").innerHTML = "";
+  $("go").disabled = false;
+  renderHistory();
+  ["big", "raw", "norm", "time", "prompt", "diff"].forEach(k => $(k).textContent = "–");
+  $("caption").textContent = `${i.width}×${i.height}px · image read once in ${i.preprocess_ms + i.encode_ms} ms (preprocess ${i.preprocess_ms} + encode ${i.encode_ms}). Every command on it now reuses that.`;
+  setErr("");
+}
+
+async function loadBlob(blob) {
+  setErr(""); $("caption").textContent = "reading image…";
+  try { showImage(await api("/api/image", blob, true)); } catch (e) { setErr(e.message); }
+}
+
+function pin(p, cls, label) {
+  const d = document.createElement("div");
+  d.className = "pin " + cls;
+  d.style.left = (p[0] / info.width * 100) + "%";
+  d.style.top = (p[1] / info.height * 100) + "%";
+  if (label) { const s = document.createElement("span"); s.textContent = label; d.appendChild(s); }
+  $("pins").appendChild(d);
+  return d;
+}
+
+function drawZoom(p) {
+  const c = $("zoom"), x = c.getContext("2d"), img = $("shot"), R = 70;
+  const sx = Math.max(0, Math.min(info.width - 2 * R, p[0] - R)), sy = Math.max(0, Math.min(info.height - 2 * R, p[1] - R));
+  x.clearRect(0, 0, 220, 220);
+  x.drawImage(img, sx, sy, 2 * R, 2 * R, 0, 0, 220, 220);
+  const cx = (p[0] - sx) / (2 * R) * 220, cy = (p[1] - sy) / (2 * R) * 220;
+  x.strokeStyle = "#e11d48"; x.lineWidth = 2;
+  x.beginPath(); x.arc(cx, cy, 12, 0, 7); x.moveTo(cx - 20, cy); x.lineTo(cx + 20, cy); x.moveTo(cx, cy - 20); x.lineTo(cx, cy + 20); x.stroke();
+}
+
+function renderHistory() {
+  $("hist").innerHTML = history.length ? history.slice().reverse().map(h =>
+    `<li data-n="${h.n}"><span class="n">${h.n}</span><span>${h.command}</span><span class="t">${h.point ? `(${h.point[0]}, ${h.point[1]})` : "no click"} · ${h.ms} ms</span></li>`).join("")
+    : '<li style="cursor:default;color:var(--muted)">nothing yet</li>';
+  $("hist").querySelectorAll("li[data-n]").forEach(li => li.onclick = () => {
+    const h = history.find(x => x.n == li.dataset.n); if (h && h.point) { drawZoom(h.point); showResult(h, true); }
+  });
+}
+
+function showResult(h, fromHistory) {
+  $("big").textContent = h.point ? `Click at (${h.point[0]}, ${h.point[1]}) px` : "No click predicted";
+  $("raw").textContent = h.raw.replace(/<\/?s>|<pad>/g, "").trim();
+  $("norm").textContent = h.norm ? `x ${h.norm[0]}, y ${h.norm[1]}  →  ×${info.width}/1000, ×${info.height}/1000 = pixels` : "–";
+  $("time").textContent = `${h.ms} ms total (${h.decode_ms} ms model). The image was already encoded.`;
+  $("prompt").textContent = h.prompt;
+  if (!fromHistory) return;
+  $("pins").querySelectorAll(".pin:not(.you)").forEach(p => p.classList.add("old"));
+}
+
+async function find() {
+  if (!info) return;
+  const command = $("cmd").value.trim(); if (!command) return;
+  setErr(""); $("go").disabled = true; $("go").textContent = "…";
+  try {
+    const r = await api("/api/find", { command, beams: +$("beams").value });
+    const h = { n: history.length + 1, command, point: r.point, norm: r.norm, ms: r.ms, decode_ms: r.decode_ms, raw: r.raw, prompt: r.prompt };
+    history.push(h);
+    $("pins").querySelectorAll(".pin:not(.you)").forEach(p => p.classList.add("old"));
+    if (r.point) { pin(r.point, "", String(h.n)); drawZoom(r.point); }
+    showResult(h, false); renderHistory(); updateDiff();
+  } catch (e) { setErr(e.message); }
+  $("go").disabled = false; $("go").textContent = "Find";
+}
+
+function updateDiff() {
+  const last = history[history.length - 1];
+  if (!youPin || !last || !last.point) { $("diff").textContent = "click on the image to mark your own click"; return; }
+  const dx = last.point[0] - youPin[0], dy = last.point[1] - youPin[1];
+  $("diff").textContent = `you (${youPin[0]}, ${youPin[1]}) · off by ${Math.round(Math.hypot(dx, dy))} px (dx ${dx}, dy ${dy})`;
+}
+
+$("shot").addEventListener("click", ev => {
+  if (!info) return;
+  const r = $("shot").getBoundingClientRect();
+  youPin = [Math.round((ev.clientX - r.left) / r.width * info.width), Math.round((ev.clientY - r.top) / r.height * info.height)];
+  $("pins").querySelectorAll(".pin.you").forEach(p => p.remove());
+  pin(youPin, "you", "you"); updateDiff();
+});
+
+$("go").onclick = find;
+$("cmd").addEventListener("keydown", e => { if (e.key === "Enter") find(); });
+$("pick").onclick = () => $("file").click();
+$("file").onchange = e => e.target.files[0] && loadBlob(e.target.files[0]);
+$("useShot").onclick = async () => { const n = $("shots").value; if (!n) return; try { showImage(await api("/api/use_shot", { name: n })); } catch (e) { setErr(e.message); } };
+$("capture").onclick = async () => {
+  const b = $("capture"); b.disabled = true; let s = 5; setErr("");
+  const t = setInterval(() => { s--; b.textContent = s > 0 ? `Capturing in ${s} s… switch to your app` : "Capturing…"; }, 1000);
+  b.textContent = "Capturing in 5 s… switch to your app";
+  try { showImage(await api("/api/capture", { delay: 5 })); } catch (e) { setErr(e.message); }
+  clearInterval(t); b.disabled = false; b.textContent = "Capture my screen in 5 s";
+};
+document.addEventListener("paste", e => { const f = [...(e.clipboardData?.files || [])].find(x => x.type.startsWith("image/")); if (f) loadBlob(f); });
+const stage = $("stage");
+["dragenter", "dragover"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); stage.classList.add("drag"); }));
+["dragleave", "drop"].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); stage.classList.remove("drag"); }));
+stage.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadBlob(f); });
+
+boot().catch(e => { $("status").textContent = "server not reachable: " + e.message; });
+</script>
+</body>
+</html>

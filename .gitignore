@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+
+# test, lint and type-check caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit*.xml
+
+# ---------------------------------------------------------------------------
+# Environments
+# ---------------------------------------------------------------------------
+.venv/
+.venv-*/
+venv/
+.uv-cache/
+
+# ---------------------------------------------------------------------------
+# Secrets: never commit keys or tokens (see docs/configuration.md)
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+/my_nebius.txt
+/slack_oauth.txt
+/telegram.txt
+*.pem
+*.key
+*.pfx
+*.p12
+
+# ---------------------------------------------------------------------------
+# Runtime data, local to this PC (portable programs, models, media, outputs,
+# learned state). Paths are configured in src/ai_pc/core/paths.py.
+# ---------------------------------------------------------------------------
+/tools/
+/models/
+/media/
+/out/
+/state/
+/runs/
+/shots/
+/kb/
+
+# research and personal scratch files
+/reports/
+/research_notes/
+/local/
+
+# ---------------------------------------------------------------------------
+# Editors and OS files (machine-specific tools go in .git/info/exclude)
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.log
+@AutomationLog.txt
+*.lnk
+Thumbs.db
+desktop.ini
+.DS_Store

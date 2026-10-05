@@ -1,0 +1,195 @@
+{
+ "name": "feature test",
+ "platform": "instagram_reels",
+ "canvas": "9:16",
+ "clips": [
+  {
+   "id": "c1",
+   "file": "mixkit_4832.mp4",
+   "from": 1.0,
+   "duration": 2.5
+  },
+  {
+   "id": "c2",
+   "file": "mixkit_47518.mp4",
+   "from": 8.0,
+   "ramp": [
+    [
+     0,
+     1.0
+    ],
+    [
+     1.0,
+     0.4
+    ],
+    [
+     1.8,
+     1.0
+    ]
+   ],
+   "to": 11.0
+  },
+  {
+   "id": "c3",
+   "file": "mixkit_28287.mp4",
+   "from": 5.0,
+   "duration": 3.0,
+   "chroma": "auto",
+   "background": "#101018"
+  },
+  {
+   "id": "c4",
+   "file": "mixkit_28287.mp4",
+   "freeze": 7.5,
+   "duration": 1.2
+  },
+  {
+   "id": "c5",
+   "file": "josh-berquist-_4sWbzH5fp8-unsplash.jpg",
+   "duration": 2.0,
+   "reframe": "fit"
+  }
+ ],
+ "layers": [
+  {
+   "id": "o1",
+   "file": "pexels-berna-elif-359546580-26628374.jpg",
+   "at": 1.0,
+   "duration": 1.5,
+   "scale": 0.4,
+   "position": [
+    0.4,
+    0.5
+   ],
+   "mask": {
+    "type": "circle",
+    "size": 0.6,
+    "feather": 20
+   },
+   "blend": "screen"
+  }
+ ],
+ "edits": [
+  {
+   "id": "t1",
+   "type": "transition",
+   "after": "c1",
+   "name": "闪白",
+   "duration": 0.4
+  },
+  {
+   "id": "e1",
+   "type": "effect",
+   "name": "拽酷红眼",
+   "on": "c3",
+   "start": 0.5,
+   "duration": 2.0,
+   "params": {
+    "effects_adjust_size": 70
+   },
+   "expect": "eyes glow red"
+  },
+  {
+   "id": "e2",
+   "type": "effect",
+   "name": "Lightning",
+   "start": 6.0,
+   "duration": 1.0
+  },
+  {
+   "id": "s1",
+   "type": "shake",
+   "on": "c3",
+   "start": 0.3,
+   "duration": 0.6,
+   "strength": 0.7
+  },
+  {
+   "id": "z1",
+   "type": "zoom",
+   "on": "c3",
+   "start": 0.0,
+   "duration": 0.5,
+   "to": 1.3
+  },
+  {
+   "id": "f1",
+   "type": "filter",
+   "name": "Baisong Green",
+   "on": "c2",
+   "strength": 70
+  },
+  {
+   "id": "a1",
+   "type": "animation",
+   "on": "c1",
+   "name": "渐显",
+   "kind": "intro",
+   "duration": 0.5
+  },
+  {
+   "id": "tx1",
+   "type": "text",
+   "text": "THE BOSS HAS ARRIVED",
+   "start": 4.5,
+   "duration": 2.5,
+   "position": "upper",
+   "size": 14,
+   "intro": "弹入",
+   "font": "bold",
+   "shadow": true
+  },
+  {
+   "id": "tx2",
+   "type": "text",
+   "text": "size 8 sample",
+   "start": 0.0,
+   "duration": 2.0,
+   "position": [
+    0,
+    0.0
+   ],
+   "size": 8
+  },
+  {
+   "id": "k1",
+   "type": "keyframes",
+   "on": "c5",
+   "property": "scale",
+   "points": [
+    [
+     0,
+     1.0
+    ],
+    [
+     2.0,
+     1.15
+    ]
+   ]
+  },
+  {
+   "id": "cap",
+   "type": "captions",
+   "lines": [
+    {
+     "start": 0.2,
+     "end": 2.0,
+     "text": "He walks in."
+    },
+    {
+     "start": 2.2,
+     "end": 4.0,
+     "text": "Everyone notices."
+    }
+   ]
+  },
+  {
+   "id": "au1",
+   "type": "audio",
+   "file": "openrouter-audio-output.mp3",
+   "at": 0.5,
+   "volume": 0.8,
+   "fade_out": 1.0
+  }
+ ]
+}
