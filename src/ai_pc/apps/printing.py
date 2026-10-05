@@ -23,7 +23,7 @@ def default_printer():
 
     try:
         return win32print.GetDefaultPrinter()
-    except pywintypes.error:  # no default printer set, or the print spooler is off
+    except (RuntimeError, pywintypes.error):  # pywin32: "The default printer was not found."; or the spooler is off
         return None
 
 

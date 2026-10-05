@@ -9,7 +9,11 @@ from ai_pc.apps import printing
 
 
 def _fails(*_args):
-    raise pywintypes.error(2, "GetDefaultPrinter", "The system cannot find the file specified.")
+    raise pywintypes.error(1722, "EnumPrinters", "The RPC server is unavailable.")
+
+
+def _no_default(*_args):
+    raise RuntimeError("The default printer was not found.")  # what pywin32 raises when none is set
 
 
 @pytest.fixture
@@ -19,8 +23,9 @@ def doc(tmp_path):
     return str(path)
 
 
-def test_print_it_is_read_with_no_default_printer(monkeypatch, doc):
-    monkeypatch.setattr(win32print, "GetDefaultPrinter", _fails)
+@pytest.mark.parametrize("no_default", [_no_default, _fails])
+def test_print_it_is_read_with_no_default_printer(monkeypatch, doc, no_default):
+    monkeypatch.setattr(win32print, "GetDefaultPrinter", no_default)
     monkeypatch.setattr(win32print, "EnumPrinters", lambda *_args: [(0, "", "Microsoft Print to PDF", "")])
     op = printing.parse("print it", {"files": {"report.docx": doc}})
     assert op == {"op": "print", "file": doc, "printer": None, "copies": 1}
@@ -30,7 +35,7 @@ def test_print_it_is_read_with_no_default_printer(monkeypatch, doc):
 
 
 def test_a_named_printer_is_used_with_no_default_printer(monkeypatch, doc):
-    monkeypatch.setattr(win32print, "GetDefaultPrinter", _fails)
+    monkeypatch.setattr(win32print, "GetDefaultPrinter", _no_default)
     monkeypatch.setattr(win32print, "EnumPrinters", lambda *_args: [(0, "", "Microsoft Print to PDF", "")])
     op = printing.parse("print it on microsoft print to pdf, 2 copies", {"files": {"report.docx": doc}})
     assert op["printer"] == "Microsoft Print to PDF" and op["copies"] == 2
