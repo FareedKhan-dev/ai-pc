@@ -4,13 +4,11 @@
 
 Live sections briefly drive Calculator (UI Automation; the typed/vision parts also use the real keyboard/mouse for ~1 s).
 """
-import os
 import re
 import shutil
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ai_pc import apps
 from ai_pc.core.config import STATE  # noqa: E402
 from ai_pc.desktop import inputs  # noqa: E402

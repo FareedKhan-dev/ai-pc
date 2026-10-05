@@ -2,12 +2,10 @@
 
   python tests/integration/test_agent_llm.py [easy] [unknown] [replay] [keep]
 """
-import os
 import shutil
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ai_pc import apps
 from ai_pc.core.config import STATE  # noqa: E402
 from ai_pc.desktop import inputs  # noqa: E402

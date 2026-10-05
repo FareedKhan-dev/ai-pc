@@ -11,7 +11,6 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ai_pc import apps  # noqa: E402
 from ai_pc.core.config import STATE  # noqa: E402
 from ai_pc.desktop.agent import Agent  # noqa: E402

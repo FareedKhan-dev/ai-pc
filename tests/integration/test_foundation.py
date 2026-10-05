@@ -1,10 +1,8 @@
 """Foundation test on Calculator: app discovery, launch, UIA snapshot speed (vs naive walk), invoke speed, cleanup."""
-import os
 import statistics as st
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ai_pc import apps
 from ai_pc.desktop import inputs, observe, uia  # noqa: E402
 
