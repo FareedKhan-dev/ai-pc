@@ -87,6 +87,14 @@ not part of this repository. Note in particular:
 - The Vocaela click model weights are licensed for non-commercial use only. The TinyClick model (MIT) is the
   alternative for the desktop agent's vision lane.
 - Whisper (speech recognition, via faster-whisper) and the YuNet face detector are used under their own licences.
+
+## Logos in the documentation
+
+The program and model logos in `docs/assets/` belong to their owners and appear only to name the programs AI PC works
+with. Most are the programs' own icons, read from their installed program files. The rest come from
+`@lobehub/icons-static-svg` 1.95.1 (MIT), `@iconify-json/logos` 1.2.15 (CC0-1.0) and `simple-icons` 16.34.0
+(CC0-1.0), from the logos shipped with GNU Octave and Rust, and from the HandBrake project's GitHub picture.
+`docs/assets/logos/SOURCES.md` gives the source of each file.
 """
     (ROOT / "THIRD_PARTY_NOTICES.md").write_text(text, encoding="utf-8", newline="\n")
     print(f"THIRD_PARTY_NOTICES.md: {len(rows)} packages")
