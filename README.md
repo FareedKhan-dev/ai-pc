@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-dark.png">
-    <img src="docs/assets/hero-light.png" width="100%" alt="The GLM, Qwen, DeepSeek and Kimi logos in the middle, joined by lines to the logos of Word, Excel, PowerPoint, CapCut, Blender, GIMP, KiCad, VS Code and other Windows programs">
+    <img src="docs/assets/hero-light.png" width="100%" alt="The AI PC spark with eight model families around it (GLM, Qwen, DeepSeek, Kimi, Llama, Mistral, Gemini, GPT), and 118 programs and services on four orbits: Word, Excel, PowerPoint, CapCut, Blender, Photoshop, AutoCAD, VS Code, KiCad and more">
   </picture>
 </p>
 
@@ -16,14 +16,16 @@
   <a href="https://github.com/FareedKhan-dev/ai-pc/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/FareedKhan-dev/ai-pc/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Windows 11" src="https://img.shields.io/badge/Windows-11-0078D4">
   <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB">
-  <img alt="100+ programs" src="https://img.shields.io/badge/programs-100%2B-6366F1">
+  <img alt="118 programs and services" src="https://img.shields.io/badge/programs%20and%20services-118-6366F1">
+  <img alt="25 model providers" src="https://img.shields.io/badge/model%20providers-25-8B5CF6">
   <img alt="License: all rights reserved" src="https://img.shields.io/badge/license-all%20rights%20reserved-lightgrey">
 </p>
 
 <p align="center">
+  <a href="#supported">Supported</a> ·
+  <a href="#see-it-work">See it work</a> ·
   <a href="#why-not-screenshots-and-clicks">Why</a> ·
   <a href="#how-it-works">How it works</a> ·
-  <a href="#the-programs">Programs</a> ·
   <a href="#where-the-language-model-fits">Models</a> ·
   <a href="#getting-started">Getting started</a> ·
   <a href="docs/README.md">Docs</a>
@@ -32,30 +34,280 @@
 You ask in plain words, typed or spoken. AI PC hands the request to the program that can do it: JianYing renders the
 video, Word lays out the report, Blender renders the house, KiCad exports the schematic. The program runs where you
 cannot see it, so you keep using the PC. Its output is measured before you get a reply, and every change is saved as a
-version that "undo" can take back.
+version that "undo" can take back. The few requests that need a language model can use any of 25 providers, or a model
+running on your own PC.
+
+## Supported
+
+### Language models
+
+Any provider with an OpenAI-compatible API works. These have presets, so choosing one is a single command
+(`ai-pc models use groq`), and the four marked "on this PC" run the model locally, with nothing sent anywhere:
 
 <table>
   <tr>
-    <td width="50%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/bar-reply-dark.png">
-        <img src="docs/assets/screens/bar-reply-light.png" alt="The command bar after 'make it brighter': the photo selected in File Explorer was brightened from 33% to 41% average brightness, checked, and saved as car_edited.png">
-      </picture>
-    </td>
-    <td width="50%">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screens/bar-confirm-dark.png">
-        <img src="docs/assets/screens/bar-confirm-light.png" alt="The command bar showing Yes and No before posting car_edited.png to a Slack channel">
-      </picture>
-    </td>
+    <td align="center" width="88"><img src="docs/assets/tiles/nebius.png" width="44" alt="Nebius"><br><sub>Nebius</sub><br><sup>default</sup></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/openai.png" width="44" alt="OpenAI"><br><sub>OpenAI</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/gemini.png" width="44" alt="Google Gemini"><br><sub>Google Gemini</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/mistral.png" width="44" alt="Mistral AI"><br><sub>Mistral AI</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/groq.png" width="44" alt="Groq"><br><sub>Groq</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/together.png" width="44" alt="Together AI"><br><sub>Together AI</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/fireworks.png" width="44" alt="Fireworks AI"><br><sub>Fireworks AI</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/deepinfra.png" width="44" alt="DeepInfra"><br><sub>DeepInfra</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/openrouter.png" width="44" alt="OpenRouter"><br><sub>OpenRouter</sub></td>
   </tr>
   <tr>
-    <td><sub>A photo is selected in File Explorer. Press Ctrl+Alt+Space and type "make it brighter". The photo program measures the picture (33% average brightness), brightens it, measures again (41%) and saves version 1.</sub></td>
-    <td><sub>After a spoken "make it black and white", "send it to slack #general" means the edited photo. Nothing leaves the PC until you press Yes; the post is then read back from the channel.</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/huggingface.png" width="44" alt="Hugging Face"><br><sub>Hugging Face</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/deepseek.png" width="44" alt="DeepSeek"><br><sub>DeepSeek</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/alibabacloud.png" width="44" alt="Alibaba Qwen"><br><sub>Alibaba Qwen</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/glm.png" width="44" alt="Z.ai GLM"><br><sub>Z.ai GLM</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/moonshot.png" width="44" alt="Moonshot Kimi"><br><sub>Moonshot Kimi</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/xai.png" width="44" alt="xAI Grok"><br><sub>xAI Grok</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/cerebras.png" width="44" alt="Cerebras"><br><sub>Cerebras</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/sambanova.png" width="44" alt="SambaNova"><br><sub>SambaNova</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/nvidia.png" width="44" alt="NVIDIA NIM"><br><sub>NVIDIA NIM</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/novita.png" width="44" alt="Novita AI"><br><sub>Novita AI</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/cohere.png" width="44" alt="Cohere"><br><sub>Cohere</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/siliconflow.png" width="44" alt="SiliconFlow"><br><sub>SiliconFlow</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/ollama.png" width="44" alt="Ollama"><br><sub>Ollama</sub><br><sup>on this PC</sup></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/lmstudio.png" width="44" alt="LM Studio"><br><sub>LM Studio</sub><br><sup>on this PC</sup></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/llamacpp.png" width="44" alt="llama.cpp"><br><sub>llama.cpp</sub><br><sup>on this PC</sup></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/vllm.png" width="44" alt="vLLM"><br><sub>vLLM</sub><br><sup>on this PC</sup></td>
   </tr>
 </table>
 
-<sub>Both pictures come from the bar's integration test, which runs the real bar on a hidden desktop with a stand-in for Slack.</sub>
+Nebius Token Factory with GLM-5.3-Flash is the default. `ai-pc models` lists the presets and shows whose key is
+already set; [configuration](docs/configuration.md#language-models) has the details.
+
+### Programs and services
+
+All 118, by what they are for. [How each one is driven, and what is checked](#how-each-program-is-driven) lists them
+again with the file format, command line or API behind each.
+
+**Office and documents**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/word.png" width="44" alt="Word"><br><sub>Word</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/excel.png" width="44" alt="Excel"><br><sub>Excel</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/powerpoint.png" width="44" alt="PowerPoint"><br><sub>PowerPoint</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/outlook.png" width="44" alt="Outlook"><br><sub>Outlook</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/onenote.png" width="44" alt="OneNote"><br><sub>OneNote</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/access.png" width="44" alt="Access"><br><sub>Access</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/libreoffice.png" width="44" alt="LibreOffice"><br><sub>LibreOffice</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/powerbi.png" width="44" alt="Power BI"><br><sub>Power BI</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/calibre.png" width="44" alt="Calibre"><br><sub>Calibre</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/obsidian.png" width="44" alt="Obsidian"><br><sub>Obsidian</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/anki.png" width="44" alt="Anki"><br><sub>Anki</sub></td>
+  </tr>
+</table>
+
+**Video and sound**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/jianying.png" width="44" alt="JianYing"><br><sub>JianYing</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/capcut.png" width="44" alt="CapCut"><br><sub>CapCut</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/premiere.png" width="44" alt="Premiere Pro"><br><sub>Premiere Pro</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/davinci.png" width="44" alt="DaVinci Resolve"><br><sub>DaVinci Resolve</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/aftereffects.png" width="44" alt="After Effects"><br><sub>After Effects</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/shotcut.png" width="44" alt="Shotcut"><br><sub>Shotcut</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/handbrake.png" width="44" alt="HandBrake"><br><sub>HandBrake</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/ffmpeg.png" width="44" alt="FFmpeg"><br><sub>FFmpeg</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/vlc.png" width="44" alt="VLC"><br><sub>VLC</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/obs.png" width="44" alt="OBS Studio"><br><sub>OBS Studio</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/audacity.png" width="44" alt="Audacity"><br><sub>Audacity</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/lmms.png" width="44" alt="LMMS"><br><sub>LMMS</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/musescore.png" width="44" alt="MuseScore"><br><sub>MuseScore</sub></td>
+  </tr>
+</table>
+
+**Pictures and design**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/photoshop.png" width="44" alt="Photoshop"><br><sub>Photoshop</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/illustrator.png" width="44" alt="Illustrator"><br><sub>Illustrator</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/lightroom.png" width="44" alt="Lightroom"><br><sub>Lightroom</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/gimp.png" width="44" alt="GIMP"><br><sub>GIMP</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/krita.png" width="44" alt="Krita"><br><sub>Krita</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/rawtherapee.png" width="44" alt="RawTherapee"><br><sub>RawTherapee</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/drawio.png" width="44" alt="draw.io"><br><sub>draw.io</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/figma.png" width="44" alt="Figma"><br><sub>Figma</sub></td>
+  </tr>
+</table>
+
+**3D, CAD and making**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/blender.png" width="44" alt="Blender"><br><sub>Blender</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/autocad.png" width="44" alt="AutoCAD"><br><sub>AutoCAD</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/revit.png" width="44" alt="Revit"><br><sub>Revit</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/freecad.png" width="44" alt="FreeCAD"><br><sub>FreeCAD</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/openscad.png" width="44" alt="OpenSCAD"><br><sub>OpenSCAD</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/prusaslicer.png" width="44" alt="PrusaSlicer"><br><sub>PrusaSlicer</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/kicad.png" width="44" alt="KiCad"><br><sub>KiCad</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/arduino.png" width="44" alt="Arduino"><br><sub>Arduino</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/qgis.png" width="44" alt="QGIS"><br><sub>QGIS</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/unity.png" width="44" alt="Unity"><br><sub>Unity</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/godot.png" width="44" alt="Godot"><br><sub>Godot</sub></td>
+  </tr>
+</table>
+
+**Code and data**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/vscode.png" width="44" alt="VS Code"><br><sub>VS Code</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/visualstudio.png" width="44" alt="Visual Studio"><br><sub>Visual Studio</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/intellij.png" width="44" alt="IntelliJ IDEA"><br><sub>IntelliJ IDEA</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/pycharm.png" width="44" alt="PyCharm"><br><sub>PyCharm</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/webstorm.png" width="44" alt="WebStorm"><br><sub>WebStorm</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/clion.png" width="44" alt="CLion"><br><sub>CLion</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/goland.png" width="44" alt="GoLand"><br><sub>GoLand</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/rider.png" width="44" alt="Rider"><br><sub>Rider</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/phpstorm.png" width="44" alt="PhpStorm"><br><sub>PhpStorm</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/androidstudio.png" width="44" alt="Android Studio"><br><sub>Android Studio</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/python.png" width="44" alt="Python"><br><sub>Python</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/nodejs.png" width="44" alt="Node.js"><br><sub>Node.js</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/typescript.png" width="44" alt="TypeScript"><br><sub>TypeScript</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/java.png" width="44" alt="Java"><br><sub>Java</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/cplusplus.png" width="44" alt="C++"><br><sub>C++</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/dotnet.png" width="44" alt=".NET"><br><sub>.NET</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/go.png" width="44" alt="Go"><br><sub>Go</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/rust.png" width="44" alt="Rust"><br><sub>Rust</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/php.png" width="44" alt="PHP"><br><sub>PHP</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/flutter.png" width="44" alt="Flutter"><br><sub>Flutter</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/android.png" width="44" alt="Android SDK"><br><sub>Android SDK</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/git.png" width="44" alt="Git"><br><sub>Git</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/github.png" width="44" alt="GitHub"><br><sub>GitHub</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/docker.png" width="44" alt="Docker"><br><sub>Docker</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/jupyter.png" width="44" alt="Jupyter"><br><sub>Jupyter</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/postman.png" width="44" alt="Postman"><br><sub>Postman</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/postgresql.png" width="44" alt="PostgreSQL"><br><sub>PostgreSQL</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/mysql.png" width="44" alt="MySQL"><br><sub>MySQL</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/mongodb.png" width="44" alt="MongoDB"><br><sub>MongoDB</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/sqlite.png" width="44" alt="SQLite"><br><sub>SQLite</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/r.png" width="44" alt="R"><br><sub>R</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/octave.png" width="44" alt="GNU Octave"><br><sub>GNU Octave</sub></td>
+  </tr>
+</table>
+
+**Work apps**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/slack.png" width="44" alt="Slack"><br><sub>Slack</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/teams.png" width="44" alt="Teams"><br><sub>Teams</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/telegram.png" width="44" alt="Telegram"><br><sub>Telegram</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/whatsapp.png" width="44" alt="WhatsApp"><br><sub>WhatsApp</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/gmail.png" width="44" alt="Gmail"><br><sub>Gmail</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/gdrive.png" width="44" alt="Google Drive"><br><sub>Google Drive</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/gcalendar.png" width="44" alt="Google Calendar"><br><sub>Google Calendar</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/gdocs.png" width="44" alt="Google Docs"><br><sub>Google Docs</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/gsheets.png" width="44" alt="Google Sheets"><br><sub>Google Sheets</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/gslides.png" width="44" alt="Google Slides"><br><sub>Google Slides</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/gforms.png" width="44" alt="Google Forms"><br><sub>Google Forms</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/onedrive.png" width="44" alt="OneDrive"><br><sub>OneDrive</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/trello.png" width="44" alt="Trello"><br><sub>Trello</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/asana.png" width="44" alt="Asana"><br><sub>Asana</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/notion.png" width="44" alt="Notion"><br><sub>Notion</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/jira.png" width="44" alt="Jira"><br><sub>Jira</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/hubspot.png" width="44" alt="HubSpot"><br><sub>HubSpot</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/zoom.png" width="44" alt="Zoom"><br><sub>Zoom</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/dropbox.png" width="44" alt="Dropbox"><br><sub>Dropbox</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/discord.png" width="44" alt="Discord"><br><sub>Discord</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/spotify.png" width="44" alt="Spotify"><br><sub>Spotify</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/salesforce.png" width="44" alt="Salesforce"><br><sub>Salesforce</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/mailchimp.png" width="44" alt="Mailchimp"><br><sub>Mailchimp</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/brevo.png" width="44" alt="Brevo"><br><sub>Brevo</sub></td>
+  </tr>
+</table>
+
+**Social media**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/facebook.png" width="44" alt="Facebook"><br><sub>Facebook</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/instagram.png" width="44" alt="Instagram"><br><sub>Instagram</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/threads.png" width="44" alt="Threads"><br><sub>Threads</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/youtube.png" width="44" alt="YouTube"><br><sub>YouTube</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/tiktok.png" width="44" alt="TikTok"><br><sub>TikTok</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/linkedin.png" width="44" alt="LinkedIn"><br><sub>LinkedIn</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/x.png" width="44" alt="X"><br><sub>X</sub></td>
+  </tr>
+</table>
+
+**Shops and accounts**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/shopify.png" width="44" alt="Shopify"><br><sub>Shopify</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/woocommerce.png" width="44" alt="WooCommerce"><br><sub>WooCommerce</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/wordpress.png" width="44" alt="WordPress"><br><sub>WordPress</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/odoo.png" width="44" alt="Odoo"><br><sub>Odoo</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/quickbooks.png" width="44" alt="QuickBooks"><br><sub>QuickBooks</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/xero.png" width="44" alt="Xero"><br><sub>Xero</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/zoho.png" width="44" alt="Zoho Books"><br><sub>Zoho Books</sub></td>
+  </tr>
+</table>
+
+**Windows itself**
+
+<table>
+  <tr>
+    <td align="center" width="88"><img src="docs/assets/tiles/windows.png" width="44" alt="Windows"><br><sub>Windows</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/chrome.png" width="44" alt="Chrome"><br><sub>Chrome</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/7zip.png" width="44" alt="7-Zip"><br><sub>7-Zip</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/keepassxc.png" width="44" alt="KeePassXC"><br><sub>KeePassXC</sub></td>
+    <td align="center" width="88"><img src="docs/assets/tiles/autohotkey.png" width="44" alt="AutoHotkey"><br><sub>AutoHotkey</sub></td>
+  </tr>
+</table>
+
+## See it work
+
+The command bar doing work in nine well-known programs, from one sentence each:
+
+<table>
+  <tr>
+    <td width="33%"><a href="docs/assets/gallery/demo-word.png"><img src="docs/assets/gallery/demo-word.png" width="100%" alt="Word: a leave application, laid out and checked, its first page shown"></a></td>
+    <td width="33%"><a href="docs/assets/gallery/demo-powerpoint.png"><img src="docs/assets/gallery/demo-powerpoint.png" width="100%" alt="PowerPoint: a 10-slide deck on going solar, every text box checked for overflow"></a></td>
+    <td width="33%"><a href="docs/assets/gallery/demo-excel.png"><img src="docs/assets/gallery/demo-excel.png" width="100%" alt="Excel: a class marks sheet with live formulas, recalculated by Excel and checked against Python"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="docs/assets/gallery/demo-autocad.png"><img src="docs/assets/gallery/demo-autocad.png" width="100%" alt="A 10 marla house plan as an AutoCAD drawing, checked 17 of 17"></a></td>
+    <td width="33%"><a href="docs/assets/gallery/demo-blender.png"><img src="docs/assets/gallery/demo-blender.png" width="100%" alt="Blender: a gold 3D title for Khan Electronics, rendered in the background, checked 12 of 12"></a></td>
+    <td width="33%"><a href="docs/assets/gallery/demo-design.png"><img src="docs/assets/gallery/demo-design.png" width="100%" alt="An Instagram post for an Eid sale, designed as HTML and rendered by Chrome, checked 8 of 8"></a></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="docs/assets/gallery/demo-video.png"><img src="docs/assets/gallery/demo-video.png" width="100%" alt="A clip made small enough for WhatsApp with FFmpeg: 8 MB to 4.5 MB, 97 of 100 alike"></a></td>
+    <td width="33%"><a href="docs/assets/gallery/bar-reply.png"><img src="docs/assets/gallery/bar-reply.png" width="100%" alt="A photo selected in File Explorer, made brighter: 33% to 41%"></a></td>
+    <td width="33%"><a href="docs/assets/gallery/bar-confirm.png"><img src="docs/assets/gallery/bar-confirm.png" width="100%" alt="Sending the edited photo to Slack waits for Yes"></a></td>
+  </tr>
+</table>
+
+<sub>Every picture is the real bar, running on a hidden desktop. The programs did the work and their checks ran as
+usual. The language model's few answers came from a scripted stand-in: the slide deck and the workbook replay answers
+recorded from real runs, and the letter's was written for the picture. Slack was the test suite's stand-in.</sub>
 
 ## Contents
 
@@ -64,7 +316,7 @@ version that "undo" can take back.
 - [How it works](#how-it-works)
 - [Where the language model fits](#where-the-language-model-fits)
 - [Ways to ask](#ways-to-ask)
-- [The programs](#the-programs)
+- [How each program is driven](#how-each-program-is-driven)
 - [Safety and privacy](#safety-and-privacy)
 - [Measured results](#measured-results)
 - [Getting started](#getting-started)
@@ -386,20 +638,33 @@ Measured share of model calls in the lanes' conversation tests:
 
 In the video lane's chat-editing tests (296 turns), the model reads 5 to 10% of the turns, and a turn takes 0.5 to 1.2 s.
 
-Every role runs on GLM-5.3-Flash, the cheapest model on the Nebius account that also reads images ($0.15 per million
-input tokens and $0.50 per million output tokens, checked 2 October 2026). The choice came from
+By default every role runs on GLM-5.3-Flash, the cheapest model on the Nebius account that also reads images ($0.15 per
+million input tokens and $0.50 per million output tokens, checked 2 October 2026). The choice came from
 [`scripts/bench_models.py`](scripts/bench_models.py), which runs the real prompts against each candidate: on six real
 CapCut screens GLM-5.3-Flash was right 6 times out of 6 in 1.6 to 2.7 s, while DeepSeek-V4.1-Flash was also right 6 out
 of 6 but took 3.9 to 64 s. Provider latency has long tails (the same DeepSeek model's median went from 2 to 3.5 s up to
 39.8 s on 1 October 2026), so a slow call gets a second, identical request and the first answer wins. The role-to-model
-table is in [`core/config.py`](src/ai_pc/core/config.py), and any model on the account can take a role.
+table is in [`core/config.py`](src/ai_pc/core/config.py).
+
+Any of the 25 providers above can take over, for every role or for one:
+
+```powershell
+ai-pc models use openrouter                         # from now on (its key: ai-pc keys set OPENROUTER_API_KEY)
+ai-pc models use ollama --model gemma3              # a model on this PC: nothing leaves it
+ai-pc models test                                   # one short request: does it answer, and how fast
+$env:AI_PC_MODEL_VISION = "qwen/qwen3-vl-30b-a3b-instruct"    # one role only
+```
+
+Each provider's key comes from the same places as the others (the environment, `.env`, the vault) and is sent only to
+that provider. A provider that refuses an optional request field (usage counts while streaming, JSON mode) is asked
+again without it, once, and never sent it again.
 
 <table>
   <tr>
-    <td align="center" width="150"><img src="docs/assets/tiles/glm.png" width="48" alt="GLM-5.3-Flash"><br><sub>GLM-5.3-Flash</sub><br><sub><sup>every role</sup></sub></td>
-    <td align="center" width="150"><img src="docs/assets/tiles/qwen.png" width="48" alt="Qwen3.8-27B"><br><sub>Qwen3.8-27B</sub><br><sub><sup>the earlier fast planner</sup></sub></td>
-    <td align="center" width="150"><img src="docs/assets/tiles/deepseek.png" width="48" alt="DeepSeek-V4.1-Flash"><br><sub>DeepSeek-V4.1-Flash</sub><br><sub><sup>the earlier vision planner</sup></sub></td>
-    <td align="center" width="150"><img src="docs/assets/tiles/kimi.png" width="48" alt="Kimi-K3"><br><sub>Kimi-K3</sub><br><sub><sup>the earlier deep planner</sup></sub></td>
+    <td align="center" width="150"><img src="docs/assets/tiles/glm.png" width="44" alt="GLM-5.3-Flash"><br><sub>GLM-5.3-Flash</sub><br><sup>every role</sup></td>
+    <td align="center" width="150"><img src="docs/assets/tiles/qwen.png" width="44" alt="Qwen3.8-27B"><br><sub>Qwen3.8-27B</sub><br><sup>the earlier fast planner</sup></td>
+    <td align="center" width="150"><img src="docs/assets/tiles/deepseek.png" width="44" alt="DeepSeek-V4.1-Flash"><br><sub>DeepSeek-V4.1-Flash</sub><br><sup>the earlier vision planner</sup></td>
+    <td align="center" width="150"><img src="docs/assets/tiles/kimi.png" width="44" alt="Kimi-K3"><br><sub>Kimi-K3</sub><br><sup>the earlier deep planner</sup></td>
   </tr>
 </table>
 
@@ -430,115 +695,11 @@ open only while you hold the keys or the mic button is on. It follows your light
   <img src="docs/assets/screens/bar-open-light.png" width="600" alt="The command bar just opened, with car.jpg from File Explorer attached and suggestions: remove the background, make it brighter, make a passport photo, send it to slack">
 </picture>
 
-## The programs
+## How each program is driven
 
-Each program below is driven by one of the five ways in. Programs that are not installed the usual way live as
-portable copies in the project's `tools/` folder; each was downloaded from its publisher and checked against the
-published checksum, and against the signature where the publisher signs. `ai-pc doctor` lists every one with its
-version.
-
-### Video and sound
-
-<table>
-  <tr>
-    <td align="center" width="96"><img src="docs/assets/tiles/jianying.png" width="48" alt="JianYing"><br><sub>JianYing</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/capcut.png" width="48" alt="CapCut"><br><sub>CapCut</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/shotcut.png" width="48" alt="Shotcut"><br><sub>Shotcut</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/handbrake.png" width="48" alt="HandBrake"><br><sub>HandBrake</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/ffmpeg.png" width="48" alt="FFmpeg"><br><sub>FFmpeg</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/audacity.png" width="48" alt="Audacity"><br><sub>Audacity</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/lmms.png" width="48" alt="LMMS"><br><sub>LMMS</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/musescore.png" width="48" alt="MuseScore"><br><sub>MuseScore</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/obs.png" width="48" alt="OBS Studio"><br><sub>OBS Studio</sub></td>
-  </tr>
-</table>
-
-### Documents and office
-
-<table>
-  <tr>
-    <td align="center" width="96"><img src="docs/assets/tiles/word.png" width="48" alt="Word"><br><sub>Word</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/excel.png" width="48" alt="Excel"><br><sub>Excel</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/powerpoint.png" width="48" alt="PowerPoint"><br><sub>PowerPoint</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/access.png" width="48" alt="Access"><br><sub>Access</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/libreoffice.png" width="48" alt="LibreOffice"><br><sub>LibreOffice</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/powerbi.png" width="48" alt="Power BI"><br><sub>Power BI</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/calibre.png" width="48" alt="Calibre"><br><sub>Calibre</sub></td>
-  </tr>
-</table>
-
-### Pictures and design
-
-<table>
-  <tr>
-    <td align="center" width="96"><img src="docs/assets/tiles/gimp.png" width="48" alt="GIMP"><br><sub>GIMP</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/krita.png" width="48" alt="Krita"><br><sub>Krita</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/rawtherapee.png" width="48" alt="RawTherapee"><br><sub>RawTherapee</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/drawio.png" width="48" alt="draw.io"><br><sub>draw.io</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/figma.png" width="48" alt="Figma"><br><sub>Figma</sub></td>
-  </tr>
-</table>
-
-### 3D, CAD and making
-
-<table>
-  <tr>
-    <td align="center" width="96"><img src="docs/assets/tiles/blender.png" width="48" alt="Blender"><br><sub>Blender</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/freecad.png" width="48" alt="FreeCAD"><br><sub>FreeCAD</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/openscad.png" width="48" alt="OpenSCAD"><br><sub>OpenSCAD</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/prusaslicer.png" width="48" alt="PrusaSlicer"><br><sub>PrusaSlicer</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/kicad.png" width="48" alt="KiCad"><br><sub>KiCad</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/arduino.png" width="48" alt="Arduino"><br><sub>Arduino</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/qgis.png" width="48" alt="QGIS"><br><sub>QGIS</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/godot.png" width="48" alt="Godot"><br><sub>Godot</sub></td>
-  </tr>
-</table>
-
-### Code and data
-
-<table>
-  <tr>
-    <td align="center" width="96"><img src="docs/assets/tiles/vscode.png" width="48" alt="VS Code"><br><sub>VS Code</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/python.png" width="48" alt="Python"><br><sub>Python</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/nodejs.png" width="48" alt="Node.js"><br><sub>Node.js</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/php.png" width="48" alt="PHP"><br><sub>PHP</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/dotnet.png" width="48" alt=".NET"><br><sub>.NET</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/java.png" width="48" alt="Java"><br><sub>Java</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/go.png" width="48" alt="Go"><br><sub>Go</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/rust.png" width="48" alt="Rust"><br><sub>Rust</sub></td>
-  </tr>
-  <tr>
-    <td align="center" width="96"><img src="docs/assets/tiles/flutter.png" width="48" alt="Flutter"><br><sub>Flutter</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/android.png" width="48" alt="Android"><br><sub>Android</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/git.png" width="48" alt="Git"><br><sub>Git</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/postgresql.png" width="48" alt="PostgreSQL"><br><sub>PostgreSQL</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/mysql.png" width="48" alt="MySQL"><br><sub>MySQL</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/mongodb.png" width="48" alt="MongoDB"><br><sub>MongoDB</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/r.png" width="48" alt="R"><br><sub>R</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/octave.png" width="48" alt="GNU Octave"><br><sub>GNU Octave</sub></td>
-  </tr>
-</table>
-
-### Windows, work apps and online services
-
-<table>
-  <tr>
-    <td align="center" width="96"><img src="docs/assets/tiles/7zip.png" width="48" alt="7-Zip"><br><sub>7-Zip</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/keepassxc.png" width="48" alt="KeePassXC"><br><sub>KeePassXC</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/autohotkey.png" width="48" alt="AutoHotkey"><br><sub>AutoHotkey</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/slack.png" width="48" alt="Slack"><br><sub>Slack</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/telegram.png" width="48" alt="Telegram"><br><sub>Telegram</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/whatsapp.png" width="48" alt="WhatsApp"><br><sub>WhatsApp</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/teams.png" width="48" alt="Teams"><br><sub>Teams</sub></td>
-    <td align="center" width="96"><img src="docs/assets/tiles/gmail.png" width="48" alt="Gmail"><br><sub>Gmail</sub></td>
-  </tr>
-</table>
-
-Also through their official APIs: Microsoft 365 (Outlook, Calendar, OneDrive), Google (Calendar, Drive, Sheets, Docs,
-Slides, Forms), Trello, Asana, Notion, Jira, HubSpot, Zoom, Facebook, Instagram, Threads, YouTube, TikTok, LinkedIn,
-X, QuickBooks Online, TallyPrime, Xero, Zoho Books, FBR Digital Invoicing, Shopify, WooCommerce, Daraz, WordPress,
-Odoo, Mailchimp, Brevo, Dropbox, Discord, Spotify, Salesforce and GitHub. Windows itself (files, folders, the Recycle
-Bin, settings, OCR, printing, updates through winget) is a lane of its own.
+Programs that are not installed the usual way live as portable copies in the project's `tools/` folder; each was
+downloaded from its publisher and checked against the published checksum, and against the signature where the
+publisher signs. `ai-pc doctor` lists every one with its version.
 
 <details>
 <summary><b>How each program is driven, and what is checked</b></summary>
@@ -648,14 +809,15 @@ Dates and details are on each program's page in [docs/programs](docs/programs).
 
 ## Getting started
 
-You need Windows 11 (64-bit), [uv](https://docs.astral.sh/uv/) and Git. A Nebius API key is needed only for the
-requests that need the model.
+You need Windows 11 (64-bit), [uv](https://docs.astral.sh/uv/) and Git. A key for one model provider (or a model server
+on this PC, such as Ollama) is needed only for the requests that need the model.
 
 ```powershell
 git clone https://github.com/FareedKhan-dev/ai-pc.git
 cd ai-pc
 uv sync                                    # .venv with Python 3.12 and the exact versions in uv.lock
 uv run ai-pc keys set NEBIUS_API_KEY       # typed at a hidden prompt, kept in the encrypted vault
+uv run ai-pc models                        # or pick another provider: ai-pc models use groq (or ollama, openai ...)
 uv run ai-pc doctor                        # every program, model and package it uses: present or missing, with versions
 ```
 
@@ -678,6 +840,7 @@ uv run ai-pc video --help                               # each program also has 
 | `ai-pc agent` | The desktop agent, for programs that can only be used through their interface |
 | `ai-pc keys` | API keys in the encrypted vault |
 | `ai-pc doctor` | Checks that every program, model and package it uses is on this PC |
+| `ai-pc models` | Chooses the language-model provider and model, lists them and tests them |
 
 [Getting started](docs/getting-started.md) covers the details, and [configuration](docs/configuration.md) covers keys,
 data folders and model choices.

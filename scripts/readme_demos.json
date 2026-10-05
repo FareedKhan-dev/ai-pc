@@ -1,0 +1,437 @@
+{
+ "_about": "What the README demo pictures (scripts/readme_demos.py) answer in place of the language model. The deck and workbook answers were recorded from real runs (GLM-5.3-Flash, 5 October 2026); the letter was written for the picture.",
+ "deck": {
+  "title": "Going Solar at Home",
+  "subtitle": "A practical guide for homeowners",
+  "theme": "modern",
+  "accent": null,
+  "meta": {
+   "author": "Presentation Designer",
+   "org": "Solar Advisory",
+   "date": "05 October 2026"
+  },
+  "slides": [
+   {
+    "layout": "title",
+    "title": "Going Solar at Home",
+    "subtitle": "A practical guide for homeowners",
+    "notes": "Welcome everyone. Today we'll walk through what going solar means for your home, from understanding the basics to maintaining a system after installation. Feel free to ask questions at any point."
+   },
+   {
+    "layout": "agenda",
+    "items": [
+     "Why homeowners consider solar",
+     "How a home solar system works",
+     "Is your home a good fit?",
+     "Costs and financing options",
+     "Choosing an installer",
+     "Installation and beyond"
+    ],
+    "notes": "Here's our roadmap for the session. We'll start with the reasons homeowners go solar, then cover how systems work, whether your roof is suitable, what it costs, how to pick an installer, and what happens after installation."
+   },
+   {
+    "layout": "bullets",
+    "title": "Homeowners go solar for three main reasons",
+    "bullets": [
+     "Lower monthly electricity bills",
+     "Greater energy independence",
+     "Reducing your environmental footprint"
+    ],
+    "notes": "Most homeowners are motivated by a combination of these three factors. For some, savings dominate; for others, it's about resilience during outages or personal values. Your own priorities will shape which system and financing make sense."
+   },
+   {
+    "layout": "process",
+    "title": "A home solar system works in four steps",
+    "steps": [
+     {
+      "title": "Sunlight hits panels",
+      "text": "Panels on your roof convert sunlight into direct current electricity."
+     },
+     {
+      "title": "Inverter converts power",
+      "text": "The inverter turns DC electricity into the AC power your home uses."
+     },
+     {
+      "title": "Home uses the electricity",
+      "text": "Your appliances run on solar power first, before drawing from the grid."
+     },
+     {
+      "title": "Excess is exported or stored",
+      "text": "Surplus power goes to a battery or back to the grid, depending on your setup."
+     }
+    ],
+    "notes": "The flow is simple: panels generate DC power, the inverter converts it to AC, your home uses it, and any surplus is stored in a battery or fed back to the grid. Net metering rules in your area determine how exported power is credited."
+   },
+   {
+    "layout": "two_column",
+    "title": "A good solar home has sun, space and a sound roof",
+    "left": {
+     "heading": "What helps",
+     "bullets": [
+      "South-facing roof (in the northern hemisphere)",
+      "Little shade from trees or buildings",
+      "Roof in good structural condition",
+      "Daytime-heavy electricity use"
+     ]
+    },
+    "right": {
+     "heading": "What complicates things",
+     "bullets": [
+      "Heavy shading for much of the day",
+      "Old roof needing replacement soon",
+      "Historic or HOA restrictions",
+      "Very low electricity consumption"
+     ]
+    },
+    "notes": "Not every home is equally suited to solar. Orientation, shading and roof condition matter most. If your roof needs replacing soon, it's often cheaper to do that before installing panels. A site assessment will confirm your situation."
+   },
+   {
+    "layout": "comparison",
+    "title": "Buy, finance or lease: three ways to go solar",
+    "left": {
+     "heading": "Buy outright",
+     "bullets": [
+      "Lowest total cost over time",
+      "You own the system and incentives",
+      "Highest upfront investment"
+     ]
+    },
+    "right": {
+     "heading": "Loan or lease",
+     "bullets": [
+      "Little or no upfront cost",
+      "Fixed monthly payments",
+      "Leasing means the installer owns the system"
+     ]
+    },
+    "notes": "Buying outright maximises long-term savings but requires capital. Loans spread the cost while you keep ownership benefits. Leases and power purchase agreements lower the barrier but typically offer smaller savings since you don't own the equipment. Compare total costs over the full term, not just monthly payments."
+   },
+   {
+    "layout": "process",
+    "title": "From first call to first kilowatt: the installation journey",
+    "steps": [
+     {
+      "title": "Site assessment",
+      "text": "An installer inspects your roof, shading and electrical panel."
+     },
+     {
+      "title": "Design and quote",
+      "text": "You receive a system design, production estimate and pricing."
+     },
+     {
+      "title": "Permits and approvals",
+      "text": "The installer handles local permits and utility interconnection."
+     },
+     {
+      "title": "Installation day",
+      "text": "Most residential installs take one to three days."
+     },
+     {
+      "title": "Inspection and activation",
+      "text": "Final inspection, utility permission, then your system goes live."
+     }
+    ],
+    "notes": "The timeline is mostly waiting on permits and utility approval rather than the physical work itself. Ask your installer for a realistic schedule upfront. Once activated, monitoring apps let you track production from day one."
+   },
+   {
+    "layout": "bullets",
+    "title": "Choose an installer the way you'd choose any contractor",
+    "bullets": [
+     "Get at least three quotes",
+     "Check licences, insurance and certifications",
+     "Read reviews and ask for references",
+     "Compare warranties on panels and workmanship",
+     "Beware of high-pressure sales tactics"
+    ],
+    "notes": "Quotes can vary widely for the same equipment, so comparison shopping pays off. Verify credentials and ask who will actually perform the work. A reputable installer will welcome questions and never pressure you to sign on the spot."
+   },
+   {
+    "layout": "bullets",
+    "title": "Solar systems need little, but not zero, attention",
+    "bullets": [
+     "Panels are typically cleaned by rain",
+     "Monitor output through your app",
+     "Keep an eye on inverter status lights",
+     "Schedule a professional check every few years",
+     "Warranties often run 20-25 years on panels"
+    ],
+    "notes": "Maintenance is minimal: rain handles most cleaning, and monitoring apps flag problems early. The inverter is the component most likely to need replacement within the system's life. Keep your warranty documents and installer contact details handy."
+   },
+   {
+    "layout": "closing",
+    "title": "Thank you",
+    "subtitle": "Ready to explore solar for your home? Start with a site assessment.",
+    "contact": "questions@solaradvisory.example",
+    "notes": "Thank you for your time. Your next step is simple: book a site assessment with a reputable installer and compare quotes. We're happy to answer any remaining questions now."
+   }
+  ],
+  "target_slides": 10
+ },
+ "workbook": {
+  "title": "Class Marks Sheet",
+  "theme": "modern",
+  "accent": null,
+  "sheets": [
+   {
+    "name": "Marks",
+    "kind": "table",
+    "columns": [
+     {
+      "name": "Roll No",
+      "type": "integer"
+     },
+     {
+      "name": "Student Name",
+      "type": "text"
+     },
+     {
+      "name": "Maths",
+      "type": "integer"
+     },
+     {
+      "name": "Science",
+      "type": "integer"
+     },
+     {
+      "name": "English",
+      "type": "integer"
+     },
+     {
+      "name": "History",
+      "type": "integer"
+     },
+     {
+      "name": "Total",
+      "type": "integer",
+      "formula": "[Maths] + [Science] + [English] + [History]"
+     },
+     {
+      "name": "Percentage",
+      "type": "percent",
+      "formula": "ROUND([Total] / 400 * 100, 1)"
+     },
+     {
+      "name": "Grade",
+      "type": "text",
+      "formula": "IF([Percentage] >= 90, \"A+\", IF([Percentage] >= 75, \"A\", IF([Percentage] >= 60, \"B\", IF([Percentage] >= 50, \"C\", IF([Percentage] >= 40, \"D\", \"F\")))))"
+     }
+    ],
+    "rows": [
+     [
+      1,
+      "Aarav Sharma",
+      88,
+      92,
+      79,
+      85,
+      null,
+      null,
+      null
+     ],
+     [
+      2,
+      "Priya Nair",
+      76,
+      81,
+      88,
+      74,
+      null,
+      null,
+      null
+     ],
+     [
+      3,
+      "Rohan Mehta",
+      65,
+      58,
+      72,
+      69,
+      null,
+      null,
+      null
+     ],
+     [
+      4,
+      "Sara Khan",
+      91,
+      87,
+      94,
+      90,
+      null,
+      null,
+      null
+     ],
+     [
+      5,
+      "Dev Patel",
+      54,
+      62,
+      49,
+      58,
+      null,
+      null,
+      null
+     ],
+     [
+      6,
+      "Ananya Iyer",
+      83,
+      79,
+      85,
+      88,
+      null,
+      null,
+      null
+     ],
+     [
+      7,
+      "Kabir Singh",
+      47,
+      55,
+      61,
+      52,
+      null,
+      null,
+      null
+     ],
+     [
+      8,
+      "Meera Das",
+      70,
+      74,
+      66,
+      78,
+      null,
+      null,
+      null
+     ]
+    ],
+    "total": {
+     "Maths": "average",
+     "Science": "average",
+     "English": "average",
+     "History": "average",
+     "Total": "sum",
+     "Percentage": "average"
+    },
+    "highlight": [
+     {
+      "column": "Percentage",
+      "rule": "scale",
+      "value": null
+     },
+     {
+      "column": "Grade",
+      "rule": "=",
+      "value": "F"
+     }
+    ]
+   },
+   {
+    "name": "Summary",
+    "kind": "summary",
+    "title": "Class Summary",
+    "metrics": [
+     {
+      "label": "Class Average %",
+      "fn": "average",
+      "of": "Percentage",
+      "source": "Marks"
+     },
+     {
+      "label": "Highest Total",
+      "fn": "max",
+      "of": "Total",
+      "source": "Marks"
+     },
+     {
+      "label": "Lowest Total",
+      "fn": "min",
+      "of": "Total",
+      "source": "Marks"
+     },
+     {
+      "label": "Students Passed",
+      "fn": "count",
+      "of": "Grade",
+      "where": {
+       "Grade": "F"
+      },
+      "source": "Marks"
+     }
+    ],
+    "groups": [
+     {
+      "title": "Average Marks by Subject",
+      "source": "Marks",
+      "columns": [
+       "Maths",
+       "Science",
+       "English",
+       "History"
+      ],
+      "fn": "average",
+      "label": "Subject",
+      "chart": "column"
+     },
+     {
+      "title": "Total Marks by Student",
+      "source": "Marks",
+      "by": "Student Name",
+      "values": [
+       {
+        "of": "Total",
+        "fn": "sum"
+       }
+      ],
+      "chart": "bar"
+     }
+    ]
+   }
+  ]
+ },
+ "letter": {
+  "doctype": "application",
+  "title": "Leave Application",
+  "language": "en",
+  "theme": "academic",
+  "accent": null,
+  "meta": {
+   "date": "5 October 2026"
+  },
+  "blocks": [
+   {
+    "type": "address",
+    "lines": [
+     "The Principal"
+    ]
+   },
+   {
+    "type": "date",
+    "text": "5 October 2026"
+   },
+   {
+    "type": "subject",
+    "text": "Application for three days' leave"
+   },
+   {
+    "type": "salutation",
+    "text": "Respected Sir/Madam,"
+   },
+   {
+    "type": "paragraph",
+    "text": "With due respect, I am Fatima Noor, a student of class 9-B. I have had a high fever since yesterday, and the doctor has advised me to rest at home."
+   },
+   {
+    "type": "paragraph",
+    "text": "I request you to grant me leave for three days. I will catch up on the lessons I miss and complete my homework when I return."
+   },
+   {
+    "type": "closing",
+    "text": "Yours obediently,",
+    "name": "Fatima Noor",
+    "title": "Class 9-B"
+   }
+  ]
+ }
+}

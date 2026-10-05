@@ -47,10 +47,15 @@ They write only under `out/_tests/` and never touch the real Desktop, Documents 
 
 ## The README's pictures
 
-The hero picture and the logo tiles in `docs/assets/` are built by `uv run python scripts/readme_assets.py` from the
-logos in `docs/assets/logos/` (their sources are in `SOURCES.md` there). To add a program, put its logo there as a
-256 px PNG, add it to the hero's lists in the script if it belongs there, and run the script again. The command bar
-pictures in `docs/assets/screens/` come from `tests/integration/test_bar.py`.
+The hero picture, the logo tiles and the gallery cards in `docs/assets/` are built by
+`uv run python scripts/readme_assets.py` from the logos in `docs/assets/logos/` (their sources are in `SOURCES.md`
+there) and the pictures in `docs/assets/screens/`. To add a program, put its logo there as a 256 px PNG, add it to the
+hero's lists in the script (the script stops if a program logo is missing from the hero or listed twice), and run it
+again.
+
+The command bar pictures come from the real bar on the hidden desktop: `uv run python scripts/readme_demos.py` takes
+the seven program demos, with a scripted stand-in for the language model (`scripts/readme_demos.json`), and
+`tests/integration/test_bar.py` takes the photo and Slack ones.
 
 ## Dependencies
 

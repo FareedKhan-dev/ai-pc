@@ -9,14 +9,25 @@ All notable changes to this project are written down here. The format follows
 
 - `ai-pc doctor`: checks that every program, model, environment and Python package AI PC uses is on this PC, shows
   their versions, and names folders in `tools/` that no code uses. `--json` gives the same with paths.
-- `scripts/readme_assets.py` builds the README's hero picture (light and dark) and the logo tiles from
-  `docs/assets/logos/`, with the hidden headless browser.
+- Language models from any OpenAI-compatible provider: 25 presets (Nebius, OpenAI, Google Gemini, Mistral, Groq,
+  Together, Fireworks, DeepInfra, OpenRouter, Hugging Face, DeepSeek, Alibaba Qwen, Z.ai, Moonshot, xAI, Cerebras,
+  SambaNova, NVIDIA NIM, Novita, Cohere, SiliconFlow, and Ollama, LM Studio, llama.cpp and vLLM on the PC) plus any
+  other address. `ai-pc models` lists, chooses (`use`), shows, tests and resets them; a model per role, keys from the
+  usual places, and a price for the cost line. Nebius with GLM-5.3-Flash stays the default
+  ([decision record 0005](docs/adr/0005-any-openai-compatible-provider.md)).
+- The model client leaves out optional fields a provider does not take (streaming usage counts, JSON mode,
+  temperature), sends `max_completion_tokens` where a provider wants it, and needs no key for local servers.
+- `ai-pc doctor` shows the language model in use and whether its key is set.
+- The command bar shows the first page of a document, deck or drawing it made, as it already did for photos and videos.
+- `scripts/readme_assets.py` builds the README's hero (light and dark), the logo tiles and the gallery cards;
+  `scripts/readme_demos.py` takes the gallery's command bar pictures on the hidden desktop.
 
 ### Changed
 
-- The README is a full product page: how requests become files and API calls, why AI PC does not drive programs
-  through screenshots (with the research and our own CapCut run), eleven diagrams, every program with its logo, the
-  command bar's own screenshots, and the measured results.
+- The README is a full product page: every supported model provider and all 118 programs and services at the top,
+  a gallery of the command bar at work in nine programs, how requests become files and API calls, why AI PC does not
+  drive programs through screenshots (with the research and our own CapCut run), eleven diagrams, and the measured
+  results.
 - `THIRD_PARTY_NOTICES.md` says where the logos in `docs/assets/` come from.
 
 - `packaging` is a direct dependency (the doctor compares installed versions with the requirements); it was already

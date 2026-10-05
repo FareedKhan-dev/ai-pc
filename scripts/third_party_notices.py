@@ -91,7 +91,7 @@ not part of this repository. Note in particular:
 ## Logos in the documentation
 
 The program and model logos in `docs/assets/` belong to their owners and appear only to name the programs AI PC works
-with. Most are the programs' own icons, read from their installed program files. The rest come from
+with. Some are the programs' own icons, read from their installed program files; the others come from
 `@lobehub/icons-static-svg` 1.95.1 (MIT), `@iconify-json/logos` 1.2.15 (CC0-1.0) and `simple-icons` 16.34.0
 (CC0-1.0), from the logos shipped with GNU Octave and Rust, and from the HandBrake project's GitHub picture.
 `docs/assets/logos/SOURCES.md` gives the source of each file.
