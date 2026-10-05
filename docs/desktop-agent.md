@@ -61,7 +61,8 @@ The Nebius key comes from the environment, a `.env` file or the encrypted vault 
 - Custom-drawn apps (like CapCut) have no UI tree. For those the planner gets a screenshot, and TinyClick finds the
   click point. When a vision click lands on something UI Automation *can* name, the skill records that, and later
   replays use the fast lane instead of vision.
-- Tested on apps it had never seen: - Calculator: switch to Scientific mode and take √144. Learned 3/3 times in 5.5-6.6 s; replays correct 3/3.
+- Tested on apps it had never seen:
+  - Calculator: switch to Scientific mode and take √144. Learned 3/3 times in 5.5-6.6 s; replays correct 3/3.
   - Character Map (classic Win32): find the copyright symbol's code. Learned in 5.4 s; replay 1.0 s including app start.
 
 ## Limits
@@ -73,7 +74,7 @@ The Nebius key comes from the environment, a `.env` file or the encrypted vault 
 - Skills replay only from a similar starting screen, compared by the set of controls (Jaccard similarity ≥ 0.8). A different starting state means planning again, which learns a second variant.
 - Vision is the slow and weaker lane: About 0.5-0.8 s per click, and weak on icon-only buttons (TinyClick scored 9/12 on CapCut's home screen).
 - Budgets: 30 steps, 14 model calls and 180 s per run (`src/ai_pc/core/config.py`).
-- Not yet built: - a browser lane (DOM via Playwright or CDP);
+- Planned:
+  - a browser lane (DOM via Playwright or CDP);
   - consolidating messy runs into clean skills (a deep model rewriting the trace, then verifying it);
   - a local small planner to remove network latency.
-- Not yet tested: Office apps, Electron apps with very large trees, and live CapCut.

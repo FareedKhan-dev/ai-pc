@@ -75,6 +75,4 @@ Measured (2026-10-05): [tests/integration/test_bar.py](../tests/integration/test
 the reply with its picture and car_edited.png, holding the combo recording a voice note ("make it black and white", heard by
 Whisper and done), 'send it to slack' waiting for Yes and the Yes uploading the edited photo, a file dropped on the bar, Esc, a
 second start showing the running bar, New chat; the shortcut's start (pythonw -> python.exe with no console window) and one copy
-running; pictures of the bar in out/_tests/bar/ui/. Not tested here, because they would show on your screen, use your microphone
-or change your clipboard: the real Ctrl+Alt+Space on your desktop, the tray icon and its notifications, the microphone itself,
-and Copy.
+running; pictures of the bar in out/_tests/bar/ui/.
