@@ -28,8 +28,9 @@ All notable changes to this project are written down here. The format follows
   a gallery of the command bar at work in nine programs, how requests become files and API calls, why AI PC does not
   drive programs through screenshots (with the research and our own CapCut run), eleven diagrams, and the measured
   results.
+- Under the README's title, a short table compares vision agents with AI PC on model calls, speed and cost, each
+  figure linked to its source or to our own runs.
 - `THIRD_PARTY_NOTICES.md` says where the logos in `docs/assets/` come from.
-
 - `packaging` is a direct dependency (the doctor compares installed versions with the requirements); it was already
   installed through matplotlib.
 

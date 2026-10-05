@@ -12,6 +12,18 @@
   It writes each program's own files, or calls its official interface, and the program renders the result.
 </p>
 
+| | Vision + text agents<br><sub>screenshot, model, click, repeat</sub> | AI PC<br><sub>writes the program's file, checks the result</sub> |
+|---|---|---|
+| Model calls | One per step, tens per task, each carrying a screenshot of 1,100 to 2,500 tokens | None for at least 9 in 10 chat turns in our tests; a few to plan a deck or a video |
+| Speed | Tens of minutes per task: changing a document's line spacing took 12 minutes, where a person needs under 30&nbsp;s | About 2&nbsp;s for a photo edit, 22&nbsp;s for a 10-slide deck, about 3.3 minutes for a finished one-minute video |
+| Model cost | Paid at every step, finished or not: $0.006 for our failed CapCut attempt below | $0 when the rules read the request; $0.002 for a 10-slide deck, $0.009 for a one-minute video |
+| A video edit | Asked to add a clip in CapCut, apply a filter and export, our screen agent gave up after 155&nbsp;s and 13 model calls | Through JianYing: the project is written in under a second, and a 15-second reel exports in 25 to 40&nbsp;s |
+
+<sub>Vision-agent figures: [OSWorld-Human](https://arxiv.org/abs/2506.16042), the [OpenAI](https://developers.openai.com/api/docs/guides/images-vision)
+and [Google](https://ai.google.dev/gemini-api/docs/media-resolution) API docs, and [our own CapCut runs](#what-we-saw-ourselves).
+AI PC figures: our test runs, in [Measured results](#measured-results) and the [program pages](docs/programs). Every cost
+here is on the same model, GLM-5.3-Flash. More in [Why not screenshots and clicks?](#why-not-screenshots-and-clicks)</sub>
+
 <p align="center">
   <a href="https://github.com/FareedKhan-dev/ai-pc/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/FareedKhan-dev/ai-pc/actions/workflows/ci.yml/badge.svg"></a>
   <img alt="Windows 11" src="https://img.shields.io/badge/Windows-11-0078D4">
@@ -795,7 +807,7 @@ runs:
 
 | Suite | What it covers | Result |
 |---|---|---|
-| `tests/unit` | Routing, file references, the command line, layers, the doctor; no programs needed (CI runs these) | 446 passed in about 15 s |
+| `tests/unit` | Routing, file references, the command line, layers, the doctor; no programs needed (CI runs these) | 464 passed in about 14 s |
 | `test_popular.py` | Over 40 desktop programs really run, from Godot and KiCad to PostgreSQL and the Android SDK | 180 of 180 |
 | `test_apps.py` | 29 smaller programs, from OCR and PC care to statistics checked against textbook p-values | 103 of 103 in 27 s |
 | `test_aipc.py` | The one chat: 45 requests routed, steps, references, the Telegram bridge, the browser page | 30 of 30 in 36 s |
