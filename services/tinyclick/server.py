@@ -37,7 +37,7 @@ if hasattr(torch, "xpu") and torch.xpu.is_available():
 else:
     DEV, DT, DEVNAME = "cpu", torch.float32, "CPU"
 model.to(DEV, DT)
-ORIG_ENCODE = model._encode_image
+ORIG_FEATURES = model.get_image_features
 LOCK = threading.Lock()
 
 
@@ -58,6 +58,13 @@ def prompt(cmd):
     return ("What to do to execute the command? " + cmd.strip()).lower()
 
 
+def tokens(cmd):
+    """The command's tokens as the processor builds them: the image's placeholders, then <s> prompt </s>."""
+    tok = processor.tokenizer
+    text = processor.image_token * processor.num_image_tokens + tok.bos_token + prompt(cmd) + tok.eos_token
+    return tok(text, add_special_tokens=False, return_tensors="pt")["input_ids"]
+
+
 def set_image(img):
     """Preprocess + encode the screenshot once; every command on it then reuses the encoded image."""
     img = img.convert("RGB")
@@ -65,11 +72,11 @@ def set_image(img):
         raise ValueError("image too large")
     with LOCK:
         t0 = time.perf_counter()
-        enc = processor(images=img, text=prompt("x"), return_tensors="pt", do_resize=True)
+        enc = processor(images=img, text=prompt("x"), return_tensors="pt")
         pv = enc["pixel_values"].to(DEV, DT)
         t1 = time.perf_counter()
         with torch.inference_mode():
-            feats = ORIG_ENCODE(pv)
+            feats = ORIG_FEATURES(pv)
         sync()
         t2 = time.perf_counter()
         buf = io.BytesIO()
@@ -87,17 +94,17 @@ def find(cmd, beams):
         if S.img is None:
             raise ValueError("load a screenshot first")
         feats = S.feats
-        model._encode_image = lambda x: feats  # image already encoded
+        model.get_image_features = lambda *a, **k: feats  # image already encoded
         try:
             t0 = time.perf_counter()
-            ids = processor.tokenizer(prompt(cmd), return_tensors="pt")["input_ids"].to(DEV)
+            ids = tokens(cmd).to(DEV)
             t1 = time.perf_counter()
             with torch.inference_mode():
                 out = model.generate(input_ids=ids, pixel_values=S.pv, num_beams=max(1, min(int(beams), 5)), max_new_tokens=16, do_sample=False)
             sync()
             t2 = time.perf_counter()
         finally:
-            model._encode_image = ORIG_ENCODE
+            model.get_image_features = ORIG_FEATURES
         raw = processor.batch_decode(out.cpu(), skip_special_tokens=False)[0]
         m = re.search(r"</s><s>(<[^>]+>|[^<\s]+)\s*([^<]*?)(<loc_\d+>.*)", raw)
         pt = re.findall(r"<loc_(\d+)><loc_(\d+)>", raw)

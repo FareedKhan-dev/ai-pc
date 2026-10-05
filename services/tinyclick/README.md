@@ -11,11 +11,18 @@ It runs in its own environment because it needs PyTorch built for Intel GPUs:
 ```powershell
 uv venv .venv-xpu --python 3.12
 uv pip install --python .venv-xpu\Scripts\python.exe -r services\tinyclick\requirements.txt --index-strategy unsafe-best-match
+.venv-xpu\Scripts\python.exe services\tinyclick\model.py --download-only   # the original weights, into models\hf
+.venv-xpu\Scripts\python.exe services\tinyclick\convert.py                 # into models\tinyclick
 services\tinyclick\run.bat        # or: ai-pc agent grounder start (starts it when needed)
 ```
+
+The model runs on the Florence-2 code that ships with transformers. `convert.py` renames the downloaded weights into
+that layout once, so no code from the model's repository is ever run (no `trust_remote_code`). The converted model
+gives the same click points as the original code: 9 of the 12 test clicks on CapCut's home screen, point for point.
 
 | File | What it is |
 |---|---|
 | `server.py` | the HTTP server and its test page (`ui.html`) |
-| `model.py` | loading TinyClick (weights cached in `models/hf`) and the 12-query accuracy and timing test |
+| `model.py` | loading TinyClick (from `models/tinyclick`) and the 12-query accuracy and timing test |
+| `convert.py` | turns the downloaded weights into transformers' built-in Florence-2 layout |
 | `run.bat` | starts the server from the project folder |
