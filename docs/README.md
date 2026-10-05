@@ -7,6 +7,7 @@
 - [Architecture](architecture.md): how the pieces fit, the repository layout, the rules every program follows
 - [Development](development.md): tests, linting, adding a program, releases
 - [Safety](safety.md): what the agents will never do, and how that is enforced
+- [Decision records](adr/README.md): why the big choices were made
 
 ## Using it
 

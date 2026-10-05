@@ -20,6 +20,8 @@
 
 ## Principles every program follows
 
+The reasons behind these are in the [decision records](adr/README.md).
+
 1. **Code first, not clicks.** A program writes the application's own file format (a JianYing draft, a .docx, a
    DXF, a Blender scene) or calls its official command line or API, then lets the application render. Driving a
    user interface is the last resort, used only by the desktop agent.
