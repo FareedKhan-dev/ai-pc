@@ -64,7 +64,8 @@ venv/
 # Editors and OS files (machine-specific tools go in .git/info/exclude)
 # ---------------------------------------------------------------------------
 .idea/
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 *.swp
 *.log
 @AutomationLog.txt
