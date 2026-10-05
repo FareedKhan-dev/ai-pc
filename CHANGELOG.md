@@ -5,6 +5,16 @@ All notable changes to this project are written down here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `ai-pc doctor`: checks that every program, model, environment and Python package AI PC uses is on this PC, shows
+  their versions, and names folders in `tools/` that no code uses. `--json` gives the same with paths.
+
+### Changed
+
+- `packaging` is a direct dependency (the doctor compares installed versions with the requirements); it was already
+  installed through matplotlib.
+
 ## [0.1.0] - 2026-10-05
 
 ### Added

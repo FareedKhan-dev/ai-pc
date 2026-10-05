@@ -33,6 +33,7 @@ dependencies = [
     "numpy>=2.5.3",
     "opencv-python-headless>=5.0.0.93",
     "openpyxl>=3.1.5",
+    "packaging>=26.3",
     "pandas>=3.0.6",  # notebooks the Jupyter program writes run with this environment
     "pillow>=12.3.0",
     "psutil>=7.2.2",
@@ -124,13 +125,13 @@ line-ending = "lf"
 [tool.mypy]
 python_version = "3.12"
 # Typed so far; add modules here as they get annotations (strict for these, imports analysed but not reported)
-files = ["src/ai_pc/core/paths.py", "src/ai_pc/core/keys.py", "src/ai_pc/core/vault.py", "src/ai_pc/cli/main.py", "src/ai_pc/cli/keys.py"]
+files = ["src/ai_pc/core/paths.py", "src/ai_pc/core/keys.py", "src/ai_pc/core/vault.py", "src/ai_pc/cli/main.py", "src/ai_pc/cli/keys.py", "src/ai_pc/cli/doctor.py"]
 strict = true
 warn_unreachable = true
 follow_imports = "silent"
 
 [[tool.mypy.overrides]]
-module = ["win32crypt", "pycapcut.*", "pyJianYingDraft.*", "uiautomation.*", "comtypes.*", "ezdxf.*", "genanki.*", "segno.*", "ifcopenshell.*", "faster_whisper.*"]
+module = ["win32api", "win32crypt", "pycapcut.*", "pyJianYingDraft.*", "uiautomation.*", "comtypes.*", "ezdxf.*", "genanki.*", "segno.*", "ifcopenshell.*", "faster_whisper.*"]
 ignore_missing_imports = true
 
 [tool.uv]

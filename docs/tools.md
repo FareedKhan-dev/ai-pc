@@ -60,3 +60,16 @@ A program that is missing makes only its own requests fail, with a message that 
 | `tools/rust/` | [rustrover](../src/ai_pc/apps/rustrover.py) |
 | `tools/shotcut/` | [shotcut](../src/ai_pc/apps/shotcut.py) |
 | `tools/tectonic/` | [latex](../src/ai_pc/apps/latex.py) |
+
+## Checking what is here
+
+`ai-pc doctor` looks for each program the same way the code that uses it does and reads its version without starting
+anything that could open a window. It also checks the models, the two Python environments, and the packages in them
+against `pyproject.toml` and `services/tinyclick/requirements.txt`. It exits with 1 when something required is missing.
+
+```powershell
+uv run ai-pc doctor           # a table: programs in tools/, programs installed on Windows, models, environments, packages
+uv run ai-pc doctor --json    # the same as JSON, with paths
+```
+
+It also names any folder in `tools/` that no code uses.

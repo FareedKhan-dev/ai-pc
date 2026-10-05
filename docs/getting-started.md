@@ -41,12 +41,14 @@ Programs like the video editor, Office, Blender or GIMP must be on the PC. Offic
 way. The others are portable copies in the project's `tools/` folder, downloaded from their publishers and checked
 (SHA-256 against the published value, signatures where the publisher signs) before they are unpacked; see
 [tools](tools.md). A program that is missing makes only its own requests fail, with a message that says what is missing.
+`uv run ai-pc doctor` shows which programs are here.
 
 Local models (Whisper for speech, the click models for the desktop agent) live in `models/`.
 
 ## Check the set-up
 
 ```powershell
-uv run pytest                     # fast unit tests (about 10 s, nothing installed needed)
+uv run ai-pc doctor               # every program, model and package it uses: present or missing, with versions
+uv run pytest                     # fast unit tests (about 15 s, nothing installed needed)
 uv run pytest -m integration      # the full suites: real programs, files and media on this PC (slow)
 ```

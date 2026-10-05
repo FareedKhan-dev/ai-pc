@@ -27,10 +27,12 @@ git clone https://github.com/FareedKhan-dev/ai-pc.git
 cd ai-pc
 uv sync
 uv run ai-pc keys set NEBIUS_API_KEY
+uv run ai-pc doctor
 ```
 
 `uv sync` creates `.venv` with Python 3.12 and the exact versions in `uv.lock`. The key goes into an encrypted vault
-on this PC; a `.env` file works too (see [docs/configuration.md](docs/configuration.md)).
+on this PC; a `.env` file works too (see [docs/configuration.md](docs/configuration.md)). `ai-pc doctor` lists every
+program, model and Python package AI PC uses, with its version, and says what is missing.
 
 ## Usage
 
@@ -49,6 +51,7 @@ uv run ai-pc video --help                                   # each program also 
 | `ai-pc video`, `office`, `photo`, `sound`, `design`, `cad`, `3d`, `convert`, `windows`, `code`, `accounts`, `hub`, `social`, `apps` | One program at a time |
 | `ai-pc agent` | The desktop agent, for programs that can only be used through their interface |
 | `ai-pc keys` | API keys in the encrypted vault |
+| `ai-pc doctor` | Checks that every program, model and package it uses is on this PC |
 
 ## Documentation
 

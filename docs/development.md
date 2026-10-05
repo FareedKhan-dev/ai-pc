@@ -7,6 +7,10 @@ uv sync
 uv run pre-commit install        # optional: runs lint, format and a secret scan before each commit
 ```
 
+Two optional developer tools live in `tools/` like the programs: the GitHub CLI (`tools/gh/`) and gitleaks
+(`tools/gitleaks/`, the same secret scan CI runs: `tools\gitleaks\gitleaks.exe git .`). `uv run ai-pc doctor` lists
+them with everything else.
+
 ## Tests
 
 | Command | Runs |
@@ -67,4 +71,5 @@ Small commits with [Conventional Commits](https://www.conventionalcommits.org) m
 - Most code has no type hints yet; mypy only covers the modules listed in `pyproject.toml`.
 - Progress is reported through `log` callbacks and `print` rather than the `logging` module.
 - The integration suites are scripts with their own check helper, not native pytest tests.
-- The programs in `tools/` are set up by hand on each PC; there is no installer for them yet.
+- The programs in `tools/` are set up by hand on each PC (`ai-pc doctor` shows which are present); there is no
+  installer for them yet.
