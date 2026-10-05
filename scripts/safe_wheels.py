@@ -50,7 +50,14 @@ def _fits(filename):
     if not m:
         return False
     py = set(m.group("py").split("."))
-    return bool((py & PY_TAGS) or m.group("py") in PY_TAGS) and m.group("abi") in ABI_TAGS and any(p in PLAT_TAGS for p in m.group("plat").split("."))
+    abis = set(m.group("abi").split("."))
+    # a stable-ABI wheel (abi3) built for an older CPython, e.g. cp39-abi3, also runs on this one
+    stable = "abi3" in abis and any(re.fullmatch(r"cp3(\d+)", t) and int(t[3:]) <= sys.version_info[1] for t in py)
+    return (
+        bool((py & PY_TAGS) or m.group("py") in PY_TAGS or stable)
+        and bool(abis & ABI_TAGS)
+        and any(p in PLAT_TAGS for p in m.group("plat").split("."))
+    )
 
 
 def fetch(folder, specs, pure=False):
