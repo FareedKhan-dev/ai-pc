@@ -322,6 +322,7 @@ recorded from real runs, and the letter's was written for the picture. Slack was
 - [Getting started](#getting-started)
 - [Under the hood](#under-the-hood)
 - [Development](#development)
+- [References](#references)
 
 ## What you can ask for
 
@@ -369,25 +370,26 @@ flowchart LR
 
 The screen loop works on any program a person can see, which is why it is popular, and it has improved quickly. On
 OSWorld-Verified, a benchmark of short desktop tasks on Linux, the best agents scored 86 to 90% in August 2026, above
-the 72% that people new to the software reached when the benchmark was made.[^osworld][^osworld-verified] Where it still
+the 72% that people new to the software reached when the benchmark was made ([OSWorld](https://arxiv.org/abs/2404.07972),
+[OSWorld-Verified](https://os-world.github.io/)). Where it still
 falls short is speed, cost and long professional work, which is most of what people do in desktop programs:
 
 | What was measured | Result | Source |
 |---|---|---|
-| Steps taken against steps needed | Even the best agents take 2.7 to 4.3 times more steps than necessary | OSWorld-Human, 2026[^osworld-human] |
-| Time per task | Tens of minutes for tasks people do in a few. Changing a document's line spacing took an agent 12 minutes; a person needs under 30 seconds | OSWorld-Human[^osworld-human] |
-| Where the time goes | Model calls for planning and reflection: 76 to 96% of the time per task. Taking screenshots and clicking: under 2% each | OSWorld-Human[^osworld-human] |
-| Later steps | Up to 3 times slower than the first steps, because each prompt carries the earlier screenshots | OSWorld-Human[^osworld-human] |
-| Against human experts | 5 to 50 times longer on GIMP, LibreOffice and similar tasks: 162 to 1,260 s per task against 11 to 48 s | OSExpert, 2026[^osexpert] |
-| One 1080p screenshot | About 1,100 to 2,500 input tokens, depending on the model, sent again at every step | OpenAI and Google API docs[^openai-vision][^gemini-res] |
-| Finding a button in professional software | Targets cover 0.07% of the screen on average. At release GPT-4o hit 0.8% of them; the best system on the leaderboard now hits 85%, using 2.6 model calls per target | ScreenSpot-Pro[^screenspot-pro] |
-| Office programs on Windows, from screenshots | 0 to 7.1% of LibreOffice tasks done, for every model tested | WindowsAgentArena-V2, 2025[^waa-v2] |
-| Long professional workflows (about 1.6 hours for a person) | The best agent finished 20.6%. No model finished any task that takes a person over 163 minutes | OSWorld 2.0, 2026[^osworld2] |
+| Steps taken against steps needed | Even the best agents take 2.7 to 4.3 times more steps than necessary | [OSWorld-Human](https://arxiv.org/abs/2506.16042), 2026 |
+| Time per task | Tens of minutes for tasks people do in a few. Changing a document's line spacing took an agent 12 minutes; a person needs under 30 seconds | [OSWorld-Human](https://arxiv.org/abs/2506.16042) |
+| Where the time goes | Model calls for planning and reflection: 76 to 96% of the time per task. Taking screenshots and clicking: under 2% each | [OSWorld-Human](https://arxiv.org/abs/2506.16042) |
+| Later steps | Up to 3 times slower than the first steps, because each prompt carries the earlier screenshots | [OSWorld-Human](https://arxiv.org/abs/2506.16042) |
+| Against human experts | 5 to 50 times longer on GIMP, LibreOffice and similar tasks: 162 to 1,260 s per task against 11 to 48 s | [OSExpert](https://arxiv.org/abs/2603.07978), 2026 |
+| One 1080p screenshot | About 1,100 to 2,500 input tokens, depending on the model, sent again at every step | [OpenAI](https://developers.openai.com/api/docs/guides/images-vision) and [Google](https://ai.google.dev/gemini-api/docs/media-resolution) API docs |
+| Finding a button in professional software | Targets cover 0.07% of the screen on average. At release GPT-4o hit 0.8% of them; the best system on the leaderboard now hits 85%, using 2.6 model calls per target | [ScreenSpot-Pro](https://arxiv.org/abs/2504.07981) and its [leaderboard](https://gui-agent.github.io/grounding-leaderboard/) |
+| Office programs on Windows, from screenshots | 0 to 7.1% of LibreOffice tasks done, for every model tested | [WindowsAgentArena-V2](https://arxiv.org/abs/2505.13909), 2025 |
+| Long professional workflows (about 1.6 hours for a person) | The best agent finished 20.6%. No model finished any task that takes a person over 163 minutes | [OSWorld 2.0](https://arxiv.org/abs/2606.29537), 2026 |
 
 Some of it comes with the loop itself, whatever the model. A picture of a timeline does not say whether the exported
 video has the effect at 7.2 seconds, and a picture of a spreadsheet does not say whether its totals are right. The agent also
 needs the screen, the mouse and the keyboard while it works, and OSWorld's authors found that simply moving, resizing
-or cluttering windows makes agents fail far more often.[^osworld]
+or cluttering windows makes agents fail far more often ([OSWorld](https://arxiv.org/abs/2404.07972)).
 
 ### What we saw ourselves
 
@@ -435,10 +437,10 @@ After a clean run it saves the steps as a skill that replays without a model: a 
 to 64 ms.
 
 Research points the same way. Microsoft's UFO2 notes that selecting and formatting Excel cells one at a time "can often
-be collapsed into a single API call".[^ufo2] An agent that can also run code reached 60.76% on OSWorld in about 10 steps
+be collapsed into a single API call" ([UFO2](https://arxiv.org/abs/2504.14603)). An agent that can also run code reached 60.76% on OSWorld in about 10 steps
 per task, where a screen-only agent needed 15; with code alone it reached 35.73%, because many tasks still need the
-interface.[^coact] And in OSWorld 2.0, an agent asked to model a part in FreeCAD stopped clicking
-and wrote a Python script in FreeCAD's console.[^osworld2]
+interface ([CoAct-1](https://arxiv.org/abs/2508.03923)). And in OSWorld 2.0, an agent asked to model a part in FreeCAD stopped clicking
+and wrote a Python script in FreeCAD's console ([OSWorld 2.0](https://arxiv.org/abs/2606.29537)).
 
 ## How it works
 
@@ -921,14 +923,16 @@ Program names and logos belong to their owners. They appear here only to name th
 project is not affiliated with or endorsed by any of them. Where each logo came from is listed in
 [docs/assets/logos/SOURCES.md](docs/assets/logos/SOURCES.md).
 
-[^osworld]: Xie et al., "OSWorld: Benchmarking Multimodal Agents for Open-Ended Tasks in Real Computer Environments", 2024. <https://arxiv.org/abs/2404.07972>
-[^osworld-verified]: OSWorld-Verified leaderboard, results file of 7 August 2026. <https://os-world.github.io/>
-[^osworld-human]: "OSWorld-Human: Benchmarking the Efficiency of Computer-Use Agents", MLSys 2026. <https://arxiv.org/abs/2506.16042>
-[^osexpert]: "OSExpert", 2026, table 3. <https://arxiv.org/abs/2603.07978>
-[^openai-vision]: OpenAI, "Images and vision" guide: tile-based models count a 1920x1080 picture as 1,105 tokens, patch-based models as about 2,450. <https://developers.openai.com/api/docs/guides/images-vision>
-[^gemini-res]: Google, Gemini API "Media resolution": 1,120 tokens per image by default, 2,240 at the resolution it recommends for computer use. <https://ai.google.dev/gemini-api/docs/media-resolution>
-[^screenspot-pro]: "ScreenSpot-Pro: GUI Grounding for Professional High-Resolution Computer Use", 2025 <https://arxiv.org/abs/2504.07981>, and its leaderboard, updated 10 September 2026 <https://gui-agent.github.io/grounding-leaderboard/>
-[^waa-v2]: "Efficient Agent Training for Computer Use" (WindowsAgentArena-V2: screenshots only, 1280x720, 30 steps), 2025. <https://arxiv.org/abs/2505.13909>
-[^osworld2]: OSWorld 2.0, long-horizon workflows, 2026. <https://arxiv.org/abs/2606.29537>
-[^ufo2]: UFO2, Microsoft, 2025. <https://arxiv.org/abs/2504.14603>
-[^coact]: CoAct-1, ICLR 2026. <https://arxiv.org/abs/2508.03923>
+## References
+
+- Xie et al., "OSWorld: Benchmarking Multimodal Agents for Open-Ended Tasks in Real Computer Environments", 2024. <https://arxiv.org/abs/2404.07972>
+- OSWorld-Verified leaderboard, results file of 7 August 2026. <https://os-world.github.io/>
+- "OSWorld-Human: Benchmarking the Efficiency of Computer-Use Agents", MLSys 2026. <https://arxiv.org/abs/2506.16042>
+- "OSExpert", 2026, table 3. <https://arxiv.org/abs/2603.07978>
+- OpenAI, "Images and vision" guide: tile-based models count a 1920x1080 picture as 1,105 tokens, patch-based models as about 2,450. <https://developers.openai.com/api/docs/guides/images-vision>
+- Google, Gemini API "Media resolution": 1,120 tokens per image by default, 2,240 at the resolution it recommends for computer use. <https://ai.google.dev/gemini-api/docs/media-resolution>
+- "ScreenSpot-Pro: GUI Grounding for Professional High-Resolution Computer Use", 2025 <https://arxiv.org/abs/2504.07981>, and its leaderboard, updated 10 September 2026 <https://gui-agent.github.io/grounding-leaderboard/>
+- "Efficient Agent Training for Computer Use" (WindowsAgentArena-V2: screenshots only, 1280x720, 30 steps), 2025. <https://arxiv.org/abs/2505.13909>
+- OSWorld 2.0, long-horizon workflows, 2026. <https://arxiv.org/abs/2606.29537>
+- UFO2, Microsoft, 2025. <https://arxiv.org/abs/2504.14603>
+- CoAct-1, ICLR 2026. <https://arxiv.org/abs/2508.03923>
