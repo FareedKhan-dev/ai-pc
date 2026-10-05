@@ -6,6 +6,7 @@ which picks the replacement from catalogue candidates.
 
 patch(plan, resolved, report, tried) -> (new plan, [change descriptions], {edit ids to re-check})
 """
+
 import copy
 import json
 
@@ -41,21 +42,25 @@ class Fixer:
     def _swap(self, card_cats, query, avoid, expect=None, seen=None):
         """A replacement item name for the categories, by meaning, avoiding names already tried."""
         ix = self.cat.index
-        hits = [h for h in ix.search(query, categories=card_cats, k=12, exclude=self.cat.missing, boost=self.cat.boost)
-                if h["name"] not in avoid]
+        hits = [h for h in ix.search(query, categories=card_cats, k=12, exclude=self.cat.missing, boost=self.cat.boost) if h["name"] not in avoid]
         if not hits:
             return None, "no other candidate"
         if self.planner is not None and expect and seen:
-            lines = "\n".join(f"- {h['name']} \"{h.get('en')}\": {h.get('desc')}" for h in hits[:8])
-            r = self.planner._call("fast", [{"role": "system", "content": SWAP_SYSTEM},
-                                            {"role": "user", "content": f"INTENDED: {expect}\nSEEN IN THE EXPORT: {seen}\nCANDIDATES:\n{lines}"}])
+            lines = "\n".join(f'- {h["name"]} "{h.get("en")}": {h.get("desc")}' for h in hits[:8])
+            r = self.planner._call(
+                "fast",
+                [
+                    {"role": "system", "content": SWAP_SYSTEM},
+                    {"role": "user", "content": f"INTENDED: {expect}\nSEEN IN THE EXPORT: {seen}\nCANDIDATES:\n{lines}"},
+                ],
+            )
             d = parse_json(r.text) or {}
             name = str(d.get("name") or "")
             if name and name != "keep" and any(h["name"] == name for h in hits):
                 return name, f"model pick: {d.get('why', '')}"
             if name == "keep":
                 return None, "model: keep"
-        return hits[0]["name"], f"closest match \"{hits[0].get('en')}\""
+        return hits[0]["name"], f'closest match "{hits[0].get("en")}"'
 
     def patch(self, plan, resolved, report, tried=None):
         plan = copy.deepcopy(plan)
@@ -137,8 +142,9 @@ class Fixer:
                 if card["category"] == "character_effect" and re_.get("face_share", 1) < 0.3:
                     cats = ["scene_effect"]  # no clear person there: a full-frame effect instead
                 avoid = set(hist) | {card["name"]}
-                name, how = self._swap(cats if st == "fail" else list(EFFECT_CATS), f"{re_.get('expect')} {card.get('en')}", avoid,
-                                       re_.get("expect"), why)
+                name, how = self._swap(
+                    cats if st == "fail" else list(EFFECT_CATS), f"{re_.get('expect')} {card.get('en')}", avoid, re_.get("expect"), why
+                )
                 if name:
                     hist.append(card["name"])
                     raw["name"] = name
@@ -179,8 +185,12 @@ class Fixer:
                 raw["strength"] = round(min(1.0, float(raw.get("strength", 0.5)) + 0.35), 2)
                 changes.append(f"{rid}: shake strength -> {raw['strength']}")
                 recheck.add(rid)
-            elif typ == "zoom" and raw is not None and st == "fail" and any(
-                    l["start"] - 0.1 <= re_["window"][0] <= l["end"] for l in resolved.get("layers", [])):
+            elif (
+                typ == "zoom"
+                and raw is not None
+                and st == "fail"
+                and any(l["start"] - 0.1 <= re_["window"][0] <= l["end"] for l in resolved.get("layers", []))
+            ):
                 raw["_drop"] = True  # hidden under an overlay: escalating it would never show
                 changes.append(f"{rid}: removed (it happens under an overlay, where nobody can see it)")
             elif typ == "zoom" and raw is not None and st == "fail":

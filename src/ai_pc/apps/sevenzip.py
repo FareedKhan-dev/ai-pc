@@ -5,6 +5,7 @@ password-protected one cannot even be listed without the password. The password 
 
   '7zip compress report.docx and data.xlsx with password Lahore123'   '7zip pack C:\\work\\photos'   '7zip extract backup.7z password Lahore123'
 """
+
 import re
 import shutil
 from pathlib import Path
@@ -19,6 +20,7 @@ ARCHIVES = {".7z", ".zip", ".rar", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".iso",
 
 def z(*args, cwd=None, timeout=1800):
     from ai_pc.core import hidden_desktop
+
     rc, out, err, timed_out = hidden_desktop.run([str(SEVEN), *map(str, args)], timeout=timeout, cwd=str(cwd) if cwd else None)
     return rc == 0 and not timed_out, out + err
 
@@ -44,6 +46,7 @@ def listing(archive, password=None):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\b7-?zip\b|\b\.7z\b|\b7z\b", c):
         return None
@@ -78,15 +81,22 @@ def run(op, ctx):
             return f"7-Zip cannot read {src.name}" + (" with that password." if pw else " (it may need a password: add 'password ...').")
         ok_t, log = z("t", *pw_args(pw), src)
         if op["op"] == "test":
-            return f"7-Zip tested {src.name}: {len(files)} file(s), {sum(files.values()):,} bytes. " + ("Checked: everything is OK." if ok_t else "NOT right: " + log.strip()[-300:])
+            return f"7-Zip tested {src.name}: {len(files)} file(s), {sum(files.values()):,} bytes. " + (
+                "Checked: everything is OK." if ok_t else "NOT right: " + log.strip()[-300:]
+            )
         dest = out / src.stem
         if dest.exists():
             shutil.rmtree(dest, ignore_errors=True)
         ok_x, log_x = z("x", "-y", *pw_args(pw), f"-o{dest}", src)
         got = {str(p.relative_to(dest)).replace("\\", "/"): p.stat().st_size for p in dest.rglob("*") if p.is_file()}
-        checks = [("7-Zip tests the archive clean", ok_t), (f"all {len(files)} file(s) unpacked with the sizes the archive lists", ok_x and got == files)]
+        checks = [
+            ("7-Zip tests the archive clean", ok_t),
+            (f"all {len(files)} file(s) unpacked with the sizes the archive lists", ok_x and got == files),
+        ]
         bad = [w for w, good in checks if not good]
-        return (f"Unpacked {src.name} into {dest}. " + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + log_x.strip()[-200:]))
+        return f"Unpacked {src.name} into {dest}. " + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + log_x.strip()[-200:]
+        )
     items = [Path(p).resolve() for p in op["items"]]
     stem = items[0].stem if len(items) == 1 else "archive"
     archive = out / f"{stem}.{'zip' if op.get('zip') else '7z'}"
@@ -109,6 +119,9 @@ def run(op, ctx):
         checks.append(("without the password it cannot be opened" + ("" if op.get("zip") else ", not even its file names"), hidden))
     bad = [w for w, good in checks if not good]
     size_in, size_out = sum(want.values()), archive.stat().st_size if archive.exists() else 0
-    return (f"7-Zip made {archive} ({size_out:,} bytes from {size_in:,}, {100 - 100 * size_out / max(1, size_in):.0f}% smaller" +
-            (", AES-256 with the password you gave" if pw else "") + "). " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + log.strip()[-200:]))
+    return (
+        f"7-Zip made {archive} ({size_out:,} bytes from {size_in:,}, {100 - 100 * size_out / max(1, size_in):.0f}% smaller"
+        + (", AES-256 with the password you gave" if pw else "")
+        + "). "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + log.strip()[-200:])
+    )

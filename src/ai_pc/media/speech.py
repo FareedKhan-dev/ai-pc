@@ -8,6 +8,7 @@ sound on the words that matter.
   keywords(words, k) -> the words to emphasise (long / rare / numbers), when the planner names none
 Model and cache stay inside the project (models/whisper/base, state/media/*.asr.json).
 """
+
 import hashlib
 import json
 import re
@@ -32,6 +33,7 @@ def _load():
     with _lock:
         if _model is None:
             from faster_whisper import WhisperModel
+
             _model = WhisperModel(str(MODEL_DIR), device="cpu", compute_type="int8", cpu_threads=8)
     return _model
 
@@ -51,18 +53,26 @@ def transcribe(path, language=None, log=print):
         return json.loads(cp.read_text(encoding="utf-8"))
     t0 = time.perf_counter()
     from ai_pc.media.audio import load
+
     samples = load(path, sr=16000)  # our own ffmpeg decode (faster-whisper's PyAV path breaks on newer PyAV)
     if len(samples) < 16000 * 0.3:
         return None
-    segs, info = _load().transcribe(samples, language=language, word_timestamps=True, vad_filter=True, beam_size=5,
-                                    condition_on_previous_text=False)
+    segs, info = _load().transcribe(samples, language=language, word_timestamps=True, vad_filter=True, beam_size=5, condition_on_previous_text=False)
     words, segments = [], []
     for s in segs:
         segments.append({"start": round(float(s.start), 3), "end": round(float(s.end), 3), "text": s.text.strip()})
         for w in s.words or []:
-            words.append({"w": w.word.strip(), "start": round(float(w.start), 3), "end": round(float(w.end), 3), "prob": round(float(w.probability), 3)})
-    out = {"language": info.language, "duration": round(info.duration, 2), "text": " ".join(s["text"] for s in segments),
-           "words": words, "segments": segments, "seconds": round(time.perf_counter() - t0, 2)}
+            words.append(
+                {"w": w.word.strip(), "start": round(float(w.start), 3), "end": round(float(w.end), 3), "prob": round(float(w.probability), 3)}
+            )
+    out = {
+        "language": info.language,
+        "duration": round(info.duration, 2),
+        "text": " ".join(s["text"] for s in segments),
+        "words": words,
+        "segments": segments,
+        "seconds": round(time.perf_counter() - t0, 2),
+    }
     cp.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     log(f"  transcribed {Path(path).name}: {len(words)} words ({info.language}) in {out['seconds']} s")
     return out
@@ -102,8 +112,34 @@ def chunks(words, n=3, max_gap=0.3, max_chars=18):
 
 def keywords(words, k=4):
     """Words worth a zoom or a colour: numbers, money, long rare words (no stop words)."""
-    stop = {"the", "and", "that", "this", "with", "have", "from", "your", "what", "when", "they", "there", "about", "would",
-            "could", "should", "their", "which", "were", "been", "just", "like", "really", "because", "going", "into"}
+    stop = {
+        "the",
+        "and",
+        "that",
+        "this",
+        "with",
+        "have",
+        "from",
+        "your",
+        "what",
+        "when",
+        "they",
+        "there",
+        "about",
+        "would",
+        "could",
+        "should",
+        "their",
+        "which",
+        "were",
+        "been",
+        "just",
+        "like",
+        "really",
+        "because",
+        "going",
+        "into",
+    }
     scored = []
     for i, w in enumerate(words):
         t = _norm(w["w"])

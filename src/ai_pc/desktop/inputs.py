@@ -1,4 +1,5 @@
 """Direct keyboard / mouse injection with SendInput (no sleeps, no library delays) and window focus helpers."""
+
 import ctypes
 import time
 from ctypes import wintypes
@@ -9,13 +10,18 @@ ULONG_PTR = ctypes.c_size_t
 
 
 class MOUSEINPUT(ctypes.Structure):
-    _fields_ = [("dx", wintypes.LONG), ("dy", wintypes.LONG), ("mouseData", wintypes.DWORD), ("dwFlags", wintypes.DWORD),
-                ("time", wintypes.DWORD), ("dwExtraInfo", ULONG_PTR)]
+    _fields_ = [
+        ("dx", wintypes.LONG),
+        ("dy", wintypes.LONG),
+        ("mouseData", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ULONG_PTR),
+    ]
 
 
 class KEYBDINPUT(ctypes.Structure):
-    _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD),
-                ("dwExtraInfo", ULONG_PTR)]
+    _fields_ = [("wVk", wintypes.WORD), ("wScan", wintypes.WORD), ("dwFlags", wintypes.DWORD), ("time", wintypes.DWORD), ("dwExtraInfo", ULONG_PTR)]
 
 
 class HARDWAREINPUT(ctypes.Structure):
@@ -32,11 +38,45 @@ class INPUT(ctypes.Structure):
 
 
 KEYUP, UNICODE, EXTENDED = 0x2, 0x4, 0x1
-VK = {"ctrl": 0x11, "control": 0x11, "alt": 0x12, "shift": 0x10, "win": 0x5B, "enter": 0x0D, "return": 0x0D, "esc": 0x1B,
-      "escape": 0x1B, "tab": 0x09, "backspace": 0x08, "delete": 0x2E, "del": 0x2E, "space": 0x20, "up": 0x26,
-      "down": 0x28, "left": 0x25, "right": 0x27, "home": 0x24, "end": 0x23, "pgup": 0x21, "pageup": 0x21,
-      "pgdn": 0x22, "pagedown": 0x22, "insert": 0x2D, "=": 0xBB, "+": 0xBB, "-": 0xBD, ",": 0xBC, ".": 0xBE,
-      "/": 0xBF, ";": 0xBA, "'": 0xDE, "[": 0xDB, "]": 0xDD, "\\": 0xDC, "`": 0xC0}
+VK = {
+    "ctrl": 0x11,
+    "control": 0x11,
+    "alt": 0x12,
+    "shift": 0x10,
+    "win": 0x5B,
+    "enter": 0x0D,
+    "return": 0x0D,
+    "esc": 0x1B,
+    "escape": 0x1B,
+    "tab": 0x09,
+    "backspace": 0x08,
+    "delete": 0x2E,
+    "del": 0x2E,
+    "space": 0x20,
+    "up": 0x26,
+    "down": 0x28,
+    "left": 0x25,
+    "right": 0x27,
+    "home": 0x24,
+    "end": 0x23,
+    "pgup": 0x21,
+    "pageup": 0x21,
+    "pgdn": 0x22,
+    "pagedown": 0x22,
+    "insert": 0x2D,
+    "=": 0xBB,
+    "+": 0xBB,
+    "-": 0xBD,
+    ",": 0xBC,
+    ".": 0xBE,
+    "/": 0xBF,
+    ";": 0xBA,
+    "'": 0xDE,
+    "[": 0xDB,
+    "]": 0xDD,
+    "\\": 0xDC,
+    "`": 0xC0,
+}
 for _i in range(1, 13):
     VK[f"f{_i}"] = 0x6F + _i
 EXT_KEYS = {0x26, 0x28, 0x25, 0x27, 0x24, 0x23, 0x21, 0x22, 0x2D, 0x2E, 0x5B}

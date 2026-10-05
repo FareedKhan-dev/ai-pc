@@ -5,6 +5,7 @@ platform, Right is held and Jump pressed, and the game reports what happened. Op
 
   "godot game: platformer called 'Jump Hero', 8 coins, green player, jump 600"   'make the godot player red'   'open the godot game'
 """
+
 import json
 import re
 import subprocess
@@ -16,10 +17,30 @@ NAME, LABEL = "godot", "Godot games: a 2D platformer by code, played headless to
 EXAMPLES = ["godot game: platformer called 'Jump Hero', 8 coins, green player, jump 600", "open the godot game"]
 GODOT = ROOT / "tools" / "godot" / "Godot_v4.7.2-stable_win64_console.exe"
 EDITOR = ROOT / "tools" / "godot" / "Godot_v4.7.2-stable_win64.exe"
-COLORS = {"red": "#e53935", "green": "#43a047", "blue": "#1e88e5", "yellow": "#fdd835", "orange": "#fb8c00", "purple": "#8e24aa", "pink": "#d81b60",
-          "white": "#fafafa", "black": "#212121", "gold": "#ffc107", "cyan": "#00acc1", "brown": "#6d4c41"}
-DEFAULT = {"title": "Jump Hero", "coins": 6, "speed": 300.0, "jump": 560.0, "player_color": "#1e88e5", "coin_color": "#ffc107", "ground_color": "#6d4c41",
-           "sky": "#87ceeb"}
+COLORS = {
+    "red": "#e53935",
+    "green": "#43a047",
+    "blue": "#1e88e5",
+    "yellow": "#fdd835",
+    "orange": "#fb8c00",
+    "purple": "#8e24aa",
+    "pink": "#d81b60",
+    "white": "#fafafa",
+    "black": "#212121",
+    "gold": "#ffc107",
+    "cyan": "#00acc1",
+    "brown": "#6d4c41",
+}
+DEFAULT = {
+    "title": "Jump Hero",
+    "coins": 6,
+    "speed": 300.0,
+    "jump": 560.0,
+    "player_color": "#1e88e5",
+    "coin_color": "#ffc107",
+    "ground_color": "#6d4c41",
+    "sky": "#87ceeb",
+}
 
 PROJECT = """; Engine configuration file (made by AI PC).
 config_version=5
@@ -193,7 +214,7 @@ def level(cfg):
     plats = [[400, 600, 800]]
     for i in range(1, n):
         plats.append([400 + i * 260, 600 - (i % 3) * 90, 180])
-    coins = [[p[0], p[1] - 70] for p in plats[1:]][:cfg["coins"]]
+    coins = [[p[0], p[1] - 70] for p in plats[1:]][: cfg["coins"]]
     while len(coins) < cfg["coins"]:
         coins.append([200 + len(coins) * 60, 520])
     return dict(cfg, platforms=plats, coin_spots=coins, start=[200, 450])
@@ -203,16 +224,27 @@ def write(folder, cfg):
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     full = level(cfg)
-    for name, text in (("project.godot", PROJECT.format(title=cfg["title"].replace('"', "'"))), ("main.tscn", SCENE), ("main.gd", MAIN), ("player.gd", PLAYER),
-                       ("check.gd", CHECK), ("game.json", json.dumps(full, indent=2))):
+    for name, text in (
+        ("project.godot", PROJECT.format(title=cfg["title"].replace('"', "'"))),
+        ("main.tscn", SCENE),
+        ("main.gd", MAIN),
+        ("player.gd", PLAYER),
+        ("check.gd", CHECK),
+        ("game.json", json.dumps(full, indent=2)),
+    ):
         (folder / name).write_text(text, encoding="utf-8", newline="\n")
     return full
 
 
 def play(folder, timeout=180):
     """Run the game headless and read its report: (report or None, any script errors)."""
-    r = subprocess.run([str(GODOT), "--headless", "--path", str(folder), "--script", "res://check.gd"], capture_output=True, text=True, timeout=timeout,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    r = subprocess.run(
+        [str(GODOT), "--headless", "--path", str(folder), "--script", "res://check.gd"],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
     text = (r.stdout or "") + (r.stderr or "")
     errors = [ln for ln in text.splitlines() if re.search(r"SCRIPT ERROR|Parse Error|ERROR:", ln)]
     m = re.search(r"AIPC_REPORT (\{.*\})", text)
@@ -222,9 +254,13 @@ def play(folder, timeout=180):
 def check(rep, errors, cfg):
     if not rep:
         return [("the game ran headless and reported", False)]
-    return [("the game ran headless with no script errors", not errors), ("the player fell onto the first platform", bool(rep.get("landed"))),
-            ("holding Right moved the player right", rep["moved"][0] > rep["rest"][0] + 50),
-            ("Jump lifted the player", rep["jump_y"] < rep["moved"][1] - 20), ("every coin is in the level", rep["coins"] == cfg["coins"])]
+    return [
+        ("the game ran headless with no script errors", not errors),
+        ("the player fell onto the first platform", bool(rep.get("landed"))),
+        ("holding Right moved the player right", rep["moved"][0] > rep["rest"][0] + 50),
+        ("Jump lifted the player", rep["jump_y"] < rep["moved"][1] - 20),
+        ("every coin is in the level", rep["coins"] == cfg["coins"]),
+    ]
 
 
 def read(text, cfg=None):
@@ -276,6 +312,12 @@ def run(op, ctx):
     rep, errors = play(folder)
     checks = check(rep, errors, cfg)
     bad = [w for w, ok in checks if not ok]
-    return (f"Godot game {'updated' if op['op'] == 'edit' else 'made'}: {folder} ('{cfg['title']}', {cfg['coins']} coins, speed {cfg['speed']:g}, jump {cfg['jump']:g}). " +
-            ("Played headless and checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) +
-             (f" ({errors[0][:200]})" if errors else "") + ".") + " Say 'open the godot game' to see it in the Godot editor (F5 plays).")
+    return (
+        f"Godot game {'updated' if op['op'] == 'edit' else 'made'}: {folder} ('{cfg['title']}', {cfg['coins']} coins, speed {cfg['speed']:g}, jump {cfg['jump']:g}). "
+        + (
+            "Played headless and checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + (f" ({errors[0][:200]})" if errors else "") + "."
+        )
+        + " Say 'open the godot game' to see it in the Godot editor (F5 plays)."
+    )

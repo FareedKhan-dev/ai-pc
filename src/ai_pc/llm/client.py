@@ -1,4 +1,5 @@
 """Tiny OpenAI-compatible chat client with streaming (stdlib only). Measures time-to-first-token and total time."""
+
 import http.client
 import json
 import random
@@ -22,8 +23,8 @@ class LLMError(Exception):
 class LLMResult:
     text: str = ""
     reasoning: str = ""
-    ttft_ms: float = 0.0           # time to first visible OR reasoning token
-    first_text_ms: float = 0.0     # time to first visible (answer) token
+    ttft_ms: float = 0.0  # time to first visible OR reasoning token
+    first_text_ms: float = 0.0  # time to first visible (answer) token
     total_ms: float = 0.0
     usage: dict = field(default_factory=dict)
     finish: str = ""
@@ -65,7 +66,7 @@ class Chat:
     def __init__(self, api_key, base_url=NEBIUS_BASE, timeout=90, deadline=240):
         self._key = api_key
         self.base_url = base_url.rstrip("/")
-        self.timeout = timeout    # idle seconds on the socket
+        self.timeout = timeout  # idle seconds on the socket
         self.deadline = deadline  # whole answer, per attempt
         u = urllib.parse.urlparse(self.base_url)
         self._scheme, self._host = u.scheme, u.hostname
@@ -97,15 +98,21 @@ class Chat:
     def complete(self, model, messages, *, max_tokens=800, temperature=0.0, json_mode=False, extra=None, retries=5):
         """One chat completion over a reused connection. Transient failures (DNS/connection errors, dropped keep-alive
         connections, timeouts, 429 and 5xx) are retried with exponential backoff and jitter; other 4xx are raised."""
-        body = {"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": temperature,
-                "stream": True, "stream_options": {"include_usage": True}}
+        body = {
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
         if json_mode:
             body["response_format"] = {"type": "json_object"}
         if extra:
             body.update(extra)
         data = json.dumps(body).encode()
         for attempt in range(retries + 1):
-            delay = (0.05 if attempt == 0 else min(8.0, 0.5 * 2 ** attempt)) + random.uniform(0, 0.25)
+            delay = (0.05 if attempt == 0 else min(8.0, 0.5 * 2**attempt)) + random.uniform(0, 0.25)
             try:
                 return self._once(model, data, extra)
             except _Status as e:
@@ -124,8 +131,7 @@ class Chat:
 
     def _once(self, model, data, extra):
         conn = self._conn()
-        hdrs = {"Authorization": "Bearer " + self._key, "Content-Type": "application/json",
-                "Accept": "text/event-stream", "User-Agent": "ai-pc/0.1"}
+        hdrs = {"Authorization": "Bearer " + self._key, "Content-Type": "application/json", "Accept": "text/event-stream", "User-Agent": "ai-pc/0.1"}
         res = LLMResult(model=model, extras_used=dict(extra or {}))
         t0 = time.perf_counter()
         conn.request("POST", self._prefix + "/chat/completions", body=data, headers=hdrs)

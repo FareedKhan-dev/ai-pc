@@ -3,6 +3,7 @@ total length measured by ffprobe), and files, folders or playlists played in VLC
 
   'make a playlist from D:\\Music\\Naats'   'shuffle playlist from D:\\Music'   'play D:\\Music\\naats.m3u8 in vlc'
 """
+
 import html
 import json
 import random
@@ -22,8 +23,13 @@ def natural(p):
 
 
 def duration(path):
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)], capture_output=True, text=True,
-                       timeout=60, creationflags=NOWIN)
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        creationflags=NOWIN,
+    )
     try:
         return float(json.loads(r.stdout)["format"]["duration"])
     except (ValueError, KeyError):
@@ -43,10 +49,16 @@ def playlist(folder, out, shuffle=False, name=None, seed=None):
     m3u = out / f"{stem}.m3u8"
     m3u.write_text("#EXTM3U\n" + "".join(f"#EXTINF:{int(d)},{f.stem}\n{f}\n" for f, d in zip(files, durs)), encoding="utf-8")
     xspf = out / f"{stem}.xspf"
-    tracks = "".join(f"<track><location>{html.escape(f.resolve().as_uri())}</location><title>{html.escape(f.stem)}</title>"
-                     f"<duration>{int(d * 1000)}</duration></track>" for f, d in zip(files, durs))
-    xspf.write_text(f'<?xml version="1.0" encoding="UTF-8"?><playlist version="1" xmlns="http://xspf.org/ns/0/"><title>{html.escape(stem)}</title>'
-                    f"<trackList>{tracks}</trackList></playlist>", encoding="utf-8")
+    tracks = "".join(
+        f"<track><location>{html.escape(f.resolve().as_uri())}</location><title>{html.escape(f.stem)}</title>"
+        f"<duration>{int(d * 1000)}</duration></track>"
+        for f, d in zip(files, durs)
+    )
+    xspf.write_text(
+        f'<?xml version="1.0" encoding="UTF-8"?><playlist version="1" xmlns="http://xspf.org/ns/0/"><title>{html.escape(stem)}</title>'
+        f"<trackList>{tracks}</trackList></playlist>",
+        encoding="utf-8",
+    )
     return files, sum(durs), [m3u, xspf]
 
 
@@ -61,6 +73,7 @@ def parse(text, ctx):
         return {"op": "playlist", "folder": path.group(1).strip(), "shuffle": bool(re.search(r"\bshuffle", c))}
     if re.match(r"^\s*play\b", c) and (path or re.search(r"\bvlc\b", c)):
         from ai_pc.apps.appschat import find_file
+
         target = path.group(1).strip() if path else find_file(text, ctx)
         if target:
             return {"op": "play", "target": target}
@@ -73,8 +86,10 @@ def run(op, ctx):
         back = [ln for ln in outs[0].read_text(encoding="utf-8").splitlines() if ln and not ln.startswith("#")]
         ok = back == [str(f) for f in files]
         h, m = divmod(int(total) // 60, 60)
-        return (f"Playlist of {len(files)} files ({h} h {m} min" if h else f"Playlist of {len(files)} files ({m} min") + \
-            f"{', shuffled' if op.get('shuffle') else ''}): {outs[0]} and {outs[1]} ({'checked' if ok else 'NOT the same when read back'}). Say 'play {outs[0]} in vlc'."
+        return (
+            (f"Playlist of {len(files)} files ({h} h {m} min" if h else f"Playlist of {len(files)} files ({m} min")
+            + f"{', shuffled' if op.get('shuffle') else ''}): {outs[0]} and {outs[1]} ({'checked' if ok else 'NOT the same when read back'}). Say 'play {outs[0]} in vlc'."
+        )
     exe = vlc()
     if not exe:
         return "VLC is not installed (say 'install vlc')."

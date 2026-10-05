@@ -3,6 +3,7 @@ the latest release's Windows build downloaded from GitHub (github.com/cloudflare
 the checksum Cloudflare publishes in the release notes, its Windows signature checked (valid, signed by Cloudflare),
 then kept as tools/cloudflared/cloudflared.exe. Nothing is installed in Windows; deleting the folder removes it.
 """
+
 import hashlib
 import json
 import re
@@ -36,8 +37,10 @@ def checksum_from_notes(body, name=ASSET):
 
 def signature(path):
     """Windows' own check of the file's signature -> (status, signer)."""
-    ps = (f"$s = Get-AuthenticodeSignature -LiteralPath '{path}'; "
-          "[pscustomobject]@{status=$s.Status.ToString(); signer=$s.SignerCertificate.Subject} | ConvertTo-Json -Compress")
+    ps = (
+        f"$s = Get-AuthenticodeSignature -LiteralPath '{path}'; "
+        "[pscustomobject]@{status=$s.Status.ToString(); signer=$s.SignerCertificate.Subject} | ConvertTo-Json -Compress"
+    )
     r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, creationflags=NO_WINDOW, timeout=60)
     try:
         d = json.loads(r.stdout.strip() or "{}")
@@ -68,5 +71,7 @@ def install(fetch=_get, check_signature=signature, dest=DEST, say=print):
         tmp.unlink(missing_ok=True)
         raise RuntimeError(f"the file's Windows signature is not a valid Cloudflare one ({status}, {signer or 'no signer'}); not installed")
     tmp.replace(dest)
-    (dest.parent / "SOURCE.txt").write_text(f"{asset['browser_download_url']}\nversion {rel.get('tag_name')}\nsha256 {got}\nsigner {signer}\n", encoding="utf-8")
+    (dest.parent / "SOURCE.txt").write_text(
+        f"{asset['browser_download_url']}\nversion {rel.get('tag_name')}\nsha256 {got}\nsigner {signer}\n", encoding="utf-8"
+    )
     return {"path": str(dest), "version": rel.get("tag_name"), "sha256": got, "signer": signer}

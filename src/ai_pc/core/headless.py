@@ -9,6 +9,7 @@ process with a timeout; calls are serialised (one profile, one browser at a time
   png(html_or_svg_path, out_png, (width, height))     CSS pixels at device scale 1 (scale=2 for retina)
   dom(html_path) -> str                               the page's HTML after its scripts ran
 """
+
 import os
 import shutil
 import subprocess
@@ -20,9 +21,13 @@ from ai_pc.core.config import ROOT
 
 PROFILE = ROOT / "out" / "chrome_profile"
 _LOCK = threading.Lock()
-CANDIDATES = [r"C:\Program Files\Google\Chrome\Application\chrome.exe", r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-              os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
-              r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"]
+CANDIDATES = [
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+]
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
@@ -46,9 +51,25 @@ def _run(extra, url, timeout=90, lane=None):
     prof = PROFILE / lane if lane else PROFILE
     prof.mkdir(parents=True, exist_ok=True)
     lock = _LOCKS.setdefault(str(prof), threading.Lock()) if lane else _LOCK
-    args = [browser(), "--headless=new", f"--user-data-dir={prof}", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
-            "--disable-sync", "--disable-background-networking", "--disable-component-update", "--disable-default-apps", "--mute-audio",
-            "--hide-scrollbars", "--disable-gpu", "--allow-file-access-from-files", "--run-all-compositor-stages-before-draw", *extra, url]
+    args = [
+        browser(),
+        "--headless=new",
+        f"--user-data-dir={prof}",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-extensions",
+        "--disable-sync",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--disable-default-apps",
+        "--mute-audio",
+        "--hide-scrollbars",
+        "--disable-gpu",
+        "--allow-file-access-from-files",
+        "--run-all-compositor-stages-before-draw",
+        *extra,
+        url,
+    ]
     with lock:
         t0 = time.perf_counter()
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=NO_WINDOW)
@@ -73,8 +94,12 @@ def pdf(src, out_pdf, wait_ms=1500, timeout=90, lane=None):
     out_pdf = Path(out_pdf).resolve()
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
     out_pdf.unlink(missing_ok=True)
-    _, err, secs = _run([f"--print-to-pdf={out_pdf}", "--no-pdf-header-footer", "--generate-pdf-document-outline=false",
-                         f"--virtual-time-budget={int(wait_ms)}"], _url(src), timeout, lane)
+    _, err, secs = _run(
+        [f"--print-to-pdf={out_pdf}", "--no-pdf-header-footer", "--generate-pdf-document-outline=false", f"--virtual-time-budget={int(wait_ms)}"],
+        _url(src),
+        timeout,
+        lane,
+    )
     if not out_pdf.exists() or out_pdf.stat().st_size < 200:
         raise RenderError(f"no PDF was written ({err.strip()[-200:]})")
     return {"path": str(out_pdf), "seconds": round(secs, 2)}
@@ -85,8 +110,18 @@ def png(src, out_png, size=(1280, 720), scale=1, wait_ms=1500, timeout=90, lane=
     out_png = Path(out_png).resolve()
     out_png.parent.mkdir(parents=True, exist_ok=True)
     out_png.unlink(missing_ok=True)
-    _, err, secs = _run([f"--screenshot={out_png}", f"--window-size={int(size[0])},{int(size[1])}", f"--force-device-scale-factor={scale}",
-                         f"--virtual-time-budget={int(wait_ms)}", "--default-background-color=FFFFFFFF"], _url(src), timeout, lane)
+    _, err, secs = _run(
+        [
+            f"--screenshot={out_png}",
+            f"--window-size={int(size[0])},{int(size[1])}",
+            f"--force-device-scale-factor={scale}",
+            f"--virtual-time-budget={int(wait_ms)}",
+            "--default-background-color=FFFFFFFF",
+        ],
+        _url(src),
+        timeout,
+        lane,
+    )
     if not out_png.exists():
         raise RenderError(f"no picture was written ({err.strip()[-200:]})")
     return {"path": str(out_png), "seconds": round(secs, 2)}

@@ -7,6 +7,7 @@ a separate answer key. Checks: each file reads back with every question and the 
   2. The sun is a star. True*
   3. Capital of Pakistan? answer: Islamabad
 """
+
 import html
 import re
 from pathlib import Path
@@ -22,7 +23,7 @@ def read(spec):
     for it in items:
         m = re.search(r"\banswer\s*:\s*(.+)$", it, re.I)
         if m:
-            out.append({"q": it[:m.start()].strip(), "kind": "short", "answer": m.group(1).strip(" ."), "options": []})
+            out.append({"q": it[: m.start()].strip(), "kind": "short", "answer": m.group(1).strip(" ."), "options": []})
             continue
         opts = re.split(r"\s+[a-hA-H][).]\s+", " " + it)
         if len(opts) > 2:
@@ -33,22 +34,37 @@ def read(spec):
         m = re.search(r"\s(true|false)\s*\*?\s*(?:/\s*(?:true|false)\s*\*?)?\s*$", it, re.I)
         if m:
             tf = re.search(r"(true|false)\s*\*", it, re.I) or m
-            out.append({"q": it[:m.start()].strip(), "kind": "tf", "answer": tf.group(1).title(), "options": [("True", tf.group(1).lower() == "true"),
-                                                                                                            ("False", tf.group(1).lower() == "false")]})
+            out.append(
+                {
+                    "q": it[: m.start()].strip(),
+                    "kind": "tf",
+                    "answer": tf.group(1).title(),
+                    "options": [("True", tf.group(1).lower() == "true"), ("False", tf.group(1).lower() == "false")],
+                }
+            )
     return [q for q in out if q["q"] and (q["kind"] != "mc" or any(r for _, r in q["options"]))]
 
 
 def moodle(qs, title):
-    x = ['<?xml version="1.0" encoding="UTF-8"?>', "<quiz>", f'<question type="category"><category><text>$course$/{html.escape(title)}</text></category></question>']
+    x = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        "<quiz>",
+        f'<question type="category"><category><text>$course$/{html.escape(title)}</text></category></question>',
+    ]
     for i, q in enumerate(qs, 1):
-        name = f"<name><text>Q{i}</text></name><questiontext format=\"html\"><text><![CDATA[<p>{html.escape(q['q'])}</p>]]></text></questiontext>"
+        name = f'<name><text>Q{i}</text></name><questiontext format="html"><text><![CDATA[<p>{html.escape(q["q"])}</p>]]></text></questiontext>'
         if q["kind"] == "mc":
             right = sum(1 for _, r in q["options"] if r)
-            x.append(f'<question type="multichoice">{name}<single>{"true" if right == 1 else "false"}</single><shuffleanswers>true</shuffleanswers>' +
-                     "".join(f'<answer fraction="{(100 // right) if r else 0}"><text>{html.escape(o)}</text></answer>' for o, r in q["options"]) + "</question>")
+            x.append(
+                f'<question type="multichoice">{name}<single>{"true" if right == 1 else "false"}</single><shuffleanswers>true</shuffleanswers>'
+                + "".join(f'<answer fraction="{(100 // right) if r else 0}"><text>{html.escape(o)}</text></answer>' for o, r in q["options"])
+                + "</question>"
+            )
         elif q["kind"] == "tf":
-            x.append(f'<question type="truefalse">{name}<answer fraction="{100 if q["answer"] == "True" else 0}"><text>true</text></answer>'
-                     f'<answer fraction="{100 if q["answer"] == "False" else 0}"><text>false</text></answer></question>')
+            x.append(
+                f'<question type="truefalse">{name}<answer fraction="{100 if q["answer"] == "True" else 0}"><text>true</text></answer>'
+                f'<answer fraction="{100 if q["answer"] == "False" else 0}"><text>false</text></answer></question>'
+            )
         else:
             x.append(f'<question type="shortanswer">{name}<answer fraction="100"><text>{html.escape(q["answer"])}</text></answer></question>')
     return "\n".join(x + ["</quiz>"])
@@ -57,6 +73,7 @@ def moodle(qs, title):
 def gift(qs):
     def esc(s):
         return re.sub(r"([~=#{}:])", r"\\\1", s)
+
     out = []
     for i, q in enumerate(qs, 1):
         if q["kind"] == "mc":
@@ -72,23 +89,36 @@ def gift(qs):
 def kahoot(qs, path):
     """Kahoot's spreadsheet import: question, up to 4 answers, time limit, correct answer number(s)."""
     from openpyxl import Workbook
+
     wb = Workbook()
     ws = wb.active
-    ws.append(["Question - max 120 characters", "Answer 1 - max 75 characters", "Answer 2 - max 75 characters", "Answer 3 - max 75 characters",
-               "Answer 4 - max 75 characters", "Time limit (sec) - 5, 10, 20, 30, 60, 90, 120, or 240 secs", "Correct answer(s) - choose at least one"])
+    ws.append(
+        [
+            "Question - max 120 characters",
+            "Answer 1 - max 75 characters",
+            "Answer 2 - max 75 characters",
+            "Answer 3 - max 75 characters",
+            "Answer 4 - max 75 characters",
+            "Time limit (sec) - 5, 10, 20, 30, 60, 90, 120, or 240 secs",
+            "Correct answer(s) - choose at least one",
+        ]
+    )
     skipped = 0
     for q in qs:
         opts = q["options"] if q["kind"] != "short" else []
         if not opts or len(opts) > 4:
             skipped += 1
             continue
-        ws.append([q["q"][:120]] + [o[:75] for o, _ in opts] + [""] * (4 - len(opts)) + [20, ",".join(str(i) for i, (_, r) in enumerate(opts, 1) if r)])
+        ws.append(
+            [q["q"][:120]] + [o[:75] for o, _ in opts] + [""] * (4 - len(opts)) + [20, ",".join(str(i) for i, (_, r) in enumerate(opts, 1) if r)]
+        )
     wb.save(path)
     return skipped
 
 
 def paper(qs, title, path, key=False):
     from docx import Document
+
     d = Document()
     d.add_heading(title + (" - Answer key" if key else ""), level=1)
     if not key:
@@ -114,8 +144,13 @@ def make(spec, title, out):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     stem = re.sub(r"[^\w-]+", "_", title.strip()) or "quiz"
-    files = {"moodle": out / f"{stem}.moodle.xml", "gift": out / f"{stem}.gift.txt", "kahoot": out / f"{stem}.kahoot.xlsx",
-             "paper": out / f"{stem}.paper.docx", "key": out / f"{stem}.answer_key.docx"}
+    files = {
+        "moodle": out / f"{stem}.moodle.xml",
+        "gift": out / f"{stem}.gift.txt",
+        "kahoot": out / f"{stem}.kahoot.xlsx",
+        "paper": out / f"{stem}.paper.docx",
+        "key": out / f"{stem}.answer_key.docx",
+    }
     files["moodle"].write_text(moodle(qs, title), encoding="utf-8")
     files["gift"].write_text(gift(qs), encoding="utf-8")
     skipped = kahoot(qs, files["kahoot"])
@@ -128,6 +163,7 @@ def check(qs, files):
     from docx import Document
     from lxml import etree
     from openpyxl import load_workbook
+
     out = []
     x = etree.parse(str(files["moodle"]))
     out.append(("Moodle XML reads back with every question", len(x.findall("question")) - 1 == len(qs)))
@@ -151,6 +187,10 @@ def run(op, ctx):
     checks = check(qs, files)
     bad = [w for w, ok in checks if not ok]
     kinds = {k: sum(1 for q in qs if q["kind"] == k) for k in ("mc", "tf", "short")}
-    return (f"{len(qs)} questions ({kinds['mc']} multiple choice, {kinds['tf']} true/false, {kinds['short']} short answer): " +
-            ", ".join(str(f) for f in files.values()) + (f". {skipped} short-answer question(s) left out of the Kahoot sheet (Kahoot needs choices)" if skipped else "") +
-            (". Checked: " + ", ".join(w for w, _ in checks) if not bad else ". NOT right: " + ", ".join(bad)) + ".")
+    return (
+        f"{len(qs)} questions ({kinds['mc']} multiple choice, {kinds['tf']} true/false, {kinds['short']} short answer): "
+        + ", ".join(str(f) for f in files.values())
+        + (f". {skipped} short-answer question(s) left out of the Kahoot sheet (Kahoot needs choices)" if skipped else "")
+        + (". Checked: " + ", ".join(w for w, _ in checks) if not bad else ". NOT right: " + ", ".join(bad))
+        + "."
+    )

@@ -16,6 +16,7 @@ Things to say: 'post <file> to instagram, tiktok and youtube tomorrow at 7 pm sa
 'what's scheduled?', 'cancel the tiktok one', 'delete that post from facebook', 'how did my posts do this week?',
 'make a report', 'any new comments?', 'reply to 2: thank you!', 'hide 3', 'when should I post?', 'turn on automatic posting'.
 """
+
 import argparse
 import datetime as dt
 import getpass
@@ -31,6 +32,7 @@ for _stream in (sys.stdout, sys.stderr):
 def steps(name=None):
     from ai_pc.social import specs
     from ai_pc.social.auth import APPS
+
     for n in [name] if name else specs.NAMES:
         s = APPS[n]
         print(f"\n== {s['label']}  (ai-pc social connect {n})")
@@ -43,6 +45,7 @@ def steps(name=None):
 def connect(name):
     from ai_pc.social import auth
     from ai_pc.social.base import SocialError
+
     if name not in auth.APPS:
         sys.exit(f"unknown platform {name}; one of: {', '.join(auth.APPS)}")
     steps(name)
@@ -67,6 +70,7 @@ def status():
     from ai_pc.social.base import SocialError
     from ai_pc.social.platforms import connected
     from ai_pc.social.store import Store
+
     db = Store()
     have = connected(db)
     for n in specs.NAMES:
@@ -83,6 +87,7 @@ def status():
 
 def queue():
     from ai_pc.social.socialchat import SocialChat
+
     print(SocialChat.start().run({"op": "queue"}))
 
 
@@ -92,6 +97,7 @@ def run(quiet=False):
     from ai_pc.social.platforms import connected
     from ai_pc.social.prepare import prepare
     from ai_pc.social.store import Store
+
     log = ROOT / "state" / "social" / "runner.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -111,13 +117,16 @@ def run(quiet=False):
 
 def setup_tunnel():
     from ai_pc.social import tunnel_setup as TS
+
     if TS.DEST.exists():
         print(f"Already installed: {TS.DEST}")
         return
-    print("Instagram (pictures) and Threads (all media) fetch media from a web address. The AI PC lends them one for about a minute\n"
-          "through Cloudflare's free quick tunnel (no account). This downloads Cloudflare's 'cloudflared' tool (about 60 MB) from\n"
-          "github.com/cloudflare/cloudflared into tools/cloudflared, checks it against Cloudflare's published SHA-256 and its Windows\n"
-          "signature, and installs nothing in Windows.")
+    print(
+        "Instagram (pictures) and Threads (all media) fetch media from a web address. The AI PC lends them one for about a minute\n"
+        "through Cloudflare's free quick tunnel (no account). This downloads Cloudflare's 'cloudflared' tool (about 60 MB) from\n"
+        "github.com/cloudflare/cloudflared into tools/cloudflared, checks it against Cloudflare's published SHA-256 and its Windows\n"
+        "signature, and installs nothing in Windows."
+    )
     if input("Download it now? [y/N]: ").strip().lower() not in ("y", "yes"):
         print("Not downloaded.")
         return
@@ -158,12 +167,16 @@ def main(argv=None):
     if a.cmd == "setup-tunnel":
         return setup_tunnel()
     from ai_pc.social.socialchat import SocialChat
+
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     sc = SocialChat.start(planner=planner, files=a.extra)
-    print(f"Social chat {sc.state['id']}. Connected: {', '.join(sc.platforms()) or 'nothing yet (ai-pc social steps / ai-pc social connect)'}. 'quit' to leave.")
+    print(
+        f"Social chat {sc.state['id']}. Connected: {', '.join(sc.platforms()) or 'nothing yet (ai-pc social steps / ai-pc social connect)'}. 'quit' to leave."
+    )
     for m in a.say or iter(lambda: input("> ").strip(), "quit"):
         if a.say:
             print(f"> {m}")

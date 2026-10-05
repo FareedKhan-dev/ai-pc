@@ -14,6 +14,7 @@ Errors say what to do next: SocialError(kind=...) with kind
   "invalid" the post itself is not acceptable (too long, wrong media): fix the post
   "policy"  the platform will not allow it for this account (an unaudited app, a missing permission)
 """
+
 from ai_pc.hub.http import Api, HubError
 
 
@@ -26,16 +27,18 @@ class SocialError(Exception):
 class Platform:
     name = ""
     label = ""
-    formats = ()                 # the kinds of post it takes: "post", "photo", "carousel", "video", "reel", "story", "short", "text"
-    native_schedule = False      # it can publish at a set time by itself (the PC may be off)
+    formats = ()  # the kinds of post it takes: "post", "photo", "carousel", "video", "reel", "story", "short", "text"
+    native_schedule = False  # it can publish at a set time by itself (the PC may be off)
     can_delete = True
-    vault_key = None             # which keys in the vault it uses (defaults to name)
+    vault_key = None  # which keys in the vault it uses (defaults to name)
 
     def __init__(self, creds=None, transport=None, store=None, pause=None):
         from ai_pc.core import vault
+
         self.creds = creds if creds is not None else (vault.get(self.vault_key or self.name) or {})
         self.transport, self.store = transport, store
         import time
+
         self.pause = pause or time.sleep
 
     # ---------------------------------------------------------------- helpers for connectors
@@ -45,7 +48,9 @@ class Platform:
     def need(self, *keys):
         missing = [k for k in keys if not self.creds.get(k)]
         if missing:
-            raise SocialError("auth", f"{self.label} is not connected: run 'ai-pc social connect {self.name}' (steps: 'ai-pc social steps {self.name}')")
+            raise SocialError(
+                "auth", f"{self.label} is not connected: run 'ai-pc social connect {self.name}' (steps: 'ai-pc social steps {self.name}')"
+            )
 
     def call(self, fn, *a, **kw):
         """An API call with the platform's errors turned into SocialError kinds."""

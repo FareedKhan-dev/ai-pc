@@ -10,6 +10,7 @@ the chat learns them like files sent, so 'it', 'this video' or a program that ne
 that is about something else ('turn on dark mode') is not handed them. Several selected files go with a request that
 says 'these', 'them', 'all' or names their kind in the plural.
 """
+
 import queue
 import re
 import threading
@@ -17,8 +18,11 @@ import time
 import traceback
 from pathlib import Path
 
-PLURAL = re.compile(r"\b(?:these|them|those|all|both|each|every|selected|files|photos|pictures|pics|images|videos|clips|songs|recordings|"
-                    r"documents|docs|pdfs|sheets|slides)\b", re.I)
+PLURAL = re.compile(
+    r"\b(?:these|them|those|all|both|each|every|selected|files|photos|pictures|pics|images|videos|clips|songs|recordings|"
+    r"documents|docs|pdfs|sheets|slides)\b",
+    re.I,
+)
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 LABEL = re.compile(r"^\[([^\]\n]{1,60})\]\s*")
 VERSION = re.compile(r"^(?:v\d+|agent_\w+)\.\w+$", re.I)  # a program's own name for a version (v3.png, agent_warm_1159.mp4)
@@ -29,7 +33,7 @@ def split_reply(text):
     out = []
     for block in re.split(r"\n(?=\[[^\]\n]{1,60}\] )", text or ""):
         m = LABEL.match(block)
-        out.append((m.group(1), block[m.end():]) if m else (None, block))
+        out.append((m.group(1), block[m.end() :]) if m else (None, block))
     return out
 
 
@@ -49,12 +53,22 @@ class Agent:
     # ---------------------------------------------------------------- asked from the bar (any thread)
     def send(self, text="", files=(), context=(), voice=None, where=""):
         self.n += 1
-        job = {"kind": "say", "id": self.n, "text": (text or "").strip(), "files": [str(f) for f in files], "context": [str(f) for f in context],
-               "voice": str(voice) if voice else None, "where": where, "queued": time.time()}
+        job = {
+            "kind": "say",
+            "id": self.n,
+            "text": (text or "").strip(),
+            "files": [str(f) for f in files],
+            "context": [str(f) for f in context],
+            "voice": str(voice) if voice else None,
+            "where": where,
+            "queued": time.time(),
+        }
         waiting = self.jobs.qsize() + (1 if self.busy else 0)
         self.jobs.put(job)
-        self.events("queued", {"id": job["id"], "text": job["text"], "voice": bool(voice), "files": job["files"], "context": job["context"],
-                               "waiting": waiting})
+        self.events(
+            "queued",
+            {"id": job["id"], "text": job["text"], "voice": bool(voice), "files": job["files"], "context": job["context"], "waiting": waiting},
+        )
         return job["id"]
 
     def new_chat(self):
@@ -68,8 +82,15 @@ class Agent:
         c = self.chat
         if c is None:
             return []
-        return [{"user": t.get("user", ""), "heard": t.get("heard"), "reply": t.get("reply", ""), "made": [p for p in t.get("made") or [] if Path(p).exists()]}
-                for t in c.state.get("turns", [])[-limit:]]
+        return [
+            {
+                "user": t.get("user", ""),
+                "heard": t.get("heard"),
+                "reply": t.get("reply", ""),
+                "made": [p for p in t.get("made") or [] if Path(p).exists()],
+            }
+            for t in c.state.get("turns", [])[-limit:]
+        ]
 
     def nice_name(self, path):
         """The name a made file leaves the chat with: the photo program's v3.png is car_edited.png (as when it is sent to Slack)."""
@@ -109,6 +130,7 @@ class Agent:
     def _work(self):
         try:
             import pythoncom
+
             pythoncom.CoInitialize()  # Word, Excel and Explorer are driven from this thread
         except Exception:  # noqa: BLE001
             pass
@@ -132,6 +154,7 @@ class Agent:
             if job["kind"] == "new":
                 try:
                     from ai_pc.assistant.chat import AIPCChat
+
                     cls = self._chat_cls or AIPCChat
                     self.chat = cls.start(chats_dir=self.chats_dir, planner=self.planner, options=self.options, log=self._log)
                     self.events("newchat", {"chat": self.chat.state["id"]})
@@ -143,9 +166,22 @@ class Agent:
             except Exception as e:  # noqa: BLE001 - one request failing never stops the next
                 self.busy, self._job = False, None
                 self._log(traceback.format_exc())
-                self.events("reply", {"id": job.get("id"), "text": f"Something went wrong: {type(e).__name__}: {e}", "parts": [], "files": [],
-                                      "heard": None, "pending": False, "choice": [], "seconds": 0, "usd": 0, "failed": True,
-                                      "waiting": self.jobs.qsize()})
+                self.events(
+                    "reply",
+                    {
+                        "id": job.get("id"),
+                        "text": f"Something went wrong: {type(e).__name__}: {e}",
+                        "parts": [],
+                        "files": [],
+                        "heard": None,
+                        "pending": False,
+                        "choice": [],
+                        "seconds": 0,
+                        "usd": 0,
+                        "failed": True,
+                        "waiting": self.jobs.qsize(),
+                    },
+                )
 
     def _say(self, job):
         self.busy, self._job = True, job
@@ -170,9 +206,22 @@ class Agent:
         st = chat.state
         choice = (st.get("choice") or {}).get("options") or []
         self.busy, self._job = False, None
-        self.events("reply", {"id": job["id"], "text": text, "parts": split_reply(text), "files": [p for p in made if Path(p).exists()],
-                              "heard": heard, "pending": bool(st.get("pending")), "choice": list(choice), "seconds": round(time.time() - t0, 1),
-                              "usd": round(max(0.0, self.cost() - usd0), 5), "failed": failed, "waiting": self.jobs.qsize()})
+        self.events(
+            "reply",
+            {
+                "id": job["id"],
+                "text": text,
+                "parts": split_reply(text),
+                "files": [p for p in made if Path(p).exists()],
+                "heard": heard,
+                "pending": bool(st.get("pending")),
+                "choice": list(choice),
+                "seconds": round(time.time() - t0, 1),
+                "usd": round(max(0.0, self.cost() - usd0), 5),
+                "failed": failed,
+                "waiting": self.jobs.qsize(),
+            },
+        )
 
     # ---------------------------------------------------------------- live notes from the programs
     def _lane(self, label):

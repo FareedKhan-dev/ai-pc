@@ -7,6 +7,7 @@ measuring the result: contrast range, sharpness, greyness, size; an .xcf is open
   'gimp enhance photo.jpg'   'gimp black and white photo.jpg resize to 800 wide'   'gimp rotate photo.jpg 90'
   "gimp poster 1080x1350: title 'Book Fair' white, subtitle 'Saturday' yellow"
 """
+
 import os
 import re
 from pathlib import Path
@@ -16,8 +17,12 @@ from PIL import Image
 from ai_pc.core.config import ROOT
 
 NAME, LABEL = "gimp", "GIMP: photo fixes (enhance, B&W, resize, rotate, square crop) and layered .xcf files"
-EXAMPLES = ["gimp enhance photo.jpg", "gimp black and white photo.jpg resize to 800 wide", "gimp rotate photo.jpg 90",
-            "gimp poster 1080x1350: title 'Book Fair' white, subtitle 'Saturday' yellow"]
+EXAMPLES = [
+    "gimp enhance photo.jpg",
+    "gimp black and white photo.jpg resize to 800 wide",
+    "gimp rotate photo.jpg 90",
+    "gimp poster 1080x1350: title 'Book Fair' white, subtitle 'Saturday' yellow",
+]
 HOME = ROOT / "tools" / "gimp-portable"
 PHOTOS = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp", ".bmp"}
 
@@ -30,57 +35,80 @@ def console():
 def gimp(code, timeout=300):
     """Run Python in GIMP's batch mode; (ok, lines GIMP printed starting AIPC)."""
     from ai_pc.core import hidden_desktop
+
     home = (HOME / "home").resolve()
     for d in ("profile", "cache", "temp"):
         (home / d).mkdir(parents=True, exist_ok=True)
     # HOME: GIMP's fonts.conf keeps its font cache at '~/AppData/Local/GIMP/...', so '~' is pointed into the project
-    env = dict(os.environ, GIMP3_DIRECTORY=str(home / "profile"), GIMP3_CACHEDIR=str(home / "cache"), GIMP3_TEMPDIR=str(home / "temp"), HOME=str(home))
+    env = dict(
+        os.environ, GIMP3_DIRECTORY=str(home / "profile"), GIMP3_CACHEDIR=str(home / "cache"), GIMP3_TEMPDIR=str(home / "temp"), HOME=str(home)
+    )
     local = Path(os.environ["LOCALAPPDATA"]) / "GIMP"
     had = local.exists()
     try:
-        rc, out, err, timed_out = hidden_desktop.run([str(console()), "-i", "-d", "-f", "--batch-interpreter=python-fu-eval", "-b", code, "--quit"],
-                                                     timeout=timeout, env=env)
+        rc, out, err, timed_out = hidden_desktop.run(
+            [str(console()), "-i", "-d", "-f", "--batch-interpreter=python-fu-eval", "-b", code, "--quit"], timeout=timeout, env=env
+        )
     finally:  # an (empty) crash-log folder GIMP makes there whatever the settings say
         if not had and local.exists() and not any(f.is_file() for f in local.rglob("*")):
             import shutil
+
             shutil.rmtree(local, ignore_errors=True)
     text = out + err
     return rc == 0 and not timed_out and "AIPC_DONE" in text, [ln for ln in text.splitlines() if "AIPC" in ln or "Traceback" in ln or "Error:" in ln]
 
 
 def photo_code(src, dest, steps):
-    lines = ["from gi.repository import Gimp, Gio",
-             f'img = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(r"{src}"))', "layer = img.get_layers()[0]"]
+    lines = [
+        "from gi.repository import Gimp, Gio",
+        f'img = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(r"{src}"))',
+        "layer = img.get_layers()[0]",
+    ]
     for s in steps:
         if s[0] == "enhance":
-            lines += ["layer.levels_stretch()", 'f = Gimp.DrawableFilter.new(layer, "gegl:unsharp-mask", "Sharpen")',
-                      'cfg = f.get_config(); cfg.set_property("std-dev", 2.0); cfg.set_property("scale", 0.7)', "f.update(); layer.merge_filter(f)"]
+            lines += [
+                "layer.levels_stretch()",
+                'f = Gimp.DrawableFilter.new(layer, "gegl:unsharp-mask", "Sharpen")',
+                'cfg = f.get_config(); cfg.set_property("std-dev", 2.0); cfg.set_property("scale", 0.7)',
+                "f.update(); layer.merge_filter(f)",
+            ]
         elif s[0] == "bw":
             lines.append("layer.desaturate(Gimp.DesaturateMode.LUMINANCE)")
         elif s[0] == "rotate":
             lines.append(f"img.rotate(Gimp.RotationType.DEGREES{s[1]})")
         elif s[0] == "square":
-            lines += ["side = min(img.get_width(), img.get_height())", "img.crop(side, side, (img.get_width() - side) // 2, (img.get_height() - side) // 2)"]
+            lines += [
+                "side = min(img.get_width(), img.get_height())",
+                "img.crop(side, side, (img.get_width() - side) // 2, (img.get_height() - side) // 2)",
+            ]
         elif s[0] == "resize":
             lines.append(f"w = {s[1]}; img.scale(w, round(img.get_height() * w / img.get_width()))")
-    lines += ["img.flatten()" if Path(dest).suffix.lower() in (".jpg", ".jpeg", ".bmp") else "pass",
-              f'Gimp.file_save(Gimp.RunMode.NONINTERACTIVE, img, Gio.File.new_for_path(r"{dest}"), None)',
-              'print("AIPC_DONE", img.get_width(), img.get_height())']
+    lines += [
+        "img.flatten()" if Path(dest).suffix.lower() in (".jpg", ".jpeg", ".bmp") else "pass",
+        f'Gimp.file_save(Gimp.RunMode.NONINTERACTIVE, img, Gio.File.new_for_path(r"{dest}"), None)',
+        'print("AIPC_DONE", img.get_width(), img.get_height())',
+    ]
     return "\n".join(lines)
 
 
 def measure(path):
     import numpy as np
+
     im = Image.open(path).convert("RGB")
     a = np.asarray(im, dtype=np.float32)
     lum = a @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
     lap = lum[1:-1, 1:-1] * 4 - lum[:-2, 1:-1] - lum[2:, 1:-1] - lum[1:-1, :-2] - lum[1:-1, 2:]
-    return {"size": im.size, "range": float(np.percentile(lum, 99.5) - np.percentile(lum, 0.5)), "sharp": float(lap.var()),
-            "sat": float((a.max(-1) - a.min(-1)).mean())}
+    return {
+        "size": im.size,
+        "range": float(np.percentile(lum, 99.5) - np.percentile(lum, 0.5)),
+        "sharp": float(lap.var()),
+        "sat": float((a.max(-1) - a.min(-1)).mean()),
+    }
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bgimp\b|\.xcf\b", c):
         return None
@@ -102,6 +130,7 @@ def parse(text, ctx):
     if f and (steps or fmt):
         return {"op": "photo", "file": f, "steps": steps, "format": (fmt.group(1).replace("jpeg", "jpg") if fmt else None)}
     from ai_pc.apps import photoshop
+
     op = photoshop.parse(re.sub(r"\bgimp\b", "photoshop", text, flags=re.I), ctx)
     return dict(op, app="gimp") if op else None
 
@@ -126,24 +155,44 @@ def run(op, ctx):
         checks = [("GIMP wrote the picture", True)]
         for s in op["steps"]:
             if s[0] == "enhance":
-                checks += [(f"contrast range widened ({before['range']:.0f} -> {after['range']:.0f})", after["range"] >= before["range"] - 0.5),
-                           ("sharper (more fine detail)", after["sharp"] > before["sharp"] * (1.0 if any(x[0] == "resize" for x in op["steps"]) else 1.05))]
+                checks += [
+                    (f"contrast range widened ({before['range']:.0f} -> {after['range']:.0f})", after["range"] >= before["range"] - 0.5),
+                    ("sharper (more fine detail)", after["sharp"] > before["sharp"] * (1.0 if any(x[0] == "resize" for x in op["steps"]) else 1.05)),
+                ]
             elif s[0] == "bw":
                 checks.append(("black and white", after["sat"] < 2.0))
             elif s[0] == "rotate":
                 w, h = before["size"]
-                checks.append((f"rotated {s[1]} degrees", after["size"] == ((h, w) if s[1] in (90, 270) else (w, h)) or any(x[0] in ("resize", "square") for x in op["steps"])))
+                checks.append(
+                    (
+                        f"rotated {s[1]} degrees",
+                        after["size"] == ((h, w) if s[1] in (90, 270) else (w, h)) or any(x[0] in ("resize", "square") for x in op["steps"]),
+                    )
+                )
             elif s[0] == "square":
                 checks.append(("square", after["size"][0] == after["size"][1]))
             elif s[0] == "resize":
                 checks.append((f"{s[1]} px wide", after["size"][0] == s[1]))
         bad = [w for w, ok in checks if not ok]
-        what = ", ".join({"enhance": "enhanced (auto contrast, sharpened)", "bw": "black and white", "rotate": "rotated", "square": "cropped square",
-                          "resize": "resized"}[s[0]] for s in op["steps"]) or "converted"
+        what = (
+            ", ".join(
+                {
+                    "enhance": "enhanced (auto contrast, sharpened)",
+                    "bw": "black and white",
+                    "rotate": "rotated",
+                    "square": "cropped square",
+                    "resize": "resized",
+                }[s[0]]
+                for s in op["steps"]
+            )
+            or "converted"
+        )
         ctx.setdefault("memo", {})["photo"] = str(dest)
-        return (f"GIMP {what}: {dest} ({after['size'][0]}x{after['size'][1]}). Done by GIMP itself (Python batch mode, hidden). " +
-                ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + "."))
+        return f"GIMP {what}: {dest} ({after['size'][0]}x{after['size'][1]}). Done by GIMP itself (Python batch mode, hidden). " + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + "."
+        )
     from ai_pc.apps import krita, photoshop
+
     if op["op"] == "stack":
         ims = [Image.open(f).convert("RGBA") for f in op["files"]]
         size = (max(i.width for i in ims), max(i.height for i in ims))
@@ -157,24 +206,35 @@ def run(op, ctx):
     for p in (xcf, png):
         p.unlink(missing_ok=True)
     flat = krita.write_ora(ora, size, layers)
-    code = "\n".join(["from gi.repository import Gimp, Gio",
-                      f'img = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(r"{ora.as_posix()}"))',
-                      f'Gimp.file_save(Gimp.RunMode.NONINTERACTIVE, img, Gio.File.new_for_path(r"{xcf.as_posix()}"), None)',
-                      f'back = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(r"{xcf.as_posix()}"))',
-                      'print("AIPC_LAYERS", "|".join(l.get_name() for l in back.get_layers()))',
-                      "back.merge_visible_layers(Gimp.MergeType.CLIP_TO_IMAGE)",
-                      f'Gimp.file_save(Gimp.RunMode.NONINTERACTIVE, back, Gio.File.new_for_path(r"{png.as_posix()}"), None)',
-                      'print("AIPC_DONE")'])
+    code = "\n".join(
+        [
+            "from gi.repository import Gimp, Gio",
+            f'img = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(r"{ora.as_posix()}"))',
+            f'Gimp.file_save(Gimp.RunMode.NONINTERACTIVE, img, Gio.File.new_for_path(r"{xcf.as_posix()}"), None)',
+            f'back = Gimp.file_load(Gimp.RunMode.NONINTERACTIVE, Gio.File.new_for_path(r"{xcf.as_posix()}"))',
+            'print("AIPC_LAYERS", "|".join(l.get_name() for l in back.get_layers()))',
+            "back.merge_visible_layers(Gimp.MergeType.CLIP_TO_IMAGE)",
+            f'Gimp.file_save(Gimp.RunMode.NONINTERACTIVE, back, Gio.File.new_for_path(r"{png.as_posix()}"), None)',
+            'print("AIPC_DONE")',
+        ]
+    )
     ok, lines = gimp(code)
     names = next((ln.split("AIPC_LAYERS", 1)[1].strip().split("|") for ln in lines if "AIPC_LAYERS" in ln), [])
     diff = None
     if png.exists():
         import numpy as np
+
         a = np.asarray(Image.open(png).convert("RGBA"), dtype=np.int16)
         b = np.asarray(flat, dtype=np.int16)
         diff = float(np.abs(a - b).mean()) if a.shape == b.shape else None
-    checks = [("GIMP saved its own .xcf and opened it again with every layer by name", xcf.exists() and set(n for n, _, _ in layers) <= set(names)),
-              ("GIMP's picture of the .xcf matches the layers" + (f" (mean difference {diff:.2f} of 255)" if diff is not None else ""), diff is not None and diff < 1.0)]
+    checks = [
+        ("GIMP saved its own .xcf and opened it again with every layer by name", xcf.exists() and set(n for n, _, _ in layers) <= set(names)),
+        (
+            "GIMP's picture of the .xcf matches the layers" + (f" (mean difference {diff:.2f} of 255)" if diff is not None else ""),
+            diff is not None and diff < 1.0,
+        ),
+    ]
     bad = [w for w, ok in checks if not ok]
-    return (f"GIMP file {xcf} ({size[0]}x{size[1]}, layers: {', '.join(n for n, _, _ in reversed(layers))}), {png.name} rendered by GIMP. " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f" {' | '.join(lines[-3:])}"))
+    return f"GIMP file {xcf} ({size[0]}x{size[1]}, layers: {', '.join(n for n, _, _ in reversed(layers))}), {png.name} rendered by GIMP. " + (
+        "Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f" {' | '.join(lines[-3:])}"
+    )

@@ -2,6 +2,7 @@
 
 Each command lives in its own module and is imported only when it runs, so the command line starts fast.
 """
+
 import difflib
 import importlib
 import sys
@@ -37,7 +38,12 @@ ALIASES = {"three": "3d", "win": "windows", "docs": "office", "coder": "code", "
 
 def usage():
     width = max(map(len, COMMANDS))
-    lines = [f"ai-pc {__version__}: the AI PC from the command line", "", "usage: ai-pc <command> [options]   (ai-pc <command> --help for its options)", ""]
+    lines = [
+        f"ai-pc {__version__}: the AI PC from the command line",
+        "",
+        "usage: ai-pc <command> [options]   (ai-pc <command> --help for its options)",
+        "",
+    ]
     lines += [f"  {name.ljust(width)}  {doc}" for name, (_, _, doc) in COMMANDS.items()]
     lines += ["", "With no command, 'ai-pc' starts the chat ('ai-pc -m \"...\"' sends it a message)."]
     return "\n".join(lines)

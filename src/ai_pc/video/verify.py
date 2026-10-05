@@ -16,6 +16,7 @@ an "expect"; the verifier looks at exactly those moments of the export and decid
 
 Checks run in parallel; frames for every check are saved as contact sheets in out/video/checks/<draft>/.
 """
+
 import difflib
 import json
 import re
@@ -44,6 +45,7 @@ def _interp(pts, t):
         if t <= t1:
             return v0 + (v1 - v0) * (t - t0) / max(1e-9, t1 - t0)
     return pts[-1][1]
+
 
 EFFECT_SYSTEM = """You check one edit in an exported video. You get a contact sheet: A = the same shot WITHOUT the edit,
 B1..Bn = moments where the edit should be visible. Judge only what you see. Reply with ONE JSON object:
@@ -171,21 +173,31 @@ class Verifier:
         wants_sound = any(e["type"] == "audio" for e in self.m["edits"])
         if wants_sound and not self.info.get("has_audio"):
             probs.append("no sound in the export")
-        r = subprocess.run(["ffmpeg", "-v", "info", "-nostats", "-i", self.video, "-an", "-vf", "scale=270:-2,blackdetect=d=0.25:pix_th=0.08",
-                            "-f", "null", "-"], capture_output=True, creationflags=NO_WINDOW)
+        r = subprocess.run(
+            ["ffmpeg", "-v", "info", "-nostats", "-i", self.video, "-an", "-vf", "scale=270:-2,blackdetect=d=0.25:pix_th=0.08", "-f", "null", "-"],
+            capture_output=True,
+            creationflags=NO_WINDOW,
+        )
         blacks = [(float(a), float(b)) for a, b in re.findall(r"black_start:([\d.]+) black_end:([\d.]+)", r.stderr.decode("utf-8", "ignore"))]
         ev["black"] = blacks
         for a, b in blacks:
             if not (a < 0.3 or b > got - 0.3):  # fades at the very start/end are normal
                 probs.append(f"black picture {a:.1f}-{b:.1f} s")
-        return {"id": "global", "type": "global", "status": "fail" if any("duration" in p or "no sound" in p for p in probs) else ("warn" if probs else "pass"),
-                "why": "; ".join(probs) or "duration, size and picture as planned", "evidence": ev}
+        return {
+            "id": "global",
+            "type": "global",
+            "status": "fail" if any("duration" in p or "no sound" in p for p in probs) else ("warn" if probs else "pass"),
+            "why": "; ".join(probs) or "duration, size and picture as planned",
+            "evidence": ev,
+        }
 
     def check_clip(self, c):
         busy = [x["window"] for x in self.m["edits"] if x.get("on") == c["id"] and x["type"] in ("zoom", "shake", "keyframes")]
         span = c["end"] - c["start"]
-        mid = next((t for t in (c["start"] + span * k for k in (0.5, 0.3, 0.75, 0.15, 0.9)) if not any(a - 0.1 <= t <= b + 0.1 for a, b in busy)),
-                   c["start"] + span / 2)
+        mid = next(
+            (t for t in (c["start"] + span * k for k in (0.5, 0.3, 0.75, 0.15, 0.9)) if not any(a - 0.1 <= t <= b + 0.1 for a, b in busy)),
+            c["start"] + span / 2,
+        )
         f = self.out(mid, 540)
         if f is None:
             return {"id": c["id"], "type": "clip", "status": "fail", "why": "no frame at this time"}
@@ -207,8 +219,14 @@ class Verifier:
             if green > 0.04:
                 probs.append(f"{green * 100:.0f}% of the picture is still screen colour")
         sheet = F.sheet([f], [f"{c['id']} {mid:.1f}s"], cols=1, cell_w=360)
-        return {"id": c["id"], "type": "clip", "status": "warn" if probs else "pass", "why": "; ".join(probs) or "framing ok",
-                "evidence": ev, "sheet": self.save(c["id"], sheet)}
+        return {
+            "id": c["id"],
+            "type": "clip",
+            "status": "warn" if probs else "pass",
+            "why": "; ".join(probs) or "framing ok",
+            "evidence": ev,
+            "sheet": self.save(c["id"], sheet),
+        }
 
     def check_speed(self, c):
         """Slow motion, fast motion and speed ramps really play: inside the clip the render shows the take's moment at
@@ -226,6 +244,7 @@ class Verifier:
             g = cv2.cvtColor(cv2.resize(im, (96, max(8, round(96 * im.shape[0] / im.shape[1]))), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
             g = cv2.GaussianBlur(g.astype(np.float32), (5, 5), 0)
             return (g - g.mean()) / (g.std() + 1e-6)
+
         votes, ev = [], []
         for t in times:
             out, right = self.out(t, 270), self.base(c, t, 270)
@@ -240,12 +259,25 @@ class Verifier:
             votes.append(sr > sw + 0.01)
         sps = "/".join(f"{x:g}x" for x in sp)
         if not votes:
-            return {"id": rid, "type": "speed", "status": "skip", "why": f"{what} ({sps}): the shot barely moves, so the speed cannot be measured",
-                    "evidence": {"samples [t, match planned, match 1x, planned~1x]": ev}}
+            return {
+                "id": rid,
+                "type": "speed",
+                "status": "skip",
+                "why": f"{what} ({sps}): the shot barely moves, so the speed cannot be measured",
+                "evidence": {"samples [t, match planned, match 1x, planned~1x]": ev},
+            }
         ok = sum(votes) * 2 > len(votes)
-        return {"id": rid, "type": "speed", "status": "pass" if ok else "fail",
-                "why": (f"{what} plays: the picture follows the take at {sps}" if ok else f"{what} ({sps}) planned, but the picture follows the take at normal speed"),
-                "evidence": {"samples [t, match planned, match 1x, planned~1x]": ev}}
+        return {
+            "id": rid,
+            "type": "speed",
+            "status": "pass" if ok else "fail",
+            "why": (
+                f"{what} plays: the picture follows the take at {sps}"
+                if ok
+                else f"{what} ({sps}) planned, but the picture follows the take at normal speed"
+            ),
+            "evidence": {"samples [t, match planned, match 1x, planned~1x]": ev},
+        }
 
     def _region(self, e, frames, ref):
         """Crop box (0-1) to judge a person-tracking effect on: eyes, face or upper body of the main face."""
@@ -274,8 +306,15 @@ class Verifier:
             c = self.clip_at(t)
             o, b = self.out(t, 360), (self.base(c, t, 360) if c else None)
             ch = F.diff(F.gray_small(o, 160), F.gray_small(cv2.resize(b, (o.shape[1], o.shape[0])), 160)) if o is not None and b is not None else 0
-            return {"id": e["id"], "type": "effect", "name": e.get("name"), "window": e["window"], "status": "pass",
-                    "why": f"texture layer (subtle by design); picture change {ch:.3f}", "evidence": {"pixel_change": round(ch, 3)}}
+            return {
+                "id": e["id"],
+                "type": "effect",
+                "name": e.get("name"),
+                "window": e["window"],
+                "status": "pass",
+                "why": f"texture layer (subtle by design); picture change {ch:.3f}",
+                "evidence": {"pixel_change": round(ch, 3)},
+            }
         t0, t1 = e["window"]
         if e.get("moves_image"):
             return self.check_motion(e, kind="shake")
@@ -284,7 +323,9 @@ class Verifier:
         n = min(14, max(6, int((t1 - t0) * 6)))
         scan_t = [t0 + (t1 - t0) * (i + 0.5) / n for i in range(n)]
         scan = self.outs(scan_t, 360)
-        box = self._region(e, [f for f in scan[:3] if f is not None], cv2.resize(ref, (360, round(360 * ref.shape[0] / ref.shape[1]))) if ref is not None else None)
+        box = self._region(
+            e, [f for f in scan[:3] if f is not None], cv2.resize(ref, (360, round(360 * ref.shape[0] / ref.shape[1]))) if ref is not None else None
+        )
         if ref is not None:
             rs = F.gray_small(cv2.resize(F.crop(ref, box) if box else ref, (160, 160)), 160)
             score = [F.diff(rs, F.gray_small(cv2.resize(F.crop(f, box) if box else f, (160, 160)), 160)) if f is not None else -1 for f in scan]
@@ -302,23 +343,38 @@ class Verifier:
                 diffs.append(round(F.diff(a, F.gray_small(c, 160)), 3))
         labels = (["A (without)"] if rcrop is not None else []) + [f"B{i + 1} {t:.1f}s" for i, t in enumerate(times)]
         sheet = F.sheet(([rcrop] if rcrop is not None else []) + crops, labels, cols=5 if rcrop is not None else 4, cell_w=300)
-        out = {"id": e["id"], "type": "effect", "name": e.get("name"), "window": e["window"], "evidence": {"pixel_change": diffs, "reference": how,
-               "region": [round(v, 3) for v in box] if box else "full frame"}, "sheet": self.save(e["id"], sheet)}
+        out = {
+            "id": e["id"],
+            "type": "effect",
+            "name": e.get("name"),
+            "window": e["window"],
+            "evidence": {"pixel_change": diffs, "reference": how, "region": [round(v, 3) for v in box] if box else "full frame"},
+            "sheet": self.save(e["id"], sheet),
+        }
         if not self.vlm:
             ok = bool(diffs) and max(diffs) > 0.04
             out.update(status="pass" if ok else "warn", why=f"pixel change up to {max(diffs, default=0):.2f} (no vision check)")
             return out
-        d, s = ask(self.planner, EFFECT_SYSTEM, f"Expected: {e.get('expect')}\nThe edit is the effect '{e.get('en')}': {e.get('desc')}"
-                   + (f" (it targets the {e.get('target')})" if e.get("target") else "") + "\n" +
-                   ("A is the same shot without the effect." if rcrop is not None else "There is no reference frame; judge B frames alone."), [sheet])
+        d, s = ask(
+            self.planner,
+            EFFECT_SYSTEM,
+            f"Expected: {e.get('expect')}\nThe edit is the effect '{e.get('en')}': {e.get('desc')}"
+            + (f" (it targets the {e.get('target')})" if e.get("target") else "")
+            + "\n"
+            + ("A is the same shot without the effect." if rcrop is not None else "There is no reference frame; judge B frames alone."),
+            [sheet],
+        )
         d = d if isinstance(d, dict) else {}
         out["evidence"].update(vision=d, vision_s=s)
         vis, strength, matches = bool(d.get("visible")), str(d.get("strength", "")).lower(), d.get("matches")
         if not vis or strength == "none":
             out.update(status="fail", why=f"not visible: {d.get('problem') or d.get('seen') or 'no difference seen'}")
         elif strength == "weak" or matches is False:
-            out.update(status="warn", why=f"{'weak' if strength == 'weak' else 'visible but different from expected'}: {d.get('seen')}"
-                       + (f" ({d.get('problem')})" if d.get("problem") else ""))
+            out.update(
+                status="warn",
+                why=f"{'weak' if strength == 'weak' else 'visible but different from expected'}: {d.get('seen')}"
+                + (f" ({d.get('problem')})" if d.get("problem") else ""),
+            )
         else:
             out.update(status="pass", why=f"{strength}: {d.get('seen')}")
         return out
@@ -328,7 +384,8 @@ class Verifier:
 
         def inner(f):  # the middle of the picture: frame-edge overlays (film strips, bars, vignettes) never shake
             h, w = f.shape[:2]
-            return f[int(0.15 * h):int(0.85 * h), int(0.15 * w):int(0.85 * w)]
+            return f[int(0.15 * h) : int(0.85 * h), int(0.15 * w) : int(0.85 * w)]
+
         g = [F.gray_small(inner(f), 160) for f in frames]
         sh = [F.shift(a, b) for a, b in zip(g, g[1:])]
         dx = [x[0] for x in sh]
@@ -340,8 +397,11 @@ class Verifier:
 
     def _clear_span(self, e, a, b, kinds=("transition", "zoom", "shake")):
         """The longest part of [a, b] that no other edit of `kinds` touches, or None."""
-        busy = sorted((x["window"][0] - 0.05, x["window"][1] + 0.05) for x in self.m["edits"]
-                      if x["type"] in kinds and x["id"] != e["id"] and x.get("window") and x["window"][0] < b and a < x["window"][1])
+        busy = sorted(
+            (x["window"][0] - 0.05, x["window"][1] + 0.05)
+            for x in self.m["edits"]
+            if x["type"] in kinds and x["id"] != e["id"] and x.get("window") and x["window"][0] < b and a < x["window"][1]
+        )
         free, cur = [], a
         for s0, s1 in busy:
             if s0 > cur:
@@ -366,7 +426,7 @@ class Verifier:
                 box = [0.05, 0.6, 0.95, 0.98] if e["type"] == "captions" else [0.0, 0.0, 0.0, 0.0]
             x0, y0, x1, y1 = box
             mx, my = 0.06, 0.05  # boxes are estimates: a margin around them
-            mask[max(0, int((y0 - my) * h)):min(h, int((y1 + my) * h)), max(0, int((x0 - mx) * w)):min(w, int((x1 + mx) * w))] = 0
+            mask[max(0, int((y0 - my) * h)) : min(h, int((y1 + my) * h)), max(0, int((x0 - mx) * w)) : min(w, int((x1 + mx) * w))] = 0
         return mask
 
     @staticmethod
@@ -408,8 +468,10 @@ class Verifier:
             else:
                 base = (ref or {}).get("jitter", 0.0)
                 ok = got["jitter"] > max(0.004, 2.0 * base) or (got["jitter"] - base > 0.006 and got["jitter"] > 1.3 * base)
-                out.update(status="pass" if ok else "fail",
-                           why=f"camera jitter {got['jitter']:.4f} vs {base:.4f} in the source" + ("" if ok else ": no shake seen"))
+                out.update(
+                    status="pass" if ok else "fail",
+                    why=f"camera jitter {got['jitter']:.4f} vs {base:.4f} in the source" + ("" if ok else ": no shake seen"),
+                )
             return out
         if kind == "zoom" or (kind == "keyframes" and e.get("property") == "scale"):
             if kind == "zoom":
@@ -457,8 +519,12 @@ class Verifier:
                 s_src = self._scale(ba, bb, mask) if ba is not None and bb is not None else None
                 if s_src:
                     s, how = s / s_src, "features, minus the footage's own zoom"
-            out["evidence"] = {"scale": round(s, 3) if s else None, "wanted": round(want, 3), "measured_by": how,
-                               "footage_zoom": round(s_src, 3) if s_src else None}
+            out["evidence"] = {
+                "scale": round(s, 3) if s else None,
+                "wanted": round(want, 3),
+                "measured_by": how,
+                "footage_zoom": round(s_src, 3) if s_src else None,
+            }
             if s is None:
                 out.update(status="warn", why="could not measure the zoom")
             elif s_src and abs(s_src - 1) > max(0.06, 2 * abs(want - 1)):
@@ -468,8 +534,10 @@ class Verifier:
             else:
                 ok = (s - 1) * (want - 1) > 0 and abs(s - 1) >= 0.4 * abs(want - 1)
                 subtle = abs(want - 1) < 0.1 and abs(s - 1) < 0.04  # a slow push of a few % is lost in the footage's own motion
-                out.update(status="pass" if ok else "warn" if subtle else "fail",
-                           why=f"zoom x{s:.2f} measured, x{want:.2f} planned" + ("" if ok or not subtle else " (too subtle to measure here)"))
+                out.update(
+                    status="pass" if ok else "warn" if subtle else "fail",
+                    why=f"zoom x{s:.2f} measured, x{want:.2f} planned" + ("" if ok or not subtle else " (too subtle to measure here)"),
+                )
             return out
         # other keyframes (position / rotation / opacity / colour): frames at the first and last keyframe must differ
         return self.check_animation(e)
@@ -491,7 +559,15 @@ class Verifier:
         out = {"id": e["id"], "type": "filter", "name": e.get("name"), "window": e["window"], "evidence": {"colour_change": deltas}}
         pairs = [(b, o) for o, b in zip(outs, bases) if o is not None and b is not None]
         if pairs:
-            out["sheet"] = self.save(e["id"], F.sheet([x for p in pairs[:2] for x in p], [f"A{i // 2 + 1} source" if i % 2 == 0 else f"B{i // 2 + 1} export" for i in range(2 * min(2, len(pairs)))], cols=4, cell_w=240))
+            out["sheet"] = self.save(
+                e["id"],
+                F.sheet(
+                    [x for p in pairs[:2] for x in p],
+                    [f"A{i // 2 + 1} source" if i % 2 == 0 else f"B{i // 2 + 1} export" for i in range(2 * min(2, len(pairs)))],
+                    cols=4,
+                    cell_w=240,
+                ),
+            )
         if not deltas:
             out.update(status="warn", why="could not compare colours")
             return out
@@ -517,9 +593,14 @@ class Verifier:
         to_b = [F.diff(x, g[4]) for x in g[1:4]]
         ab = F.diff(g[0], g[4])
         mid_unique = max(min(a, b) for a, b in zip(to_a, to_b))  # a hard cut: every middle frame equals one side
-        out = {"id": e["id"], "type": "transition", "name": e.get("name"), "window": e["window"],
-               "evidence": {"a_vs_b": round(ab, 3), "middle_vs_sides": round(mid_unique, 3)},
-               "sheet": self.save(e["id"], F.sheet(fr, [f"{t:.2f}s" for t in ts], cols=5, cell_w=200))}
+        out = {
+            "id": e["id"],
+            "type": "transition",
+            "name": e.get("name"),
+            "window": e["window"],
+            "evidence": {"a_vs_b": round(ab, 3), "middle_vs_sides": round(mid_unique, 3)},
+            "sheet": self.save(e["id"], F.sheet(fr, [f"{t:.2f}s" for t in ts], cols=5, cell_w=200)),
+        }
         if mid_unique > max(0.035, 0.12 * ab):
             out.update(status="pass", why="the frames at the cut differ from both clips (a transition is visible)")
         else:
@@ -545,8 +626,12 @@ class Verifier:
         if not self.vlm:
             out.update(status="skip", why="needs the vision model")
             return out
-        d, s = ask(self.planner, TEXT_SYSTEM, "Expected text per frame: " + "; ".join(f"{lab.split()[0]}: \"{w}\"" for lab, w in zip(labels, want)),
-                   [F.sheet(frames, labels, cols=min(3, len(frames)), cell_w=420)])
+        d, s = ask(
+            self.planner,
+            TEXT_SYSTEM,
+            "Expected text per frame: " + "; ".join(f'{lab.split()[0]}: "{w}"' for lab, w in zip(labels, want)),
+            [F.sheet(frames, labels, cols=min(3, len(frames)), cell_w=420)],
+        )
         got = (d or {}).get("frames", []) if isinstance(d, dict) else []
         safe = self.m.get("safe") or {}
         probs, scores = [], []
@@ -587,13 +672,21 @@ class Verifier:
         g = [F.gray_small(cv2.resize(f, (192, max(2, round(192 * f.shape[0] / f.shape[1])))), 192) for f in fr]
         change = max(F.diff(g[0], x) for x in g[1:])
         sheet = F.sheet(fr, [f"{t:.2f}s" for t in ts], cols=4, cell_w=300)
-        out = {"id": e["id"], "type": e["type"], "name": e.get("name"), "window": e["window"], "evidence": {"change": round(change, 3), "region": box or "full frame"},
-               "sheet": self.save(e["id"], sheet)}
+        out = {
+            "id": e["id"],
+            "type": e["type"],
+            "name": e.get("name"),
+            "window": e["window"],
+            "evidence": {"change": round(change, 3), "region": box or "full frame"},
+            "sheet": self.save(e["id"], sheet),
+        }
         if not self.vlm:
             out.update(status="pass" if change >= 0.02 else "warn", why=f"picture change {change:.3f} across the animation (no vision check)")
             return out
         target = "the text" if e.get("on_text") else "the clip"
-        d, s = ask(self.planner, MOTION_SYSTEM, f"Expected: {e.get('expect')} ({target}; '{e.get('en')}': {e.get('motion') or e.get('desc')})", [sheet])
+        d, s = ask(
+            self.planner, MOTION_SYSTEM, f"Expected: {e.get('expect')} ({target}; '{e.get('en')}': {e.get('motion') or e.get('desc')})", [sheet]
+        )
         d = d if isinstance(d, dict) else {}
         out["evidence"].update(vision=d, vision_s=s)
         if d.get("animates") is False and change < 0.03:
@@ -630,12 +723,15 @@ class Verifier:
         for c in self.m["clips"]:
             if (only is None or c["id"] in only) and not c.get("overlay") and (c.get("focus") or c.get("chroma")):
                 jobs.append((c["id"], self.check_clip, (c,)))
-            if (only is None or c["id"] in only or f"{c['id']}:speed" in only) and c.get("end", 0) - c.get("start", 0) >= 0.8 and \
-                    any(pc["kind"] == "video" and abs(pc["speed"] - 1) > 0.05 for pc in c.get("pieces") or []):
+            if (
+                (only is None or c["id"] in only or f"{c['id']}:speed" in only)
+                and c.get("end", 0) - c.get("start", 0) >= 0.8
+                and any(pc["kind"] == "video" and abs(pc["speed"] - 1) > 0.05 for pc in c.get("pieces") or [])
+            ):
                 jobs.append((f"{c['id']}:speed", self.check_speed, (c,)))
         # slow push-ins the style adds to every shot (ken burns, "kb*") are texture, not asks: check a sample of them
         kb = [e["id"] for e in self.m["edits"] if e["type"] == "keyframes" and str(e["id"]).startswith("kb")]
-        kb_skip = set(kb) - set(kb[::max(1, len(kb) // KB_SAMPLE)][:KB_SAMPLE]) if only is None else set()
+        kb_skip = set(kb) - set(kb[:: max(1, len(kb) // KB_SAMPLE)][:KB_SAMPLE]) if only is None else set()
         for e in self.m["edits"]:
             if only is not None and e["id"] not in only or e["id"] in kb_skip:
                 continue
@@ -674,8 +770,14 @@ class Verifier:
         order = {"fail": 0, "warn": 1, "pass": 2, "skip": 3}
         results.sort(key=lambda r: (order.get(r.get("status"), 9), str(r.get("id"))))
         counts = {k: sum(1 for r in results if r.get("status") == k) for k in order}
-        rep = {"video": self.video, "draft": self.m["draft"], "checked": len(results), "counts": counts,
-               "seconds": round(time.perf_counter() - t0, 1), "results": results}
+        rep = {
+            "video": self.video,
+            "draft": self.m["draft"],
+            "checked": len(results),
+            "counts": counts,
+            "seconds": round(time.perf_counter() - t0, 1),
+            "results": results,
+        }
         (self.dir / "report.json").write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
         self.log(f"verified {len(results)} edit points in {rep['seconds']} s: {counts['pass']} pass, {counts['warn']} warn, {counts['fail']} fail")
         return rep
@@ -690,6 +792,8 @@ def summary(rep):
     for r in rep["results"]:
         mark = {"pass": "OK  ", "warn": "WARN", "fail": "FAIL", "skip": "SKIP"}.get(r.get("status"), "?   ")
         win = r.get("window")
-        lines.append(f"{mark} {r.get('id'):<8} {r.get('type', ''):<10} {('%.1f-%.1fs' % tuple(win)) if win else '':<11} "
-                     f"{(r.get('name') or '')[:10]:<10} {r.get('why', '')[:110]}")
+        lines.append(
+            f"{mark} {r.get('id'):<8} {r.get('type', ''):<10} {('%.1f-%.1fs' % tuple(win)) if win else '':<11} "
+            f"{(r.get('name') or '')[:10]:<10} {r.get('why', '')[:110]}"
+        )
     return "\n".join(lines)

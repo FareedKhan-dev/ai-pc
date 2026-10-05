@@ -9,6 +9,7 @@ compile error with its file and line.
 
   "goland go project called 'Shop'"   'go app called Stock'   'golang build C:\\code\\api\\go.mod'
 """
+
 import os
 import re
 import shutil
@@ -237,14 +238,24 @@ def home():
 def env():
     h = home()
     e = {k: v for k, v in os.environ.items() if not k.upper().startswith("GO")}  # no GOROOT/GOPATH/GOFLAGS from elsewhere on the PC
-    e.update(PATH=str(GOROOT / "bin") + os.pathsep + os.environ["PATH"], GOPATH=str(h / "gopath"), GOCACHE=str(h / "cache"), GOENV=str(h / "env"),
-             GOTMPDIR=str(h / "tmp"), GOTOOLCHAIN="local", GOFLAGS="-modcacherw", CGO_ENABLED="0",
-             APPDATA=str(h / "appdata"), LOCALAPPDATA=str(h / "localappdata"))  # go's telemetry and config dirs follow these
+    e.update(
+        PATH=str(GOROOT / "bin") + os.pathsep + os.environ["PATH"],
+        GOPATH=str(h / "gopath"),
+        GOCACHE=str(h / "cache"),
+        GOENV=str(h / "env"),
+        GOTMPDIR=str(h / "tmp"),
+        GOTOOLCHAIN="local",
+        GOFLAGS="-modcacherw",
+        CGO_ENABLED="0",
+        APPDATA=str(h / "appdata"),
+        LOCALAPPDATA=str(h / "localappdata"),
+    )  # go's telemetry and config dirs follow these
     return e
 
 
 def go(*args, cwd, timeout=600):
     from ai_pc.core import hidden_desktop
+
     rc, out, err, timed_out = hidden_desktop.run([str(GO), *map(str, args)], timeout=timeout, cwd=str(cwd), env=env())
     return rc == 0 and not timed_out, out + err
 
@@ -271,8 +282,12 @@ def version():
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
-    if not re.search(r"\bgolang\b|\bgoland\b|\bgo\.mod\b|\bgo\s+(?:project|app|program|module|cli|api|service|code)\b|\bin go\b(?!\s+(?:ahead|back|on|out|over|away|home|through))", c):
+    if not re.search(
+        r"\bgolang\b|\bgoland\b|\bgo\.mod\b|\bgo\s+(?:project|app|program|module|cli|api|service|code)\b|\bin go\b(?!\s+(?:ahead|back|on|out|over|away|home|through))",
+        c,
+    ):
         return None
     f = find_file(text, ctx, {".mod"})
     if f and Path(f).name.lower() == "go.mod":
@@ -293,20 +308,37 @@ def run(op, ctx):
         errs = compile_errors(vet + tests + built)
         if not (ok_v and ok_t and ok_b):
             failed = re.findall(r"^--- FAIL: (\S+)", tests, re.M)
-            return (f"Go build of {folder.name} FAILED" + (f" with {len(errs)} problem(s): " + "; ".join(errs[:8]) if errs else
-                    (f": tests failed: {', '.join(failed[:6])}" if failed else ": " + (vet + tests + built).strip()[-300:])) + ".")
-        return f"{folder.name} builds with Go {version()}: go vet clean; " + "; ".join(ln.strip() for ln in tests.splitlines() if ln.startswith(("ok", "?"))) + "."
+            return (
+                f"Go build of {folder.name} FAILED"
+                + (
+                    f" with {len(errs)} problem(s): " + "; ".join(errs[:8])
+                    if errs
+                    else (f": tests failed: {', '.join(failed[:6])}" if failed else ": " + (vet + tests + built).strip()[-300:])
+                )
+                + "."
+            )
+        return (
+            f"{folder.name} builds with Go {version()}: go vet clean; "
+            + "; ".join(ln.strip() for ln in tests.splitlines() if ln.startswith(("ok", "?")))
+            + "."
+        )
     name = op["name"]
     pkg = re.sub(r"[^a-z0-9]", "", name.lower()) or "app"
     out = (Path(ctx["out"]) / "goland" / name).resolve()
     if out.exists():
         shutil.rmtree(out, ignore_errors=True)
-    files = {"go.mod": GO_MOD.format(pkg=pkg, version=version()), "inventory/inventory.go": INVENTORY, "inventory/inventory_test.go": TESTS,
-             f"cmd/{pkg}/main.go": MAIN.format(pkg=pkg), ".gitignore": f"/{pkg}.exe\n/.idea/\n"}
+    files = {
+        "go.mod": GO_MOD.format(pkg=pkg, version=version()),
+        "inventory/inventory.go": INVENTORY,
+        "inventory/inventory_test.go": TESTS,
+        f"cmd/{pkg}/main.go": MAIN.format(pkg=pkg),
+        ".gitignore": f"/{pkg}.exe\n/.idea/\n",
+    }
     for rel, text in files.items():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         (out / rel).write_text(tabs(text), encoding="utf-8", newline="\n")  # gofmt wants LF line ends
     from ai_pc.core import hidden_desktop
+
     ok_v, vet = go("vet", "./...", cwd=out)
     ok_t, tests = go("test", "-v", "./...", cwd=out)
     exe = out / f"{pkg}.exe"
@@ -315,13 +347,29 @@ def run(op, ctx):
     rc_f, unformatted, _, _ = hidden_desktop.run([str(GOROOT / "bin" / "gofmt.exe"), "-l", "."], timeout=60, cwd=str(out), env=env())
     passed = len(re.findall(r"^--- PASS:", tests, re.M))
     errs = compile_errors(vet + tests + built)
-    checks = [("go vet finds nothing", ok_v and not errs), (f"go test: {passed} of 5 tests passed", ok_t and passed == 5),
-              (f"go build made {exe.name} ({exe.stat().st_size / 1024 / 1024:.1f} MB, one file, no C runtime needed) and it prints the stock's value (Rs 22,000)"
-               if exe.exists() else "go build made the .exe", ok_b and rc == 0 and "Total value: Rs 22,000" in ran),
-              ("gofmt finds every file formatted", rc_f == 0 and not unformatted.strip())]
+    checks = [
+        ("go vet finds nothing", ok_v and not errs),
+        (f"go test: {passed} of 5 tests passed", ok_t and passed == 5),
+        (
+            f"go build made {exe.name} ({exe.stat().st_size / 1024 / 1024:.1f} MB, one file, no C runtime needed) and it prints the stock's value (Rs 22,000)"
+            if exe.exists()
+            else "go build made the .exe",
+            ok_b and rc == 0 and "Total value: Rs 22,000" in ran,
+        ),
+        ("gofmt finds every file formatted", rc_f == 0 and not unformatted.strip()),
+    ]
     ctx.setdefault("memo", {})["project"] = str(out)  # for VS Code and the other tools
     bad = [w for w, good in checks if not good]
-    return (f"Go module {out} (example.com/{pkg}: inventory package + tests, cmd/{pkg}; open the folder in GoLand or VS Code). " +
-            (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else "") +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(errs[:5]) +
-             (" Not formatted: " + unformatted.strip()[:200] if unformatted.strip() else "")))
+    return (
+        f"Go module {out} (example.com/{pkg}: inventory package + tests, cmd/{pkg}; open the folder in GoLand or VS Code). "
+        + (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else "")
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: "
+            + "; ".join(bad)
+            + ". "
+            + "; ".join(errs[:5])
+            + (" Not formatted: " + unformatted.strip()[:200] if unformatted.strip() else "")
+        )
+    )

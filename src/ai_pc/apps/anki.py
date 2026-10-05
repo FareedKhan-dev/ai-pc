@@ -7,6 +7,7 @@ package's own database: the deck is there with every note, the right number of c
   "anki deck 'Capitals': France = Paris; Japan = Tokyo; Pakistan = Islamabad, both ways"   'anki deck from biology.xlsx'
   'anki cloze: The {mitochondria} is the powerhouse of the cell; Water boils at {100} degrees'
 """
+
 import html
 import json
 import re
@@ -17,8 +18,11 @@ import zlib
 from pathlib import Path
 
 NAME, LABEL = "anki", "Anki: flashcard decks (.apkg) from lists, notes, CSV or Excel"
-EXAMPLES = ["anki deck 'Capitals': France = Paris; Japan = Tokyo; Pakistan = Islamabad, both ways", "anki deck from biology.xlsx",
-            "anki cloze: The {mitochondria} is the powerhouse of the cell"]
+EXAMPLES = [
+    "anki deck 'Capitals': France = Paris; Japan = Tokyo; Pakistan = Islamabad, both ways",
+    "anki deck from biology.xlsx",
+    "anki cloze: The {mitochondria} is the powerhouse of the cell",
+]
 SOURCES = {".txt", ".md", ".csv", ".tsv", ".xlsx"}
 SEPS = r"\s*::\s*|\s+=\s+|\s+[-–—]\s+|\t|:\s+"
 HEADER = re.compile(r"^(?:front|question|term|word|q)$", re.I)
@@ -41,13 +45,18 @@ def pairs_from_file(path):
     p = Path(path)
     if p.suffix.lower() == ".xlsx":
         from openpyxl import load_workbook
+
         wb = load_workbook(p, read_only=True, data_only=True)
         rows = [[("" if c is None else str(c)).strip() for c in r[:2]] for r in wb.active.iter_rows(values_only=True)]
         wb.close()
     elif p.suffix.lower() in (".csv", ".tsv"):
         import csv
+
         text = p.read_text(encoding="utf-8-sig")
-        rows = [[c.strip() for c in r[:2]] for r in csv.reader(text.splitlines(), delimiter="\t" if p.suffix.lower() == ".tsv" or "\t" in text[:500] else ",")]
+        rows = [
+            [c.strip() for c in r[:2]]
+            for r in csv.reader(text.splitlines(), delimiter="\t" if p.suffix.lower() == ".tsv" or "\t" in text[:500] else ",")
+        ]
     else:
         return pairs_from_text(p.read_text(encoding="utf-8-sig"))
     rows = [r for r in rows if len(r) == 2 and r[0] and r[1]]
@@ -65,6 +74,7 @@ def clozes(text):
         def sub(m):
             n[0] += 1
             return "{{c%d::%s}}" % (n[0], html.escape(m.group(1)))
+
         body = re.sub(r"\{\{?(?:c\d+::)?([^{}]+)\}?\}", sub, html.escape(item.strip(), quote=False).replace("&#x27;", "'"))
         if n[0]:
             out.append(body)
@@ -77,6 +87,7 @@ def _id(name, salt):
 
 def write(path, deck_name, pairs=(), cloze=(), both=False):
     import genanki
+
     deck = genanki.Deck(_id(deck_name, "deck"), deck_name)
     model = genanki.BASIC_AND_REVERSED_CARD_MODEL if both else genanki.BASIC_MODEL
     for f, b in pairs:
@@ -100,14 +111,17 @@ def check(path, deck_name, notes, cards, first):
             flds = db.execute("select flds from notes order by id limit 1").fetchone()[0].split("\x1f")[0]
         finally:
             db.close()
-    return [("the package holds Anki's collection and media list", "collection.anki2" in names and "media" in names),
-            (f"the deck '{deck_name}' is in it with all {notes} notes", did is not None and n_notes == notes),
-            (f"{cards} cards to study", n_cards == cards),
-            ("the first card reads as given", html.unescape(flds) == html.unescape(first))]
+    return [
+        ("the package holds Anki's collection and media list", "collection.anki2" in names and "media" in names),
+        (f"the deck '{deck_name}' is in it with all {notes} notes", did is not None and n_notes == notes),
+        (f"{cards} cards to study", n_cards == cards),
+        ("the first card reads as given", html.unescape(flds) == html.unescape(first)),
+    ]
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\banki\b", c):
         return None
@@ -120,7 +134,14 @@ def parse(text, ctx):
         items = clozes(body if body.strip() else Path(src).read_text(encoding="utf-8-sig") if src else "")
         return {"op": "deck", "name": m.group(1) if m else "Cloze Cards", "pairs": [], "cloze": items, "both": False} if items else None
     if src and not body.strip():
-        return {"op": "deck", "name": m.group(1) if m else Path(src).stem.replace("_", " ").title(), "file": src, "pairs": None, "cloze": [], "both": both}
+        return {
+            "op": "deck",
+            "name": m.group(1) if m else Path(src).stem.replace("_", " ").title(),
+            "file": src,
+            "pairs": None,
+            "cloze": [],
+            "both": both,
+        }
     pairs = pairs_from_text(body)
     return {"op": "deck", "name": m.group(1) if m else "AI PC Cards", "pairs": pairs, "cloze": [], "both": both} if pairs else None
 
@@ -138,7 +159,13 @@ def run(op, ctx):
     first = pairs[0][0] if pairs else op["cloze"][0]
     checks = check(path, op["name"], notes, cards, html.escape(first) if pairs else first)
     bad = [w for w, ok in checks if not ok]
-    sample = "; ".join(f"{f} -> {b}" for f, b in pairs[:3]) if pairs else "; ".join(re.sub(r"\{\{c\d+::([^}]+)\}\}", r"[\1]", html.unescape(t)) for t in op["cloze"][:2])
-    return (f"Anki deck '{op['name']}': {path} ({notes} notes, {cards} cards{', both ways' if op['both'] else ''}; e.g. {sample}). "
-            "Double-click it (or Anki: File > Import) to add it to Anki; making it again updates the same cards. " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + "."))
+    sample = (
+        "; ".join(f"{f} -> {b}" for f, b in pairs[:3])
+        if pairs
+        else "; ".join(re.sub(r"\{\{c\d+::([^}]+)\}\}", r"[\1]", html.unescape(t)) for t in op["cloze"][:2])
+    )
+    return (
+        f"Anki deck '{op['name']}': {path} ({notes} notes, {cards} cards{', both ways' if op['both'] else ''}; e.g. {sample}). "
+        "Double-click it (or Anki: File > Import) to add it to Anki; making it again updates the same cards. "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ".")
+    )

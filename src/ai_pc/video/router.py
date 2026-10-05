@@ -11,6 +11,7 @@
 Rules decide in microseconds; only an unclear message goes to the cheap model (one short JSON call). answer() runs
 the questions (catalog / capability / classify / style / help) and returns text; edit and revise are run by the studio.
 """
+
 import json
 import re
 
@@ -19,20 +20,33 @@ from ai_pc.video import awareness
 from ai_pc.video import catalog_qa as CQ
 from ai_pc.video import taxonomy as TX
 
-Q_START = re.compile(r"^(what|which|who|how|do|does|did|can|could|is|are|any|show|list|tell|give|got|have|where|why|whats|what's|"
-                     r"is there|are there)\b")
+Q_START = re.compile(
+    r"^(what|which|who|how|do|does|did|can|could|is|are|any|show|list|tell|give|got|have|where|why|whats|what's|"
+    r"is there|are there)\b"
+)
 EDIT_VERBS = re.compile(r"\b(edit|make|create|cut|turn|put together|produce|build|montage|reel|compile|stitch)\b")
-REVISE = re.compile(r"\b(make it|change|more|less|add|remove|replace|instead|stronger|weaker|faster|slower|swap|move|shorter|longer|"
-                    r"louder|quieter|bigger|smaller|again|redo|fix)\b")
-CAPABILITY = re.compile(r"\b(can you|could you|are you able|is it possible|possible to|do you support|can i|could i|"
-                        r"how (?:do|would|can|could|should) (?:i|you|we))\b")
-CLASSIFY = re.compile(r"\b(what (?:kind|type|sort) of (?:video|edit)|which (?:kind|type) of (?:video|edit)|classify|categori[sz]e|"
-                      r"what (?:should|would) (?:this|it) be|what genre)\b")
-STYLE_Q = re.compile(r"\b(what style|which style|analy[sz]e (?:this|the|my) (?:edit|video|sample|reference)|style of (?:this|the)|"
-                     r"how (?:is|was) (?:this|it) edited|study this)\b")
+REVISE = re.compile(
+    r"\b(make it|change|more|less|add|remove|replace|instead|stronger|weaker|faster|slower|swap|move|shorter|longer|"
+    r"louder|quieter|bigger|smaller|again|redo|fix)\b"
+)
+CAPABILITY = re.compile(
+    r"\b(can you|could you|are you able|is it possible|possible to|do you support|can i|could i|"
+    r"how (?:do|would|can|could|should) (?:i|you|we))\b"
+)
+CLASSIFY = re.compile(
+    r"\b(what (?:kind|type|sort) of (?:video|edit)|which (?:kind|type) of (?:video|edit)|classify|categori[sz]e|"
+    r"what (?:should|would) (?:this|it) be|what genre)\b"
+)
+STYLE_Q = re.compile(
+    r"\b(what style|which style|analy[sz]e (?:this|the|my) (?:edit|video|sample|reference)|style of (?:this|the)|"
+    r"how (?:is|was) (?:this|it) edited|study this)\b"
+)
 HELP = re.compile(r"\b(what can you do|help|what do you (?:do|support)|your (?:features|capabilities)|features)\b")
-LIKE = re.compile(r"\b(?:like|same (?:style|vibe) as|in the style of|similar to|match(?:ing)?)\s+(?:this|that|the|my)?\s*"
-                  r"([\w\-. ]+\.(?:mp4|mov|mkv|webm|m4v))", re.I)
+LIKE = re.compile(
+    r"\b(?:like|same (?:style|vibe) as|in the style of|similar to|match(?:ing)?)\s+(?:this|that|the|my)?\s*"
+    r"([\w\-. ]+\.(?:mp4|mov|mkv|webm|m4v))",
+    re.I,
+)
 
 ROUTE_SYSTEM = """Classify a message to a video-editing assistant. Reply with ONE JSON object:
 {"intent": "catalog|capability|classify|style|edit|revise|help", "why": "<few words>"}
@@ -44,7 +58,8 @@ BUILT_IN = {  # what this editor does with its own tools (no catalogue item need
     r"\bshak(?:e|y|ing)\b": "camera shake (position keyframes, any strength, on beats or hits)",
     r"\bzoom|punch(?:-| )?in\b": "zoom punches and slow push-ins (scale keyframes, timed to beats)",
     r"\bslow(?:-| )?mo|slow motion|speed ramp|velocity\b": "slow motion and speed ramps (fast-slow-fast on the key moment)",
-    r"\bfreeze\b": "freeze frames", r"\brevers": "reverse playback",
+    r"\bfreeze\b": "freeze frames",
+    r"\brevers": "reverse playback",
     r"\bgreen ?screen|chroma|blue screen\b": "green/blue screen removal (with a clean background behind it)",
     r"\bcaption|subtitle\b": "captions from speech (local Whisper) or from given text, styled and timed",
     r"\bvoice ?over|narrat": "voiceover: narration with subtitles and the music ducked under it",
@@ -53,7 +68,9 @@ BUILT_IN = {  # what this editor does with its own tools (no catalogue item need
     r"\bsound effects?|sfx|whoosh|impact|riser\b": "synthesised sound effects: impact, hit, whoosh, swoosh, riser, sub drop, thunder, glitch",
     r"\breframe|vertical|9:16|crop\b": "reframing for 9:16 / 16:9 / 1:1 that keeps faces in view",
     r"\bjump cuts?|pauses|silence\b": "jump cuts that remove pauses and filler words from speech",
-    r"\bmask\b": "shape masks", r"\bblend\b": "blend modes", r"\blabels?|titles?|text\b": "titles, labels and kinetic text",
+    r"\bmask\b": "shape masks",
+    r"\bblend\b": "blend modes",
+    r"\blabels?|titles?|text\b": "titles, labels and kinetic text",
     r"\blike this|same style|reference|sample\b": "matching the style of a sample edit you give (rhythm, moves, look, text)",
 }
 NOT_POSSIBLE = {
@@ -120,6 +137,7 @@ def capability(message, planner=None):
 
         def fits(it):
             return not looks or any(w in f"{it['en']} {it['desc']}".lower() for w in looks)
+
         usable = [it for it in found if it["state"] in ("ready", "untried")]
         exact = [it for it in usable if fits(it)]
         vip = [it for it in found if it["state"] == "vip" and fits(it)]
@@ -128,22 +146,32 @@ def capability(message, planner=None):
         usable.sort(key=lambda it: (it["state"] != "ready", -len(moods & set(it.get("use") if isinstance(it.get("use"), list) else []))))
         support = []
         if spec["target"] and looks:  # e.g. lightning on the eyes: a full-frame lightning around the person helps
-            support = [it for it in CQ.find({**spec, "target": None, "kinds": ["scene_effect"]}) if it["state"] in ("ready", "untried") and fits(it)][:2]
+            support = [it for it in CQ.find({**spec, "target": None, "kinds": ["scene_effect"]}) if it["state"] in ("ready", "untried") and fits(it)][
+                :2
+            ]
         if exact:
             items = exact
             lines.append("Yes: " + "; ".join(name(it) for it in exact[:4]) + ".")
         else:
             if vip:
                 cc = any("CapCut" in it["note"] for it in vip)
-                lines.append(f"The exact look ({', '.join(it['en'] for it in vip[:3])}) is VIP-only in JianYing" + ("; free in CapCut" if cc else "") + ".")
+                lines.append(
+                    f"The exact look ({', '.join(it['en'] for it in vip[:3])}) is VIP-only in JianYing" + ("; free in CapCut" if cc else "") + "."
+                )
             alt = usable[:2] + support
             items = alt
             if alt:
-                lines.append("Closest that works here: " + "; ".join(name(it) for it in alt) +
-                             (" (a face effect on the " + spec["target"] + " plus a full-frame one around the person)" if support and spec["target"] else "") + ".")
+                lines.append(
+                    "Closest that works here: "
+                    + "; ".join(name(it) for it in alt)
+                    + (" (a face effect on the " + spec["target"] + " plus a full-frame one around the person)" if support and spec["target"] else "")
+                    + "."
+                )
     if not (yes or nope or items):
-        lines.append("I could not match that to a technique or a catalogue item; describe the look you want (e.g. 'lightning "
-                     "around the eyes', 'a glitch between clips') and I will check.")
+        lines.append(
+            "I could not match that to a technique or a catalogue item; describe the look you want (e.g. 'lightning "
+            "around the eyes', 'a glitch between clips') and I will check."
+        )
     return "\n".join(lines)
 
 
@@ -151,16 +179,20 @@ def help_text():
     groups = {}
     for t, p in TX.TYPES.items():
         groups.setdefault(p["style"], []).append(p["label"])
-    return "\n".join([
-        "I edit videos from plain requests: give me clips (and optionally a sample edit to match) and say what you want.",
-        f"I recognise {len(TX.TYPES)} kinds of edit and edit each the way it is done professionally, e.g. "
-        + ", ".join(p["label"] for p in list(TX.TYPES.values())[:8]) + ", and more.",
-        "Built in: " + "; ".join(list(dict.fromkeys(BUILT_IN.values()))[:9]) + ".",
-        "Catalogue: ~1,000 filters, ~1,100 scene effects, 240 face/body effects, ~450 transitions, ~500 animations, ~800 fonts "
-        "(free ones usable; I know which work here).",
-        "Ask me things like: 'what eye effects do you have?', 'do you have glitch transitions?', 'what kind of video are these "
-        "clips?', 'make it like sample.mp4'.",
-        "Limits: " + "; ".join(awareness.LIMITS[:4]) + "."])
+    return "\n".join(
+        [
+            "I edit videos from plain requests: give me clips (and optionally a sample edit to match) and say what you want.",
+            f"I recognise {len(TX.TYPES)} kinds of edit and edit each the way it is done professionally, e.g. "
+            + ", ".join(p["label"] for p in list(TX.TYPES.values())[:8])
+            + ", and more.",
+            "Built in: " + "; ".join(list(dict.fromkeys(BUILT_IN.values()))[:9]) + ".",
+            "Catalogue: ~1,000 filters, ~1,100 scene effects, 240 face/body effects, ~450 transitions, ~500 animations, ~800 fonts "
+            "(free ones usable; I know which work here).",
+            "Ask me things like: 'what eye effects do you have?', 'do you have glitch transitions?', 'what kind of video are these "
+            "clips?', 'make it like sample.mp4'.",
+            "Limits: " + "; ".join(awareness.LIMITS[:4]) + ".",
+        ]
+    )
 
 
 def answer(message, files=(), planner=None, last_draft=None, log=print):
@@ -175,13 +207,17 @@ def answer(message, files=(), planner=None, last_draft=None, log=print):
         return it, help_text()
     if it == "classify":
         from ai_pc.video import analyze as AN
+
         an = AN.analyze(list(files), planner=planner, log=log) if files else {}
         c = TX.classify(message, an)
         alts = ", ".join(f"{TX.TYPES[t]['label']} {p * 100:.0f}%" for t, p in c["alternatives"])
-        return it, (f"{c['label']} ({c['confidence'] * 100:.0f}% sure" + (f"; also possible: {alts}" if alts else "") + ")\n"
-                    f"Why: {'; '.join(c['reasons']) or 'general signals'}\n\nHow I would edit it:\n" + TX.design_block(c))
+        return it, (
+            f"{c['label']} ({c['confidence'] * 100:.0f}% sure" + (f"; also possible: {alts}" if alts else "") + ")\n"
+            f"Why: {'; '.join(c['reasons']) or 'general signals'}\n\nHow I would edit it:\n" + TX.design_block(c)
+        )
     if it == "style":
         from ai_pc.video import reference as RF
+
         target = (list(files) + r["references"])[:1]
         if not target:
             return it, "Give me the video to analyse."

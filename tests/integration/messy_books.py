@@ -1,6 +1,7 @@
 """Workbooks as clients send them: a title above the table, dates typed as text in three styles, prices with 'Rs' and
 commas, city names in four spellings, a duplicated order, an empty row inside the data, a price list on another sheet.
 Written with openpyxl (that is the client's tool here; the agent edits them only through Excel)."""
+
 import datetime as dt
 from pathlib import Path
 
@@ -27,8 +28,13 @@ ORDERS = [  # id, date, customer, city, product, qty, unit price, status, due da
     ("SO-1015", "2026-03-24", "Capital Solar", "Islamabad", "Mounting Kit", 10, "6,600", "Pending", dt.datetime(2026, 4, 9)),  # typed twice
     ("SO-1016", "30 Mar 2026", "Margalla Builders", "Islamabad", "Battery 200Ah", 5, "52,800", "Paid", dt.datetime(2026, 4, 14)),
 ]
-PRODUCTS = [("Solar Panel 550W", "Panels", 34000), ("Inverter 6kW", "Inverters", 150000), ("Inverter 10kW", "Inverters", 255000),
-            ("Battery 200Ah", "Storage", 43000), ("Mounting Kit", "Accessories", 4200)]
+PRODUCTS = [
+    ("Solar Panel 550W", "Panels", 34000),
+    ("Inverter 6kW", "Inverters", 150000),
+    ("Inverter 10kW", "Inverters", 255000),
+    ("Battery 200Ah", "Storage", 43000),
+    ("Mounting Kit", "Accessories", 4200),
+]
 
 
 def sales_book(path):

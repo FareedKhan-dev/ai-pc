@@ -1,15 +1,31 @@
 """The package's layers only depend downwards (see docs/architecture.md):
 
-  cli  ->  assistant  ->  programs (video, office, photo, ... apps, desktop)  ->  llm, media  ->  core
+cli  ->  assistant  ->  programs (video, office, photo, ... apps, desktop)  ->  llm, media  ->  core
 """
+
 import ast
 from pathlib import Path
 
 import pytest
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "ai_pc"
-PROGRAMS = {"accounts", "apps", "cad", "coding", "convert", "design", "desktop", "hub", "office", "photo", "social", "sound", "three", "video",
-            "windows"}
+PROGRAMS = {
+    "accounts",
+    "apps",
+    "cad",
+    "coding",
+    "convert",
+    "design",
+    "desktop",
+    "hub",
+    "office",
+    "photo",
+    "social",
+    "sound",
+    "three",
+    "video",
+    "windows",
+}
 # what each layer may import from the package (besides itself)
 ALLOWED = {"core": set(), "llm": {"core"}, "media": {"core"}}
 ALLOWED.update({p: {"core", "llm", "media"} | PROGRAMS for p in PROGRAMS})
@@ -38,6 +54,11 @@ def test_a_layer_imports_only_what_is_below_it(layer):
 
 
 def test_relative_imports_are_not_used():
-    rel = [f"{f.relative_to(SRC)}:{n.lineno}" for f in SRC.rglob("*.py") if "bl" not in f.parts
-           for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))) if isinstance(n, ast.ImportFrom) and n.level]
+    rel = [
+        f"{f.relative_to(SRC)}:{n.lineno}"
+        for f in SRC.rglob("*.py")
+        if "bl" not in f.parts
+        for n in ast.walk(ast.parse(f.read_text(encoding="utf-8")))
+        if isinstance(n, ast.ImportFrom) and n.level
+    ]
     assert not rel, rel

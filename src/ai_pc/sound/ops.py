@@ -9,6 +9,7 @@ tighten (long pauses shortened), fillers ('um', 'uh' cut, found by Whisper), spe
 voice with ducking, join. Effects: echo, reverb, telephone, mono, stereo. Time changes return the parts kept, so a
 video and its captions can be cut the same way.
 """
+
 import json
 import math
 import re
@@ -21,8 +22,21 @@ import numpy as np
 from ai_pc.sound import measure as M
 
 RATE = 48000
-TARGETS = {"youtube": -14.0, "spotify": -14.0, "tiktok": -14.0, "instagram": -14.0, "facebook": -14.0, "podcast": -16.0, "apple": -16.0,
-           "whatsapp": -16.0, "voice": -16.0, "audiobook": -19.0, "broadcast": -23.0, "tv": -23.0, "radio": -23.0}
+TARGETS = {
+    "youtube": -14.0,
+    "spotify": -14.0,
+    "tiktok": -14.0,
+    "instagram": -14.0,
+    "facebook": -14.0,
+    "podcast": -16.0,
+    "apple": -16.0,
+    "whatsapp": -16.0,
+    "voice": -16.0,
+    "audiobook": -19.0,
+    "broadcast": -23.0,
+    "tv": -23.0,
+    "radio": -23.0,
+}
 FILLERS = {"um", "uh", "erm", "uhm", "umm", "uhh", "hmm", "mm", "ah", "eh", "er"}
 
 
@@ -88,8 +102,10 @@ def _check_denoise(b, a, args, info):
     drop = b["noise_db"] - a["noise_db"]
     sp = a["speech_db"] - b["speech_db"]
     also = f" (with {' and '.join(info['also'])})" if info.get("also") else ""
-    return [_c(drop >= need, f"background noise {b['noise_db']:.0f} -> {a['noise_db']:.0f} dB ({drop:.1f} dB quieter, wanted {need}+){also}"),
-            _c(-3.5 <= sp <= 1.5, f"the voice kept its level ({sp:+.1f} dB)")]
+    return [
+        _c(drop >= need, f"background noise {b['noise_db']:.0f} -> {a['noise_db']:.0f} dB ({drop:.1f} dB quieter, wanted {need}+){also}"),
+        _c(-3.5 <= sp <= 1.5, f"the voice kept its level ({sp:+.1f} dB)"),
+    ]
 
 
 def _dehum(src, dst, a, m):
@@ -103,8 +119,10 @@ def _check_dehum(b, a, args, info):
     hb, ha = (b.get("hum") or {}).get("db", 0), (a.get("hum") or {}).get("db", 0)
     if not info["found"]:
         return [_c(ha < 10, f"no hum was there to remove ({hb:.0f} dB); none now ({ha:.0f} dB)")]
-    return [_c(ha < 8 or hb - ha >= 15, f"{info['hz']} Hz hum {hb:.0f} -> {ha:.0f} dB above the sound around it"),
-            _c(abs(a["speech_db"] - b["speech_db"]) <= 2.5, f"the voice kept its level ({a['speech_db'] - b['speech_db']:+.1f} dB)")]
+    return [
+        _c(ha < 8 or hb - ha >= 15, f"{info['hz']} Hz hum {hb:.0f} -> {ha:.0f} dB above the sound around it"),
+        _c(abs(a["speech_db"] - b["speech_db"]) <= 2.5, f"the voice kept its level ({a['speech_db'] - b['speech_db']:+.1f} dB)"),
+    ]
 
 
 def _highpass(src, dst, a, m):
@@ -186,14 +204,31 @@ def spread(path):
 
 def _check_compress(b, a, args, info):
     sb, sa = b.get("_spread") or 0, a.get("_spread") or 0
-    return [_c(sa <= sb - 0.7 or (b.get("lra") or 0) - (a.get("lra") or 0) >= 0.7, f"the level evens out: spread {sb:.1f} -> {sa:.1f} dB, "
-               f"loudness range {b.get('lra') or 0:.1f} -> {a.get('lra') or 0:.1f} LU")]
+    return [
+        _c(
+            sa <= sb - 0.7 or (b.get("lra") or 0) - (a.get("lra") or 0) >= 0.7,
+            f"the level evens out: spread {sb:.1f} -> {sa:.1f} dB, loudness range {b.get('lra') or 0:.1f} -> {a.get('lra') or 0:.1f} LU",
+        )
+    ]
 
 
 def _loudnorm_pass1(src, target, tp, lra):
-    code, _, err = M.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(src), "-vn", "-af", f"loudnorm=I={target}:TP={tp}:LRA={lra}:print_format=json",
-                          "-f", "null", "-"])
-    js = err[err.rfind("{"):err.rfind("}") + 1]
+    code, _, err = M.run(
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-nostats",
+            "-i",
+            str(src),
+            "-vn",
+            "-af",
+            f"loudnorm=I={target}:TP={tp}:LRA={lra}:print_format=json",
+            "-f",
+            "null",
+            "-",
+        ]
+    )
+    js = err[err.rfind("{") : err.rfind("}") + 1]
     return json.loads(js)
 
 
@@ -202,8 +237,10 @@ def _normalize(src, dst, a, m):
     tp = float(a.get("tp", -1.5))
     lra = 11 if target > -20 else 15
     p1 = _loudnorm_pass1(src, target, tp, lra)
-    af = (f"loudnorm=I={target}:TP={tp}:LRA={lra}:measured_I={p1['input_i']}:measured_TP={p1['input_tp']}:measured_LRA={p1['input_lra']}"
-          f":measured_thresh={p1['input_thresh']}:offset={p1['target_offset']}:linear=true")
+    af = (
+        f"loudnorm=I={target}:TP={tp}:LRA={lra}:measured_I={p1['input_i']}:measured_TP={p1['input_tp']}:measured_LRA={p1['input_lra']}"
+        f":measured_thresh={p1['input_thresh']}:offset={p1['target_offset']}:linear=true"
+    )
     ff([src], dst, af=af)
     after = M.loudness(dst)
     if abs(after["lufs"] - target) > 0.8:  # dynamic mode left it off target (a very peaky file): one more gain step, then a limiter
@@ -215,9 +252,15 @@ def _normalize(src, dst, a, m):
 
 
 def _check_normalize(b, a, args, info):
-    return [_c(abs(a["lufs"] - info["target"]) <= 1.0, f"loudness {b['lufs']:.1f} -> {a['lufs']:.1f} LUFS (target {info['target']:g}"
-               + (f" for {info['platform']}" if info.get("platform") else "") + ")"),
-            _c((a["true_peak"] if a["true_peak"] is not None else -99) <= info["tp"] + 0.5, f"true peak {a['true_peak']} dBTP (at most {info['tp']:g})")]
+    return [
+        _c(
+            abs(a["lufs"] - info["target"]) <= 1.0,
+            f"loudness {b['lufs']:.1f} -> {a['lufs']:.1f} LUFS (target {info['target']:g}"
+            + (f" for {info['platform']}" if info.get("platform") else "")
+            + ")",
+        ),
+        _c((a["true_peak"] if a["true_peak"] is not None else -99) <= info["tp"] + 0.5, f"true peak {a['true_peak']} dBTP (at most {info['tp']:g})"),
+    ]
 
 
 def _volume(src, dst, a, m):
@@ -230,8 +273,10 @@ def _check_volume(b, a, args, info):
     ch = a["lufs"] - b["lufs"]
     want = info["db"]
     ok = (abs(ch - want) <= 1.5) or (want > 0 and ch >= min(want, 2) and (a["true_peak"] or 0) <= -0.5)
-    return [_c(ok, f"loudness {b['lufs']:.1f} -> {a['lufs']:.1f} LUFS ({ch:+.1f} dB, asked {want:+g})"),
-            _c((a["true_peak"] if a["true_peak"] is not None else -99) <= -0.4, f"no clipping (true peak {a['true_peak']} dBTP)")]
+    return [
+        _c(ok, f"loudness {b['lufs']:.1f} -> {a['lufs']:.1f} LUFS ({ch:+.1f} dB, asked {want:+g})"),
+        _c((a["true_peak"] if a["true_peak"] is not None else -99) <= -0.4, f"no clipping (true peak {a['true_peak']} dBTP)"),
+    ]
 
 
 # ---------------------------------------------------------------- time
@@ -240,7 +285,9 @@ def segments_filter(segs, label="0:a", fade=0.008):
     for i, (s, e) in enumerate(segs):
         d = e - s
         f = min(fade, d / 4)
-        parts.append(f"[{label}]atrim=start={s:.4f}:end={e:.4f},asetpts=PTS-STARTPTS,afade=t=in:d={f:.4f},afade=t=out:st={max(0, d - f):.4f}:d={f:.4f}[s{i}]")
+        parts.append(
+            f"[{label}]atrim=start={s:.4f}:end={e:.4f},asetpts=PTS-STARTPTS,afade=t=in:d={f:.4f},afade=t=out:st={max(0, d - f):.4f}:d={f:.4f}[s{i}]"
+        )
     return ";".join(parts) + ";" + "".join(f"[s{i}]" for i in range(len(segs))) + f"concat=n={len(segs)}:v=0:a=1[out]"
 
 
@@ -328,7 +375,14 @@ def _tighten(src, dst, a, m):
     cuts = [(s + mx / 2, e - mx / 2) for s, e in long_]
     keep = _complement(cuts, m["duration"])
     segs = keep_segments(src, dst, keep)
-    return {"keep": segs, "removed": round(sum(e - s for s, e in cuts), 2), "max_pause": mx, "count": len(cuts), "expect": sum(b - a for a, b in segs), "level": level}
+    return {
+        "keep": segs,
+        "removed": round(sum(e - s for s, e in cuts), 2),
+        "max_pause": mx,
+        "count": len(cuts),
+        "expect": sum(b - a for a, b in segs),
+        "level": level,
+    }
 
 
 def _check_tighten(b, a, args, info):
@@ -339,10 +393,16 @@ def _check_tighten(b, a, args, info):
     longest = max((e - s for s, e in after), default=0.0)
     sb = b["duration"] - sum(e - s for s, e in b.get("pauses", []))
     sa = a["duration"] - sum(e - s for s, e in after)
-    return [_c(longest <= info["max_pause"] + 0.2, f"{info['count']} long pause(s) shortened: the longest is now {longest:.2f} s "
-               f"(was {b['longest_pause']:.2f})"),
-            _c(abs(a["duration"] - info["expect"]) <= 0.1, f"{info['removed']:.1f} s of silence taken out ({b['duration']:.1f} -> {a['duration']:.1f} s)"),
-            _c(abs(sa - sb) <= max(0.4, 0.05 * sb), f"all the speech kept ({sb:.1f} s -> {sa:.1f} s of sound)")]
+    return [
+        _c(
+            longest <= info["max_pause"] + 0.2,
+            f"{info['count']} long pause(s) shortened: the longest is now {longest:.2f} s (was {b['longest_pause']:.2f})",
+        ),
+        _c(
+            abs(a["duration"] - info["expect"]) <= 0.1, f"{info['removed']:.1f} s of silence taken out ({b['duration']:.1f} -> {a['duration']:.1f} s)"
+        ),
+        _c(abs(sa - sb) <= max(0.4, 0.05 * sb), f"all the speech kept ({sb:.1f} s -> {sa:.1f} s of sound)"),
+    ]
 
 
 def _fillers(src, dst, a, m):
@@ -360,7 +420,13 @@ def _fillers(src, dst, a, m):
             cuts.append((lo, hi))
     keep = _complement(cuts, m["duration"])
     segs = keep_segments(src, dst, keep)
-    return {"keep": segs, "count": len(cuts), "words_before": len(words) - len(hits), "found": [w["w"] for w in hits], "expect": sum(b - a for a, b in segs)}
+    return {
+        "keep": segs,
+        "count": len(cuts),
+        "words_before": len(words) - len(hits),
+        "found": [w["w"] for w in hits],
+        "expect": sum(b - a for a, b in segs),
+    }
 
 
 def _check_fillers(b, a, args, info):
@@ -369,8 +435,10 @@ def _check_fillers(b, a, args, info):
     words = transcribe_words(a["_path"], verbatim=True)
     left = [w["w"] for w in words if _norm(w["w"]) in FILLERS]
     kept = len(words) - len(left)
-    return [_c(len(left) <= max(0, info["count"] // 4), f"{info['count']} filler(s) cut ({', '.join(info['found'][:6])}); {len(left)} still heard"),
-            _c(kept >= info["words_before"] - max(1, info["words_before"] // 20), f"the other words kept ({info['words_before']} -> {kept})")]
+    return [
+        _c(len(left) <= max(0, info["count"] // 4), f"{info['count']} filler(s) cut ({', '.join(info['found'][:6])}); {len(left)} still heard"),
+        _c(kept >= info["words_before"] - max(1, info["words_before"] // 20), f"the other words kept ({info['words_before']} -> {kept})"),
+    ]
 
 
 def _speed(src, dst, a, m):
@@ -382,7 +450,12 @@ def _speed(src, dst, a, m):
 
 
 def _check_speed(b, a, args, info):
-    out = [_c(abs(a["duration"] - info["expect"]) <= max(0.1, 0.02 * info["expect"]), f"{b['duration']:.1f} s -> {a['duration']:.1f} s at {info['factor']:g}x")]
+    out = [
+        _c(
+            abs(a["duration"] - info["expect"]) <= max(0.1, 0.02 * info["expect"]),
+            f"{b['duration']:.1f} s -> {a['duration']:.1f} s at {info['factor']:g}x",
+        )
+    ]
     if b.get("pitch_hz") and a.get("pitch_hz"):
         r = a["pitch_hz"] / b["pitch_hz"]
         out.append(_c(0.9 <= r <= 1.1, f"the voice's pitch kept ({b['pitch_hz']:.0f} -> {a['pitch_hz']:.0f} Hz)"))
@@ -400,8 +473,12 @@ def _check_pitch(b, a, args, info):
     out = [_c(abs(a["duration"] - b["duration"]) <= 0.05 * b["duration"] + 0.05, f"length kept ({b['duration']:.1f} -> {a['duration']:.1f} s)")]
     if b.get("pitch_hz") and a.get("pitch_hz"):
         r = a["pitch_hz"] / b["pitch_hz"]
-        out.append(_c(abs(math.log2(r) * 12 - info["semitones"]) <= 1.5, f"pitch {b['pitch_hz']:.0f} -> {a['pitch_hz']:.0f} Hz ({math.log2(r) * 12:+.1f} semitones, "
-                      f"asked {info['semitones']:+g})"))
+        out.append(
+            _c(
+                abs(math.log2(r) * 12 - info["semitones"]) <= 1.5,
+                f"pitch {b['pitch_hz']:.0f} -> {a['pitch_hz']:.0f} Hz ({math.log2(r) * 12:+.1f} semitones, asked {info['semitones']:+g})",
+            )
+        )
     return out
 
 
@@ -417,17 +494,46 @@ def _music(src, dst, a, m):
     lay = _layout(m)
     fo = min(3.0, d / 4)
     duck = a.get("duck", True)
-    fc = (f"[1:a]atrim=0:{d:.3f},asetpts=PTS-STARTPTS,aresample={RATE},aformat=channel_layouts={lay},volume={gain:.2f}dB,"
-          f"afade=t=in:d={min(1.5, d / 6):.2f},afade=t=out:st={max(0, d - fo):.3f}:d={fo:.2f}[m];"
-          f"[0:a]aresample={RATE},aformat=channel_layouts={lay},asplit=2[v][sc];")
+    fc = (
+        f"[1:a]atrim=0:{d:.3f},asetpts=PTS-STARTPTS,aresample={RATE},aformat=channel_layouts={lay},volume={gain:.2f}dB,"
+        f"afade=t=in:d={min(1.5, d / 6):.2f},afade=t=out:st={max(0, d - fo):.3f}:d={fo:.2f}[m];"
+        f"[0:a]aresample={RATE},aformat=channel_layouts={lay},asplit=2[v][sc];"
+    )
     if duck:
         fc += "[m][sc]sidechaincompress=threshold=0.02:ratio=12:attack=20:release=450:makeup=1[md];"
     else:
         fc += "[m]anull[md];[sc]anullsink;"
     fc += "[md]asplit=2[md1][md2];[v][md1]amix=inputs=2:duration=first:normalize=0,alimiter=limit=0.891:level=disabled[out]"
     stem = Path(dst).with_suffix(".music.wav")
-    args = ["ffmpeg", "-v", "error", "-y", "-nostdin", "-i", str(src), "-stream_loop", "-1", "-i", str(music), "-filter_complex", fc,
-            "-map", "[out]", "-ar", str(RATE), "-c:a", "pcm_s24le", str(dst), "-map", "[md2]", "-ar", str(RATE), "-c:a", "pcm_s24le", str(stem)]
+    args = [
+        "ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-nostdin",
+        "-i",
+        str(src),
+        "-stream_loop",
+        "-1",
+        "-i",
+        str(music),
+        "-filter_complex",
+        fc,
+        "-map",
+        "[out]",
+        "-ar",
+        str(RATE),
+        "-c:a",
+        "pcm_s24le",
+        str(dst),
+        "-map",
+        "[md2]",
+        "-ar",
+        str(RATE),
+        "-c:a",
+        "pcm_s24le",
+        str(stem),
+    ]
     code, _, err = M.run(args)
     if code:
         raise OpError(f"FFmpeg: {err.strip()[-300:]}")
@@ -435,8 +541,10 @@ def _music(src, dst, a, m):
 
 
 def _check_music(b, a, args, info):
-    out = [_c(abs(a["duration"] - b["duration"]) <= 0.08, f"length kept ({a['duration']:.1f} s)"),
-           _c((a["true_peak"] if a["true_peak"] is not None else -99) <= -0.4, f"no clipping (true peak {a['true_peak']} dBTP)")]
+    out = [
+        _c(abs(a["duration"] - b["duration"]) <= 0.08, f"length kept ({a['duration']:.1f} s)"),
+        _c((a["true_peak"] if a["true_peak"] is not None else -99) <= -0.4, f"no clipping (true peak {a['true_peak']} dBTP)"),
+    ]
     pz = [(s + 0.25, e - 0.1) for s, e in info["voice_pauses"] if e - s >= 0.8]
     talk = _complement([(s, e) for s, e in info["voice_pauses"]], b["duration"])
     under = M.level_db(info["stem"], talk)
@@ -498,6 +606,7 @@ def _channels(n):
     def go(src, dst, a, m):
         ff([src], dst, extra=["-ac", str(n)])
         return {"channels": n}
+
     return go
 
 
@@ -523,8 +632,13 @@ def plan_clean(m, target=None, platform=None):
         steps.append(("deess", {"strength": "medium"}, f"harsh 's' sounds ({m['sibilance_db']:.0f} dB)"))
     if (m.get("lra") or 0) > 9:
         steps.append(("compress", {"amount": "light"}, f"the level wanders ({m['lra']:.0f} LU)"))
-    steps.append(("normalize", {"platform": platform or "podcast", **({"lufs": target} if target else {})},
-                  f"loudness {m['lufs']:.0f} LUFS -> {target or TARGETS.get(platform or 'podcast', -16):g}"))
+    steps.append(
+        (
+            "normalize",
+            {"platform": platform or "podcast", **({"lufs": target} if target else {})},
+            f"loudness {m['lufs']:.0f} LUFS -> {target or TARGETS.get(platform or 'podcast', -16):g}",
+        )
+    )
     return steps
 
 
@@ -565,17 +679,27 @@ _VERBATIM = "Umm, let me think, uh, like, hmm... Okay, so, um, here's what I'm, 
 def transcribe_words(path, verbatim=False, language=None):
     """Words with times from the local Whisper (models/whisper/base); with verbatim=True it keeps 'um' and 'uh'."""
     from ai_pc.media import speech
+
     if not speech.available():
         raise OpError("the speech model is missing (models/whisper/base)")
     y = M.load(path, sr=16000)
     if len(y) < 16000 * 0.3:
         return []
-    segs, info = speech._load().transcribe(y, language=language, word_timestamps=True, vad_filter=False, beam_size=5,
-                                           condition_on_previous_text=False, initial_prompt=_VERBATIM if verbatim else None)
+    segs, info = speech._load().transcribe(
+        y,
+        language=language,
+        word_timestamps=True,
+        vad_filter=False,
+        beam_size=5,
+        condition_on_previous_text=False,
+        initial_prompt=_VERBATIM if verbatim else None,
+    )
     out = []
     for s in segs:
         for w in s.words or []:
-            out.append({"w": w.word.strip(), "start": round(float(w.start), 3), "end": round(float(w.end), 3), "prob": round(float(w.probability), 3)})
+            out.append(
+                {"w": w.word.strip(), "start": round(float(w.start), 3), "end": round(float(w.end), 3), "prob": round(float(w.probability), 3)}
+            )
     return out
 
 

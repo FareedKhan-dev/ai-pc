@@ -17,6 +17,7 @@ blurred sides for a clip of another shape); keep the sound in step through cuts,
 `over` changes one decision when a job is built again: {"q": knob} {"sized": True, "kbps_scale": 0.9} {"encode": True}
 {"enc": name} {"gif_long": 360, "colors": 128} {"fast": True}.
 """
+
 import math
 import re
 import shutil
@@ -139,11 +140,49 @@ def timeline(chain, sources):
 
 
 # ---------------------------------------------------------------- what was asked
-DEFAULTS = {"mode": "video", "container": None, "vcodec": None, "acodec": None, "quality": None, "max_mb": None, "percent": None, "same": False,
-            "preset": None, "resize": None, "fps": None, "aspect": None, "fit": None, "focus": None, "rotate": 0, "hflip": False, "vflip": False,
-            "bars": False, "crop": None, "deint": False, "stab": None, "denoise": None, "sharpen": False, "gray": False, "logo": None, "subs": None,
-            "fade_in": 0.0, "fade_out": 0.0, "mute": False, "audio": None, "volume_db": 0.0, "normalize": None, "sync": 0.0, "mono": False, "hw": None,
-            "lossless": False, "exact": False, "gif": None, "frames": None, "split": None, "smooth": False}
+DEFAULTS = {
+    "mode": "video",
+    "container": None,
+    "vcodec": None,
+    "acodec": None,
+    "quality": None,
+    "max_mb": None,
+    "percent": None,
+    "same": False,
+    "preset": None,
+    "resize": None,
+    "fps": None,
+    "aspect": None,
+    "fit": None,
+    "focus": None,
+    "rotate": 0,
+    "hflip": False,
+    "vflip": False,
+    "bars": False,
+    "crop": None,
+    "deint": False,
+    "stab": None,
+    "denoise": None,
+    "sharpen": False,
+    "gray": False,
+    "logo": None,
+    "subs": None,
+    "fade_in": 0.0,
+    "fade_out": 0.0,
+    "mute": False,
+    "audio": None,
+    "volume_db": 0.0,
+    "normalize": None,
+    "sync": 0.0,
+    "mono": False,
+    "hw": None,
+    "lossless": False,
+    "exact": False,
+    "gif": None,
+    "frames": None,
+    "split": None,
+    "smooth": False,
+}
 
 
 def settings(chain):
@@ -252,14 +291,21 @@ def venc(enc, q=None, kbps=None, fast=False):
     if enc in ("h264_qsv", "av1_qsv"):
         return ["-c:v", enc, "-preset", "medium"] + (["-profile:v", "high"] if enc == "h264_qsv" else []) + (rate or ["-global_quality", str(q)])
     if enc == "libx264":
-        return ["-c:v", "libx264", "-preset", "veryfast" if fast else "slow" if (q or 99) <= 18 else "medium", "-profile:v", "high"] + (rate or ["-crf", str(q)])
+        return ["-c:v", "libx264", "-preset", "veryfast" if fast else "slow" if (q or 99) <= 18 else "medium", "-profile:v", "high"] + (
+            rate or ["-crf", str(q)]
+        )
     if enc == "libsvtav1":
-        return ["-c:v", "libsvtav1", "-preset", "10" if fast else "6" if (q or 99) <= 22 else "8"] + (["-b:v", f"{kbps}k"] if kbps else ["-crf", str(q)])
+        return ["-c:v", "libsvtav1", "-preset", "10" if fast else "6" if (q or 99) <= 22 else "8"] + (
+            ["-b:v", f"{kbps}k"] if kbps else ["-crf", str(q)]
+        )
     if enc == "libvpx-vp9":
         return ["-c:v", "libvpx-vp9", "-row-mt", "1", "-deadline", "good", "-cpu-used", "6" if fast else "4"] + (
-            ["-b:v", f"{kbps}k"] if kbps else ["-crf", str(q), "-b:v", "0"])
+            ["-b:v", f"{kbps}k"] if kbps else ["-crf", str(q), "-b:v", "0"]
+        )
     if enc == "libx265":
-        return ["-c:v", "libx265", "-preset", "fast" if fast else "medium", "-x265-params", "log-level=error"] + (["-b:v", f"{kbps}k"] if kbps else ["-crf", str(q)])
+        return ["-c:v", "libx265", "-preset", "fast" if fast else "medium", "-x265-params", "log-level=error"] + (
+            ["-b:v", f"{kbps}k"] if kbps else ["-crf", str(q)]
+        )
     if enc == "prores_ks":
         return ["-c:v", "prores_ks", "-profile:v", "2", "-vendor", "apl0"]
     if enc == "mpeg4":
@@ -356,7 +402,9 @@ def _blurpad(g, lab, W, H):
     a, b = g.new(), g.new()
     g.lines.append(f"[{lab}]split[{a}][{b}]")
     bw, bh = even(W / 4), even(H / 4)
-    bg = g.chain(a, [f"scale={bw}:{bh}:force_original_aspect_ratio=increase", f"crop={bw}:{bh}", "boxblur=8:3", f"scale={W}:{H}", "eq=brightness=-0.06"])
+    bg = g.chain(
+        a, [f"scale={bw}:{bh}:force_original_aspect_ratio=increase", f"crop={bw}:{bh}", "boxblur=8:3", f"scale={W}:{H}", "eq=brightness=-0.06"]
+    )
     fg = g.chain(b, [f"scale={W}:{H}:force_original_aspect_ratio=decrease", "setsar=1"])
     return g.chain([bg, fg], ["overlay=(W-w)/2:(H-h)/2", "setsar=1"])
 
@@ -364,8 +412,13 @@ def _blurpad(g, lab, W, H):
 def _logo(g, lab, idx, o, W, H):
     lw = even(W * float(o.get("size", 0.15)))
     m = max(8, int(min(W, H) * 0.03))
-    pos = {"br": (f"W-w-{m}", f"H-h-{m}"), "bl": (f"{m}", f"H-h-{m}"), "tr": (f"W-w-{m}", f"{m}"), "tl": (f"{m}", f"{m}"),
-           "center": ("(W-w)/2", "(H-h)/2")}.get(o.get("corner", "br"), (f"W-w-{m}", f"H-h-{m}"))
+    pos = {
+        "br": (f"W-w-{m}", f"H-h-{m}"),
+        "bl": (f"{m}", f"H-h-{m}"),
+        "tr": (f"W-w-{m}", f"{m}"),
+        "tl": (f"{m}", f"{m}"),
+        "center": ("(W-w)/2", "(H-h)/2"),
+    }.get(o.get("corner", "br"), (f"W-w-{m}", f"H-h-{m}"))
     lg = g.chain(f"{idx}:v:0", [f"scale={lw}:-1", "format=rgba", f"colorchannelmixer=aa={float(o.get('opacity', 0.85)):.2f}"])
     return g.chain([lab, lg], [f"overlay=x={pos[0]}:y={pos[1]}:format=auto"])
 
@@ -393,8 +446,11 @@ def graph(job, stage="encode"):
             else:
                 vlabs.append(g.chain(f"{pc['idx']}:v:0", pc["vnorm"]))
         if keep_a:
-            alabs.append(g.chain(f"{pc['idx']}:a:0", pc["anorm"], p="a") if pc["has_a"] else
-                         g.source(f"anullsrc=r=48000:cl={job.get('layout', 'stereo')},atrim=duration={pc['dur']:.3f}"))
+            alabs.append(
+                g.chain(f"{pc['idx']}:a:0", pc["anorm"], p="a")
+                if pc["has_a"]
+                else g.source(f"anullsrc=r=48000:cl={job.get('layout', 'stereo')},atrim=duration={pc['dur']:.3f}")
+            )
     vl = al = None
     n = len(job["pieces_in"])
     if n > 1 and (want_v or keep_a):
@@ -430,8 +486,17 @@ def graph(job, stage="encode"):
         if stage == "loud":
             steps = [s for s in steps if not s.startswith("loudnorm")] + [f"loudnorm=I={job['loud_target']}:TP=-1.5:LRA=11:print_format=json"]
         if ai:  # a sound file instead of, or under, the original sound
-            m = g.chain(f"{ai['idx']}:a:0", [f"atrim=0:{ai['dur']:.3f}", "asetpts=PTS-STARTPTS", f"volume={ai['db']:.1f}dB",
-                                              "aresample=48000", "aformat=sample_fmts=fltp:channel_layouts=stereo"], p="a")
+            m = g.chain(
+                f"{ai['idx']}:a:0",
+                [
+                    f"atrim=0:{ai['dur']:.3f}",
+                    "asetpts=PTS-STARTPTS",
+                    f"volume={ai['db']:.1f}dB",
+                    "aresample=48000",
+                    "aformat=sample_fmts=fltp:channel_layouts=stereo",
+                ],
+                p="a",
+            )
             if ai["mode"] == "mix" and al is not None:
                 al = g.chain(al, ["aresample=48000", "aformat=sample_fmts=fltp:channel_layouts=stereo"], p="a")
                 al = g.chain([al, m], ["amix=inputs=2:duration=first:dropout_transition=0:normalize=0"], p="a")
@@ -471,7 +536,9 @@ def _pieces_in(job, sources, video=True, canvas=None, canvas_fps=None):
             vnorm += ["scale=iw*sar:ih", "setsar=1"]
         if video and joined and canvas:
             W, H = canvas
-            vnorm = "blurpad" if abs(v["w"] / v["h"] - W / H) > 0.03 else vnorm + [f"scale={W}:{H}", "setsar=1", f"fps={canvas_fps:g}", "format=yuv420p"]
+            vnorm = (
+                "blurpad" if abs(v["w"] / v["h"] - W / H) > 0.03 else vnorm + [f"scale={W}:{H}", "setsar=1", f"fps={canvas_fps:g}", "format=yuv420p"]
+            )
         anorm = ["asetpts=PTS-STARTPTS"] + (["aresample=48000", f"aformat=sample_fmts=fltp:channel_layouts={layout}"] if multi else [])
         out.append({"idx": k, "vnorm": vnorm, "anorm": anorm, "has_a": bool(src.get("audio")), "dur": p["end"] - p["start"]})
     job["pieces_in"], job["layout"] = out, layout
@@ -511,8 +578,19 @@ def build(S, pieces, speed, sources, folder, caps, over=None, name="out"):
     has_v = any((sources[i].get("video") and not sources[i]["video"].get("image")) for i in used)
     has_a = any(sources[i].get("audio") for i in used)
     mode = S["mode"]
-    job = {"mode": mode, "D": D, "pieces": pieces, "speed": speed, "notes": [], "pre": [], "preset": S.get("preset"), "split": S.get("split"),
-           "folder": str(folder), "name": name, "audio_in": None}
+    job = {
+        "mode": mode,
+        "D": D,
+        "pieces": pieces,
+        "speed": speed,
+        "notes": [],
+        "pre": [],
+        "preset": S.get("preset"),
+        "split": S.get("split"),
+        "folder": str(folder),
+        "name": name,
+        "audio_in": None,
+    }
     if mode in ("video", "gif", "webp", "frames") and not has_v:
         if mode != "video":
             raise PlanError("it is sound only, so there is no picture for that")
@@ -586,10 +664,21 @@ def _build_audio(job, S, sources, preset, over, has_a):
     est = est_size(pieces, speed, sources) if main.get("video") is None else (main["audio"]["bitrate"] or 128000) * D / 8
     if single and not fx and not S.get("audio") and src_a == acodec and not S.get("quality") and not (cap and est > cap):
         whole = pieces[0]["start"] < 0.01 and pieces[0]["end"] > main["duration"] - 0.01
-        job.update(kind="copy", inputs=_inputs_for(pieces, sources), maps=["-map", "0:a:0"], venc=["-vn"], aenc=["-c:a", "copy"], vsteps=None, asteps=None,
-                   acodec=src_a)
-        job["notes"].append(f"copied the {MD.CODEC_WORDS.get(src_a, src_a)} sound as it is (no quality lost)" if whole else
-                            "cut without re-encoding the sound (no quality lost)")
+        job.update(
+            kind="copy",
+            inputs=_inputs_for(pieces, sources),
+            maps=["-map", "0:a:0"],
+            venc=["-vn"],
+            aenc=["-c:a", "copy"],
+            vsteps=None,
+            asteps=None,
+            acodec=src_a,
+        )
+        job["notes"].append(
+            f"copied the {MD.CODEC_WORDS.get(src_a, src_a)} sound as it is (no quality lost)"
+            if whole
+            else "cut without re-encoding the sound (no quality lost)"
+        )
     else:
         kbps = None
         if cap:
@@ -600,13 +689,32 @@ def _build_audio(job, S, sources, preset, over, has_a):
             if acodec in ("flac", "pcm_s16le", "pcm_s24le", "alac"):
                 acodec, cont = "mp3", "mp3"
                 job["notes"].append("lossless sound cannot be squeezed, so it is MP3")
-        job.update(kind="audio", inputs=_inputs_for(pieces, sources), vsteps=None, asteps=fx, acodec=acodec, venc=["-vn"],
-                   aenc=aenc(acodec, level, kbps if acodec in ("mp3", "aac", "opus", "vorbis") else None, 1 if S.get("mono") else None))
+        job.update(
+            kind="audio",
+            inputs=_inputs_for(pieces, sources),
+            vsteps=None,
+            asteps=fx,
+            acodec=acodec,
+            venc=["-vn"],
+            aenc=aenc(acodec, level, kbps if acodec in ("mp3", "aac", "opus", "vorbis") else None, 1 if S.get("mono") else None),
+        )
         _pieces_in(job, sources, video=False)
         _audio_input(job, S, sources)
-    job.update(ext=cont, mux=CONTAINERS[cont]["mux"], opts=(["-movflags", "+faststart"] if cont == "m4a" else []), rate={"kind": "audio", "cap": cap},
-               out=str(Path(job["folder"]) / f"{job['name']}.{cont}"))
-    job["expect"] = {"duration": D, "video": False, "audio": True, "acodec": job["acodec"], "max_bytes": cap, "channels": 1 if S.get("mono") else None}
+    job.update(
+        ext=cont,
+        mux=CONTAINERS[cont]["mux"],
+        opts=(["-movflags", "+faststart"] if cont == "m4a" else []),
+        rate={"kind": "audio", "cap": cap},
+        out=str(Path(job["folder"]) / f"{job['name']}.{cont}"),
+    )
+    job["expect"] = {
+        "duration": D,
+        "video": False,
+        "audio": True,
+        "acodec": job["acodec"],
+        "max_bytes": cap,
+        "channels": 1 if S.get("mono") else None,
+    }
     return job
 
 
@@ -631,7 +739,11 @@ def _build_video(job, S, sources, preset, caps, over, has_a):
         notes.append(f"{MD.CODEC_WORDS.get(S['vcodec'], S['vcodec'])} does not go in {cont.upper()}")
     want_v = S["vcodec"] if S["vcodec"] in allowed_v else (t["vcodec"] if t.get("vcodec") in allowed_v and not S["container"] else None)
     keep_v = mv["codec"] if mv["codec"] in allowed_v else None
-    vfam = mode if mode in ("gif", "webp") else want_v or (keep_v if keep_v in ("h264", "av1", "prores", "vp9") else None) or CONTAINERS[cont]["default"][0]
+    vfam = (
+        mode
+        if mode in ("gif", "webp")
+        else want_v or (keep_v if keep_v in ("h264", "av1", "prores", "vp9") else None) or CONTAINERS[cont]["default"][0]
+    )
     src_a = (main.get("audio") or {}).get("codec")
     want_a = S["acodec"] if S["acodec"] in allowed_a else (t["acodec"] if t.get("acodec") in allowed_a else None)
     enc_a = want_a or CONTAINERS[cont]["default"][1]
@@ -642,20 +754,69 @@ def _build_video(job, S, sources, preset, caps, over, has_a):
     hdr_fix = bool(mv["hdr"])
     pre_aspect = bool(t.get("aspect")) and abs(mv["w"] / mv["h"] - ratio(t["aspect"])) > 0.03
     cfr_fix = bool(t.get("cfr") and mv["vfr"])
-    spatial = any([S["rotate"], S["hflip"], S["vflip"], S["bars"], S["crop"], S["aspect"], S["resize"], S["fps"], S["deint"], S["stab"], S["denoise"],
-                   S["sharpen"], S["gray"], S["logo"], (S["subs"] or {}).get("burn", True) if S["subs"] else False, S["fade_in"], S["fade_out"], speed != 1,
-                   joined, t.get("max_long") and max(mv["w"], mv["h"]) > t["max_long"], t.get("max_fps") and fps_src > t["max_fps"] + 0.5, bits_bad,
-                   pre_aspect, cfr_fix, t.get("bake_rotation") and mv["rotation"], mv["w"] % 2, mv["h"] % 2, mv["interlaced"] and preset,
-                   mode in ("gif", "webp"), abs((mv.get("sar") or 1) - 1) > 0.01 and preset, S.get("smooth"), hdr_fix and (preset or S["vcodec"])])
+    spatial = any(
+        [
+            S["rotate"],
+            S["hflip"],
+            S["vflip"],
+            S["bars"],
+            S["crop"],
+            S["aspect"],
+            S["resize"],
+            S["fps"],
+            S["deint"],
+            S["stab"],
+            S["denoise"],
+            S["sharpen"],
+            S["gray"],
+            S["logo"],
+            (S["subs"] or {}).get("burn", True) if S["subs"] else False,
+            S["fade_in"],
+            S["fade_out"],
+            speed != 1,
+            joined,
+            t.get("max_long") and max(mv["w"], mv["h"]) > t["max_long"],
+            t.get("max_fps") and fps_src > t["max_fps"] + 0.5,
+            bits_bad,
+            pre_aspect,
+            cfr_fix,
+            t.get("bake_rotation") and mv["rotation"],
+            mv["w"] % 2,
+            mv["h"] % 2,
+            mv["interlaced"] and preset,
+            mode in ("gif", "webp"),
+            abs((mv.get("sar") or 1) - 1) > 0.01 and preset,
+            S.get("smooth"),
+            hdr_fix and (preset or S["vcodec"]),
+        ]
+    )
     est = est_size(pieces, speed, sources)
     cap, cap_why = _cap(S, preset, S.get("gif") if mode in ("gif", "webp") else None, D, est)
     asked_rate = bool(S.get("same") or S.get("quality") or cap_why == "asked")
-    can_copy_v = (mode == "video" and not spatial and not asked_rate and not (cap and est > cap * 0.97) and mv["codec"] in allowed_v
-                  and want_v in (None, mv["codec"]) and (not t or mv["codec"] in t.get("vcodecs_ok", {t.get("vcodec")})))
+    can_copy_v = (
+        mode == "video"
+        and not spatial
+        and not asked_rate
+        and not (cap and est > cap * 0.97)
+        and mv["codec"] in allowed_v
+        and want_v in (None, mv["codec"])
+        and (not t or mv["codec"] in t.get("vcodecs_ok", {t.get("vcodec")}))
+    )
     a_changes = bool(_asteps(S, D, speed, {"pre": [], "notes": []}) or S.get("audio"))
-    can_copy_a = (not out_a) or (src_a in allowed_a and want_a in (None, src_a) and not a_changes and (not t or src_a in t.get("acodecs_ok", {t.get("acodec")})))
-    if (cap_why == "asked" and mode == "video" and est <= cap * 0.97 and not spatial and not S.get("same") and not S.get("quality")
-            and mv["codec"] in allowed_v and want_v in (None, mv["codec"]) and (not t or mv["codec"] in t.get("vcodecs_ok", {t.get("vcodec")}))):
+    can_copy_a = (not out_a) or (
+        src_a in allowed_a and want_a in (None, src_a) and not a_changes and (not t or src_a in t.get("acodecs_ok", {t.get("acodec")}))
+    )
+    if (
+        cap_why == "asked"
+        and mode == "video"
+        and est <= cap * 0.97
+        and not spatial
+        and not S.get("same")
+        and not S.get("quality")
+        and mv["codec"] in allowed_v
+        and want_v in (None, mv["codec"])
+        and (not t or mv["codec"] in t.get("vcodecs_ok", {t.get("vcodec")}))
+    ):
         can_copy_v = True  # it already fits: nothing to squeeze
         notes.append(f"it is already {MD.human(est)}, under {cap / 1e6:g} MB")
     # ---- copy: the picture as it is (a new container, a cut on keyframes, a size it already fits; the sound remade if it changes)
@@ -706,8 +867,10 @@ def _build_video(job, S, sources, preset, caps, over, has_a):
             notes.append(f"cropped to {aspect}: the {'sides' if wide else 'top and bottom'} are cut off")
         else:
             nw, nh = (w - w % 2, even(w / r)) if wide else (even(h * r), h - h % 2)
-            notes.append(f"made it {aspect} with {'black bars' if fit == 'bars' else 'a blurred copy of the video'} filling the "
-                         f"{'top and bottom' if wide else 'sides'}")
+            notes.append(
+                f"made it {aspect} with {'black bars' if fit == 'bars' else 'a blurred copy of the video'} filling the "
+                f"{'top and bottom' if wide else 'sides'}"
+            )
         shape = (fit, nw, nh)
         short0 = min(w, h)
         w, h = nw, nh
@@ -762,11 +925,14 @@ def _build_video(job, S, sources, preset, caps, over, has_a):
         abps = 0 if not out_a else 160 if total_k > 3000 else 128 if total_k > 1200 else 96 if total_k > 500 else 64 if total_k > 200 else 48
         vk = total_k - abps
         if vk < 50:
-            raise PlanError(f"{MD.mmss(D)} of video cannot fit in {cap / 1e6:.3g} MB and still be watchable; say 'split it into parts under "
-                            f"{cap / 1e6:.3g} MB', cut it shorter, or save the sound only")
+            raise PlanError(
+                f"{MD.mmss(D)} of video cannot fit in {cap / 1e6:.3g} MB and still be watchable; say 'split it into parts under "
+                f"{cap / 1e6:.3g} MB', cut it shorter, or save the sound only"
+            )
         if not S["resize"] and not S["fps"] and not over.get("nofit"):
-            nw, nh, nf, fine = (fit_sample(fw, fh, fps_out or fps_src, vk, over["k_native"]) if over.get("k_native") else None) or \
-                fit_bitrate(fw, fh, fps_out or fps_src, vk, vfam)
+            nw, nh, nf, fine = (fit_sample(fw, fh, fps_out or fps_src, vk, over["k_native"]) if over.get("k_native") else None) or fit_bitrate(
+                fw, fh, fps_out or fps_src, vk, vfam
+            )
             if (nw, nh) != (fw, fh):
                 notes.append(f"made it {min(nw, nh)}p so {MD.mmss(D)} fits in {cap / 1e6:.3g} MB" + ("" if fine else "; it will look soft"))
                 fw, fh = nw, nh
@@ -815,8 +981,11 @@ def _build_video(job, S, sources, preset, caps, over, has_a):
             y = "0" if focus == "top" else f"ih-{nh}" if focus == "bottom" else f"(ih-{nh})/2"
             steps.append(("f", f"crop={nw}:{nh}:{x}:{y}"))
         elif how == "bars":
-            steps += [("f", f"scale={fw}:{fh}:force_original_aspect_ratio=decrease:flags=lanczos"), ("f", f"pad={fw}:{fh}:(ow-iw)/2:(oh-ih)/2:color=black"),
-                      ("f", "setsar=1")]
+            steps += [
+                ("f", f"scale={fw}:{fh}:force_original_aspect_ratio=decrease:flags=lanczos"),
+                ("f", f"pad={fw}:{fh}:(ow-iw)/2:(oh-ih)/2:color=black"),
+                ("f", "setsar=1"),
+            ]
             scaled = True
         else:
             steps.append(("blurpad", fw, fh))
@@ -824,13 +993,17 @@ def _build_video(job, S, sources, preset, caps, over, has_a):
     if not scaled and ((fw, fh) != (w, h)):
         steps += [("f", f"scale={fw}:{fh}:flags=lanczos"), ("f", "setsar=1")]
     if S["denoise"]:
-        steps.append(("f", {"light": "hqdn3d=1.5:1.5:4:4", "medium": "hqdn3d=3:3:6:6", "strong": "hqdn3d=5:4:9:7"}.get(S["denoise"], "hqdn3d=3:3:6:6")))
+        steps.append(
+            ("f", {"light": "hqdn3d=1.5:1.5:4:4", "medium": "hqdn3d=3:3:6:6", "strong": "hqdn3d=5:4:9:7"}.get(S["denoise"], "hqdn3d=3:3:6:6"))
+        )
     if S["sharpen"]:
         steps.append(("f", "unsharp=5:5:0.8:3:3:0.4"))
     if S["gray"]:
         steps.append(("f", "hue=s=0"))
     if fps_out and (abs(fps_out - fps_src) > 0.01 or mv["vfr"] or speed != 1 or joined):
-        steps.append(("f", f"minterpolate=fps={fps_out:g}:mi_mode=mci:mc_mode=aobmc:vsbmc=1" if S.get("smooth") and speed < 1 else f"fps={fps_out:g}"))
+        steps.append(
+            ("f", f"minterpolate=fps={fps_out:g}:mi_mode=mci:mc_mode=aobmc:vsbmc=1" if S.get("smooth") and speed < 1 else f"fps={fps_out:g}")
+        )
     inputs = _inputs_for(pieces, sources)
     if S["logo"]:
         steps.append(("logo", len(inputs), S["logo"], fw, fh))
@@ -867,8 +1040,11 @@ def _build_video(job, S, sources, preset, caps, over, has_a):
     elif mode == "gif":
         job.update(venc=["-c:v", "gif", "-loop", "0"], aenc=["-an"], acodec=None)
     else:
-        job.update(venc=["-c:v", "libwebp_anim", "-lossless", "0", "-q:v", str(int(over.get("webp_q", 70))), "-loop", "0", "-compression_level", "4"],
-                   aenc=["-an"], acodec=None)
+        job.update(
+            venc=["-c:v", "libwebp_anim", "-lossless", "0", "-q:v", str(int(over.get("webp_q", 70))), "-loop", "0", "-compression_level", "4"],
+            aenc=["-an"],
+            acodec=None,
+        )
     opts = []
     if cont in ("mp4", "mov"):
         opts += ["-movflags", "+faststart"] + (["-tag:v", "hvc1"] if vfam == "hevc" else [])
@@ -881,9 +1057,20 @@ def _build_video(job, S, sources, preset, caps, over, has_a):
         job["subs_in"] = {"idx": len(job["inputs"]), "codec": {"mp4": "mov_text", "mov": "mov_text", "mkv": "srt", "webm": "webvtt"}.get(cont, "srt")}
         job["inputs"].append(["-i", str(Path(job["folder"]) / subs_soft)])
     job.update(ext=cont, mux=CONTAINERS[cont]["mux"], opts=opts, out=str(Path(job["folder"]) / f"{job['name']}.{cont}"))
-    job["expect"] = {"duration": D, "video": True, "vcodec": vfam, "w": fw, "h": fh, "fps": fps_out if mode == "video" else None, "audio": out_a,
-                     "acodec": enc_a if out_a else None, "max_bytes": cap, "faststart": cont in ("mp4", "mov"),
-                     "pix8": vfam in ("h264", "hevc", "av1", "vp9") and not ten, "channels": 1 if (S.get("mono") and out_a) else None}
+    job["expect"] = {
+        "duration": D,
+        "video": True,
+        "vcodec": vfam,
+        "w": fw,
+        "h": fh,
+        "fps": fps_out if mode == "video" else None,
+        "audio": out_a,
+        "acodec": enc_a if out_a else None,
+        "max_bytes": cap,
+        "faststart": cont in ("mp4", "mov"),
+        "pix8": vfam in ("h264", "hevc", "av1", "vp9") and not ten,
+        "channels": 1 if (S.get("mono") and out_a) else None,
+    }
     if mode == "video":
         notes.append(f"made the picture as {WORDS.get(vfam, vfam)} on {'the Intel GPU' if ench.endswith('_qsv') else 'the processor'}")
     return job
@@ -897,8 +1084,10 @@ def _copy_job(job, S, sources, cont, snaps, whole, worst, enc_s, can_copy_a, out
         pieces = [dict(p, start=s) for p, s in snaps]
         job["pieces"], job["D"] = pieces, total(pieces) / job["speed"]
         if worst > 0.25:
-            notes.append(f"cut at the nearest clean cut point (up to {worst:.1f} s earlier than asked) so nothing is re-encoded"
-                         + (f"; say 'cut it exactly' to re-encode instead (about {max(1, round(enc_s / 60))} min)" if enc_s > 45 else ""))
+            notes.append(
+                f"cut at the nearest clean cut point (up to {worst:.1f} s earlier than asked) so nothing is re-encoded"
+                + (f"; say 'cut it exactly' to re-encode instead (about {max(1, round(enc_s / 60))} min)" if enc_s > 45 else "")
+            )
     acopy = can_copy_a and out_a
     if len(pieces) > 1:  # pieces of one file joined back without re-encoding (the concat demuxer, from keyframe to cut)
         lst = Path(job["folder"]) / f"{job['name']}_parts.txt"
@@ -918,25 +1107,64 @@ def _copy_job(job, S, sources, cont, snaps, whole, worst, enc_s, can_copy_a, out
     elif subs:
         notes.append("its subtitle tracks were left out (they cannot go in this kind of file, or were cut)")
     if whole:
-        notes.append("copied the picture as it is (no quality lost)" + ("" if acopy or not out_a else
-                     f"; the sound was made {MD.CODEC_WORDS.get(enc_a, enc_a)}"))
+        notes.append(
+            "copied the picture as it is (no quality lost)"
+            + ("" if acopy or not out_a else f"; the sound was made {MD.CODEC_WORDS.get(enc_a, enc_a)}")
+        )
     else:
         notes.append("cut without re-encoding (no quality lost)")
-    opts = (["-movflags", "+faststart"] if cont in ("mp4", "mov") else []) + (["-tag:v", "hvc1"] if mv["codec"] == "hevc" and cont in ("mp4", "mov") else [])
-    job.update(kind=kind, inputs=inputs, maps=maps, venc=["-c:v", "copy"], aenc=["-c:a", "copy"] if acopy else aenc(enc_a, "high") if out_a else ["-an"],
-               sub_enc=["-c:s", "mov_text"] if cont in ("mp4", "mov") else ["-c:s", "copy"], vsteps=None, asteps=None, opts=opts, ext=cont,
-               mux=CONTAINERS[cont]["mux"], out=str(Path(job["folder"]) / f"{job['name']}.{cont}"),
-               acodec=(src_a if acopy else enc_a) if out_a else None, vcodec=mv["codec"], w=mv["w"], h=mv["h"], fps=None, rate={"kind": "copy", "cap": cap},
-               venc_name="copy")
+    opts = (["-movflags", "+faststart"] if cont in ("mp4", "mov") else []) + (
+        ["-tag:v", "hvc1"] if mv["codec"] == "hevc" and cont in ("mp4", "mov") else []
+    )
+    job.update(
+        kind=kind,
+        inputs=inputs,
+        maps=maps,
+        venc=["-c:v", "copy"],
+        aenc=["-c:a", "copy"] if acopy else aenc(enc_a, "high") if out_a else ["-an"],
+        sub_enc=["-c:s", "mov_text"] if cont in ("mp4", "mov") else ["-c:s", "copy"],
+        vsteps=None,
+        asteps=None,
+        opts=opts,
+        ext=cont,
+        mux=CONTAINERS[cont]["mux"],
+        out=str(Path(job["folder"]) / f"{job['name']}.{cont}"),
+        acodec=(src_a if acopy else enc_a) if out_a else None,
+        vcodec=mv["codec"],
+        w=mv["w"],
+        h=mv["h"],
+        fps=None,
+        rate={"kind": "copy", "cap": cap},
+        venc_name="copy",
+    )
     if a_changes and out_a:  # the picture copied, the sound remade through its filters (replaced, levelled, moved in time)
-        job.update(kind="vcopy", inputs=_inputs_for(pieces, sources), vsteps=None, maps=["-map", "0:v:0"],
-                   asteps=_asteps(S, job["D"], job["speed"], job), aenc=aenc(enc_a, "high", channels=1 if S.get("mono") else None), acodec=enc_a)
+        job.update(
+            kind="vcopy",
+            inputs=_inputs_for(pieces, sources),
+            vsteps=None,
+            maps=["-map", "0:v:0"],
+            asteps=_asteps(S, job["D"], job["speed"], job),
+            aenc=aenc(enc_a, "high", channels=1 if S.get("mono") else None),
+            acodec=enc_a,
+        )
         _pieces_in(job, sources, video=False)
         _audio_input(job, S, sources)
         notes[-1] = "copied the picture as it is (no quality lost) and remade the sound"
-    job["expect"] = {"duration": job["D"], "video": True, "vcodec": mv["codec"], "w": mv["w"], "h": mv["h"], "fps": None, "audio": out_a,
-                     "acodec": job["acodec"], "max_bytes": cap, "faststart": cont in ("mp4", "mov"), "pix8": None, "copy": True,
-                     "tol": 0.3 if job["kind"] in ("copy", "vcopy") else 0.5 + 0.1 * len(pieces)}
+    job["expect"] = {
+        "duration": job["D"],
+        "video": True,
+        "vcodec": mv["codec"],
+        "w": mv["w"],
+        "h": mv["h"],
+        "fps": None,
+        "audio": out_a,
+        "acodec": job["acodec"],
+        "max_bytes": cap,
+        "faststart": cont in ("mp4", "mov"),
+        "pix8": None,
+        "copy": True,
+        "tol": 0.3 if job["kind"] in ("copy", "vcopy") else 0.5 + 0.1 * len(pieces),
+    }
     if (S.get("split") or {}).get("parts") or (S.get("split") or {}).get("every"):
         notes.append("the parts start at the nearest clean cut points, so their lengths differ a little")
     return job
@@ -997,7 +1225,7 @@ def _read_srt(text):
         m = re.search(r"(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)", block)
         if m:
             g = [int(x) for x in m.groups()]
-            cues.append((g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000, g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000, block[m.end():].strip("\n")))
+            cues.append((g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000, g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000, block[m.end() :].strip("\n")))
     return cues
 
 
@@ -1016,7 +1244,11 @@ def _build_frames(job, S, sources):
     mv = sources[pieces[0]["src"]]["video"]
     q = ["-q:v", "2"] if fmt == "jpg" else []
     rot = S["rotate"] % 360
-    turns = {90: ["transpose=1"], 270: ["transpose=2"], 180: ["hflip", "vflip"]}.get(rot, []) + (["hflip"] if S["hflip"] else []) + (["vflip"] if S["vflip"] else [])
+    turns = (
+        {90: ["transpose=1"], 270: ["transpose=2"], 180: ["hflip", "vflip"]}.get(rot, [])
+        + (["hflip"] if S["hflip"] else [])
+        + (["vflip"] if S["vflip"] else [])
+    )
     w, h = (mv["h"], mv["w"]) if rot in (90, 270) else (mv["w"], mv["h"])
     folder = Path(job["folder"])
     job.update(kind="frames", asteps=None, rate={"kind": "frames"}, ext=fmt)
@@ -1026,13 +1258,29 @@ def _build_frames(job, S, sources):
         for t in times:
             si, st = src_time(pieces, speed, t)
             o = folder / f"{job['name']}_at_{MD.mmss(t).replace(':', '-').replace('.', '_')}.{fmt}"
-            runs.append(["-ss", f"{st:.3f}", "-i", sources[si]["path"], "-frames:v", "1"] + (["-vf", ",".join(turns)] if turns else []) + q + [str(o)])
+            runs.append(
+                ["-ss", f"{st:.3f}", "-i", sources[si]["path"], "-frames:v", "1"] + (["-vf", ",".join(turns)] if turns else []) + q + [str(o)]
+            )
             outs.append(str(o))
         if f.get("best"):  # the most typical frame of the middle of the video (FFmpeg's thumbnail filter)
             si, st = src_time(pieces, speed, D * 0.15)
             o = folder / f"{job['name']}_thumbnail.{fmt}"
-            runs.append(["-ss", f"{st:.3f}", "-t", f"{max(1.0, D * 0.7 * speed):.3f}", "-i", sources[si]["path"],
-                         "-vf", ",".join(turns + ["thumbnail=120"]), "-frames:v", "1"] + q + [str(o)])
+            runs.append(
+                [
+                    "-ss",
+                    f"{st:.3f}",
+                    "-t",
+                    f"{max(1.0, D * 0.7 * speed):.3f}",
+                    "-i",
+                    sources[si]["path"],
+                    "-vf",
+                    ",".join(turns + ["thumbnail=120"]),
+                    "-frames:v",
+                    "1",
+                ]
+                + q
+                + [str(o)]
+            )
             outs.append(str(o))
         job.update(runs=runs, frames_out=outs, out=outs[0], vsteps=None, expect={"images": len(outs), "w": w, "h": h})
         return job
@@ -1056,6 +1304,12 @@ def _build_frames(job, S, sources):
     sub = folder / f"{job['name']}_frames"
     sub.mkdir(exist_ok=True)
     steps.append(("f", f"select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,{every:.4f})'"))
-    job.update(vsteps=steps, sheet=False, pattern=str(sub / f"frame_%03d.{fmt}"), out=str(sub), venc=["-fps_mode", "vfr"] + q,
-               expect={"images": n, "w": w, "h": h})
+    job.update(
+        vsteps=steps,
+        sheet=False,
+        pattern=str(sub / f"frame_%03d.{fmt}"),
+        out=str(sub),
+        venc=["-fps_mode", "vfr"] + q,
+        expect={"images": n, "w": w, "h": h},
+    )
     return job

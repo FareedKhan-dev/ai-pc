@@ -1,11 +1,25 @@
 """One connector per service, all on ai_pc.hub.http.Api (tests pass a FakeTransport). connector("slack") -> Slack()."""
+
 import importlib
 
 from ai_pc.core import vault
 from ai_pc.hub.http import HubError
 
-MODULES = {"slack": "slack", "telegram": "telegram", "trello": "trello", "notion": "notion", "google": "google", "microsoft": "microsoft",
-           "hubspot": "hubspot", "asana": "asana", "jira": "jira", "zoom": "zoom", "whatsapp": "whatsapp", "figma": "figma", "canva": "canva"}
+MODULES = {
+    "slack": "slack",
+    "telegram": "telegram",
+    "trello": "trello",
+    "notion": "notion",
+    "google": "google",
+    "microsoft": "microsoft",
+    "hubspot": "hubspot",
+    "asana": "asana",
+    "jira": "jira",
+    "zoom": "zoom",
+    "whatsapp": "whatsapp",
+    "figma": "figma",
+    "canva": "canva",
+}
 
 
 class Base:

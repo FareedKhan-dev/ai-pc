@@ -5,6 +5,7 @@ Figma rations its API by plan and seat (2025-11-17): reading a file or exporting
 Full and Dev seats, but only up to 20 a MONTH on View and Collab seats. So a file read is cached until Figma says the
 file changed (its metadata is a cheap Tier 3 call), and every export takes all the frames in one request.
 """
+
 import json
 import re
 from pathlib import Path
@@ -40,11 +41,16 @@ class Figma(Base):
             return self.api().get(path, params=params or None, retries=1 if tier == 1 else 3)
         except HubError as e:
             if e.status == 429:
-                raise HubError("figma: Figma's API limit is reached for now (on a View or Collab seat it is 20 file reads a month; on a Full "
-                               "seat, about 10 a minute). Try again later.", e.status, e.body)
+                raise HubError(
+                    "figma: Figma's API limit is reached for now (on a View or Collab seat it is 20 file reads a month; on a Full "
+                    "seat, about 10 a minute). Try again later.",
+                    e.status,
+                    e.body,
+                )
             if e.status == 403:
-                raise HubError("figma: the token cannot open that file (is it shared with you, and does the token have 'File content: read'?)",
-                               e.status, e.body)
+                raise HubError(
+                    "figma: the token cannot open that file (is it shared with you, and does the token have 'File content: read'?)", e.status, e.body
+                )
             if e.status == 404:
                 raise HubError("figma: no such file (check the link)", e.status, e.body)
             raise
@@ -57,8 +63,12 @@ class Figma(Base):
     def meta(self, key):
         js = self._get(f"v1/files/{key}/meta", tier=3)
         f = js.get("file") or js
-        return {"name": f.get("name"), "version": str(f.get("version") or f.get("last_touched_at") or ""), "last_touched": f.get("last_touched_at"),
-                "editor": f.get("editorType")}
+        return {
+            "name": f.get("name"),
+            "version": str(f.get("version") or f.get("last_touched_at") or ""),
+            "last_touched": f.get("last_touched_at"),
+            "editor": f.get("editorType"),
+        }
 
     def file(self, key, fresh=False):
         """The whole file (its node tree), from the cache while Figma's version of it is unchanged."""
@@ -90,8 +100,17 @@ class Figma(Base):
                     add(n.get("children", []), f"{where} / {n.get('name', '')}")
                 elif n.get("type") in ("FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "GROUP") and n.get("visible", True):
                     bb = n.get("absoluteBoundingBox") or {}
-                    out.append({"id": n["id"], "name": n.get("name", ""), "page": where, "type": n["type"],
-                                "w": round(bb.get("width", 0)), "h": round(bb.get("height", 0))})
+                    out.append(
+                        {
+                            "id": n["id"],
+                            "name": n.get("name", ""),
+                            "page": where,
+                            "type": n["type"],
+                            "w": round(bb.get("width", 0)),
+                            "h": round(bb.get("height", 0)),
+                        }
+                    )
+
         for page in (data.get("document") or {}).get("children", []):
             add(page.get("children", []), page.get("name", ""))
         return out
@@ -166,8 +185,17 @@ class Figma(Base):
             if status >= 400 or not content:
                 continue
             head = content[:12]
-            ext = "png" if head.startswith(b"\x89PNG") else "jpg" if head[:2] == b"\xff\xd8" else "gif" if head.startswith(b"GIF8") else \
-                "webp" if head[8:12] == b"WEBP" else "png"
+            ext = (
+                "png"
+                if head.startswith(b"\x89PNG")
+                else "jpg"
+                if head[:2] == b"\xff\xd8"
+                else "gif"
+                if head.startswith(b"GIF8")
+                else "webp"
+                if head[8:12] == b"WEBP"
+                else "png"
+            )
             p = folder / f"{ref}.{ext}"
             p.write_bytes(content)
             out[ref] = str(p)
@@ -193,16 +221,33 @@ class Figma(Base):
                 st = n["style"]
                 k = (st.get("fontFamily"), st.get("fontWeight"), round(st.get("fontSize", 0)))
                 sid = (n.get("styles") or {}).get("text")
-                t = texts.setdefault(k, {"family": st.get("fontFamily"), "weight": st.get("fontWeight"), "size": round(st.get("fontSize", 0)),
-                                         "line": round(st.get("lineHeightPx", 0)), "uses": 0, "name": (styles.get(sid) or {}).get("name") if sid else None})
+                t = texts.setdefault(
+                    k,
+                    {
+                        "family": st.get("fontFamily"),
+                        "weight": st.get("fontWeight"),
+                        "size": round(st.get("fontSize", 0)),
+                        "line": round(st.get("lineHeightPx", 0)),
+                        "uses": 0,
+                        "name": (styles.get(sid) or {}).get("name") if sid else None,
+                    },
+                )
                 t["uses"] += 1
         return {"colors": sorted(colors.values(), key=lambda c: -c["uses"]), "text": sorted(texts.values(), key=lambda t: (-t["size"], -t["uses"]))}
 
     # ---------------------------------------------------------------- comments
     def comments(self, key):
         js = self._get(f"v1/files/{key}/comments", tier=2)
-        return [{"id": c["id"], "who": (c.get("user") or {}).get("handle"), "text": c.get("message", ""), "when": c.get("created_at"),
-                 "resolved": bool(c.get("resolved_at"))} for c in js.get("comments", [])]
+        return [
+            {
+                "id": c["id"],
+                "who": (c.get("user") or {}).get("handle"),
+                "text": c.get("message", ""),
+                "when": c.get("created_at"),
+                "resolved": bool(c.get("resolved_at")),
+            }
+            for c in js.get("comments", [])
+        ]
 
     def comment(self, key, message, node_id=None):
         body = {"message": message}
@@ -211,8 +256,12 @@ class Figma(Base):
         js = self.api().post(f"v1/files/{key}/comments", json=body)
         cid = js.get("id")
         back = [c for c in self.comments(key) if c["id"] == cid]
-        return {"id": cid, "where": f"Figma file {key}", "verified": bool(back) and back[0]["text"] == message,
-                "undo": {"service": "figma", "op": "uncomment", "key": key, "id": cid}}
+        return {
+            "id": cid,
+            "where": f"Figma file {key}",
+            "verified": bool(back) and back[0]["text"] == message,
+            "undo": {"service": "figma", "op": "uncomment", "key": key, "id": cid},
+        }
 
     def uncomment(self, key, id):  # noqa: A002
         self.api().delete(f"v1/files/{key}/comments/{id}")
@@ -223,4 +272,3 @@ def hex_of(c, opacity=1.0):
     r, g, b = (max(0, min(255, round(c.get(k, 0) * 255))) for k in ("r", "g", "b"))
     a = c.get("a", 1) * (opacity if opacity is not None else 1)
     return f"#{r:02x}{g:02x}{b:02x}" + (f"{round(a * 255):02x}" if a < 0.999 else "")
-

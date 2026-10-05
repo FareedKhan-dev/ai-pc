@@ -16,6 +16,7 @@ Layouts: collage, side_by_side, passport (a standard's size and head height, whi
   document (a photographed page flattened and cleaned like a scan).
 Transparency and alpha are kept through edits; a transparent photo stays transparent.
 """
+
 import math
 import os
 from pathlib import Path
@@ -27,26 +28,96 @@ from PIL import Image, ImageChops, ImageColor, ImageDraw, ImageEnhance, ImageFil
 from ai_pc.photo import analyze as A
 
 FONT_DIR = Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"
-FONTS = {"impact": "impact.ttf", "bold": "segoeuib.ttf", "segoe": "segoeui.ttf", "title": "bahnschrift.ttf", "bahnschrift": "bahnschrift.ttf",
-         "georgia": "georgiab.ttf", "serif": "georgia.ttf", "elegant": "georgiai.ttf", "arial": "arialbd.ttf", "times": "timesbd.ttf",
-         "comic": "comicbd.ttf", "script": "segoesc.ttf", "handwriting": "segoesc.ttf", "verdana": "verdanab.ttf", "condensed": "ARIALNB.TTF",
-         "fun": "SHOWG.TTF", "bauhaus": "BAUHS93.TTF", "mono": "consolab.ttf", "calibri": "calibrib.ttf", "tahoma": "tahomabd.ttf",
-         "trebuchet": "trebucbd.ttf", "candara": "Candarab.ttf"}
+FONTS = {
+    "impact": "impact.ttf",
+    "bold": "segoeuib.ttf",
+    "segoe": "segoeui.ttf",
+    "title": "bahnschrift.ttf",
+    "bahnschrift": "bahnschrift.ttf",
+    "georgia": "georgiab.ttf",
+    "serif": "georgia.ttf",
+    "elegant": "georgiai.ttf",
+    "arial": "arialbd.ttf",
+    "times": "timesbd.ttf",
+    "comic": "comicbd.ttf",
+    "script": "segoesc.ttf",
+    "handwriting": "segoesc.ttf",
+    "verdana": "verdanab.ttf",
+    "condensed": "ARIALNB.TTF",
+    "fun": "SHOWG.TTF",
+    "bauhaus": "BAUHS93.TTF",
+    "mono": "consolab.ttf",
+    "calibri": "calibrib.ttf",
+    "tahoma": "tahomabd.ttf",
+    "trebuchet": "trebucbd.ttf",
+    "candara": "Candarab.ttf",
+}
 SIZES = {"tiny": 0.025, "small": 0.04, "medium": 0.065, "large": 0.095, "huge": 0.14}
-ASPECTS = {"square": (1, 1), "1:1": (1, 1), "4:5": (4, 5), "5:4": (5, 4), "16:9": (16, 9), "9:16": (9, 16), "3:2": (3, 2), "2:3": (2, 3), "4:3": (4, 3),
-           "3:4": (3, 4), "21:9": (21, 9), "a4": (210, 297), "a4 landscape": (297, 210), "portrait": (4, 5), "landscape": (16, 9), "story": (9, 16),
-           "wide": (16, 9), "cinema": (21, 9), "passport": (35, 45)}
+ASPECTS = {
+    "square": (1, 1),
+    "1:1": (1, 1),
+    "4:5": (4, 5),
+    "5:4": (5, 4),
+    "16:9": (16, 9),
+    "9:16": (9, 16),
+    "3:2": (3, 2),
+    "2:3": (2, 3),
+    "4:3": (4, 3),
+    "3:4": (3, 4),
+    "21:9": (21, 9),
+    "a4": (210, 297),
+    "a4 landscape": (297, 210),
+    "portrait": (4, 5),
+    "landscape": (16, 9),
+    "story": (9, 16),
+    "wide": (16, 9),
+    "cinema": (21, 9),
+    "passport": (35, 45),
+}
 PRESETS = {  # name: (width, height)
-    "instagram": (1080, 1080), "instagram post": (1080, 1080), "instagram portrait": (1080, 1350), "instagram story": (1080, 1920), "story": (1080, 1920),
-    "reel": (1080, 1920), "tiktok": (1080, 1920), "whatsapp status": (1080, 1920), "youtube thumbnail": (1280, 720), "thumbnail": (1280, 720),
-    "facebook post": (1200, 630), "facebook cover": (1640, 624), "linkedin banner": (1584, 396), "linkedin post": (1200, 627), "twitter header": (1500, 500),
-    "x header": (1500, 500), "twitter post": (1600, 900), "whatsapp dp": (640, 640), "profile picture": (640, 640), "dp": (640, 640),
-    "wallpaper": (1920, 1080), "desktop wallpaper": (1920, 1080), "phone wallpaper": (1080, 2340), "a4 print": (2480, 3508), "4x6 print": (1800, 1200),
-    "6x4 print": (1800, 1200), "5x7 print": (1500, 2100), "pinterest": (1000, 1500), "email": (1200, 800)}
+    "instagram": (1080, 1080),
+    "instagram post": (1080, 1080),
+    "instagram portrait": (1080, 1350),
+    "instagram story": (1080, 1920),
+    "story": (1080, 1920),
+    "reel": (1080, 1920),
+    "tiktok": (1080, 1920),
+    "whatsapp status": (1080, 1920),
+    "youtube thumbnail": (1280, 720),
+    "thumbnail": (1280, 720),
+    "facebook post": (1200, 630),
+    "facebook cover": (1640, 624),
+    "linkedin banner": (1584, 396),
+    "linkedin post": (1200, 627),
+    "twitter header": (1500, 500),
+    "x header": (1500, 500),
+    "twitter post": (1600, 900),
+    "whatsapp dp": (640, 640),
+    "profile picture": (640, 640),
+    "dp": (640, 640),
+    "wallpaper": (1920, 1080),
+    "desktop wallpaper": (1920, 1080),
+    "phone wallpaper": (1080, 2340),
+    "a4 print": (2480, 3508),
+    "4x6 print": (1800, 1200),
+    "6x4 print": (1800, 1200),
+    "5x7 print": (1500, 2100),
+    "pinterest": (1000, 1500),
+    "email": (1200, 800),
+}
 PASSPORTS = {  # name: (width mm, height mm, head height as a share of the photo's height: low, high)
-    "35x45": (35, 45, 0.70, 0.80), "pakistan": (35, 45, 0.70, 0.80), "uk": (35, 45, 0.645, 0.755), "schengen": (35, 45, 0.70, 0.80),
-    "india": (35, 45, 0.70, 0.80), "uae": (43, 55, 0.62, 0.72), "saudi": (40, 60, 0.55, 0.65), "us": (51, 51, 0.50, 0.69), "2x2": (51, 51, 0.50, 0.69),
-    "canada": (50, 70, 0.443, 0.514), "china": (33, 48, 0.58, 0.69)}
+    "35x45": (35, 45, 0.70, 0.80),
+    "pakistan": (35, 45, 0.70, 0.80),
+    "uk": (35, 45, 0.645, 0.755),
+    "schengen": (35, 45, 0.70, 0.80),
+    "india": (35, 45, 0.70, 0.80),
+    "uae": (43, 55, 0.62, 0.72),
+    "saudi": (40, 60, 0.55, 0.65),
+    "us": (51, 51, 0.50, 0.69),
+    "2x2": (51, 51, 0.50, 0.69),
+    "canada": (50, 70, 0.443, 0.514),
+    "china": (33, 48, 0.58, 0.69),
+}
 
 
 class OpError(Exception):
@@ -80,9 +151,26 @@ def colour(c, default=(255, 255, 255)):
         return default
     if isinstance(c, (tuple, list)):
         return tuple(int(v) for v in c[:3])
-    names = {"off white": "#f5f3ee", "cream": "#fff8e7", "light blue": "#cfe8ff", "sky blue": "#87ceeb", "navy": "#1f2a44", "gold": "#d4a017",
-             "light grey": "#d9d9d9", "light gray": "#d9d9d9", "dark grey": "#333333", "dark gray": "#333333", "beige": "#f5f5dc", "maroon": "#800000",
-             "teal": "#008080", "mint": "#98ff98", "peach": "#ffe5b4", "coral": "#ff7f50", "lavender": "#e6e6fa", "olive": "#808000"}
+    names = {
+        "off white": "#f5f3ee",
+        "cream": "#fff8e7",
+        "light blue": "#cfe8ff",
+        "sky blue": "#87ceeb",
+        "navy": "#1f2a44",
+        "gold": "#d4a017",
+        "light grey": "#d9d9d9",
+        "light gray": "#d9d9d9",
+        "dark grey": "#333333",
+        "dark gray": "#333333",
+        "beige": "#f5f5dc",
+        "maroon": "#800000",
+        "teal": "#008080",
+        "mint": "#98ff98",
+        "peach": "#ffe5b4",
+        "coral": "#ff7f50",
+        "lavender": "#e6e6fa",
+        "olive": "#808000",
+    }
     try:
         return ImageColor.getrgb(names.get(str(c).lower().strip(), str(c).strip()))
     except ValueError:
@@ -147,11 +235,11 @@ def brightness(im, amount=0.2, target=None):
     g = 1.0
     for _ in range(32):
         g = math.sqrt(lo * hi)
-        if A.lum(a ** g).mean() > want:
+        if A.lum(a**g).mean() > want:
             lo = g
         else:
             hi = g
-    out = rgb.point(lut(lambda x: x ** g) * 3)
+    out = rgb.point(lut(lambda x: x**g) * 3)
     return merge(out, al), {"from": m, "want": want, "gamma": round(g, 3)}
 
 
@@ -167,8 +255,10 @@ def contrast(im, amount=0.25):
             s = lambda t: 1 / (1 + math.exp(-k * (t - mid)))  # noqa: E731
             return (s(x) - s(0)) / (s(1) - s(0))
     else:
+
         def curve(x):
             return mid + (x - mid) * (1 + amt)
+
     return merge(rgb.point(lut(curve) * 3), al), {}
 
 
@@ -216,7 +306,7 @@ def highlights(im, amount=0.4):
     """Bring the highlights down (a bright sky's detail back) or up (amount < 0)."""
     t = float(amount)
     rgb, al = split(im)
-    return merge(rgb.point(lut(lambda x: x - t * 2.6 * x ** 3 * (1 - x)) * 3), al), {}
+    return merge(rgb.point(lut(lambda x: x - t * 2.6 * x**3 * (1 - x)) * 3), al), {}
 
 
 def white_balance(im, strength=0.85):
@@ -251,7 +341,7 @@ def levels(im, low=0.5, high=99.5, keep_mean=True):
         lo_g, hi_g = 0.2, 5.0
         for _ in range(30):
             g = math.sqrt(lo_g * hi_g)
-            if A.lum(st ** g).mean() > m0:
+            if A.lum(st**g).mean() > m0:
                 lo_g = g
             else:
                 hi_g = g
@@ -285,7 +375,9 @@ def auto(im, brighter=False):
             out = Image.composite(lifted, im.convert("RGB"), fgm)
             steps.append(f"brightened the subject (it was {sub:.0%}); the {bd['kind']} screen is left as it is for keying")
         else:
-            steps.append(f"a {bd['kind']}-screen shot: the subject is already well lit ({sub:.0%}), so it is left as it is; say 'remove the background' to key it")
+            steps.append(
+                f"a {bd['kind']}-screen shot: the subject is already well lit ({sub:.0%}), so it is left as it is; say 'remove the background' to key it"
+            )
         return out, {"steps": steps, "before": {k: st[k] for k in ("brightness", "contrast", "saturation")}, "studio": bd["kind"]}
     if max(abs(c) for c in st["cast"]) > 0.08 and st["saturation"] < 0.55:
         out, inf = white_balance(out, 0.7)
@@ -803,8 +895,18 @@ def brighten_faces(im, amount=0.35):
     return merge(Image.composite(lifted, rgb, m), al), {"boxes": boxes}
 
 
-CORNERS = {"top-left": (0, 0), "top-right": (1, 0), "bottom-left": (0, 1), "bottom-right": (1, 1), "top": (0.5, 0), "bottom": (0.5, 1),
-           "left": (0, 0.5), "right": (1, 0.5), "center": (0.5, 0.5), "middle": (0.5, 0.5)}
+CORNERS = {
+    "top-left": (0, 0),
+    "top-right": (1, 0),
+    "bottom-left": (0, 1),
+    "bottom-right": (1, 1),
+    "top": (0.5, 0),
+    "bottom": (0.5, 1),
+    "left": (0, 0.5),
+    "right": (1, 0.5),
+    "center": (0.5, 0.5),
+    "middle": (0.5, 0.5),
+}
 
 
 def erase(im, where="bottom-right", size=0.18, box=None):
@@ -822,18 +924,21 @@ def erase(im, where="bottom-right", size=0.18, box=None):
         x1, y1 = x0 + w, y0 + h
     b = _box_clip((x0, y0, x1, y1), rgb.size)
     img = A.bgr(rgb)
-    reg = img[b[1]:b[3], b[0]:b[2]]
+    reg = img[b[1] : b[3], b[0] : b[2]]
     g = cv2.cvtColor(reg, cv2.COLOR_BGR2GRAY)
     tophat = cv2.morphologyEx(g, cv2.MORPH_TOPHAT, np.ones((9, 9), np.uint8))
     blackhat = cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, np.ones((9, 9), np.uint8))
     marks = ((tophat > 40) | (blackhat > 40)).astype(np.uint8) * 255
     marks = cv2.dilate(marks, np.ones((5, 5), np.uint8), iterations=2)
     mask = np.zeros(img.shape[:2], np.uint8)
-    mask[b[1]:b[3], b[0]:b[2]] = marks
+    mask[b[1] : b[3], b[0] : b[2]] = marks
     if mask.sum() == 0:
         raise OpError(f"I see nothing to remove in the {where.replace('-', ' ')}")
     out = cv2.inpaint(img, mask, 7, cv2.INPAINT_TELEA)
-    return merge(Image.fromarray(cv2.cvtColor(out, cv2.COLOR_BGR2RGB)), al), {"box": b, "marks": float((mask > 0).sum() / ((b[2] - b[0]) * (b[3] - b[1]) + 1))}
+    return merge(Image.fromarray(cv2.cvtColor(out, cv2.COLOR_BGR2RGB)), al), {
+        "box": b,
+        "marks": float((mask > 0).sum() / ((b[2] - b[0]) * (b[3] - b[1]) + 1)),
+    }
 
 
 # ------------------------------------------------------------------------------------------------ words
@@ -931,8 +1036,18 @@ def text(im, text="", where="auto", color="auto", size=None, font_name=None, sty
     for i, ln in enumerate(lines):
         lx = x + (bw - d.textlength(ln, font=f)) / 2
         ld.text((lx, y + i * lh), ln, font=f, fill=fill + (255,), stroke_width=stroke, stroke_fill=stroke_c + (255,))
-    return _onto(rgb, al, layer), {"box": box, "fill": fill, "behind": behind, "contrast": round(cr, 2), "stroke": stroke, "where": pos, "lines": lines,
-                                   "font_px": f.size, "faces": [ff["box"] for ff in fl], "auto": where in (None, "auto")}
+    return _onto(rgb, al, layer), {
+        "box": box,
+        "fill": fill,
+        "behind": behind,
+        "contrast": round(cr, 2),
+        "stroke": stroke,
+        "where": pos,
+        "lines": lines,
+        "font_px": f.size,
+        "faces": [ff["box"] for ff in fl],
+        "auto": where in (None, "auto"),
+    }
 
 
 def meme(im, top=None, bottom=None):
@@ -968,7 +1083,9 @@ def watermark(im, text=None, logo=None, where="bottom-right", opacity=0.35, tile
         tw = d.textlength(t, font=f)
         if tiled:
             tile = Image.new("RGBA", (int(tw + f.size * 2), int(f.size * 3)), (0, 0, 0, 0))
-            ImageDraw.Draw(tile).text((f.size, f.size), t, font=f, fill=(255, 255, 255, op), stroke_width=max(1, f.size // 18), stroke_fill=(0, 0, 0, op // 2))
+            ImageDraw.Draw(tile).text(
+                (f.size, f.size), t, font=f, fill=(255, 255, 255, op), stroke_width=max(1, f.size // 18), stroke_fill=(0, 0, 0, op // 2)
+            )
             tile = tile.rotate(30, expand=True, resample=Image.BICUBIC)
             for yy in range(-tile.height, H + tile.height, int(tile.height * 0.9)):
                 off = (yy // max(1, int(tile.height * 0.9))) % 2 * tile.width // 2
@@ -1021,7 +1138,7 @@ def side_by_side(a, b, labels=("Before", "After")):
     out.paste(a2, (0, 0))
     out.paste(b2, (a2.width + g, 0))
     if labels:
-        for (lbl, x0, w) in ((labels[0], 0, a2.width), (labels[1], a2.width + g, b2.width)):
+        for lbl, x0, w in ((labels[0], 0, a2.width), (labels[1], a2.width + g, b2.width)):
             f = font("bold", h * 0.045)
             d = ImageDraw.Draw(out)
             d.text((x0 + h * 0.03, h * 0.03), lbl, font=f, fill="white", stroke_width=max(1, f.size // 12), stroke_fill="black")
@@ -1111,11 +1228,62 @@ def document(im, mode="scan"):
 
 
 # ------------------------------------------------------------------------------------------------ the registry, and the checks
-OPS = {f.__name__: f for f in (brightness, contrast, saturation, vibrance, warmth, tint, shadows, highlights, white_balance, levels, clarity, auto,
-                               bw, sepia, vintage, cinematic, dramatic, fade, soft, pop, sketch, cartoon, painting, hdr, invert,
-                               crop, trim, rotate, flip, straighten, resize, canvas, border, rounded, polaroid, vignette,
-                               denoise, sharpen, blur, blur_faces, blur_background, remove_background, replace_background, smooth_skin, brighten_faces,
-                               erase, text, meme, watermark, passport, document)}
+OPS = {
+    f.__name__: f
+    for f in (
+        brightness,
+        contrast,
+        saturation,
+        vibrance,
+        warmth,
+        tint,
+        shadows,
+        highlights,
+        white_balance,
+        levels,
+        clarity,
+        auto,
+        bw,
+        sepia,
+        vintage,
+        cinematic,
+        dramatic,
+        fade,
+        soft,
+        pop,
+        sketch,
+        cartoon,
+        painting,
+        hdr,
+        invert,
+        crop,
+        trim,
+        rotate,
+        flip,
+        straighten,
+        resize,
+        canvas,
+        border,
+        rounded,
+        polaroid,
+        vignette,
+        denoise,
+        sharpen,
+        blur,
+        blur_faces,
+        blur_background,
+        remove_background,
+        replace_background,
+        smooth_skin,
+        brighten_faces,
+        erase,
+        text,
+        meme,
+        watermark,
+        passport,
+        document,
+    )
+}
 LOOKS = {"bw", "sepia", "vintage", "cinematic", "dramatic", "fade", "soft", "pop", "sketch", "cartoon", "painting", "hdr", "invert"}
 
 
@@ -1143,8 +1311,12 @@ def check(name, before, after, args=None, info=None):
     if name == "brightness":
         want = info.get("want", sb["brightness"])
         moved = sa["brightness"] - sb["brightness"]
-        out.append(_ok((want - sb["brightness"]) * moved > 0 and abs(sa["brightness"] - want) <= max(0.05, abs(want - sb["brightness"]) * 0.5),
-                       f"average brightness {sb['brightness']:.0%} -> {sa['brightness']:.0%} (asked about {want:.0%})"))
+        out.append(
+            _ok(
+                (want - sb["brightness"]) * moved > 0 and abs(sa["brightness"] - want) <= max(0.05, abs(want - sb["brightness"]) * 0.5),
+                f"average brightness {sb['brightness']:.0%} -> {sa['brightness']:.0%} (asked about {want:.0%})",
+            )
+        )
     elif name == "contrast":
         out.append(_ok((sa["contrast"] - sb["contrast"]) * (amt or 1) > 0, f"contrast {sb['contrast']:.3f} -> {sa['contrast']:.3f}"))
     elif name in ("saturation", "vibrance"):
@@ -1152,7 +1324,12 @@ def check(name, before, after, args=None, info=None):
     elif name == "warmth":
         out.append(_ok((sa["warmth"] - sb["warmth"]) * (amt or 1) > 0, f"warmth (red minus blue) {sb['warmth']:+.3f} -> {sa['warmth']:+.3f}"))
     elif name == "shadows":
-        out.append(_ok((sa["dark_mean"] - sb["dark_mean"]) * (amt or 1) > 0 or sb["dark_mean"] == 0, f"the dark parts {sb['dark_mean']:.0%} -> {sa['dark_mean']:.0%}"))
+        out.append(
+            _ok(
+                (sa["dark_mean"] - sb["dark_mean"]) * (amt or 1) > 0 or sb["dark_mean"] == 0,
+                f"the dark parts {sb['dark_mean']:.0%} -> {sa['dark_mean']:.0%}",
+            )
+        )
     elif name == "highlights":
         out.append(_ok((sb["light_mean"] - sa["light_mean"]) * (amt or 1) >= 0, f"the light parts {sb['light_mean']:.0%} -> {sa['light_mean']:.0%}"))
     elif name == "white_balance":
@@ -1161,7 +1338,9 @@ def check(name, before, after, args=None, info=None):
     elif name == "levels":
         out.append(_ok(sa["contrast"] >= sb["contrast"] - 0.002, f"tonal spread {sb['contrast']:.3f} -> {sa['contrast']:.3f}"))
     elif name in ("clarity", "hdr", "dramatic"):
-        out.append(_ok(sa["sharpness"] > sb["sharpness"] or sa["contrast"] > sb["contrast"], f"detail {sb['sharpness']:.0f} -> {sa['sharpness']:.0f}"))
+        out.append(
+            _ok(sa["sharpness"] > sb["sharpness"] or sa["contrast"] > sb["contrast"], f"detail {sb['sharpness']:.0f} -> {sa['sharpness']:.0f}")
+        )
     elif name == "auto" and info.get("studio"):
         out.append(_ok(_diff(before, after) < 0.15, "the screen behind is kept for keying"))
     elif name == "auto":
@@ -1189,7 +1368,12 @@ def check(name, before, after, args=None, info=None):
         out.append(_ok(d > 0.015, f"the look changed it ({d:.1%} of the tones)"))
     elif name in ("crop", "canvas") and (args.get("aspect") or args.get("size")):
         r = (args["size"][0] / args["size"][1]) if args.get("size") else _aspect(args["aspect"])
-        out.append(_ok(abs(after.width / after.height - r) / r < 0.01, f"shape {after.width}x{after.height} ({after.width / after.height:.3f}, asked {r:.3f})"))
+        out.append(
+            _ok(
+                abs(after.width / after.height - r) / r < 0.01,
+                f"shape {after.width}x{after.height} ({after.width / after.height:.3f}, asked {r:.3f})",
+            )
+        )
         if name == "crop" and info.get("faces"):
             x0, y0, x1, y1 = info["box"]
             inside = all(fx >= x0 - 2 and fy >= y0 - 2 and fx + fw <= x1 + 2 and fy + fh <= y1 + 2 for fx, fy, fw, fh in info["faces"][:1])
@@ -1204,7 +1388,9 @@ def check(name, before, after, args=None, info=None):
     elif name == "crop":
         out.append(_ok(after.width < before.width or after.height < before.height, f"{before.width}x{before.height} -> {after.width}x{after.height}"))
     elif name == "trim":
-        out.append(_ok(after.width < before.width and after.height < before.height, f"{before.width}x{before.height} -> {after.width}x{after.height}"))
+        out.append(
+            _ok(after.width < before.width and after.height < before.height, f"{before.width}x{before.height} -> {after.width}x{after.height}")
+        )
     elif name == "rotate":
         d = float(args.get("degrees", 90)) % 180
         want = (before.height, before.width) if abs(d - 90) < 1e-6 else before.size
@@ -1229,7 +1415,9 @@ def check(name, before, after, args=None, info=None):
         a = A.lum(A.arr(A.small(after.convert("RGB"), 200)[0]))
         b = A.lum(A.arr(A.small(before.convert("RGB"), 200)[0]))
         h, w = a.shape
-        cor = lambda m: float(np.mean([m[:h // 6, :w // 6].mean(), m[:h // 6, -w // 6:].mean(), m[-h // 6:, :w // 6].mean(), m[-h // 6:, -w // 6:].mean()]))  # noqa: E731
+        cor = lambda m: float(
+            np.mean([m[: h // 6, : w // 6].mean(), m[: h // 6, -w // 6 :].mean(), m[-h // 6 :, : w // 6].mean(), m[-h // 6 :, -w // 6 :].mean()])
+        )  # noqa: E731
         out.append(_ok(cor(a) < cor(b) - 0.005, f"corners {cor(b):.0%} -> {cor(a):.0%}"))
     elif name == "denoise":
         out.append(_ok(sa["noise"] <= sb["noise"] + 1e-4, f"grain {sb['noise']:.4f} -> {sa['noise']:.4f}"))
@@ -1238,6 +1426,7 @@ def check(name, before, after, args=None, info=None):
     elif name == "blur":
         out.append(_ok(sa["sharpness"] < sb["sharpness"], f"detail {sb['sharpness']:.0f} -> {sa['sharpness']:.0f}"))
     elif name == "blur_faces":
+
         def gone(b):
             x0, y0, x1, y1 = b
             core = (x0 + (x1 - x0) // 5, y0 + (y1 - y0) // 5, x1 - (x1 - x0) // 5, y1 - (y1 - y0) // 5)
@@ -1247,6 +1436,7 @@ def check(name, before, after, args=None, info=None):
                 same = lambda z: float((np.abs(z[:, 1:] - z[:, :-1]).max(axis=2) <= 1).mean())  # noqa: E731
                 return same(a_) > 0.6 and same(a_) > same(b_) + 0.25
             return _lap_var(after, core) < 0.35 * max(_lap_var(before, core), 1e-6)
+
         hidden = [b for b in info["boxes"] if (b[2] - b[0]) >= 4 and gone(b)]
         out.append(_ok(len(hidden) == len([b for b in info["boxes"] if (b[2] - b[0]) >= 4]), f"{len(hidden)}/{len(info['boxes'])} faces blurred"))
         rest = before.convert("RGB").copy()
@@ -1260,7 +1450,12 @@ def check(name, before, after, args=None, info=None):
         out.append(_ok(len(left) <= len(info["boxes"]) * 0.25, f"faces the detector still finds there: {len(left)}"))
     elif name == "remove_background":
         a = np.asarray(after.getchannel("A")) if after.mode == "RGBA" else None
-        out.append(_ok(a is not None and 0.03 < (a > 127).mean() < 0.95, f"transparent background, the subject {info.get('fg_share', 0):.0%} of the photo ({info.get('how')})"))
+        out.append(
+            _ok(
+                a is not None and 0.03 < (a > 127).mean() < 0.95,
+                f"transparent background, the subject {info.get('fg_share', 0):.0%} of the photo ({info.get('how')})",
+            )
+        )
         fl = A.faces(before)
         if fl and a is not None:
             x, y, w, h = fl[0]["box"]
@@ -1282,8 +1477,12 @@ def check(name, before, after, args=None, info=None):
             v0, v1 = float(g0[bgm].var()) if bgm.any() else 0, float(g1[bgm].var()) if bgm.any() else 0
             out.append(_ok(v1 < v0 * 0.6 or v0 < 1, f"background detail {v0:.0f} -> {v1:.0f} ({info.get('how')})"))
     elif name in ("smooth_skin", "brighten_faces"):
-        ch = [_lap_var(after, b) <= _lap_var(before, b) + 1 if name == "smooth_skin" else A.lum(A.arr(after.crop(b))).mean() > A.lum(A.arr(before.crop(b))).mean()
-              for b in info["boxes"]]
+        ch = [
+            _lap_var(after, b) <= _lap_var(before, b) + 1
+            if name == "smooth_skin"
+            else A.lum(A.arr(after.crop(b))).mean() > A.lum(A.arr(before.crop(b))).mean()
+            for b in info["boxes"]
+        ]
         out.append(_ok(all(ch), f"{sum(ch)}/{len(ch)} faces {'smoother' if name == 'smooth_skin' else 'brighter'}"))
     elif name == "erase":
         d = _diff(before, after, info["box"])
@@ -1292,10 +1491,19 @@ def check(name, before, after, args=None, info=None):
         out.append(_ok(rest / (before.width * before.height) < 0.003, "the rest untouched"))
     elif name == "text":
         x0, y0, x1, y1 = info["box"]
-        out.append(_ok(x0 >= 0 and y0 >= 0 and x1 <= after.width and y1 <= after.height, f"the text fits ({len(info['lines'])} line(s), {info['font_px']} px)"))
+        out.append(
+            _ok(
+                x0 >= 0 and y0 >= 0 and x1 <= after.width and y1 <= after.height,
+                f"the text fits ({len(info['lines'])} line(s), {info['font_px']} px)",
+            )
+        )
         out.append(_ok(_diff(before, after, info["box"]) > 0.01, "it is on the photo"))
-        out.append(_ok(info["contrast"] >= 4.5 or info["stroke"] > 0, f"readable: contrast {info['contrast']}:1 with what is behind" +
-                       (" (outlined)" if info["stroke"] else "")))
+        out.append(
+            _ok(
+                info["contrast"] >= 4.5 or info["stroke"] > 0,
+                f"readable: contrast {info['contrast']}:1 with what is behind" + (" (outlined)" if info["stroke"] else ""),
+            )
+        )
         if info.get("auto") and info.get("faces"):
             over = [f for f in info["faces"] if not (f[0] + f[2] < x0 or f[0] > x1 or f[1] + f[3] < y0 or f[1] > y1)]
             out.append(_ok(not over, "not over a face"))
@@ -1314,7 +1522,7 @@ def check(name, before, after, args=None, info=None):
         else:
             fl = A.faces(after)
             out.append(_ok(bool(fl) and abs((fl[0]["box"][0] + fl[0]["box"][2] / 2) / after.width - 0.5) < 0.06, "the face is centred"))
-            edge = np.asarray(after.convert("RGB"), dtype=np.float32)[:max(2, after.height // 25), :max(2, after.width // 8)].mean()
+            edge = np.asarray(after.convert("RGB"), dtype=np.float32)[: max(2, after.height // 25), : max(2, after.width // 8)].mean()
             out.append(_ok(edge > 225, f"a plain light background ({edge / 255:.0%} white in the corner)"))
     elif name == "document":
         g = np.asarray(after.convert("L"), dtype=np.float32) / 255

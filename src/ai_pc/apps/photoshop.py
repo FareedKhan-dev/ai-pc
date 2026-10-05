@@ -7,6 +7,7 @@ names, their places and the flattened picture.
   "photoshop file 1080x1080: background shop.jpg; logo logo.png top-left; title 'Eid Sale' white; subtitle '20% off everything' yellow"
   'psd with layers bg.png, product.png, badge.png'
 """
+
 import re
 import struct
 from pathlib import Path
@@ -14,10 +15,23 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 NAME, LABEL = "photoshop", "Photoshop: layered PSD files (posters, posts, stacked pictures)"
-EXAMPLES = ["photoshop file 1080x1080: background shop.jpg; logo logo.png top-left; title 'Eid Sale' white; subtitle '20% off' yellow",
-            "psd with layers bg.png, product.png, badge.png"]
-COLORS = {"white": (255, 255, 255), "black": (0, 0, 0), "red": (229, 57, 53), "yellow": (253, 216, 53), "gold": (255, 193, 7), "green": (67, 160, 71),
-          "blue": (30, 136, 229), "orange": (251, 140, 0), "pink": (216, 27, 96), "purple": (142, 36, 170), "grey": (158, 158, 158)}
+EXAMPLES = [
+    "photoshop file 1080x1080: background shop.jpg; logo logo.png top-left; title 'Eid Sale' white; subtitle '20% off' yellow",
+    "psd with layers bg.png, product.png, badge.png",
+]
+COLORS = {
+    "white": (255, 255, 255),
+    "black": (0, 0, 0),
+    "red": (229, 57, 53),
+    "yellow": (253, 216, 53),
+    "gold": (255, 193, 7),
+    "green": (67, 160, 71),
+    "blue": (30, 136, 229),
+    "orange": (251, 140, 0),
+    "pink": (216, 27, 96),
+    "purple": (142, 36, 170),
+    "grey": (158, 158, 158),
+}
 
 
 def _pascal(name):
@@ -64,7 +78,7 @@ def write_psd(path, size, layers):
 
 
 def _font(size, bold=True):
-    for f in (("segoeuib.ttf", "arialbd.ttf") if bold else ("segoeui.ttf", "arial.ttf")):
+    for f in ("segoeuib.ttf", "arialbd.ttf") if bold else ("segoeui.ttf", "arial.ttf"):
         try:
             return ImageFont.truetype(f, size)
         except OSError:
@@ -118,12 +132,15 @@ def check(path, layers, flat):
     boxes = [x[2] for x in im.layers]
     want = [(left, top, left + l.width, top + l.height) for _, l, (left, top) in layers]
     same = list(im.convert("RGB").getdata()) == list(flat.getdata())
-    return [("Pillow reads every layer by name, in its place", names == [n for n, _, _ in layers] and [tuple(b) for b in boxes] == want),
-            ("the flattened picture is the layers stacked", same)]
+    return [
+        ("Pillow reads every layer by name, in its place", names == [n for n, _, _ in layers] and [tuple(b) for b in boxes] == want),
+        ("the flattened picture is the layers stacked", same),
+    ]
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bphotoshop\b|\bpsd\b", c):
         return None
@@ -144,8 +161,14 @@ def parse(text, ctx):
             texts.append((label.title(), mm.group(1), COLORS[(mm.group(2) or ("white" if label == "title" else "yellow")).lower()]))
     if not (bg or lg or texts):
         return None
-    return {"op": "poster", "size": size, "background": find_file(bg.group(1), ctx) if bg else None, "logo": find_file(lg.group(1), ctx) if lg else None,
-            "logo_at": (lg.group(2) or "top-left").lower() if lg else "top-left", "texts": texts}
+    return {
+        "op": "poster",
+        "size": size,
+        "background": find_file(bg.group(1), ctx) if bg else None,
+        "logo": find_file(lg.group(1), ctx) if lg else None,
+        "logo_at": (lg.group(2) or "top-left").lower() if lg else "top-left",
+        "texts": texts,
+    }
 
 
 def run(op, ctx):
@@ -164,5 +187,9 @@ def run(op, ctx):
     flat.save(dest.with_suffix(".png"))
     checks = check(dest, layers, flat)
     bad = [w for w, ok in checks if not ok]
-    return (f"PSD with {len(layers)} layers ({', '.join(n for n, _, _ in layers)}), {size[0]}x{size[1]}: {dest} (and a PNG preview). Opens in Photoshop, GIMP, Photopea "
-            "and Affinity with every layer movable. " + ("Checked: " + "; ".join(w for w, _ in checks) if not bad else "NOT right: " + "; ".join(bad)) + ".")
+    return (
+        f"PSD with {len(layers)} layers ({', '.join(n for n, _, _ in layers)}), {size[0]}x{size[1]}: {dest} (and a PNG preview). Opens in Photoshop, GIMP, Photopea "
+        "and Affinity with every layer movable. "
+        + ("Checked: " + "; ".join(w for w, _ in checks) if not bad else "NOT right: " + "; ".join(bad))
+        + "."
+    )

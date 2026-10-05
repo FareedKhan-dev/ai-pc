@@ -11,6 +11,7 @@ outside its folder, running other programs, the network, the registry) is shown 
   c.say("make a website from https://www.figma.com/design/KEY/Shop?node-id=1-2")   -> HTML and CSS from the Figma frame, measured against it
   c.say("turn my Canva design 'Eid sale' into a web page")   -> the same from Canva (its PowerPoint export); "does it still match the design?"
 """
+
 import datetime as dt
 import json
 import re
@@ -114,13 +115,22 @@ class CodeChat:
         cid = f"code_{time.strftime('%Y%m%d_%H%M%S')}"
         folder = Path(chats_dir or CHATS) / cid
         folder.mkdir(parents=True, exist_ok=True)
-        st = {"id": cid, "folder": str(folder), "project": None, "run": None, "turns": [], "pending": None, "projects_dir": str(projects_dir or PROJECTS)}
+        st = {
+            "id": cid,
+            "folder": str(folder),
+            "project": None,
+            "run": None,
+            "turns": [],
+            "pending": None,
+            "projects_dir": str(projects_dir or PROJECTS),
+        }
         return cls(st, planner, projects_dir, connectors)
 
     def _conn(self, name):
         if name in self.connectors:
             return self.connectors[name]
         from ai_pc.hub import services
+
         return services.connector(name)
 
     def project(self):
@@ -164,7 +174,9 @@ class CodeChat:
             return "Not run. The code is saved; say 'undo' to take it back, or ask for a change."
         self.state["pending"] = None
         intents = [
-            (r"^\s*undo\b", self.undo), (r"^\s*redo\b", self.redo), (r"^\s*(?:history|versions|log)\b", self.history),
+            (r"^\s*undo\b", self.undo),
+            (r"^\s*redo\b", self.redo),
+            (r"^\s*(?:history|versions|log)\b", self.history),
             (r"\bwhat changed\b|\bshow (?:me )?the (?:diff|changes)\b", self.what_changed),
             (r"\b(?:list|show) (?:my |the )?projects\b", self.list_projects),
             (r"\bopen (?:it |this |the project )?(?:in )?(?:vs ?code|vscode|the editor)\b|\bshow (?:it|me) in vs ?code\b", self.open_vscode),
@@ -184,7 +196,9 @@ class CodeChat:
         if re.search(r"\bcanva\b", c) and re.search(DESIGN_WORDS, c):
             self._turn["intents"].append("from_canva")
             return self.from_design("canva", msg)
-        if re.search(r"\b(?:match(?:es)?|look(?:s)? like|compare[sd]?|check(?:ed)?|measure[sd]?)\b.*\b(?:the )?design\b", c) and self.state.get("project"):
+        if re.search(r"\b(?:match(?:es)?|look(?:s)? like|compare[sd]?|check(?:ed)?|measure[sd]?)\b.*\b(?:the )?design\b", c) and self.state.get(
+            "project"
+        ):
             self._turn["intents"].append("design_check")
             return self.design_check()
         for rx, fn in intents:
@@ -192,10 +206,13 @@ class CodeChat:
             if mm:
                 self._turn["intents"].append(fn.__name__)
                 return fn(mm.group(1) if mm.lastindex else None) if fn in (self.run,) else fn()
-        thing = r"\b(?:script|program|app|application|tool|website|web ?page|site|landing page|game|bot|api|cli|calculator|converter|tracker|dashboard|" \
-                r"portfolio|utility)\b"
-        new = re.search(r"\b(?:make|create|build|write|generate|code|develop)\b.*" + thing, c) and \
-            (not self.state.get("project") or re.search(r"\b(?:make|create|build|write|generate|develop)\s+(?:me\s+)?(?:a|an|new|another)\b", c))
+        thing = (
+            r"\b(?:script|program|app|application|tool|website|web ?page|site|landing page|game|bot|api|cli|calculator|converter|tracker|dashboard|"
+            r"portfolio|utility)\b"
+        )
+        new = re.search(r"\b(?:make|create|build|write|generate|code|develop)\b.*" + thing, c) and (
+            not self.state.get("project") or re.search(r"\b(?:make|create|build|write|generate|develop)\s+(?:me\s+)?(?:a|an|new|another)\b", c)
+        )
         if new:
             self._turn["intents"].append("new")
             return self.new(msg)
@@ -206,8 +223,13 @@ class CodeChat:
 
     # ---------------------------------------------------------------- building
     def new(self, request):
-        kind_hint = "web" if re.search(r"\bwebsite|web ?page|\bsite\b|landing page|portfolio|html|in the browser|browser game", request, re.I) else \
-            "node" if re.search(r"\bnode\b|\bjavascript\b(?!.*\bweb)|\bexpress\b", request, re.I) else "python"
+        kind_hint = (
+            "web"
+            if re.search(r"\bwebsite|web ?page|\bsite\b|landing page|portfolio|html|in the browser|browser game", request, re.I)
+            else "node"
+            if re.search(r"\bnode\b|\bjavascript\b(?!.*\bweb)|\bexpress\b", request, re.I)
+            else "python"
+        )
         ans = self.ask(NEW_SYSTEM, f"Make this ({kind_hint} unless the request says otherwise): {request}")
         meta, files = parse_files(ans)
         if not files:
@@ -228,8 +250,10 @@ class CodeChat:
 
     def edit(self, request):
         proj = self.project()
-        ctx = f"PROJECT ({proj.kind}), files and what is in them:\n{repomap(proj)}\n\nRUN COMMAND: {self.state.get('run')}\n\n" \
-              f"FILES:\n{relevant(proj, request)}\n\nCHANGE TO MAKE: {request}"
+        ctx = (
+            f"PROJECT ({proj.kind}), files and what is in them:\n{repomap(proj)}\n\nRUN COMMAND: {self.state.get('run')}\n\n"
+            f"FILES:\n{relevant(proj, request)}\n\nCHANGE TO MAKE: {request}"
+        )
         ans = self.ask(EDIT_SYSTEM, ctx)
         changed, problems = self._apply(proj, ans)
         if not changed:
@@ -260,15 +284,20 @@ class CodeChat:
             sha = proj.commit(f"{what} (not run yet)")
             self.state["pending"] = {"what": what}
             lines = "\n".join(f"  {h['file']}:{h['line']}  {h['what']}: {h['code']}" for h in hits[:8])
-            return (f"Saved ({sha}), but not run: this code could change things on your PC:\n{lines}\n"
-                    f"Say 'yes' to run its checks anyway, 'no' to leave it, or ask me to remove those parts.")
+            return (
+                f"Saved ({sha}), but not run: this code could change things on your PC:\n{lines}\n"
+                f"Say 'yes' to run its checks anyway, 'no' to leave it, or ask me to remove those parts."
+            )
         checks = V.check(proj, self._run_cmd(proj))
         rounds = 0
         while any(not c["ok"] and c["level"] == "fail" for c in checks) and rounds < 3 and self.planner is not None:
             rounds += 1
             errors = "\n\n".join(f"CHECK FAILED: {c['what']}\n{c['detail']}" for c in checks if not c["ok"])
-            ans = self.ask(FIX_SYSTEM, f"PROJECT ({proj.kind}):\n{repomap(proj)}\nRUN COMMAND: {self.state.get('run')}\n\n{errors[:6000]}\n\n"
-                                       f"FILES:\n{relevant(proj, errors + ' ' + what)}")
+            ans = self.ask(
+                FIX_SYSTEM,
+                f"PROJECT ({proj.kind}):\n{repomap(proj)}\nRUN COMMAND: {self.state.get('run')}\n\n{errors[:6000]}\n\n"
+                f"FILES:\n{relevant(proj, errors + ' ' + what)}",
+            )
             self._apply(proj, ans)
             if V.risks(proj) and not allow:
                 return self._checked(proj, what)
@@ -280,8 +309,11 @@ class CodeChat:
         tests = next((c for c in checks if c["what"].startswith("tests:")), None)
         shot = next((c for c in checks if c["what"].startswith("screenshot")), None)
         files = proj.files()
-        head = (f"Made {proj.folder.name} ({proj.kind}): {', '.join(f for f in files if not f.startswith('.'))[:300]}." if new else
-                f"Changed {', '.join(changed or [])}.")
+        head = (
+            f"Made {proj.folder.name} ({proj.kind}): {', '.join(f for f in files if not f.startswith('.'))[:300]}."
+            if new
+            else f"Changed {', '.join(changed or [])}."
+        )
         body = []
         if tests:
             body.append(tests["what"].capitalize())
@@ -295,28 +327,38 @@ class CodeChat:
             body.append(shot["what"])
         if rounds:
             body.append(f"repaired in {rounds} round(s)")
-        verdict = "all checks pass" if not bad else "NOT right yet: " + "; ".join(f"{c['what']} ({c['detail'].strip().splitlines()[-1][:160] if c['detail'].strip() else ''})" for c in bad[:2])
+        verdict = (
+            "all checks pass"
+            if not bad
+            else "NOT right yet: "
+            + "; ".join(f"{c['what']} ({c['detail'].strip().splitlines()[-1][:160] if c['detail'].strip() else ''})" for c in bad[:2])
+        )
         tail = f" Version {sha}." if sha else ""
         tip = f" Folder: {proj.folder}. Say 'open it in VS Code' to see it, or ask for a change." if new else ""
-        return f"{head} " + "; ".join(body) + (". " if body else "") + verdict + "." + tail + tip + (f" ({'; '.join(problems[:1])})" if problems else "")
+        return (
+            f"{head} " + "; ".join(body) + (". " if body else "") + verdict + "." + tail + tip + (f" ({'; '.join(problems[:1])})" if problems else "")
+        )
 
     # ---------------------------------------------------------------- from a design (Figma, Canva)
     def from_design(self, source, msg, link=None):
         from ai_pc.coding import fromdesign as FD
+
         quoted = re.findall(r"[\"“”']([^\"“”']{2,80})[\"“”']", msg)
         try:
             if source == "figma":
                 link = link or self.state.get("figma_link")
                 if not link:
                     return "Paste the Figma link of the frame (in Figma: right-click the frame > Copy/Paste as > Copy link to selection)."
-                m = re.search(r"\bframe\s+(?:called\s+|named\s+)?([\w][\w &/-]{0,40}?)(?:\s+(?:from|in|into|of|as)\b|[.,!?]|$)", msg, re.I) or \
-                    re.search(r"\bthe\s+([\w][\w &/-]{0,40}?)\s+frame\b", msg, re.I)
+                m = re.search(
+                    r"\bframe\s+(?:called\s+|named\s+)?([\w][\w &/-]{0,40}?)(?:\s+(?:from|in|into|of|as)\b|[.,!?]|$)", msg, re.I
+                ) or re.search(r"\bthe\s+([\w][\w &/-]{0,40}?)\s+frame\b", msg, re.I)
                 frame = quoted[0] if quoted else (m.group(1).strip() if m else None)
                 r = FD.from_figma(self._conn("figma"), link, frame, self.projects_dir)
                 self.state["figma_link"] = link
             else:
-                m = re.search(r"\bcanva design\s+(?:called\s+|named\s+)?([\w][\w &'-]{0,60}?)(?:\s+(?:into|to|as|in)\b|[.,!?]|$)", msg, re.I) or \
-                    re.search(r"\bmy\s+([\w][\w &'-]{0,60}?)\s+(?:canva\s+)?design\b", msg, re.I)
+                m = re.search(
+                    r"\bcanva design\s+(?:called\s+|named\s+)?([\w][\w &'-]{0,60}?)(?:\s+(?:into|to|as|in)\b|[.,!?]|$)", msg, re.I
+                ) or re.search(r"\bmy\s+([\w][\w &'-]{0,60}?)\s+(?:canva\s+)?design\b", msg, re.I)
                 name = quoted[0] if quoted else (m.group(1).strip() if m else None)
                 pm = re.search(r"\bpages?\s+(\d+)(?:\s*(?:-|to|and)\s*(\d+))?", msg, re.I)
                 pages = list(range(int(pm.group(1)), int(pm.group(2) or pm.group(1)) + 1)) if pm else None
@@ -326,19 +368,28 @@ class CodeChat:
         except (ValueError, KeyError) as e:
             return f"Couldn't read that design: {e}"
         proj = r["project"]
-        self.state.update(project=str(proj.folder), run="index.html", about=f"made from the {source.title()} design '{r['name']}'",
-                          design={"source": source, "name": r["name"]})
+        self.state.update(
+            project=str(proj.folder),
+            run="index.html",
+            about=f"made from the {source.title()} design '{r['name']}'",
+            design={"source": source, "name": r["name"]},
+        )
         self.state["last_checks"] = r["web"]
         return FD.summary(r)
 
     def design_check(self):
         from ai_pc.coding import designcheck as DC
+
         proj = self._need()
         if not (proj.folder / "design" / "design.json").exists():
             return "This project was not made from a design, so there is nothing to compare it with."
         r = DC.check(proj.folder, shot=(proj.folder / "design" / "reference.png").exists())
-        return ("Matches the design: " if r["ok"] else "Differs from the design: ") + "; ".join(r["lines"]) + "." + \
-            (" The side-by-side picture is .out/compare.png in the project." if r.get("picture") else "")
+        return (
+            ("Matches the design: " if r["ok"] else "Differs from the design: ")
+            + "; ".join(r["lines"])
+            + "."
+            + (" The side-by-side picture is .out/compare.png in the project." if r.get("picture") else "")
+        )
 
     # ---------------------------------------------------------------- the rest
     def run(self, args=None):
@@ -354,7 +405,9 @@ class CodeChat:
         if V.risks(proj) and not self.state.get("allowed"):
             return "This code can change things on your PC; I ran it only after your yes before. Say 'yes' to allow it."
         r = proj.run(cmd, timeout=120)
-        return f"`{' '.join(cmd)}` exit {r['code']} in {r['seconds']} s:\n{(r['out'] or '').strip()[-1500:]}" + (f"\n{r['err'].strip()[-800:]}" if r["err"].strip() else "")
+        return f"`{' '.join(cmd)}` exit {r['code']} in {r['seconds']} s:\n{(r['out'] or '').strip()[-1500:]}" + (
+            f"\n{r['err'].strip()[-800:]}" if r["err"].strip() else ""
+        )
 
     def test(self):
         proj = self._need()
@@ -363,8 +416,10 @@ class CodeChat:
 
     def explain(self):
         proj = self._need()
-        ans = self.ask("Explain this project to someone who does not code: what it does, how to use it, and which file does what. 5-8 short lines. English.",
-                       f"{repomap(proj)}\n\n{relevant(proj, 'main', 9000)}")
+        ans = self.ask(
+            "Explain this project to someone who does not code: what it does, how to use it, and which file does what. 5-8 short lines. English.",
+            f"{repomap(proj)}\n\n{relevant(proj, 'main', 9000)}",
+        )
         return ans.strip()
 
     def show(self):
@@ -377,7 +432,9 @@ class CodeChat:
         proj = self._need()
         main = next((f for f in ("main.py", "index.html", "index.js") if f in proj.files()), None)
         proj.open_in_vscode(main)
-        return f"Opened {proj.folder.name} in VS Code" + (f" at {main}" if main else "") + ". Its Run and Test tasks are set up (Terminal > Run Task)."
+        return (
+            f"Opened {proj.folder.name} in VS Code" + (f" at {main}" if main else "") + ". Its Run and Test tasks are set up (Terminal > Run Task)."
+        )
 
     def undo(self):
         proj = self._need()

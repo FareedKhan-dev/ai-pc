@@ -12,6 +12,7 @@ API's 50-posts-a-day limit asked first); Reels, Stories and carousel videos uplo
 pictures given to Instagram at a temporary web address (Instagram takes pictures only from a URL: see mediahost.py);
 permalink read back; delete (API since December 2025), comments, replies, hiding, media insights.
 """
+
 import datetime as dt
 import json
 import time
@@ -31,7 +32,9 @@ def _meta_error(plat, e):
         err = {"message": str(err or e)}
     code, sub, msg = err.get("code"), err.get("error_subcode"), err.get("error_user_msg") or err.get("message") or str(e)
     if code == 190:
-        return SocialError("auth", f"{plat.label}: the Meta sign-in has expired or was withdrawn (code 190/{sub}); run 'ai-pc social connect {plat.name}'")
+        return SocialError(
+            "auth", f"{plat.label}: the Meta sign-in has expired or was withdrawn (code 190/{sub}); run 'ai-pc social connect {plat.name}'"
+        )
     if code in (4, 17, 32, 613, 80001, 80002):
         return SocialError("limit", f"{plat.label}: Meta's rate limit for now ({msg})", retry_after=900)
     if code == 368:
@@ -81,8 +84,14 @@ class _Meta(Platform):
         """Meta's resumable upload: the whole file (or what is left of it) to rupload.facebook.com, with its offset."""
         size = Path(path).stat().st_size
         up = self.api(base, {}, 600)
-        st, h, content = up.request("POST", f"{base}/{ident}", data=Path(path).read_bytes(), raw=True, retries=2,
-                                    headers={"Authorization": f"OAuth {token}", "offset": "0", "file_size": str(size), "Content-Type": "application/octet-stream"})
+        st, h, content = up.request(
+            "POST",
+            f"{base}/{ident}",
+            data=Path(path).read_bytes(),
+            raw=True,
+            retries=2,
+            headers={"Authorization": f"OAuth {token}", "offset": "0", "file_size": str(size), "Content-Type": "application/octet-stream"},
+        )
         if st >= 400:
             try:
                 body = json.loads(content.decode("utf-8"))
@@ -107,13 +116,18 @@ class Facebook(_Meta):
     def whoami(self):
         pid, tok = self.page()
         p = self.call(self.gapi(tok).get, pid, params={"fields": "name,followers_count,link"})
-        return {"who": p.get("name"), "where": "Facebook Page" + (f", {p['followers_count']} followers" if p.get("followers_count") is not None else ""),
-                "id": pid}
+        return {
+            "who": p.get("name"),
+            "where": "Facebook Page" + (f", {p['followers_count']} followers" if p.get("followers_count") is not None else ""),
+            "id": pid,
+        }
 
     def warnings(self, post, target):
         w = []
         if not self.creds.get("live"):
-            w.append("if the Meta app is still in Development mode, only you can see Page posts: switch the app to Live (ai-pc social steps facebook)")
+            w.append(
+                "if the Meta app is still in Development mode, only you can see Page posts: switch the app to Live (ai-pc social steps facebook)"
+            )
         return w
 
     def _schedule(self, post, body):
@@ -208,20 +222,32 @@ class Facebook(_Meta):
         user = self.creds.get("user_token") or tok
         if not r.get("video_id"):
             if not r.get("upload"):
-                s = self.call(self.gapi(user).post, f"{self.creds.get('app_id')}/uploads",
-                              params={"file_name": path.name, "file_length": size, "file_type": "video/mp4"})
+                s = self.call(
+                    self.gapi(user).post,
+                    f"{self.creds.get('app_id')}/uploads",
+                    params={"file_name": path.name, "file_length": size, "file_type": "video/mp4"},
+                )
                 self.checkpoint(job, upload=s["id"])
                 r = job["remote"]
             if not r.get("handle"):
-                st, h, content = self.api(GRAPH, {}, 600).request("POST", f"{GRAPH}/{r['upload']}", data=path.read_bytes(), raw=True, retries=2,
-                                                                  headers={"Authorization": f"OAuth {user}", "file_offset": "0"})
+                st, h, content = self.api(GRAPH, {}, 600).request(
+                    "POST",
+                    f"{GRAPH}/{r['upload']}",
+                    data=path.read_bytes(),
+                    raw=True,
+                    retries=2,
+                    headers={"Authorization": f"OAuth {user}", "file_offset": "0"},
+                )
                 if st >= 400:
                     self.checkpoint(job, upload=None)
                     raise SocialError("retry" if st >= 500 else "invalid", f"Facebook refused the video upload ({st})")
                 self.checkpoint(job, handle=json.loads(content.decode("utf-8"))["h"])
                 r = job["remote"]
-            body = {"title": (prepared.get("title") or post.get("title") or "")[:255], "description": prepared.get("text") or "",
-                    "fbuploader_video_file_chunk": r["handle"]}
+            body = {
+                "title": (prepared.get("title") or post.get("title") or "")[:255],
+                "description": prepared.get("text") or "",
+                "fbuploader_video_file_chunk": r["handle"],
+            }
             sched = self._schedule(post, body)
             res = self.call(self.gapi(tok).post, f"{pid}/videos", json=body, retries=0)
             self.checkpoint(job, video_id=res["id"], post_id=res["id"], scheduled=sched)
@@ -324,9 +350,13 @@ class Facebook(_Meta):
 
     def comments(self, job, since=None):
         pid, tok = self.page()
-        js = self.call(self.gapi(tok).get, f"{job['remote']['post_id']}/comments", params={"filter": "stream", "fields": "id,message,created_time,from"})
-        return [{"id": c["id"], "author": (c.get("from") or {}).get("name") or "someone", "text": c.get("message", ""), "created": c.get("created_time")}
-                for c in js.get("data") or []]
+        js = self.call(
+            self.gapi(tok).get, f"{job['remote']['post_id']}/comments", params={"filter": "stream", "fields": "id,message,created_time,from"}
+        )
+        return [
+            {"id": c["id"], "author": (c.get("from") or {}).get("name") or "someone", "text": c.get("message", ""), "created": c.get("created_time")}
+            for c in js.get("data") or []
+        ]
 
     def reply(self, job, comment_id, text):
         pid, tok = self.page()
@@ -351,6 +381,7 @@ class Instagram(_Meta):
         self.need("ig_id")
         if self.creds.get("ig_mode") == "instagram":
             from ai_pc.social import auth
+
             return auth.fresh_token(self) if not self.transport else self.creds["access_token"]
         return self.creds.get("user_token") or self.creds.get("page_token")
 
@@ -362,8 +393,11 @@ class Instagram(_Meta):
 
     def whoami(self):
         u = self.call(self.ig().get, self.creds["ig_id"], params={"fields": "username,followers_count"})
-        return {"who": "@" + (u.get("username") or "?"), "where": "Instagram" + (f", {u['followers_count']} followers" if u.get("followers_count") is not None else ""),
-                "id": self.creds["ig_id"]}
+        return {
+            "who": "@" + (u.get("username") or "?"),
+            "where": "Instagram" + (f", {u['followers_count']} followers" if u.get("followers_count") is not None else ""),
+            "id": self.creds["ig_id"],
+        }
 
     def limits(self):
         js = self.call(self.ig().get, f"{self.creds['ig_id']}/content_publishing_limit", params={"fields": "quota_usage,config"})
@@ -374,6 +408,7 @@ class Instagram(_Meta):
 
     def host(self):
         from ai_pc.social.mediahost import MediaHost
+
         fb = None
         if self.creds.get("page_token"):
             fb = Facebook(self.creds, self.transport, self.store, self.pause)
@@ -387,7 +422,7 @@ class Instagram(_Meta):
         r = job.get("remote") or {}
         if self.creds.get("ig_mode") == "instagram":  # no resumable upload with Instagram login: the video goes by web address too
             return None
-        c = (r.get(key) or {})
+        c = r.get(key) or {}
         if not c.get("id"):
             res = self._container(dict(params, upload_type="resumable"))
             c = {"id": res["id"], "sent": False}
@@ -408,7 +443,9 @@ class Instagram(_Meta):
             bad = {i: s for i, s in states.items() if s[0] in ("ERROR", "EXPIRED")}
             if bad:
                 i, (code, why) = next(iter(bad.items()))
-                raise SocialError("invalid" if code == "ERROR" else "retry", f"Instagram could not use the media ({code}: {why or 'no reason given'})")
+                raise SocialError(
+                    "invalid" if code == "ERROR" else "retry", f"Instagram could not use the media ({code}: {why or 'no reason given'})"
+                )
             if all(s[0] in ("FINISHED", "PUBLISHED") for s in states.values()):
                 return True
             if time.time() - t0 > min(budget, 300):
@@ -511,13 +548,21 @@ class Instagram(_Meta):
         metric = "views,reach,likes,comments,shares,saved" if fmt != "story" else "views,reach,replies"
         js = self.call(self.ig().get, f"{mid}/insights", params={"metric": metric})
         vals = {d["name"]: (d.get("values") or [{}])[0].get("value") for d in js.get("data") or []}
-        return {"views": vals.get("views"), "reach": vals.get("reach"), "likes": vals.get("likes"), "comments": vals.get("comments"),
-                "shares": vals.get("shares"), "saves": vals.get("saved")}
+        return {
+            "views": vals.get("views"),
+            "reach": vals.get("reach"),
+            "likes": vals.get("likes"),
+            "comments": vals.get("comments"),
+            "shares": vals.get("shares"),
+            "saves": vals.get("saved"),
+        }
 
     def comments(self, job, since=None):
         js = self.call(self.ig().get, f"{job['remote']['media_id']}/comments", params={"fields": "id,text,timestamp,username"})
-        return [{"id": c["id"], "author": "@" + (c.get("username") or "someone"), "text": c.get("text", ""), "created": c.get("timestamp")}
-                for c in js.get("data") or []]
+        return [
+            {"id": c["id"], "author": "@" + (c.get("username") or "someone"), "text": c.get("text", ""), "created": c.get("timestamp")}
+            for c in js.get("data") or []
+        ]
 
     def reply(self, job, comment_id, text):
         res = self.call(self.ig().post, f"{comment_id}/replies", json={"message": text}, retries=0)

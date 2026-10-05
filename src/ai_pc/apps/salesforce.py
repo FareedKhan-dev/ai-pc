@@ -6,6 +6,7 @@ your org offers is used.
   'salesforce leads'   'add salesforce lead: Ali Raza, Ali Traders, ali@x.com, 0300-1234567'   'salesforce opportunities'
   'salesforce leads by status'
 """
+
 import base64
 import hashlib
 import re
@@ -20,18 +21,31 @@ NAME, LABEL = "salesforce", "Salesforce CRM: leads, opportunities, add a lead, c
 EXAMPLES = ["salesforce leads", "add salesforce lead: Ali Raza, Ali Traders, ali@x.com, 0300-1234567"]
 OUTWARD = {"add"}
 CALLBACK = "http://localhost:1717/OauthRedirect"
-APP = {"label": "Salesforce", "fields": [("client_id", "Consumer key of your Salesforce app", False), ("client_secret", "Consumer secret", True),
-                                         ("login", "Login address (Enter for https://login.salesforce.com)", False)],
-       "steps": ["Salesforce Setup > App Manager (or External Client App Manager) > New: enable OAuth, callback http://localhost:1717/OauthRedirect, "
-                 "scopes 'api' and 'refresh_token, offline_access', require PKCE.",
-                 "Copy the consumer key and secret, run 'ai-pc apps connect salesforce' and log in when the browser opens.",
-                 "A free Developer Edition org (developer.salesforce.com/signup) works for trying it."]}
+APP = {
+    "label": "Salesforce",
+    "fields": [
+        ("client_id", "Consumer key of your Salesforce app", False),
+        ("client_secret", "Consumer secret", True),
+        ("login", "Login address (Enter for https://login.salesforce.com)", False),
+    ],
+    "steps": [
+        "Salesforce Setup > App Manager (or External Client App Manager) > New: enable OAuth, callback http://localhost:1717/OauthRedirect, "
+        "scopes 'api' and 'refresh_token, offline_access', require PKCE.",
+        "Copy the consumer key and secret, run 'ai-pc apps connect salesforce' and log in when the browser opens.",
+        "A free Developer Edition org (developer.salesforce.com/signup) works for trying it.",
+    ],
+}
 
 
 def _token(login, form, transport=None):
     try:
         return Api(login, service="salesforce sign-in", transport=transport).request(
-            "POST", "services/oauth2/token", data=urllib.parse.urlencode(form).encode(), headers={"Content-Type": "application/x-www-form-urlencoded"}, retries=1)
+            "POST",
+            "services/oauth2/token",
+            data=urllib.parse.urlencode(form).encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            retries=1,
+        )
     except HubError as e:
         raise RuntimeError(f"Salesforce refused the sign-in ({e})") from e
 
@@ -42,14 +56,24 @@ class Client:
 
     def _refresh(self):
         c = self.c
-        tok = _token(c.get("login", "https://login.salesforce.com"), {"grant_type": "refresh_token", "refresh_token": c["refresh_token"], "client_id": c["client_id"],
-                                                                     "client_secret": c.get("client_secret", "")}, self.transport)
+        tok = _token(
+            c.get("login", "https://login.salesforce.com"),
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": c["refresh_token"],
+                "client_id": c["client_id"],
+                "client_secret": c.get("client_secret", ""),
+            },
+            self.transport,
+        )
         c.update(access_token=tok["access_token"], instance_url=tok.get("instance_url", c["instance_url"]))
         if self.transport is None:
             vault.put(NAME, {"access_token": c["access_token"], "instance_url": c["instance_url"]})
 
     def call(self, method, path, body=None, params=None, again=True):
-        api = Api(self.c["instance_url"], headers={"Authorization": f"Bearer {self.c['access_token']}"}, service="salesforce", transport=self.transport)
+        api = Api(
+            self.c["instance_url"], headers={"Authorization": f"Bearer {self.c['access_token']}"}, service="salesforce", transport=self.transport
+        )
         try:
             return api.request(method, path, json_body=body, params=params, retries=0 if method == "POST" else 3)
         except HubError as e:
@@ -85,18 +109,44 @@ def client(ctx):
 
 def connect(values, transport=None, store=None, open_url=webbrowser.open, show=print, timeout=300):
     from ai_pc.accounts.systems.loop import loopback_localhost
+
     login = (values.get("login") or "https://login.salesforce.com").rstrip("/")
     verifier = secrets.token_urlsafe(64)[:96]
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
 
     def build(redirect, state):
-        return f"{login}/services/oauth2/authorize?" + urllib.parse.urlencode({"response_type": "code", "client_id": values["client_id"], "redirect_uri": redirect,
-                                                                               "state": state, "code_challenge": challenge, "code_challenge_method": "S256"})
+        return f"{login}/services/oauth2/authorize?" + urllib.parse.urlencode(
+            {
+                "response_type": "code",
+                "client_id": values["client_id"],
+                "redirect_uri": redirect,
+                "state": state,
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+            }
+        )
+
     got, redirect = loopback_localhost(build, 1717, "/OauthRedirect", show=show, open_url=open_url, timeout=timeout, who="Salesforce")
-    tok = _token(login, {"grant_type": "authorization_code", "code": got["code"], "client_id": values["client_id"], "client_secret": values.get("client_secret", ""),
-                         "redirect_uri": redirect, "code_verifier": verifier}, transport)
-    creds = {"client_id": values["client_id"], "client_secret": values.get("client_secret", ""), "login": login, "access_token": tok["access_token"],
-             "refresh_token": tok.get("refresh_token", ""), "instance_url": tok["instance_url"]}
+    tok = _token(
+        login,
+        {
+            "grant_type": "authorization_code",
+            "code": got["code"],
+            "client_id": values["client_id"],
+            "client_secret": values.get("client_secret", ""),
+            "redirect_uri": redirect,
+            "code_verifier": verifier,
+        },
+        transport,
+    )
+    creds = {
+        "client_id": values["client_id"],
+        "client_secret": values.get("client_secret", ""),
+        "login": login,
+        "access_token": tok["access_token"],
+        "refresh_token": tok.get("refresh_token", ""),
+        "instance_url": tok["instance_url"],
+    }
     (store or (lambda v: vault.put(NAME, v)))(creds)
     return {"who": tok["instance_url"], "where": "Salesforce"}
 
@@ -140,7 +190,10 @@ def run(op, ctx):
         return "\n".join(f"- {r['Name']} ({r.get('Company')}): {r.get('Status')}" for r in rs) or "No leads yet."
     if op["op"] == "opps":
         rs = c.query("SELECT Id, Name, StageName, Amount, CloseDate FROM Opportunity WHERE IsClosed = false ORDER BY CloseDate LIMIT 10")
-        return "\n".join(f"- {r['Name']}: {r.get('StageName')}, {r.get('Amount') or 0:,.0f}, closes {r.get('CloseDate')}" for r in rs) or "No open opportunities."
+        return (
+            "\n".join(f"- {r['Name']}: {r.get('StageName')}, {r.get('Amount') or 0:,.0f}, closes {r.get('CloseDate')}" for r in rs)
+            or "No open opportunities."
+        )
     if op["op"] == "by_status":
         rs = c.query("SELECT Status, COUNT(Id) n FROM Lead GROUP BY Status")
         return "Leads by status: " + ", ".join(f"{r['Status']} {r['n']}" for r in rs) + "."

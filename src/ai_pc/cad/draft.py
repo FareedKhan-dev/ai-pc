@@ -5,6 +5,7 @@ inches, the plot line and the road, a north arrow, a room schedule, a title bloc
   doc, sheet = drawing(lay)        lay from floorplan.plan(); a second floor is drawn beside the first
   doc.saveas("plan.dxf")           AutoCAD, BricsCAD, LibreCAD and DraftSight open it; 1 drawing unit = 1 inch
 """
+
 import datetime as dt
 import math
 
@@ -14,8 +15,20 @@ from ezdxf.enums import TextEntityAlignment
 from ai_pc.cad.floorplan import INNER, OUTER, summary
 from ai_pc.cad.units import ft_in, marla_of
 
-LAYERS = {"A-WALL": (7, 0.50), "A-WALL-FILL": (8, 0.13), "A-DOOR": (1, 0.25), "A-GLAZ": (5, 0.25), "A-FURN": (8, 0.13), "A-STAIR": (7, 0.25),
-          "A-TEXT": (7, 0.25), "A-DIMS": (7, 0.18), "A-PLOT": (3, 0.25), "A-SHEET": (7, 0.35), "A-TITLE": (7, 0.25), "A-AREA": (9, 0.0)}
+LAYERS = {
+    "A-WALL": (7, 0.50),
+    "A-WALL-FILL": (8, 0.13),
+    "A-DOOR": (1, 0.25),
+    "A-GLAZ": (5, 0.25),
+    "A-FURN": (8, 0.13),
+    "A-STAIR": (7, 0.25),
+    "A-TEXT": (7, 0.25),
+    "A-DIMS": (7, 0.18),
+    "A-PLOT": (3, 0.25),
+    "A-SHEET": (7, 0.35),
+    "A-TITLE": (7, 0.25),
+    "A-AREA": (9, 0.0),
+}
 SCALES = [50, 75, 100, 125, 150, 200, 250, 300]
 PAPER = {"A3": (420, 297), "A2": (594, 420), "A1": (841, 594), "A4": (297, 210)}
 
@@ -56,6 +69,7 @@ def union(rects, holes=()):
 
     def f(i, j):
         return 0 <= i < nx and 0 <= j < ny and fill[i][j]
+
     edges = {}
     for i in range(nx):
         for j in range(ny):
@@ -133,13 +147,31 @@ def _wall_rects(lay):
         bt = r.get("bath")
         if bt:
             if bt["side"] == "right":
-                rects.append((bt["x0"] - INNER, bt["y0"] - (INNER if bt["end"] == "rear" else 0), bt["x0"], bt["y1"] + (INNER if bt["end"] == "front" else 0)))
+                rects.append(
+                    (bt["x0"] - INNER, bt["y0"] - (INNER if bt["end"] == "rear" else 0), bt["x0"], bt["y1"] + (INNER if bt["end"] == "front" else 0))
+                )
             else:
-                rects.append((bt["x1"], bt["y0"] - (INNER if bt["end"] == "rear" else 0), bt["x1"] + INNER, bt["y1"] + (INNER if bt["end"] == "front" else 0)))
+                rects.append(
+                    (bt["x1"], bt["y0"] - (INNER if bt["end"] == "rear" else 0), bt["x1"] + INNER, bt["y1"] + (INNER if bt["end"] == "front" else 0))
+                )
             if bt["end"] == "rear":
-                rects.append((bt["x0"] - (INNER if bt["side"] == "right" else 0), bt["y0"] - INNER, bt["x1"] + (INNER if bt["side"] == "left" else 0), bt["y0"]))
+                rects.append(
+                    (
+                        bt["x0"] - (INNER if bt["side"] == "right" else 0),
+                        bt["y0"] - INNER,
+                        bt["x1"] + (INNER if bt["side"] == "left" else 0),
+                        bt["y0"],
+                    )
+                )
             else:
-                rects.append((bt["x0"] - (INNER if bt["side"] == "right" else 0), bt["y1"], bt["x1"] + (INNER if bt["side"] == "left" else 0), bt["y1"] + INNER))
+                rects.append(
+                    (
+                        bt["x0"] - (INNER if bt["side"] == "right" else 0),
+                        bt["y1"],
+                        bt["x1"] + (INNER if bt["side"] == "left" else 0),
+                        bt["y1"] + INNER,
+                    )
+                )
     cx0, cy0, cx1, cy1 = lay["clear"]
     out = []
     for r in rects:  # clip inner walls to the building
@@ -151,7 +183,11 @@ def _wall_rects(lay):
 
 def _thick(lay, o, at):
     ex0, ey0, ex1, ey1 = lay["envelope"]
-    edge = (abs(at - (ey0 + OUTER / 2)) < 1 or abs(at - (ey1 - OUTER / 2)) < 1) if o == "h" else (abs(at - (ex0 + OUTER / 2)) < 1 or abs(at - (ex1 - OUTER / 2)) < 1)
+    edge = (
+        (abs(at - (ey0 + OUTER / 2)) < 1 or abs(at - (ey1 - OUTER / 2)) < 1)
+        if o == "h"
+        else (abs(at - (ex0 + OUTER / 2)) < 1 or abs(at - (ex1 - OUTER / 2)) < 1)
+    )
     return OUTER if edge else INNER
 
 
@@ -166,6 +202,7 @@ def _opening(lay, d):
 def _blocks(doc):
     def blk(name):
         return doc.blocks.new(name)
+
     b = blk("BED_DOUBLE")  # 5' x 6'-6", headboard at y=0
     b.add_lwpolyline([(0, 0), (60, 0), (60, 78), (0, 78)], close=True)
     b.add_lwpolyline([(4, 4), (28, 4), (28, 18), (4, 18)], close=True)
@@ -247,8 +284,10 @@ def _label_rect(r, text_w, name_h):
     bt = r.get("bath")
     if not bt:
         return r["x0"], r["y0"], r["x1"], r["y1"]
-    cands = [(r["x0"], r["y0"], r["x1"], bt["y0"] - INNER) if bt["end"] == "rear" else (r["x0"], bt["y1"] + INNER, r["x1"], r["y1"]),
-             (bt["x1"] + INNER, r["y0"], r["x1"], r["y1"]) if bt["side"] == "left" else (r["x0"], r["y0"], bt["x0"] - INNER, r["y1"])]
+    cands = [
+        (r["x0"], r["y0"], r["x1"], bt["y0"] - INNER) if bt["end"] == "rear" else (r["x0"], bt["y1"] + INNER, r["x1"], r["y1"]),
+        (bt["x1"] + INNER, r["y0"], r["x1"], r["y1"]) if bt["side"] == "left" else (r["x0"], r["y0"], bt["x0"] - INNER, r["y1"]),
+    ]
     fit = [q for q in cands if (q[2] - q[0]) >= text_w + 4 and (q[3] - q[1]) >= name_h * 3]
     pool = fit or cands
     return max(pool, key=lambda q: (q[2] - q[0]) * (q[3] - q[1]))
@@ -308,14 +347,25 @@ def _label_layout(r, th, zones=()):
     if best is None:  # written up the room
         h = max(th * 0.4, min(th, (x1 - x0) * 0.45, ah / (len(lab) * BOLD)))
         bw = h * 1.2
-        return {"at": ((x0 + x1) / 2, (y0 + y1) / 2), "lines": [lab], "h": h, "up": True, "size": size_txt, "size_h": 0,
-                "box": ((x0 + x1) / 2 - bw / 2, (y0 + y1) / 2 - len(lab) * BOLD * h / 2, (x0 + x1) / 2 + bw / 2, (y0 + y1) / 2 + len(lab) * BOLD * h / 2)}
+        return {
+            "at": ((x0 + x1) / 2, (y0 + y1) / 2),
+            "lines": [lab],
+            "h": h,
+            "up": True,
+            "size": size_txt,
+            "size_h": 0,
+            "box": ((x0 + x1) / 2 - bw / 2, (y0 + y1) / 2 - len(lab) * BOLD * h / 2, (x0 + x1) / 2 + bw / 2, (y0 + y1) / 2 + len(lab) * BOLD * h / 2),
+        }
     lines, h = best
     size_h = min(size_h, aw / (len(size_txt) * REG)) if r["kind"] != "passage" else 0
     size_h = size_h if size_h >= th * 0.45 else 0
     mx, my = (x0 + x1) / 2, (y0 + y1) / 2
     bt = r.get("bath")
-    zones = list(zones) + ([(r["x0"], r["y0"], r["x0"] + 26, r["y1"]), (r["x0"], r["y1"] - 26, r["x1"], r["y1"])] if r["kind"] == "kitchen" else [])         + ([(bt["x0"] - INNER, bt["y0"] - INNER, bt["x1"] + INNER, bt["y1"] + INNER)] if bt else [])
+    zones = (
+        list(zones)
+        + ([(r["x0"], r["y0"], r["x0"] + 26, r["y1"]), (r["x0"], r["y1"] - 26, r["x1"], r["y1"])] if r["kind"] == "kitchen" else [])
+        + ([(bt["x0"] - INNER, bt["y0"] - INNER, bt["x1"] + INNER, bt["y1"] + INNER)] if bt else [])
+    )
     rx0, ry0, rx1, ry1 = r["x0"], r["y0"], r["x1"], r["y1"]  # anywhere in the room outside its bath
     for k in (1.0, 0.9):  # clear of door swings, the bath and the kitchen counter: nearest the middle, then a little smaller
         hk, sk = h * k, size_h * k
@@ -325,15 +375,41 @@ def _label_layout(r, th, zones=()):
         xs = [mx + f * (x1 - x0) for f in (0, -0.15, 0.15, -0.3, 0.3)] + [v for z in zones for v in (z[2] + half + 0.5, z[0] - half - 0.5)]
         ys = [my + f * (y1 - y0) for f in (0, -0.12, 0.12, -0.24, 0.24)] + [v for z in zones for v in (z[3] + down_ + 0.5, z[1] - up_ - 0.5)]
         spots = sorted(((cx, cy) for cx in xs for cy in ys), key=lambda p: abs(p[0] - mx) / max(x1 - x0, 1) + abs(p[1] - my) / max(y1 - y0, 1))
-        hit = next(((cx, cy) for cx, cy in spots if cx - half >= rx0 and cx + half <= rx1 and cy - down_ >= ry0 and cy + up_ <= ry1
-                    and not _hits((cx - half, cy - down_, cx + half, cy + up_), zones)), None)
+        hit = next(
+            (
+                (cx, cy)
+                for cx, cy in spots
+                if cx - half >= rx0
+                and cx + half <= rx1
+                and cy - down_ >= ry0
+                and cy + up_ <= ry1
+                and not _hits((cx - half, cy - down_, cx + half, cy + up_), zones)
+            ),
+            None,
+        )
         if hit:
             cx, cy = hit
-            return {"at": (cx, cy), "lines": lines, "h": hk, "up": False, "size": size_txt, "size_h": sk, "box": (cx - half, cy - down_, cx + half, cy + up_)}
+            return {
+                "at": (cx, cy),
+                "lines": lines,
+                "h": hk,
+                "up": False,
+                "size": size_txt,
+                "size_h": sk,
+                "box": (cx - half, cy - down_, cx + half, cy + up_),
+            }
     half = max(max(len(x) for x in lines) * BOLD * h, len(size_txt) * REG * size_h) / 2 + 3
     up_ = h * (0.9 if len(lines) == 1 else 1.4) + h * 0.8
     down_ = h * 0.6 + (h * 0.5 if len(lines) > 1 else 0) + max(size_h, h * 0.5) * 0.7
-    return {"at": (mx, my), "lines": lines, "h": h, "up": False, "size": size_txt, "size_h": size_h, "box": (mx - half, my - down_, mx + half, my + up_)}
+    return {
+        "at": (mx, my),
+        "lines": lines,
+        "h": h,
+        "up": False,
+        "size": size_txt,
+        "size_h": size_h,
+        "box": (mx - half, my - down_, mx + half, my + up_),
+    }
 
 
 def _label_zone(r, th, zones=()):
@@ -344,6 +420,7 @@ def _label_zone(r, th, zones=()):
 def _skylight_box(r, th):
     """Where a room without an outside wall gets its skylight: (frame box, with its word under it) or None."""
     from ai_pc.cad.floorplan import KINDS as _K
+
     if not (_K[r["kind"]][5] and not r.get("outside")):
         return None
     x0, y0, x1, y1 = _main_rect(r)
@@ -361,7 +438,7 @@ def _free_box(rect, bw, bh, avoid):
         return None
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     pts = [(lo_x + (hi_x - lo_x) * i / 12, lo_y + (hi_y - lo_y) * j / 6) for i in range(13) for j in range(7)]
-    for px, py in sorted(pts, key=lambda p: (abs(p[1] - cy) / max(y1 - y0, 1) * 1.5 + abs(p[0] - cx) / max(x1 - x0, 1))):
+    for px, py in sorted(pts, key=lambda p: abs(p[1] - cy) / max(y1 - y0, 1) * 1.5 + abs(p[0] - cx) / max(x1 - x0, 1)):
         box = (px - bw / 2, py - bh / 2, px + bw / 2, py + bh / 2)
         if not _hits(box, avoid):
             return box
@@ -463,8 +540,9 @@ def _furnish(msp, lay, th=0.0):
             if box:
                 _ins(msp, "DINING6", box[0], box[1] + 20)
         elif k == "kitchen" and w >= 66 and d >= 66:
-            msp.add_lwpolyline([(x0, y1), (x1, y1), (x1, y1 - 24), (x0 + 24, y1 - 24), (x0 + 24, y0 + 12), (x0, y0 + 12)], close=True,
-                               dxfattribs={"layer": "A-FURN"})
+            msp.add_lwpolyline(
+                [(x0, y1), (x1, y1), (x1, y1 - 24), (x0 + 24, y1 - 24), (x0 + 24, y0 + 12), (x0, y0 + 12)], close=True, dxfattribs={"layer": "A-FURN"}
+            )
             _ins(msp, "STOVE", cx, y1 - 22)
             _ins(msp, "SINK", x0 + 3, cy + 15, -90)
         elif k == "porch" and w >= 84 and d >= 176:
@@ -567,8 +645,9 @@ def _stairs(msp, r, th):
         msp.add_line((x0, y0 + n * tread * 0.45), (mid, y0 + n * tread * 0.62), dxfattribs=att)  # the cut line of the floor above
         y0 + 8
     ux = (r["x0"] + r["x1"]) / 2 if (r.get("stair") == "straight" or (r["x1"] - r["x0"]) < 70) else (r["x0"] + (r["x0"] + r["x1"]) / 2) / 2
-    msp.add_text("UP", dxfattribs={"layer": "A-TEXT", "height": th * 0.8, "style": "ARCHB"}).set_placement((ux, r["y0"] + th * 1.3),
-                                                                                                    align=TextEntityAlignment.MIDDLE_CENTER)
+    msp.add_text("UP", dxfattribs={"layer": "A-TEXT", "height": th * 0.8, "style": "ARCHB"}).set_placement(
+        (ux, r["y0"] + th * 1.3), align=TextEntityAlignment.MIDDLE_CENTER
+    )
 
 
 # ------------------------------------------------------------------------------------------------ the drawing
@@ -597,9 +676,13 @@ def _chain(msp, style, pts, base, axis, u, origin):
         if b - a < 6:
             continue
         if axis == "x":
-            dim = msp.add_linear_dim(base=(a, base), p1=(a, origin), p2=(b, origin), dimstyle=style, text=ft_in(b - a), dxfattribs={"layer": "A-DIMS"})
+            dim = msp.add_linear_dim(
+                base=(a, base), p1=(a, origin), p2=(b, origin), dimstyle=style, text=ft_in(b - a), dxfattribs={"layer": "A-DIMS"}
+            )
         else:
-            dim = msp.add_linear_dim(base=(base, a), p1=(origin, a), p2=(origin, b), angle=90, dimstyle=style, text=ft_in(b - a), dxfattribs={"layer": "A-DIMS"})
+            dim = msp.add_linear_dim(
+                base=(base, a), p1=(origin, a), p2=(origin, b), angle=90, dimstyle=style, text=ft_in(b - a), dxfattribs={"layer": "A-DIMS"}
+            )
         dim.render()
 
 
@@ -623,10 +706,15 @@ def _plan(msp, lay, ox, oy, scale, style, title):
         _furnish(msp, moved, th)
     W, D = moved["plot"]
     px0, py0 = ox, oy
-    msp.add_lwpolyline([(px0, py0), (px0 + W, py0), (px0 + W, py0 + D), (px0, py0 + D)], close=True,
-                       dxfattribs={"layer": "A-PLOT", "linetype": "DASHDOT", "ltscale": scale / 25})
+    msp.add_lwpolyline(
+        [(px0, py0), (px0 + W, py0), (px0 + W, py0 + D), (px0, py0 + D)],
+        close=True,
+        dxfattribs={"layer": "A-PLOT", "linetype": "DASHDOT", "ltscale": scale / 25},
+    )
     for r in moved["rooms"]:
-        msp.add_lwpolyline([(r["x0"], r["y0"]), (r["x1"], r["y0"]), (r["x1"], r["y1"]), (r["x0"], r["y1"])], close=True, dxfattribs={"layer": "A-AREA"})
+        msp.add_lwpolyline(
+            [(r["x0"], r["y0"]), (r["x1"], r["y0"]), (r["x1"], r["y1"]), (r["x0"], r["y1"])], close=True, dxfattribs={"layer": "A-AREA"}
+        )
         if r["kind"] == "stairs":
             _stairs(msp, r, th)
         if r["kind"] == "stairs":  # the treads and UP say what it is
@@ -634,55 +722,80 @@ def _plan(msp, lay, ox, oy, scale, style, title):
         lb = _label_layout(r, th, _swing_zones(moved))
         cx, cy = lb["at"]
         if not lb["up"]:
-            mt = msp.add_mtext("\\P".join(lb["lines"]), dxfattribs={"layer": "A-TEXT", "char_height": lb["h"], "style": "ARCHB", "attachment_point": 5})
+            mt = msp.add_mtext(
+                "\\P".join(lb["lines"]), dxfattribs={"layer": "A-TEXT", "char_height": lb["h"], "style": "ARCHB", "attachment_point": 5}
+            )
             mt.set_location((cx, cy + lb["h"] * (0.9 if len(lb["lines"]) == 1 else 1.4)))
             if lb["size_h"]:
                 msp.add_text(lb["size"], dxfattribs={"layer": "A-TEXT", "height": lb["size_h"], "style": "ARCH"}).set_placement(
-                    (cx, cy - lb["h"] * 0.6 - (lb["h"] * 0.5 if len(lb["lines"]) > 1 else 0)), align=TextEntityAlignment.MIDDLE_CENTER)
+                    (cx, cy - lb["h"] * 0.6 - (lb["h"] * 0.5 if len(lb["lines"]) > 1 else 0)), align=TextEntityAlignment.MIDDLE_CENTER
+                )
         else:  # too narrow for the words across (a store): written up the room
             msp.add_text(lb["lines"][0], dxfattribs={"layer": "A-TEXT", "height": lb["h"], "style": "ARCHB", "rotation": 90}).set_placement(
-                (cx, cy), align=TextEntityAlignment.MIDDLE_CENTER)
+                (cx, cy), align=TextEntityAlignment.MIDDLE_CENTER
+            )
         bt = r.get("bath")
         if bt:
             bsz = f"{ft_in(bt['w'])} x {ft_in(bt['d'])}"
             fits = bt["w"] >= len(bsz) * th * 0.5 * 0.6 + 4
             msp.add_text("BATH", dxfattribs={"layer": "A-TEXT", "height": th * 0.7, "style": "ARCHB"}).set_placement(
-                ((bt["x0"] + bt["x1"]) / 2, (bt["y0"] + bt["y1"]) / 2 + (th * 0.4 if fits else 0)), align=TextEntityAlignment.MIDDLE_CENTER)
+                ((bt["x0"] + bt["x1"]) / 2, (bt["y0"] + bt["y1"]) / 2 + (th * 0.4 if fits else 0)), align=TextEntityAlignment.MIDDLE_CENTER
+            )
             if fits:
                 msp.add_text(bsz, dxfattribs={"layer": "A-TEXT", "height": th * 0.5, "style": "ARCH"}).set_placement(
-                    ((bt["x0"] + bt["x1"]) / 2, (bt["y0"] + bt["y1"]) / 2 - th * 0.6), align=TextEntityAlignment.MIDDLE_CENTER)
+                    ((bt["x0"] + bt["x1"]) / 2, (bt["y0"] + bt["y1"]) / 2 - th * 0.6), align=TextEntityAlignment.MIDDLE_CENTER
+                )
     for r in moved["rooms"]:  # a room with no outside wall gets a skylight (dashed: it is overhead)
         sky = _skylight_box(r, th)
         if sky:
             (sx0, sy0, sx1, sy1), _ = sky
             sw, sh, cx, cy = sx1 - sx0, sy1 - sy0, (sx0 + sx1) / 2, (sy0 + sy1) / 2
-            msp.add_lwpolyline([(cx - sw / 2, cy - sh / 2), (cx + sw / 2, cy - sh / 2), (cx + sw / 2, cy + sh / 2), (cx - sw / 2, cy + sh / 2)], close=True,
-                               dxfattribs={"layer": "A-GLAZ", "linetype": "DASHED", "ltscale": scale / 60})
-            msp.add_line((cx - sw / 2, cy - sh / 2), (cx + sw / 2, cy + sh / 2), dxfattribs={"layer": "A-GLAZ", "linetype": "DASHED", "ltscale": scale / 60})
+            msp.add_lwpolyline(
+                [(cx - sw / 2, cy - sh / 2), (cx + sw / 2, cy - sh / 2), (cx + sw / 2, cy + sh / 2), (cx - sw / 2, cy + sh / 2)],
+                close=True,
+                dxfattribs={"layer": "A-GLAZ", "linetype": "DASHED", "ltscale": scale / 60},
+            )
+            msp.add_line(
+                (cx - sw / 2, cy - sh / 2), (cx + sw / 2, cy + sh / 2), dxfattribs={"layer": "A-GLAZ", "linetype": "DASHED", "ltscale": scale / 60}
+            )
             msp.add_text("SKYLIGHT", dxfattribs={"layer": "A-TEXT", "height": th * 0.5, "style": "ARCH"}).set_placement(
-                (cx, cy - sh / 2 - th * 0.6), align=TextEntityAlignment.MIDDLE_CENTER)
+                (cx, cy - sh / 2 - th * 0.6), align=TextEntityAlignment.MIDDLE_CENTER
+            )
     ex0_, ey0_, ex1_, ey1_ = moved["envelope"]
     if moved["plot"][1] + oy - ey1_ >= 24:  # the open space at the back, named between the dimension lines that cross it
-        xs = sorted({ex0_, ex1_} | {v for r in moved["rooms"] if abs(r["y1"] - (ey1_ - OUTER)) < 1
-                                    for v, ok in ((r["x0"] - INNER / 2, r["x0"] > ex0_ + OUTER + 1), (r["x1"] + INNER / 2, r["x1"] < ex1_ - OUTER - 1)) if ok})
+        xs = sorted(
+            {ex0_, ex1_}
+            | {
+                v
+                for r in moved["rooms"]
+                if abs(r["y1"] - (ey1_ - OUTER)) < 1
+                for v, ok in ((r["x0"] - INNER / 2, r["x0"] > ex0_ + OUTER + 1), (r["x1"] + INNER / 2, r["x1"] < ex1_ - OUTER - 1))
+                if ok
+            }
+        )
         a, b = max(zip(xs, xs[1:]), key=lambda p: p[1] - p[0])
         txt = f"OPEN SPACE {ft_in(moved['plot'][1] + oy - ey1_)}"
         msp.add_text(txt, dxfattribs={"layer": "A-TEXT", "height": min(th * 0.7, (b - a - 8) / (len(txt) * REG)), "style": "ARCH"}).set_placement(
-            ((a + b) / 2, (ey1_ + moved["plot"][1] + oy) / 2), align=TextEntityAlignment.MIDDLE_CENTER)
+            ((a + b) / 2, (ey1_ + moved["plot"][1] + oy) / 2), align=TextEntityAlignment.MIDDLE_CENTER
+        )
     for r in moved["rooms"]:  # the gate: the porch opens onto the road
         if r["kind"] == "porch" and "front" in r.get("outside", []):
             msp.add_line((r["x0"], ey0_ + 1), (r["x1"], ey0_ + 1), dxfattribs={"layer": "A-DOOR", "linetype": "DASHED", "ltscale": scale / 60})
             msp.add_text("GATE", dxfattribs={"layer": "A-TEXT", "height": th * 0.55, "style": "ARCH"}).set_placement(
-                ((r["x0"] + r["x1"]) / 2, ey0_ + th * 0.9), align=TextEntityAlignment.MIDDLE_CENTER)
+                ((r["x0"] + r["x1"]) / 2, ey0_ + th * 0.9), align=TextEntityAlignment.MIDDLE_CENTER
+            )
     for w in moved["windows"]:
         if w["kind"] == "vent":
             y = w["at"] + (OUTER / 2 + 2.2 * u if w.get("side") == "rear" else -OUTER / 2 - 2.2 * u)
-            msp.add_text("V", dxfattribs={"layer": "A-TEXT", "height": th * 0.6, "style": "ARCH"}).set_placement(((w["a"] + w["b"]) / 2, y),
-                                                                                                               align=TextEntityAlignment.MIDDLE_CENTER)
+            msp.add_text("V", dxfattribs={"layer": "A-TEXT", "height": th * 0.6, "style": "ARCH"}).set_placement(
+                ((w["a"] + w["b"]) / 2, y), align=TextEntityAlignment.MIDDLE_CENTER
+            )
     ex0, ey0, ex1, ey1 = moved["envelope"]
     gap = 9 * u
+
     def inner_x(r):
         return [v for v, ok in ((r["x0"] - INNER / 2, r["x0"] > ex0 + OUTER + 1), (r["x1"] + INNER / 2, r["x1"] < ex1 - OUTER - 1)) if ok]
+
     xs = [ex0, ex1] + [v for r in moved["rooms"] if abs(r["y0"] - (ey0 + OUTER)) < 1 for v in inner_x(r)]
     _chain(msp, style, [v for v in xs if ex0 <= v <= ex1], py0 - gap, "x", u, ey0)
     _chain(msp, style, [px0, px0 + W], py0 - gap * 2, "x", u, py0)
@@ -691,8 +804,9 @@ def _plan(msp, lay, ox, oy, scale, style, title):
     _chain(msp, style, [py0, py0 + D], px0 - gap * 2, "y", u, px0)
     xs_rear = [ex0, ex1] + [v for r in moved["rooms"] if abs(r["y1"] - (ey1 - OUTER)) < 1 for v in inner_x(r)]
     _chain(msp, style, [v for v in xs_rear if ex0 <= v <= ex1], py0 + D + gap, "x", u, ey1)
-    msp.add_text("ROAD", dxfattribs={"layer": "A-TEXT", "height": th * 1.2, "style": "ARCHB"}).set_placement((px0 + W / 2, py0 - gap * 3.2),
-                                                                                                         align=TextEntityAlignment.MIDDLE_CENTER)
+    msp.add_text("ROAD", dxfattribs={"layer": "A-TEXT", "height": th * 1.2, "style": "ARCHB"}).set_placement(
+        (px0 + W / 2, py0 - gap * 3.2), align=TextEntityAlignment.MIDDLE_CENTER
+    )
     mt = msp.add_mtext(f"{title}", dxfattribs={"layer": "A-TITLE", "char_height": th * 1.5, "style": "ARCHB", "attachment_point": 2})
     mt.set_location((px0 + W / 2, py0 + D + gap * 3.2))
     return moved
@@ -701,6 +815,7 @@ def _plan(msp, lay, ox, oy, scale, style, title):
 def _offset(lay, ox, oy):
     """The layout moved by (ox, oy) (a second floor drawn beside the first)."""
     import copy
+
     m = copy.deepcopy({k: v for k, v in lay.items() if k != "upper"})
     for r in m["rooms"]:
         for k in ("x0", "x1"):
@@ -753,9 +868,13 @@ def drawing(lay, paper=None, scale=None, project=None, client=None):
     need_w = (W * len(floors)) / _mm(scale) + margin * 2 * len(floors)
     need_h = D / _mm(scale) + margin * 2
     if need_w > usable_w + 1 or need_h > usable_h + 1:  # a scale asked for that the sheet cannot hold
-        fit = next((s for s in SCALES if (W * len(floors)) / _mm(s) + margin * 2 * len(floors) <= usable_w and D / _mm(s) + margin * 2 <= usable_h), None)
-        raise ValueError(f"at 1:{scale} the plan{'s need' if len(floors) > 1 else ' needs'} {need_w:.0f} x {need_h:.0f} mm and {paper_name} has room for "
-                         f"{usable_w:.0f} x {usable_h:.0f}" + (f"; 1:{fit} fits {paper_name}" if fit else "") + ", or ask for a bigger sheet")
+        fit = next(
+            (s for s in SCALES if (W * len(floors)) / _mm(s) + margin * 2 * len(floors) <= usable_w and D / _mm(s) + margin * 2 <= usable_h), None
+        )
+        raise ValueError(
+            f"at 1:{scale} the plan{'s need' if len(floors) > 1 else ' needs'} {need_w:.0f} x {need_h:.0f} mm and {paper_name} has room for "
+            f"{usable_w:.0f} x {usable_h:.0f}" + (f"; 1:{fit} fits {paper_name}" if fit else "") + ", or ask for a bigger sheet"
+        )
     u = _mm(scale)
     doc = _new()
     msp = doc.modelspace()
@@ -770,8 +889,11 @@ def drawing(lay, paper=None, scale=None, project=None, client=None):
         oy = fy0 + tb_h * u + (fh - tb_h * u - D) / 2
         plans.append(_plan(msp, fl, ox, oy, scale, style, names.get(fl.get("floor"), "PLAN")))
     frame = (fx0, fy0, fx0 + fw, fy0 + fh)
-    msp.add_lwpolyline([(frame[0], frame[1]), (frame[2], frame[1]), (frame[2], frame[3]), (frame[0], frame[3])], close=True,
-                       dxfattribs={"layer": "A-SHEET", "const_width": 0.5 * u})
+    msp.add_lwpolyline(
+        [(frame[0], frame[1]), (frame[2], frame[1]), (frame[2], frame[3]), (frame[0], frame[3])],
+        close=True,
+        dxfattribs={"layer": "A-SHEET", "const_width": 0.5 * u},
+    )
     sheet = (frame[0] - 20 * u, frame[1] - 10 * u, frame[2] + 10 * u, frame[3] + 10 * u)
     _title(msp, lay, frame, scale, paper_name, project, client)
     _schedule(msp, lay, frame, scale)
@@ -793,16 +915,19 @@ def _title(msp, lay, frame, scale, paper, project, client):
     s = summary(lay)
     W, D = (v / 12 for v in lay["plot"])
     covered = s["covered_sqft"] + (summary(lay["upper"])["covered_sqft"] if lay.get("upper") else 0)
-    rows = [(project or b.get("name") or "House", 4.5, x0 + 3 * u, y0 + 35 * u, True),
-            (f"Plot {W:.0f}' x {D:.0f}' ({marla_of(W, D):.1f} marla, {W * D:.0f} sq ft)", 2.6, x0 + 3 * u, y0 + 25 * u, False),
-            (f"Covered area {covered:,} sq ft" + (" on 2 floors" if lay.get("upper") else ""), 2.6, x0 + 88 * u, y0 + 25 * u, False),
-            (("Client: " + client) if client else "Client: -", 2.4, x0 + 3 * u, y0 + 15 * u, False),
-            (f"Scale 1:{scale} on {paper}   Units: feet-inches", 2.4, x0 + 88 * u, y0 + 15 * u, False),
-            (f"Date {dt.date.today():%d %b %Y}   Drawn by AI PC (ezdxf)", 2.2, x0 + 3 * u, y0 + 5 * u, False),
-            ("Walls 9\" outer, 4.5\" inner. Check every size on site.", 2.2, x0 + 88 * u, y0 + 5 * u, False)]
+    rows = [
+        (project or b.get("name") or "House", 4.5, x0 + 3 * u, y0 + 35 * u, True),
+        (f"Plot {W:.0f}' x {D:.0f}' ({marla_of(W, D):.1f} marla, {W * D:.0f} sq ft)", 2.6, x0 + 3 * u, y0 + 25 * u, False),
+        (f"Covered area {covered:,} sq ft" + (" on 2 floors" if lay.get("upper") else ""), 2.6, x0 + 88 * u, y0 + 25 * u, False),
+        (("Client: " + client) if client else "Client: -", 2.4, x0 + 3 * u, y0 + 15 * u, False),
+        (f"Scale 1:{scale} on {paper}   Units: feet-inches", 2.4, x0 + 88 * u, y0 + 15 * u, False),
+        (f"Date {dt.date.today():%d %b %Y}   Drawn by AI PC (ezdxf)", 2.2, x0 + 3 * u, y0 + 5 * u, False),
+        ('Walls 9" outer, 4.5" inner. Check every size on site.', 2.2, x0 + 88 * u, y0 + 5 * u, False),
+    ]
     for text, hmm, x, y, bold in rows:
         msp.add_text(text, dxfattribs={"layer": "A-TITLE", "height": hmm * u, "style": "ARCHB" if bold else "ARCH"}).set_placement(
-            (x, y), align=TextEntityAlignment.MIDDLE_LEFT)
+            (x, y), align=TextEntityAlignment.MIDDLE_LEFT
+        )
 
 
 def _schedule(msp, lay, frame, scale):
@@ -812,13 +937,16 @@ def _schedule(msp, lay, frame, scale):
     x0 = frame[0] + 3 * u
     y = frame[1] + 40 * u - 4 * u
     msp.add_text("ROOM SCHEDULE (clear sizes)", dxfattribs={"layer": "A-TITLE", "height": 2.4 * u, "style": "ARCHB"}).set_placement(
-        (x0, y), align=TextEntityAlignment.MIDDLE_LEFT)
+        (x0, y), align=TextEntityAlignment.MIDDLE_LEFT
+    )
     blocks = []
     for fl, head in ((lay, "Ground floor"), (lay.get("upper"), "First floor")):
         if not fl:
             continue
         rows = [(head.upper(), None, True)] if lay.get("upper") else []
-        rows += [(r["label"].title()[:16], f"{r['size']}  {r['area_sqft']:.0f} sq ft", False) for r in summary(fl)["rooms"] if r["label"] != "PASSAGE"]
+        rows += [
+            (r["label"].title()[:16], f"{r['size']}  {r['area_sqft']:.0f} sq ft", False) for r in summary(fl)["rooms"] if r["label"] != "PASSAGE"
+        ]
         blocks.append(rows)
     room_w = (frame[2] - 170 * u - 4 * u) - x0  # up to the title block
     name_c = max(len(n) for b in blocks for n, _, _ in b)
@@ -832,7 +960,7 @@ def _schedule(msp, lay, frame, scale):
             break
     step = min(4.2, 30.0 / per)
     places, col = [], 0
-    for b in (blocks if split else [[r for blk in blocks for r in blk]]):
+    for b in blocks if split else [[r for blk in blocks for r in blk]]:
         for i, row in enumerate(b):
             places.append((col + i // per, i % per, row))
         col += -(-len(b) // per)
@@ -840,10 +968,12 @@ def _schedule(msp, lay, frame, scale):
         cx = x0 + c * col_w * u
         cy = y - (i + 1) * step * u
         msp.add_text(name, dxfattribs={"layer": "A-TITLE", "height": h * u, "style": "ARCHB" if head else "ARCH"}).set_placement(
-            (cx, cy), align=TextEntityAlignment.MIDDLE_LEFT)
+            (cx, cy), align=TextEntityAlignment.MIDDLE_LEFT
+        )
         if rest:
             msp.add_text(rest, dxfattribs={"layer": "A-TITLE", "height": h * u, "style": "ARCH"}).set_placement(
-                (cx + name_w * u, cy), align=TextEntityAlignment.MIDDLE_LEFT)
+                (cx + name_w * u, cy), align=TextEntityAlignment.MIDDLE_LEFT
+            )
 
 
 def _north(msp, lay, frame, scale):
@@ -853,4 +983,5 @@ def _north(msp, lay, frame, scale):
     x, y = frame[2] - 15 * u, frame[3] - 18 * u
     msp.add_blockref("NORTH", (x, y), dxfattribs={"layer": "A-TITLE", "xscale": u, "yscale": u, "rotation": rot})
     msp.add_text("N", dxfattribs={"layer": "A-TITLE", "height": 3 * u, "style": "ARCHB"}).set_placement(
-        (x + 14 * u * math.sin(math.radians(-rot)), y + 14 * u * math.cos(math.radians(rot))), align=TextEntityAlignment.MIDDLE_CENTER)
+        (x + 14 * u * math.sin(math.radians(-rot)), y + 14 * u * math.cos(math.radians(rot))), align=TextEntityAlignment.MIDDLE_CENTER
+    )

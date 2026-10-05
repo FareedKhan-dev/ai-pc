@@ -9,6 +9,7 @@ shown first and done after a yes.
   ai-pc apps talk -m "flowchart: Start -> Take order -> In stock? -yes-> Pack -> End; In stock? -no-> Order -> Pack"
   ai-pc apps list
 """
+
 import argparse
 import sys
 
@@ -30,6 +31,7 @@ def main(argv=None):
     c.add_argument("program")
     a = ap.parse_args(argv)
     from ai_pc.apps import all_modules, load
+
     if a.cmd == "list":
         for m in all_modules():
             print(f"{m.LABEL}\n    e.g. " + "\n    e.g. ".join(m.EXAMPLES[:2]))
@@ -46,6 +48,7 @@ def main(argv=None):
                 print(f"  Note: {m.APP['notes']}")
         if a.cmd == "connect":
             import getpass
+
             m = mods[0]
             vals = {}
             for key, prompt, secret in m.APP["fields"]:
@@ -60,6 +63,7 @@ def main(argv=None):
                 print(f"\nNot connected: {e}")
         return
     from ai_pc.apps.appschat import AppsChat
+
     c = AppsChat.start(files=a.files)
     for msg in a.say or iter(lambda: input("> ").strip(), "quit"):
         if a.say:

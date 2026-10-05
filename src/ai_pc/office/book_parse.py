@@ -6,6 +6,7 @@ plural, "column C"), values by what the data holds ("the cancelled orders" -> St
   r = parse_book(clause, m, focus, raw, carry) -> {"ops": [...], "focus": {"sheet", "cols"}, "ask": str | None}
   q = question_query(clause, m, focus)          -> a query computed exactly by bookchat.run_query, or None
 """
+
 import datetime as _dt
 import re
 
@@ -16,11 +17,21 @@ from ai_pc.office.xlsx_com import as_number
 DESC = r"\b(?:desc(?:ending)?|highest first|largest first|biggest first|most first|high(?:est)? to low(?:est)?|z ?(?:to|-) ?a|newest first|latest first|most recent first|reverse(?:d)?|top first|best first)\b"
 ASC = r"\b(?:asc(?:ending)?|lowest first|smallest first|least first|low(?:est)? to high(?:est)?|a ?(?:to|-) ?z|oldest first|earliest first|alphabetical(?:ly)?)\b"
 ROWS = r"(?:rows?|records?|entries|entry|lines?|orders?|students?|items?|sales?|employees?|customers?|products?|people|transactions?|invoices?)"
-MONTHS = {m: i for i, m in enumerate(["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"], 1)}
+MONTHS = {
+    m: i
+    for i, m in enumerate(
+        ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"], 1
+    )
+}
 MONTHS.update({k[:3]: v for k, v in list(MONTHS.items())})
 MONTHS["sept"] = 9
-FNS = [(r"\baverage|\bmean\b|\bavg\b", "average"), (r"\bcount\b|\bnumber of\b|\bhow many\b", "count"), (r"\bhighest|\bmaximum\b|\bmax\b|\blargest|\bbiggest", "max"),
-       (r"\blowest|\bminimum\b|\bmin\b|\bsmallest", "min"), (r"\btotal|\bsum\b", "sum")]
+FNS = [
+    (r"\baverage|\bmean\b|\bavg\b", "average"),
+    (r"\bcount\b|\bnumber of\b|\bhow many\b", "count"),
+    (r"\bhighest|\bmaximum\b|\bmax\b|\blargest|\bbiggest", "max"),
+    (r"\blowest|\bminimum\b|\bmin\b|\bsmallest", "min"),
+    (r"\btotal|\bsum\b", "sum"),
+]
 
 
 # ------------------------------------------------------------------------------------------------ finding things
@@ -76,7 +87,9 @@ def col_spans(c, s):
     for col in cols_in(c, s):
         name = " ".join(col["name"].lower().split())
         st = XM._stem(name)
-        mt = re.search(r"(?<![\w])" + re.escape(name) + r"(?:s|es)?(?![\w])", c) or (re.search(r"(?<![\w])" + re.escape(st) + r"(?:s|es)?(?![\w])", c) if st else None)
+        mt = re.search(r"(?<![\w])" + re.escape(name) + r"(?:s|es)?(?![\w])", c) or (
+            re.search(r"(?<![\w])" + re.escape(st) + r"(?:s|es)?(?![\w])", c) if st else None
+        )
         if not mt:
             mt = re.search(r"\bcolumn\s+" + col["letter"].lower() + r"\b", c)
         if mt:
@@ -128,6 +141,7 @@ def _years(s):
 def date_of(text, s=None):
     """'1 March', 'March 1st 2026', '01/03/2026', '2026-03-01' -> 'YYYY-MM-DD' (the data's year when none is said)."""
     from ai_pc.office.xlsx_com import _parse_date
+
     t = re.sub(r"(\d)(?:st|nd|rd|th)\b", r"\1", str(text).strip(" .,"))
     d = _parse_date(t, "dmy")
     if d:
@@ -157,15 +171,18 @@ def month_range(text, s=None):
     return f"{y}-{mo:02d}-01", f"{y}-{mo:02d}-{last:02d}"
 
 
-CMP = [(r">=|\bat least\b|\bminimum of\b|\bno less than\b|\bor more\b|\bor above\b|\band above\b|\bor over\b", ">="),
-       (r"<=|\bat most\b|\bmaximum of\b|\bno more than\b|\bor less\b|\bor below\b|\band below\b|\bup to\b|\bor under\b", "<="),
-       (r"<>|!=|\bis not\b|\bisn'?t\b|\bare not\b|\baren'?t\b|\bnot equal(?: to)?\b|\bother than\b|\bexcept\b|\bnot\b", "<>"),
-       (r"\bbetween\b", "between"), (r"\bstarts? with\b|\bbegins? with\b", "starts"),
-       (r"\bcontain(?:s|ing)?\b|\bincludes?\b|\bincluding\b|\bhas\b.*\bin it\b", "contains"),
-       (r"\b(?:is |are )?(?:blank|empty|missing)\b", "blank"),
-       (r">|\babove\b|\bover\b|\bmore than\b|\bgreater than\b|\bhigher than\b|\bbigger than\b|\bexceed(?:s|ing)?\b|\bafter\b|\blater than\b", ">"),
-       (r"<|\bbelow\b|\bunder\b|\bless than\b|\blower than\b|\bsmaller than\b|\bbefore\b|\bearlier than\b", "<"),
-       (r"=|\bequals?\b|\bequal to\b|\bis\b|\bare\b|\bof\b|\bfor\b|\bin\b|\bfrom\b", "=")]
+CMP = [
+    (r">=|\bat least\b|\bminimum of\b|\bno less than\b|\bor more\b|\bor above\b|\band above\b|\bor over\b", ">="),
+    (r"<=|\bat most\b|\bmaximum of\b|\bno more than\b|\bor less\b|\bor below\b|\band below\b|\bup to\b|\bor under\b", "<="),
+    (r"<>|!=|\bis not\b|\bisn'?t\b|\bare not\b|\baren'?t\b|\bnot equal(?: to)?\b|\bother than\b|\bexcept\b|\bnot\b", "<>"),
+    (r"\bbetween\b", "between"),
+    (r"\bstarts? with\b|\bbegins? with\b", "starts"),
+    (r"\bcontain(?:s|ing)?\b|\bincludes?\b|\bincluding\b|\bhas\b.*\bin it\b", "contains"),
+    (r"\b(?:is |are )?(?:blank|empty|missing)\b", "blank"),
+    (r">|\babove\b|\bover\b|\bmore than\b|\bgreater than\b|\bhigher than\b|\bbigger than\b|\bexceed(?:s|ing)?\b|\bafter\b|\blater than\b", ">"),
+    (r"<|\bbelow\b|\bunder\b|\bless than\b|\blower than\b|\bsmaller than\b|\bbefore\b|\bearlier than\b", "<"),
+    (r"=|\bequals?\b|\bequal to\b|\bis\b|\bare\b|\bof\b|\bfor\b|\bin\b|\bfrom\b", "="),
+]
 
 
 def value_for(col, text, s):
@@ -227,9 +244,13 @@ def condition(c, s, col=None):
             continue
         if opn == "blank":
             return {"col": col["name"], "op": "blank", "value": None}
-        after = rest[mm.end():] if opn not in (">=", "<=") or mm.group(0).strip().startswith(("at", "minimum", "maximum", "no ", "up")) or mm.group(0) in (">=", "<=") else rest[:mm.start()]
+        after = (
+            rest[mm.end() :]
+            if opn not in (">=", "<=") or mm.group(0).strip().startswith(("at", "minimum", "maximum", "no ", "up")) or mm.group(0) in (">=", "<=")
+            else rest[: mm.start()]
+        )
         if opn in (">=", "<=") and not after.strip():
-            after = rest[:mm.start()]
+            after = rest[: mm.start()]
         after = re.sub(r"^\s*(?:is|are|=|equal to|equals)\s+", " ", after)
         parts = [p for p in re.split(r"\s+or\s+|\s*,\s*", after) if p.strip()]
         if opn in ("=", "<>") and len(parts) > 1 and col["kind"] == "text":
@@ -259,13 +280,23 @@ def metric(t, nums=None, additive=False):
         nums = [x for x in nums if not RATE.search(x["name"])] or nums
     if not nums:
         return None
-    return max(nums, key=lambda x: (x["kind"] == "money") * 3 + bool(METRIC.search(x["name"])) * 2 - bool(DERIVED.search(x["name"])) * 5
-               - bool(RATE.search(x["name"])) * 2 + x["idx"] * 0.01)
+    return max(
+        nums,
+        key=lambda x: (
+            (x["kind"] == "money") * 3
+            + bool(METRIC.search(x["name"])) * 2
+            - bool(DERIVED.search(x["name"])) * 5
+            - bool(RATE.search(x["name"])) * 2
+            + x["idx"] * 0.01
+        ),
+    )
 
 
 def value_of_sales(t):
     """(qty column, price column) when a table has quantities and unit prices but no amount: their product is the money."""
-    if any(x["kind"] == "money" or re.search(r"amount|total|revenue|sales|value", x["name"], re.I) for x in t["cols"] if x["kind"] in ("number", "money")):
+    if any(
+        x["kind"] == "money" or re.search(r"amount|total|revenue|sales|value", x["name"], re.I) for x in t["cols"] if x["kind"] in ("number", "money")
+    ):
         return None
     q = next((x for x in t["cols"] if x["kind"] in ("number", "money") and QTY.search(x["name"])), None)
     p = next((x for x in t["cols"] if x["kind"] in ("number", "money") and RATE.search(x["name"])), None)
@@ -296,8 +327,11 @@ def words_to_formula(e, s):
     columns, numbers or arithmetic (the model reads those)."""
     e = " ".join(str(e).split()).strip(" .")
     e = re.sub(r"^(?:the\s+|a\s+|an\s+)", "", e)
-    mif = re.match(r"^(?:if\s+)?(?P<cond>.+?)\s*(?:,|then)\s*(?P<a>[^,]+?)\s*,?\s*(?:else|otherwise)\s+(?P<b>.+)$", e) if e.startswith("if ") else \
-        re.match(r"^(?P<a>.+?)\s+(?:if|when)\s+(?P<cond>.+?)\s*,?\s*(?:else|otherwise)\s+(?P<b>.+)$", e)
+    mif = (
+        re.match(r"^(?:if\s+)?(?P<cond>.+?)\s*(?:,|then)\s*(?P<a>[^,]+?)\s*,?\s*(?:else|otherwise)\s+(?P<b>.+)$", e)
+        if e.startswith("if ")
+        else re.match(r"^(?P<a>.+?)\s+(?:if|when)\s+(?P<cond>.+?)\s*,?\s*(?:else|otherwise)\s+(?P<b>.+)$", e)
+    )
     if mif:
         cond = condition(mif.group("cond"), s)
         if not cond or cond["op"] not in (">", "<", ">=", "<=", "=", "<>"):
@@ -310,6 +344,7 @@ def words_to_formula(e, s):
                 return f
             n = as_number(x)
             return str(n if not float(n).is_integer() else int(n)) if n is not None else '"' + _name(x, x).replace('"', '""') + '"'
+
         v = cond["value"]
         vv = (str(int(v)) if float(v).is_integer() else str(v)) if isinstance(v, (int, float)) else f'"{v}"'
         return f"IF([{cond['col']}]{cond['op']}{vv},{lit(mif.group('a'))},{lit(mif.group('b'))})"
@@ -330,8 +365,18 @@ def words_to_formula(e, s):
     if agg:
         refs = re.findall(r"@\d+@", agg.group(2))
         if len(refs) >= 2 and not re.sub(r"@\d+@|,|\band\b|\s", "", agg.group(2)):
-            fn = {"sum": "SUM", "total": "SUM", "average": "AVERAGE", "mean": "AVERAGE", "max": "MAX", "maximum": "MAX", "highest": "MAX",
-                  "min": "MIN", "minimum": "MIN", "lowest": "MIN"}[agg.group(1)]
+            fn = {
+                "sum": "SUM",
+                "total": "SUM",
+                "average": "AVERAGE",
+                "mean": "AVERAGE",
+                "max": "MAX",
+                "maximum": "MAX",
+                "highest": "MAX",
+                "min": "MIN",
+                "minimum": "MIN",
+                "lowest": "MIN",
+            }[agg.group(1)]
             return f"{fn}(" + ",".join(marks[r] for r in refs) + ")"
     diff = re.match(r"^\s*(?:the\s+)?difference between\s+(@\d+@)\s+and\s+(@\d+@)\s*$", t)
     if diff:
@@ -339,8 +384,12 @@ def words_to_formula(e, s):
     t = re.sub(r"(\d+(?:\.\d+)?)\s*(?:%|percent)\s+of\s+(@\d+@)", r"\2*\1%", t)
     t = re.sub(r"(@\d+@)\s+as\s+(?:a\s+)?(?:%|percent(?:age)?)\s+of\s+(@\d+@)", r"\1/\2", t)
     t = re.sub(r"\bratio of\s+(@\d+@)\s+to\s+(@\d+@)", r"\1/\2", t)
-    reps = [(r"\bmultiplied by\b|\btimes\b|(?<=@)\s+x\s+(?=@)|(?<=\d)\s*x\s*(?=@)|(?<=@)\s*x\s*(?=\d)|×", "*"), (r"\bdivided by\b|\bover\b|\bper\b", "/"),
-            (r"\bplus\b|\badded to\b", "+"), (r"\bminus\b|\bless\b|\bsubtract(?:ed)?\b", "-")]
+    reps = [
+        (r"\bmultiplied by\b|\btimes\b|(?<=@)\s+x\s+(?=@)|(?<=\d)\s*x\s*(?=@)|(?<=@)\s*x\s*(?=\d)|×", "*"),
+        (r"\bdivided by\b|\bover\b|\bper\b", "/"),
+        (r"\bplus\b|\badded to\b", "+"),
+        (r"\bminus\b|\bless\b|\bsubtract(?:ed)?\b", "-"),
+    ]
     for rx, op in reps:
         t = re.sub(rx, f" {op} ", t)
     t = re.sub(r"(\d)\s*k\b", r"\g<1>000", t)
@@ -365,21 +414,32 @@ def _new_column(c, raw, s, m, q):
     """'add a column Amount = Qty times Unit Price', 'add a bonus column that is 10% of salary', 'add a running total of
     amount', 'add a rank by total', 'bring the category from the products sheet', 'number the rows'."""
     t = s["table"]
-    mm = re.search(r"\b(?:add|insert|create|make|put|include|calculate|compute|give me)\b\s+(?:me\s+)?(?:a\s+|an\s+|new\s+|another\s+)*"
-                   r"(?:column|col|field)\s+(?:called\s+|named\s+|for\s+|titled\s+)?(?P<name>.+?)\s*(?:=|:|\bthat(?: is| shows| gives)?\b|\bwhich(?: is)?\b|\bwith\b|\bshowing\b|"
-                   r"\bas\b|\bto show\b|\bequal(?:s| to)\b|\bbeing\b|\bgiving\b)\s*(?P<expr>.+)$", c) or \
-        re.search(r"\b(?:add|insert|create|make|put|include)\b\s+(?:me\s+)?(?:a\s+|an\s+|new\s+|another\s+)*(?P<name>[\w%#&/ .-]+?)\s+(?:column|col|field)\b\s*"
-                  r"(?:=|:|\bthat(?: is| shows| gives)?\b|\bwhich(?: is)?\b|\bwith\b|\bshowing\b|\bas\b|\bto show\b|\bequal(?:s| to)\b|\bbeing\b|\bgiving\b|\bby\b|\bof\b)?\s*(?P<expr>.*)$", c) or \
-        re.search(r"\b(?:calculate|compute|work out)\s+(?:the\s+)?(?P<name>[\w%#&/ .-]+?)\s+(?:as|=|by|from)\s+(?P<expr>.+)$", c)
+    mm = (
+        re.search(
+            r"\b(?:add|insert|create|make|put|include|calculate|compute|give me)\b\s+(?:me\s+)?(?:a\s+|an\s+|new\s+|another\s+)*"
+            r"(?:column|col|field)\s+(?:called\s+|named\s+|for\s+|titled\s+)?(?P<name>.+?)\s*(?:=|:|\bthat(?: is| shows| gives)?\b|\bwhich(?: is)?\b|\bwith\b|\bshowing\b|"
+            r"\bas\b|\bto show\b|\bequal(?:s| to)\b|\bbeing\b|\bgiving\b)\s*(?P<expr>.+)$",
+            c,
+        )
+        or re.search(
+            r"\b(?:add|insert|create|make|put|include)\b\s+(?:me\s+)?(?:a\s+|an\s+|new\s+|another\s+)*(?P<name>[\w%#&/ .-]+?)\s+(?:column|col|field)\b\s*"
+            r"(?:=|:|\bthat(?: is| shows| gives)?\b|\bwhich(?: is)?\b|\bwith\b|\bshowing\b|\bas\b|\bto show\b|\bequal(?:s| to)\b|\bbeing\b|\bgiving\b|\bby\b|\bof\b)?\s*(?P<expr>.*)$",
+            c,
+        )
+        or re.search(r"\b(?:calculate|compute|work out)\s+(?:the\s+)?(?P<name>[\w%#&/ .-]+?)\s+(?:as|=|by|from)\s+(?P<expr>.+)$", c)
+    )
     pos = {}
     pm = re.search(r"\b(after|before|next to|beside|right of|left of)\s+(?:the\s+)?(.+?)(?:\s+column)?\s*$", c)
     if pm:
         pc = cols_in(pm.group(2), s)
         if pc:
             pos = {"before" if pm.group(1) in ("before", "left of") else "after": pc[0]["name"]}
-    special = re.search(r"\brunning\s+(?:total|sum|balance)\b(?:\s+of\s+(?P<a>.+?))?(?=\s+(?:after|before|next to)\b|$)|\brank(?:ing)?\b(?:\s+(?:by|of|on)\s+(?P<b>.+?))?(?=\s+(?:after|before)\b|$)|"
-                        r"\b(?:share|percent(?:age)? of (?:the )?total|% of (?:the )?total|portion)\b(?:\s+of\s+(?P<c>.+?))?(?=\s+(?:after|before)\b|$)|"
-                        r"\b(?:serial|s\.?\s?no|sr\.?\s?no|row number|sequence|numbering)\b", c)
+    special = re.search(
+        r"\brunning\s+(?:total|sum|balance)\b(?:\s+of\s+(?P<a>.+?))?(?=\s+(?:after|before|next to)\b|$)|\brank(?:ing)?\b(?:\s+(?:by|of|on)\s+(?P<b>.+?))?(?=\s+(?:after|before)\b|$)|"
+        r"\b(?:share|percent(?:age)? of (?:the )?total|% of (?:the )?total|portion)\b(?:\s+of\s+(?P<c>.+?))?(?=\s+(?:after|before)\b|$)|"
+        r"\b(?:serial|s\.?\s?no|sr\.?\s?no|row number|sequence|numbering)\b",
+        c,
+    )
     if special and (mm or re.search(r"\b(?:add|insert|create|put|include|number)\b", c)):
         target = special.group("a") or special.group("b") or special.group("c")
         cs = cols_in(target or c, s)
@@ -399,8 +459,11 @@ def _new_column(c, raw, s, m, q):
                 return None
             return {"op": "add_column", "name": f"Share of {nums[0]['name']}", "share": nums[0]["name"], **(pos or {"after": nums[0]["name"]})}
         return {"op": "add_column", "name": "No.", "series": {"start": 1}, "before": t["cols"][0]["name"]}
-    look = re.search(r"\b(?:look ?up|bring|fetch|pull|get|add|copy)\b\s+(?:in\s+)?(?:the\s+|each\s+)?(?P<what>.+?)\s+(?:column\s+)?(?:from|out of)\s+(?:the\s+)?(?P<sheet>.+?)(?:\s+(?:sheet|tab))?"
-                     r"(?:\s+(?:by|using|matching|based on|on)\s+(?:the\s+)?(?P<key>.+?))?\s*$", c)
+    look = re.search(
+        r"\b(?:look ?up|bring|fetch|pull|get|add|copy)\b\s+(?:in\s+)?(?:the\s+|each\s+)?(?P<what>.+?)\s+(?:column\s+)?(?:from|out of)\s+(?:the\s+)?(?P<sheet>.+?)(?:\s+(?:sheet|tab))?"
+        r"(?:\s+(?:by|using|matching|based on|on)\s+(?:the\s+)?(?P<key>.+?))?\s*$",
+        c,
+    )
     if look:
         other = sheet_in("from " + look.group("sheet") + " sheet", m) or sheet_in(c, m)
         o = XM.sheet(m, other) if other else None
@@ -410,14 +473,24 @@ def _new_column(c, raw, s, m, q):
                 return {"ask": f"Which column of '{o['name']}'? It has {', '.join(x['name'] for x in o['table']['cols'])}."}
             here = cols_in(look.group("key") or "", s) if look.group("key") else []
             there_names = {x["name"].lower(): x for x in o["table"]["cols"]}
-            key = here[0] if here else next((x for x in t["cols"] if x["name"].lower() in there_names and x["name"].lower() != vcols[0]["name"].lower()), None)
+            key = (
+                here[0]
+                if here
+                else next((x for x in t["cols"] if x["name"].lower() in there_names and x["name"].lower() != vcols[0]["name"].lower()), None)
+            )
             if key is None:
                 return {"ask": f"Which column matches the two sheets? (e.g. 'bring {vcols[0]['name']} from {o['name']} by Product')"}
             match = there_names.get(key["name"].lower()) or (cols_in(look.group("key") or "", o) or [None])[0]
             if match is None:
                 return {"ask": f"Which column of '{o['name']}' holds the {key['name']}?"}
-            return {"op": "add_column", "name": vcols[0]["name"] if all(x["name"].lower() != vcols[0]["name"].lower() for x in t["cols"]) else f"{vcols[0]['name']} ({o['name']})",
-                    "lookup": {"sheet": o["name"], "key": key["name"], "match": match["name"], "value": vcols[0]["name"]}, **(pos or {"after": key["name"]})}
+            return {
+                "op": "add_column",
+                "name": vcols[0]["name"]
+                if all(x["name"].lower() != vcols[0]["name"].lower() for x in t["cols"])
+                else f"{vcols[0]['name']} ({o['name']})",
+                "lookup": {"sheet": o["name"], "key": key["name"], "match": match["name"], "value": vcols[0]["name"]},
+                **(pos or {"after": key["name"]}),
+            }
     if not mm:
         return None
     name = mm.group("name").strip(" '\"")
@@ -461,8 +534,12 @@ def _new_row(c, raw, s, q):
         else:
             vals[col["name"]] = seg_raw
     key = t["cols"][0]
-    kn = re.search(r"\b(?:for|named|called|of)\s+(?P<k>[^,:]+?)(?=\s+(?:with|who|having|from|in|on|at)\b|\s*[,:]|$)", c) or \
-        re.search(r"\b(?:add|insert|append|enter)\s+(?:a\s+|an\s+|another\s+|new\s+)*" + ROWS + r"\s+(?P<k>(?!with\b)[a-z][^,:]*?)\s+(?=with\b|who\b|having\b|:)", c)
+    kn = re.search(r"\b(?:for|named|called|of)\s+(?P<k>[^,:]+?)(?=\s+(?:with|who|having|from|in|on|at)\b|\s*[,:]|$)", c) or re.search(
+        r"\b(?:add|insert|append|enter)\s+(?:a\s+|an\s+|another\s+|new\s+)*"
+        + ROWS
+        + r"\s+(?P<k>(?!with\b)[a-z][^,:]*?)\s+(?=with\b|who\b|having\b|:)",
+        c,
+    )
     who = q[0] if q else None
     if not who and kn and not cols_in(kn.group("k"), s):
         got = re.search(re.escape(kn.group("k").strip()), raw, re.I)
@@ -482,7 +559,7 @@ def _new_row(c, raw, s, q):
             items = [x.strip() for x in re.split(r"\s*,\s*", mm.group(1)) if x.strip()]
             typed = [x for x in t["cols"] if not x["formula"]]
             if len(items) in (len(typed), len(typed) - (1 if _is_id(s, typed[0]) else 0)):
-                for col, v in zip(typed[len(typed) - len(items):], items):
+                for col, v in zip(typed[len(typed) - len(items) :], items):
                     n = as_number(v) if col["kind"] in ("number", "money", "percent") else None
                     vals[col["name"]] = n if n is not None else v
                 explicit = len(items)
@@ -554,6 +631,7 @@ def _style_set(c):
 def _cleanup(s):
     """'clean up the data': what this table needs, read from the data itself (only the steps that would change something)."""
     from ai_pc.office.xlsx_com import _norm_cat, _parse_date
+
     t = s["table"]
     ops = []
     for col in t["cols"]:
@@ -585,7 +663,9 @@ def _cleanup(s):
     return ops
 
 
-SUBSPLIT = re.compile(r",?\s+(?:and|then|plus|also|with)\s+(?=(?:a|an|the)\s+(?:(?:grand\s+)?total|totals|sum|average|count)\s+row\b|(?:a|an)\s+drop ?down\b)")
+SUBSPLIT = re.compile(
+    r",?\s+(?:and|then|plus|also|with)\s+(?=(?:a|an|the)\s+(?:(?:grand\s+)?total|totals|sum|average|count)\s+row\b|(?:a|an)\s+drop ?down\b)"
+)
 
 
 def parse_book(clause, m, focus=None, raw=None, carry=False):
@@ -593,9 +673,15 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
     raw = raw or clause
     parts = SUBSPLIT.split(c)
     if len(parts) > 1:  # "add a column Amount = Qty x Price and a total row"
-        outs = [parse_book(p if i == 0 or re.match(r"\s*(?:add|make|insert|create|put)\b", p) else "add " + p, m, focus, raw=raw, carry=carry) for i, p in enumerate(parts)]
-        merged = {"ops": [o for r in outs for o in r["ops"]], "focus": next((r["focus"] for r in reversed(outs) if r.get("focus")), focus),
-                  "ask": None if all(r["ops"] for r in outs) else next((r["ask"] for r in outs if r.get("ask")), None)}
+        outs = [
+            parse_book(p if i == 0 or re.match(r"\s*(?:add|make|insert|create|put)\b", p) else "add " + p, m, focus, raw=raw, carry=carry)
+            for i, p in enumerate(parts)
+        ]
+        merged = {
+            "ops": [o for r in outs for o in r["ops"]],
+            "focus": next((r["focus"] for r in reversed(outs) if r.get("focus")), focus),
+            "ask": None if all(r["ops"] for r in outs) else next((r["ask"] for r in outs if r.get("ask")), None),
+        }
         if not all(r["ops"] for r in outs) and not merged["ask"]:
             merged["ops"] = []  # one half could not be read: the model reads the whole clause
         return merged
@@ -603,7 +689,11 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
     cm = P.QUOTE.sub(" QQ ", c)
     focus = focus or {}
     named_sheet = sheet_in(cm, m)
-    if named_sheet and re.search(r"\b(?:look ?up|bring|fetch|pull|get|copy|add)\b", cm) and re.search(r"\b(?:from|out of)\s+(?:the\s+)?" + re.escape(named_sheet.lower()), cm):
+    if (
+        named_sheet
+        and re.search(r"\b(?:look ?up|bring|fetch|pull|get|copy|add)\b", cm)
+        and re.search(r"\b(?:from|out of)\s+(?:the\s+)?" + re.escape(named_sheet.lower()), cm)
+    ):
         named_sheet = None  # "bring the cost from the Products sheet": Products is where it comes from
     sh = named_sheet or focus.get("sheet") or m["main"]
     s = XM.sheet(m, sh)
@@ -613,10 +703,17 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
         return out
     t = s.get("table")
     mentioned = cols_in(cm, s) if t else []
-    if not mentioned and t and re.search(r"\b(?:it|its|that column|this column|that|them|those columns|these columns|the new column)\b", cm) and focus.get("cols"):
+    if (
+        not mentioned
+        and t
+        and re.search(r"\b(?:it|its|that column|this column|that|them|those columns|these columns|the new column)\b", cm)
+        and focus.get("cols")
+    ):
         # a column made earlier in the same message is not in the map yet: Excel will have it when this runs
-        mentioned = [XM.col(m, sh, n) or {"name": n, "kind": "number", "letter": "?", "idx": -1, "formula": "new", "fmt": "", "formulas": 1, "blank": 0}
-                     for n in focus["cols"]]
+        mentioned = [
+            XM.col(m, sh, n) or {"name": n, "kind": "number", "letter": "?", "idx": -1, "formula": "new", "fmt": "", "formulas": 1, "blank": 0}
+            for n in focus["cols"]
+        ]
     if mentioned:
         out["focus"]["cols"] = [x["name"] for x in mentioned]
     S = {"sheet": s["name"]}
@@ -631,22 +728,32 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
     def ask(text):
         out["ask"] = text
         return out
+
     remove = bool(re.search(r"\b(?:delete|remove|drop|get rid of|take out|erase)\b", cm))
 
     # ---------------------------------------------------------------- sheets
-    mm = re.search(r"\brename\s+(?:the\s+)?(?:sheet|tab)\s+['\"]?(.+?)['\"]?\s+(?:to|as|into)\s+['\"]?(.+?)['\"]?$|\brename\s+(?:the\s+)?['\"]?(.+?)['\"]?\s+(?:sheet|tab)\s+(?:to|as|into)\s+['\"]?(.+?)['\"]?$|"
-                   r"\bcall\s+(?:the\s+)?['\"]?(.+?)['\"]?\s+(?:sheet|tab)\s+['\"]?(.+?)['\"]?$", c)
+    mm = re.search(
+        r"\brename\s+(?:the\s+)?(?:sheet|tab)\s+['\"]?(.+?)['\"]?\s+(?:to|as|into)\s+['\"]?(.+?)['\"]?$|\brename\s+(?:the\s+)?['\"]?(.+?)['\"]?\s+(?:sheet|tab)\s+(?:to|as|into)\s+['\"]?(.+?)['\"]?$|"
+        r"\bcall\s+(?:the\s+)?['\"]?(.+?)['\"]?\s+(?:sheet|tab)\s+['\"]?(.+?)['\"]?$",
+        c,
+    )
     if mm:
         old, new = next((mm.group(i), mm.group(i + 1)) for i in (1, 3, 5) if mm.group(i))
         sn = XM.sheet(m, old)
         if sn:
             nm = re.search(re.escape(new.strip()), raw, re.I)
             return done({"op": "rename_sheet", "sheet": sn["name"], "name": q[-1] if q else (nm.group(0) if nm else new).strip(" '\"")})
-    mm = re.search(r"\b(?:add|insert|create|make)\s+(?:a\s+)?(?:new\s+|blank\s+|empty\s+)?(?:sheet|tab|worksheet)(?:\s+(?:called|named)\s+['\"]?(.+?)['\"]?)?$", c)
+    mm = re.search(
+        r"\b(?:add|insert|create|make)\s+(?:a\s+)?(?:new\s+|blank\s+|empty\s+)?(?:sheet|tab|worksheet)(?:\s+(?:called|named)\s+['\"]?(.+?)['\"]?)?$",
+        c,
+    )
     if mm:
         nm = q[0] if q else (re.search(re.escape(mm.group(1)), raw, re.I).group(0) if mm.group(1) else "Sheet")
         return done({"op": "add_sheet", "name": nm})
-    mm = re.search(r"\b(?:delete|remove|drop)\s+(?:the\s+)?['\"]?(.+?)['\"]?\s+(?:sheet|tab|worksheet)\b|\b(?:delete|remove|drop)\s+(?:the\s+)?(?:sheet|tab)\s+['\"]?(.+?)['\"]?(?:\s+anyway.*)?$", c)
+    mm = re.search(
+        r"\b(?:delete|remove|drop)\s+(?:the\s+)?['\"]?(.+?)['\"]?\s+(?:sheet|tab|worksheet)\b|\b(?:delete|remove|drop)\s+(?:the\s+)?(?:sheet|tab)\s+['\"]?(.+?)['\"]?(?:\s+anyway.*)?$",
+        c,
+    )
     if mm:
         sn = XM.sheet(m, mm.group(1) or mm.group(2))
         if sn:
@@ -657,33 +764,64 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
         if sn:
             return done({"op": "hide", "sheet": sn["name"], "sheet_only": True, "show": mm.group(1) != "hide"})
     if not t:
-        return ask(f"Sheet '{s['name']}' has no table to work on; say which sheet ({', '.join(x['name'] for x in m['sheets'] if x['table'])}).") if \
-            re.search(r"\b(?:sort|filter|highlight|column|row|total|chart|pivot)\b", cm) else out
+        return (
+            ask(f"Sheet '{s['name']}' has no table to work on; say which sheet ({', '.join(x['name'] for x in m['sheets'] if x['table'])}).")
+            if re.search(r"\b(?:sort|filter|highlight|column|row|total|chart|pivot)\b", cm)
+            else out
+        )
     cols = t["cols"]
     nums = [x for x in cols if x["kind"] in ("number", "money", "percent")]
 
     # ---------------------------------------------------------------- clean-up
-    if re.search(r"\b(?:clean(?:\s+up)?|tidy(?:\s+up)?|fix)\s+(?:up\s+)?(?:the\s+|this\s+|my\s+)?(?:data|sheet|table|workbook|whole thing|everything|mess)\b", cm):
+    if re.search(
+        r"\b(?:clean(?:\s+up)?|tidy(?:\s+up)?|fix)\s+(?:up\s+)?(?:the\s+|this\s+|my\s+)?(?:data|sheet|table|workbook|whole thing|everything|mess)\b",
+        cm,
+    ):
         ops = _cleanup(s)
         if not ops:
-            return ask("The data already looks clean: no spaces to trim, no mixed spellings, no numbers or dates stored as text, no empty or repeated rows.")
+            return ask(
+                "The data already looks clean: no spaces to trim, no mixed spellings, no numbers or dates stored as text, no empty or repeated rows."
+            )
         return done(*ops)
-    if re.search(r"\b(?:convert|turn|change|make|fix)\b.*\b(?:to|into|as|real|proper)\s+(?:real\s+|proper\s+)?numbers?\b|\b(?:stored|saved) as text\b.*\bnumbers?\b|\btext numbers\b", cm) and mentioned:
+    if (
+        re.search(
+            r"\b(?:convert|turn|change|make|fix)\b.*\b(?:to|into|as|real|proper)\s+(?:real\s+|proper\s+)?numbers?\b|\b(?:stored|saved) as text\b.*\bnumbers?\b|\btext numbers\b",
+            cm,
+        )
+        and mentioned
+    ):
         return done({"op": "to_number", "cols": [x["name"] for x in mentioned]})
     if re.search(r"\b(?:convert|turn|change|make|fix)\b.*\b(?:dates?)\b", cm) and (mentioned or [x for x in cols if x["kind"] == "date"]):
-        dc = [x for x in mentioned if x["kind"] in ("date", "text")] or [x for x in cols if x["kind"] == "date" or re.search(r"date", x["name"], re.I)]
+        dc = [x for x in mentioned if x["kind"] in ("date", "text")] or [
+            x for x in cols if x["kind"] == "date" or re.search(r"date", x["name"], re.I)
+        ]
         if dc:
-            order = "mdy" if re.search(r"\bmonth first\b|\bamerican\b|\bus format\b|mm/dd", cm) else "dmy" if re.search(r"\bday first\b|dd/mm", cm) else None
+            order = (
+                "mdy"
+                if re.search(r"\bmonth first\b|\bamerican\b|\bus format\b|mm/dd", cm)
+                else "dmy"
+                if re.search(r"\bday first\b|dd/mm", cm)
+                else None
+            )
             return done({"op": "to_date", "col": dc[0]["name"], **({"order": order} if order else {})})
     if re.search(r"\btrim\b|\b(?:extra|double|trailing|leading)\s+spaces\b", cm):
         tc = [x for x in mentioned if x["kind"] == "text"]
         return done({"op": "clean_text", "how": "trim", **({"cols": [x["name"] for x in tc]} if tc else {})})
-    mm = re.search(r"\b(proper case|title case|capitali[sz]e(?: each word| the first letters?)?|upper ?case|all caps|capital letters|lower ?case|small letters)\b", cm)
+    mm = re.search(
+        r"\b(proper case|title case|capitali[sz]e(?: each word| the first letters?)?|upper ?case|all caps|capital letters|lower ?case|small letters)\b",
+        cm,
+    )
     if mm:
         how = "proper" if re.search(r"proper|title|capitali", mm.group(1)) else "upper" if re.search(r"upper|caps|capital", mm.group(1)) else "lower"
         tc = [x for x in mentioned if x["kind"] == "text"]
         return done({"op": "clean_text", "how": how, **({"cols": [x["name"] for x in tc]} if tc else {})})
-    if re.search(r"\b(?:consistent|standardi[sz]e|one spelling|same spelling|spelt? differently|spelling|duplicates? names|variants|mixed case)\b", cm) and mentioned and not remove:
+    if (
+        re.search(
+            r"\b(?:consistent|standardi[sz]e|one spelling|same spelling|spelt? differently|spelling|duplicates? names|variants|mixed case)\b", cm
+        )
+        and mentioned
+        and not remove
+    ):
         return done(*[{"op": "map_values", "col": x["name"], "auto": True} for x in mentioned if x["kind"] == "text"][:3])
     mm = re.search(r"\bfill\s+(?:in\s+)?(?:the\s+|all\s+)?(?:blanks?|empty cells|gaps|missing(?: values)?|empty)\b(.*)$", cm)
     if mm:
@@ -732,17 +870,29 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
         return out if r.get("unknown") else ask(r["ask"]) if r.get("ask") else done(r)
 
     # ---------------------------------------------------------------- columns
-    if remove and mentioned and (re.search(r"\bcolumns?\b", cm) or re.fullmatch(r"\s*(?:delete|remove|drop|get rid of)\s+(?:the\s+)?[\w %#&/.-]+?(?:\s+anyway\w*)?\s*", cm)):
+    if (
+        remove
+        and mentioned
+        and (
+            re.search(r"\bcolumns?\b", cm) or re.fullmatch(r"\s*(?:delete|remove|drop|get rid of)\s+(?:the\s+)?[\w %#&/.-]+?(?:\s+anyway\w*)?\s*", cm)
+        )
+    ):
         return done(*[{"op": "delete_column", "col": x["name"], **({"force": True} if _force(cm) else {})} for x in mentioned])
-    mm = re.search(r"\brename\s+(?:the\s+)?(?:column\s+)?(.+?)(?:\s+column)?\s+(?:to|as|into)\s+(.+)$|\bcall\s+(?:the\s+)?(.+?)\s+column\s+(.+)$|"
-                   r"\bchange\s+(?:the\s+)?(?:header|heading|name)\s+(?:of\s+)?(?:the\s+)?(.+?)(?:\s+column)?\s+to\s+(.+)$", cm)
+    mm = re.search(
+        r"\brename\s+(?:the\s+)?(?:column\s+)?(.+?)(?:\s+column)?\s+(?:to|as|into)\s+(.+)$|\bcall\s+(?:the\s+)?(.+?)\s+column\s+(.+)$|"
+        r"\bchange\s+(?:the\s+)?(?:header|heading|name)\s+(?:of\s+)?(?:the\s+)?(.+?)(?:\s+column)?\s+to\s+(.+)$",
+        cm,
+    )
     if mm:
         old, new = next((mm.group(i), mm.group(i + 1)) for i in (1, 3, 5) if mm.group(i))
         oc = cols_in(old, s)
         if oc:
             nm = q[-1] if q else _name(raw, new.strip(" '\"."))
             return done({"op": "rename_column", "col": oc[0]["name"], "name": nm})
-    mm = re.search(r"\bmove\s+(?:the\s+)?(.+?)(?:\s+column)?\s+(?:to\s+the\s+(end|start|front|beginning|left|right)|(after|before|next to|beside)\s+(?:the\s+)?(.+?)(?:\s+column)?)\s*$", cm)
+    mm = re.search(
+        r"\bmove\s+(?:the\s+)?(.+?)(?:\s+column)?\s+(?:to\s+the\s+(end|start|front|beginning|left|right)|(after|before|next to|beside)\s+(?:the\s+)?(.+?)(?:\s+column)?)\s*$",
+        cm,
+    )
     if mm and cols_in(mm.group(1), s):
         a = cols_in(mm.group(1), s)[0]
         if mm.group(2):
@@ -753,10 +903,17 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
     mm = re.search(r"\b(hide|unhide|show)\b", cm)
     if mm and mentioned and re.search(r"\bcolumns?\b|\bhide\b|\bunhide\b", cm) and not re.search(r"\bonly\b|\brows?\b", cm):
         return done({"op": "hide", "cols": [x["name"] for x in mentioned], "show": mm.group(1) != "hide"})
-    mm = re.search(r"\bsplit\s+(?:the\s+)?(.+?)(?:\s+column)?\s+into\s+(.+?)(?:\s+(?:by|on|at|using)\s+(?:the\s+)?(comma|space|dash|hyphen|slash|['\"].+?['\"]|\S))?\s*$", cm)
+    mm = re.search(
+        r"\bsplit\s+(?:the\s+)?(.+?)(?:\s+column)?\s+into\s+(.+?)(?:\s+(?:by|on|at|using)\s+(?:the\s+)?(comma|space|dash|hyphen|slash|['\"].+?['\"]|\S))?\s*$",
+        cm,
+    )
     if mm and cols_in(mm.group(1), s):
         names = [_name(raw, x) for x in re.split(r"\s*,\s*|\s+and\s+", mm.group(2).strip(" .")) if x.strip()]
-        sep = {"comma": ",", "space": None, "dash": "-", "hyphen": "-", "slash": "/"}.get(mm.group(3), (mm.group(3) or "").strip("'\"") or None) if mm.group(3) else None
+        sep = (
+            {"comma": ",", "space": None, "dash": "-", "hyphen": "-", "slash": "/"}.get(mm.group(3), (mm.group(3) or "").strip("'\"") or None)
+            if mm.group(3)
+            else None
+        )
         return done({"op": "split_column", "col": cols_in(mm.group(1), s)[0]["name"], "names": names, **({"sep": sep} if sep else {})})
     r = _new_column(cm, raw, s, m, q)
     if r:
@@ -769,7 +926,9 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
         return done(r)
 
     # ---------------------------------------------------------------- sort and filter
-    if re.search(r"\bsort\b|\bre-?order\b|\b(?:order|arrange)\s+(?:it|them|everything|the (?:rows|data|table|list|sheet|records)|by)\b", cm) and not re.search(r"\bsort of\b", cm):
+    if re.search(
+        r"\bsort\b|\bre-?order\b|\b(?:order|arrange)\s+(?:it|them|everything|the (?:rows|data|table|list|sheet|records)|by)\b", cm
+    ) and not re.search(r"\bsort of\b", cm):
         spans = col_spans(cm, s)
         if not spans:
             return ask(f"Sort by which column? ({', '.join(x['name'] for x in cols)})")
@@ -793,19 +952,32 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
         cond = condition(wm.group(1), s) if wm and cols_in(wm.group(1), s) else (condition(cm, s) if mentioned else None)
         best = metric(t)
         if not cond and best and re.search(r"\b(?:over|above|under|below|more than|less than|at least|at most|between|greater than)\b", cm):
-            cond = condition(" " + best["name"].lower() + " " + cm[fm.end():], s, best)
+            cond = condition(" " + best["name"].lower() + " " + cm[fm.end() :], s, best)
         if not cond:
             vs = values_in(cm, s)
             if vs:
                 same_col = [x for x in vs if x[0] is vs[0][0]]
-                cond = {"col": vs[0][0]["name"], "op": "in" if len(same_col) > 1 else "=", "value": [x[1] for x in same_col] if len(same_col) > 1 else vs[0][1]}
+                cond = {
+                    "col": vs[0][0]["name"],
+                    "op": "in" if len(same_col) > 1 else "=",
+                    "value": [x[1] for x in same_col] if len(same_col) > 1 else vs[0][1],
+                }
         if cond:
-            op = {"op": "filter", "col": cond["col"], "cmp": cond["op"], "value": cond["value"], **({"value2": cond["value2"]} if cond.get("value2") is not None else {})}
+            op = {
+                "op": "filter",
+                "col": cond["col"],
+                "cmp": cond["op"],
+                "value": cond["value"],
+                **({"value2": cond["value2"]} if cond.get("value2") is not None else {}),
+            }
             return done(op)
         return ask("Filter on what? e.g. 'show only Lahore' or 'filter where Amount is above 100,000'.")
 
     # ---------------------------------------------------------------- highlights
-    if re.search(r"\b(?:remove|clear|delete|turn off|take off|get rid of)\b.*\b(?:highlight\w*|conditional format\w*|colou?r(?:s|ing)?|data bars|colou?r scale|heat ?map)\b", cm):
+    if re.search(
+        r"\b(?:remove|clear|delete|turn off|take off|get rid of)\b.*\b(?:highlight\w*|conditional format\w*|colou?r(?:s|ing)?|data bars|colou?r scale|heat ?map)\b",
+        cm,
+    ):
         return done({"op": "clear_highlights", **({"col": mentioned[0]["name"]} if mentioned else {})})
     if re.search(r"\bdata\s*bars?\b|\bin-?cell bars?\b", cm):
         tc = [x for x in mentioned if x in nums] or nums[-1:]
@@ -816,14 +988,24 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
     hm = re.search(r"\b(?:highlight|mark|flag|shade|colou?r(?:-code)?)\b", cm)
     if hm and not re.search(r"\b(?:header|heading|title)s?\b", cm):
         colour = next((g.group(1) for g in P.COLOUR_RX.finditer(cm)), None)
-        rows_too = bool(re.search(r"\b(?:rows?|whole (?:row|line)|entire (?:row|line)|lines?)\b|\b" + ROWS + r"\s+(?:who|that|which|where|with)\b", cm))
+        rows_too = bool(
+            re.search(r"\b(?:rows?|whole (?:row|line)|entire (?:row|line)|lines?)\b|\b" + ROWS + r"\s+(?:who|that|which|where|with)\b", cm)
+        )
         top = re.search(r"\b(top|bottom|highest|lowest|best|worst)\s+(\d+)\s*(%|percent)?", cm)
         base = {"color": colour} if colour else {}
         if top:
             tc = [x for x in mentioned if x in nums] or nums[-1:]
             if tc:
-                return done({"op": "conditional", "col": tc[0]["name"], "rule": "top" if top.group(1) in ("top", "highest", "best") else "bottom",
-                             "value": int(top.group(2)), **({"percent": True} if top.group(3) else {}), **base})
+                return done(
+                    {
+                        "op": "conditional",
+                        "col": tc[0]["name"],
+                        "rule": "top" if top.group(1) in ("top", "highest", "best") else "bottom",
+                        "value": int(top.group(2)),
+                        **({"percent": True} if top.group(3) else {}),
+                        **base,
+                    }
+                )
         if re.search(r"\bduplicat\w*|\brepeated\b", cm):
             tc = mentioned or [x for x in cols if x["kind"] == "text"][:1]
             return done({"op": "conditional", "col": tc[0]["name"], "rule": "duplicates", **base})
@@ -851,10 +1033,10 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
         if wm and cols_in(wm.group(1), s):
             cond = condition(wm.group(1), s)
         if not cond and mentioned:
-            cond = condition(cm[hm.end():], s)
+            cond = condition(cm[hm.end() :], s)
         best = metric(t)
         if not cond and best and re.search(r"\b(?:over|above|under|below|more than|less than|at least|at most|between|greater than|>|<)\b", cm):
-            cond = condition(" " + best["name"].lower() + " " + cm[hm.end():], s, best)
+            cond = condition(" " + best["name"].lower() + " " + cm[hm.end() :], s, best)
             rows_too = rows_too or bool(re.search(r"\b" + ROWS + r"\b", cm))
         if not cond:
             vs = values_in(cm, s)
@@ -865,22 +1047,54 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
             if cond["op"] == "in":
                 return done(*[{"op": "conditional", "col": cond["col"], "rule": "=", "value": v, "rows": rows_too, **base} for v in cond["value"]])
             rule = {"starts": "contains"}.get(cond["op"], cond["op"])
-            return done({"op": "conditional", "col": cond["col"], "rule": rule, "value": cond["value"], **({"value2": cond["value2"]} if cond.get("value2") is not None else {}),
-                         **({"rows": True} if rows_too else {}), **base})
+            return done(
+                {
+                    "op": "conditional",
+                    "col": cond["col"],
+                    "rule": rule,
+                    "value": cond["value"],
+                    **({"value2": cond["value2"]} if cond.get("value2") is not None else {}),
+                    **({"rows": True} if rows_too else {}),
+                    **base,
+                }
+            )
 
     # ---------------------------------------------------------------- totals, summaries, pivots, charts
-    if re.search(r"\b(?:total|totals|grand total|sum|average|averages|count|subtotal)\s+row\b|\badd\s+(?:up\s+)?(?:the\s+)?totals?\b(?!\s+(?:column|by|per|for))|\btotal\s+(?:up\s+)?(?:the\s+)?(?:columns?|numbers)\b", cm) or \
-            (re.search(r"^\s*(?:total|sum)(?:\s+up)?\s+(?:the\s+)?", cm) and mentioned and not re.search(r"\b(?:by|per|for each|for every|in each)\b", cm)):
-        fn = "average" if re.search(r"\baverages?\b|\bmean\b", cm) else "count" if re.search(r"\bcount\b", cm) else "max" if re.search(r"\bhighest|\bmax", cm) else \
-            "min" if re.search(r"\blowest|\bmin", cm) else "sum"
+    if re.search(
+        r"\b(?:total|totals|grand total|sum|average|averages|count|subtotal)\s+row\b|\badd\s+(?:up\s+)?(?:the\s+)?totals?\b(?!\s+(?:column|by|per|for))|\btotal\s+(?:up\s+)?(?:the\s+)?(?:columns?|numbers)\b",
+        cm,
+    ) or (
+        re.search(r"^\s*(?:total|sum)(?:\s+up)?\s+(?:the\s+)?", cm) and mentioned and not re.search(r"\b(?:by|per|for each|for every|in each)\b", cm)
+    ):
+        fn = (
+            "average"
+            if re.search(r"\baverages?\b|\bmean\b", cm)
+            else "count"
+            if re.search(r"\bcount\b", cm)
+            else "max"
+            if re.search(r"\bhighest|\bmax", cm)
+            else "min"
+            if re.search(r"\blowest|\bmin", cm)
+            else "sum"
+        )
         tc = [x for x in mentioned if x in nums]
         return done({"op": "total_row", "fn": fn, **({"cols": [x["name"] for x in tc]} if tc else {})})
     piv = re.search(r"\bpivot\b", cm)
-    summ = re.search(r"\b(?:summary|summari[sz]e|breakdown|break(?:\s+it)?\s+down|group(?:ed)?)\b|\b(?:total|sum|average|count|number)\s+(?:of\s+)?(?:the\s+)?(?:[\w ]+?\s+)?(?:by|per|for each|for every|in each)\b|"
-                     r"\b(?:monthly|quarterly|yearly|annual)\s+(?:totals?|summary|sales|figures)\b", cm)
+    summ = re.search(
+        r"\b(?:summary|summari[sz]e|breakdown|break(?:\s+it)?\s+down|group(?:ed)?)\b|\b(?:total|sum|average|count|number)\s+(?:of\s+)?(?:the\s+)?(?:[\w ]+?\s+)?(?:by|per|for each|for every|in each)\b|"
+        r"\b(?:monthly|quarterly|yearly|annual)\s+(?:totals?|summary|sales|figures)\b",
+        cm,
+    )
     chart = re.search(r"\b(?:chart|graph|plot|visuali[sz]e|bar chart|pie|line chart)\b", cm)
-    period = "month" if re.search(r"\bmonth(?:ly|s)?\b|\bper month\b", cm) else "quarter" if re.search(r"\bquarter(?:ly|s)?\b", cm) else \
-        "year" if re.search(r"\byear(?:ly|s)?\b|\bannual\b", cm) else None
+    period = (
+        "month"
+        if re.search(r"\bmonth(?:ly|s)?\b|\bper month\b", cm)
+        else "quarter"
+        if re.search(r"\bquarter(?:ly|s)?\b", cm)
+        else "year"
+        if re.search(r"\byear(?:ly|s)?\b|\bannual\b", cm)
+        else None
+    )
     if summ and chart and not re.search(r"\b(?:summary|summari[sz]e|breakdown|break(?:\s+it)?\s+down|group(?:ed)?)\b", cm):
         summ = None  # "a bar chart of total by student": the chart op totals a repeating column itself
     if piv or summ:
@@ -890,9 +1104,11 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
         if period and datec and not [x for x in bycols if x["kind"] == "date"]:
             bycols = [datec] + [x for x in bycols if x is not datec]
         if not bycols:
-            return ask(f"By which column? e.g. 'summary of {(nums[-1]['name'] if nums else 'Amount')} by {next((x['name'] for x in cols if x['kind'] == 'text'), 'City')}'.")
+            return ask(
+                f"By which column? e.g. 'summary of {(nums[-1]['name'] if nums else 'Amount')} by {next((x['name'] for x in cols if x['kind'] == 'text'), 'City')}'."
+            )
         vals = [x for x in mentioned if x in nums and x not in bycols]
-        fn = next((f for rx, f in FNS if re.search(rx, cm[:bym.start()] if bym else cm)), "sum")
+        fn = next((f for rx, f in FNS if re.search(rx, cm[: bym.start()] if bym else cm)), "sum")
         if fn == "count":
             vals = vals[:1]
         kind = None
@@ -904,13 +1120,40 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
             rowf = bycols[0]
             if period and rowf["kind"] == "date" and len(bycols) > 1:  # "by city and month": cities down, months across
                 rowf, colf = next(x for x in bycols if x["kind"] != "date"), [rowf]
-            return done({"op": "pivot", "rows": [rowf["name"]], **({"columns": [colf[0]["name"]]} if colf else {}), "values": [x["name"] for x in vals] if vals else [],
-                         "fn": fn, **({"period": period} if period else {})})
-        return done({"op": "summary", "by": bycols[0]["name"], "values": [x["name"] for x in vals], "fn": fn, **({"period": period} if period and bycols[0]["kind"] == "date" else {}),
-                     **({"chart": kind} if kind else {})})
+            return done(
+                {
+                    "op": "pivot",
+                    "rows": [rowf["name"]],
+                    **({"columns": [colf[0]["name"]]} if colf else {}),
+                    "values": [x["name"] for x in vals] if vals else [],
+                    "fn": fn,
+                    **({"period": period} if period else {}),
+                }
+            )
+        return done(
+            {
+                "op": "summary",
+                "by": bycols[0]["name"],
+                "values": [x["name"] for x in vals],
+                "fn": fn,
+                **({"period": period} if period and bycols[0]["kind"] == "date" else {}),
+                **({"chart": kind} if kind else {}),
+            }
+        )
     if chart:
-        kind = "pie" if re.search(r"\bpie\b", cm) else "doughnut" if re.search(r"\bdo(?:ugh)?nut\b", cm) else "line" if re.search(r"\bline\b|\bover time\b|\btrend\b", cm) else \
-            "bar" if re.search(r"\bbar\b", cm) else "area" if re.search(r"\barea\b", cm) else "column"
+        kind = (
+            "pie"
+            if re.search(r"\bpie\b", cm)
+            else "doughnut"
+            if re.search(r"\bdo(?:ugh)?nut\b", cm)
+            else "line"
+            if re.search(r"\bline\b|\bover time\b|\btrend\b", cm)
+            else "bar"
+            if re.search(r"\bbar\b", cm)
+            else "area"
+            if re.search(r"\barea\b", cm)
+            else "column"
+        )
         bym = re.search(r"\b(?:by|per|for each|against|vs\.?|versus|across|over|for)\b(.*)$", cm)
         xs = cols_in(bym.group(1), s) if bym else []
         if re.search(r"\bover time\b|\btrend\b", cm) or (period and not xs):
@@ -918,8 +1161,22 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
             xs = [dc] if dc else xs
         ys = [x for x in mentioned if x in nums and x not in xs]
         x = xs[0] if xs else next((y for y in mentioned if y not in nums), None)
-        place = "new_sheet" if re.search(r"\b(?:new|separate|own|another)\s+(?:sheet|tab)\b", cm) else "beside" if re.search(r"\b(?:beside|next to|right of)\b", cm) else None
-        return done({"op": "chart", "type": kind, **({"x": x["name"]} if x else {}), **({"y": [y["name"] for y in ys]} if ys else {}), **({"place": place} if place else {})})
+        place = (
+            "new_sheet"
+            if re.search(r"\b(?:new|separate|own|another)\s+(?:sheet|tab)\b", cm)
+            else "beside"
+            if re.search(r"\b(?:beside|next to|right of)\b", cm)
+            else None
+        )
+        return done(
+            {
+                "op": "chart",
+                "type": kind,
+                **({"x": x["name"]} if x else {}),
+                **({"y": [y["name"] for y in ys]} if ys else {}),
+                **({"place": place} if place else {}),
+            }
+        )
 
     # ---------------------------------------------------------------- formats and looks
     if re.search(r"\bunfreeze\b|\bremove (?:the )?freeze\b", cm):
@@ -936,19 +1193,47 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
             if not re.search(r"\brows?\b|\bheader\b|\btop\b", cm):
                 rows_n = 0 if re.search(r"\bonly\b", cm) else rows_n
         return done({"op": "freeze", "rows": rows_n, "cols": cols_n})
-    fm = re.search(r"\b(currency|money|rupees?|rs\.?|pkr|dollars?|usd|\$|percent(?:age)?s?|%|dates?|thousands(?: separators?)?|commas?|whole numbers|integers|no decimals|"
-                   r"(\d|one|two|three)\s*(?:decimals?|decimal places|dp|places))\b", cm)
-    if fm and (re.search(r"\b(?:format|show|display|as|in|into|with|add|put|use|change|turn|set)\b", cm)) and mentioned and not re.search(r"\bhighlight|\bfilter\b|\bround\b", cm):
+    fm = re.search(
+        r"\b(currency|money|rupees?|rs\.?|pkr|dollars?|usd|\$|percent(?:age)?s?|%|dates?|thousands(?: separators?)?|commas?|whole numbers|integers|no decimals|"
+        r"(\d|one|two|three)\s*(?:decimals?|decimal places|dp|places))\b",
+        cm,
+    )
+    if (
+        fm
+        and (re.search(r"\b(?:format|show|display|as|in|into|with|add|put|use|change|turn|set)\b", cm))
+        and mentioned
+        and not re.search(r"\bhighlight|\bfilter\b|\bround\b", cm)
+    ):
         w = fm.group(1)
         dm = fm.group(2)
-        fmt = ("rs" if re.search(r"rupee|rs|currency|money", w) and not re.search(r"pkr", w) else "pkr" if "pkr" in w else "usd" if re.search(r"dollar|usd|\$", w) else
-               "percent1" if re.search(r"percent|%", w) and re.search(r"\b1\b|one\s+decimal", cm) else "percent" if re.search(r"percent|%", w) else
-               "date" if "date" in w else "thousands" if re.search(r"thousand|comma", w) else "integer" if re.search(r"whole|integer|no decimals", w) else
-               {"1": "decimals1", "one": "decimals1", "2": "decimals2", "two": "decimals2", "3": "0.000", "three": "0.000"}.get(dm or "", "decimals2"))
+        fmt = (
+            "rs"
+            if re.search(r"rupee|rs|currency|money", w) and not re.search(r"pkr", w)
+            else "pkr"
+            if "pkr" in w
+            else "usd"
+            if re.search(r"dollar|usd|\$", w)
+            else "percent1"
+            if re.search(r"percent|%", w) and re.search(r"\b1\b|one\s+decimal", cm)
+            else "percent"
+            if re.search(r"percent|%", w)
+            else "date"
+            if "date" in w
+            else "thousands"
+            if re.search(r"thousand|comma", w)
+            else "integer"
+            if re.search(r"whole|integer|no decimals", w)
+            else {"1": "decimals1", "one": "decimals1", "2": "decimals2", "two": "decimals2", "3": "0.000", "three": "0.000"}.get(
+                dm or "", "decimals2"
+            )
+        )
         return done({"op": "number_format", "cols": [x["name"] for x in mentioned], "format": fmt})
     mm = re.search(r"\bround(?:\s+(?:off|up|down))?\b", cm)
     if mm and (mentioned or nums):
-        dm = re.search(r"\b(\d|zero|no|one|two|three)\s*(?:decimals?|decimal places|dp|places)\b|\bto\s+(?:the\s+)?(?:nearest\s+)?(?:whole number|integer|rupee)\b", cm)
+        dm = re.search(
+            r"\b(\d|zero|no|one|two|three)\s*(?:decimals?|decimal places|dp|places)\b|\bto\s+(?:the\s+)?(?:nearest\s+)?(?:whole number|integer|rupee)\b",
+            cm,
+        )
         d = 0 if not dm or not dm.group(1) else {"zero": 0, "no": 0, "one": 1, "two": 2, "three": 3}.get(dm.group(1), None)
         d = int(dm.group(1)) if dm and dm.group(1) and d is None else (d if dm else 2 if not re.search(r"whole|integer|nearest", cm) else 0)
         tc = [x for x in mentioned if x["kind"] in ("number", "money", "percent")] or nums[-1:]
@@ -962,7 +1247,10 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
             if len(vals) <= 15:
                 items = vals
         return done({"op": "validation", "col": mentioned[0]["name"], "list": items}) if items else ask("Which values should the dropdown offer?")
-    if re.search(r"\bauto-?fit\b|\bfit\s+(?:the\s+)?columns\b|\b(?:widen|resize)\s+(?:the\s+)?columns\b|\bcolumns?\s+(?:are\s+)?too\s+narrow\b|\bmake\s+(?:the\s+)?columns\s+(?:wider|fit)\b|#####", cm):
+    if re.search(
+        r"\bauto-?fit\b|\bfit\s+(?:the\s+)?columns\b|\b(?:widen|resize)\s+(?:the\s+)?columns\b|\bcolumns?\s+(?:are\s+)?too\s+narrow\b|\bmake\s+(?:the\s+)?columns\s+(?:wider|fit)\b|#####",
+        cm,
+    ):
         return done({"op": "autofit"})
     tgt = re.search(r"\b(header(?:s| row)?|heading(?:s| row)?|top row|titles?|column names|totals? row|grand total)\b", cm)
     st = _style_set(cm)
@@ -978,8 +1266,15 @@ def parse_book(clause, m, focus=None, raw=None, carry=False):
             ra = re.search(re.escape(a), raw, re.I)
             rb = re.search(re.escape(b), raw, re.I)
             whole = any(" ".join(str(v).split()).lower() == a.lower() for r in t["rows"] for v in r if isinstance(v, str))
-            return done({"op": "replace", "find": ra.group(0) if ra else a, "with": rb.group(0) if rb else b, **({"col": incol[0]["name"]} if incol else {}),
-                         **({"whole": True} if whole and incol else {})})
+            return done(
+                {
+                    "op": "replace",
+                    "find": ra.group(0) if ra else a,
+                    "with": rb.group(0) if rb else b,
+                    **({"col": incol[0]["name"]} if incol else {}),
+                    **({"whole": True} if whole and incol else {}),
+                }
+            )
     return out
 
 
@@ -1036,36 +1331,84 @@ def question_query(c, m, focus=None):
     label = next((x for x in mentioned if x["kind"] == "text" and x is not bycol and not any(w["col"] == x["name"] for w in where)), None)
     if label is None and re.match(r"\s*who\b", c):
         label = next((x for x in t["cols"] if x["kind"] == "text" and PERSON.search(x["name"])), None)
-    additive = bool(re.search(r"\b(?:most|least|sold|sell|sells|selling|bought|buy|spent|spend|earned|earn|made|total|sum|revenue|sales|more|less|how much|turnover)\b", c))
+    additive = bool(
+        re.search(
+            r"\b(?:most|least|sold|sell|sells|selling|bought|buy|spent|spend|earned|earn|made|total|sum|revenue|sales|more|less|how much|turnover)\b",
+            c,
+        )
+    )
     vs = value_of_sales(t)
     if vs and additive and vcol is None:  # "which customer bought the most": quantity times price, row by row
-        return {"fn": "argmax" if not re.search(r"\bleast|lowest|fewest|less\b", c) else "argmin", "sheet": sh, "col": f"{vs[0]['name']} x {vs[1]['name']}",
-                "product": [vs[0]["name"], vs[1]["name"]], "where": where, **({"label": label["name"]} if label else {}),
-                **({"by": bycol["name"]} if bycol else {})} if re.search(r"\b(?:who|which)\b|\b(?:most|least|highest|lowest|top|best|biggest|fewest)\b", c) and not re.search(r"\bhow (?:many|much)\b", c) else \
-            {"fn": "sum", "sheet": sh, "col": f"{vs[0]['name']} x {vs[1]['name']}", "product": [vs[0]["name"], vs[1]["name"]], "where": where,
-             **({"by": bycol["name"]} if bycol else {})}
+        return (
+            {
+                "fn": "argmax" if not re.search(r"\bleast|lowest|fewest|less\b", c) else "argmin",
+                "sheet": sh,
+                "col": f"{vs[0]['name']} x {vs[1]['name']}",
+                "product": [vs[0]["name"], vs[1]["name"]],
+                "where": where,
+                **({"label": label["name"]} if label else {}),
+                **({"by": bycol["name"]} if bycol else {}),
+            }
+            if re.search(r"\b(?:who|which)\b|\b(?:most|least|highest|lowest|top|best|biggest|fewest)\b", c)
+            and not re.search(r"\bhow (?:many|much)\b", c)
+            else {
+                "fn": "sum",
+                "sheet": sh,
+                "col": f"{vs[0]['name']} x {vs[1]['name']}",
+                "product": [vs[0]["name"], vs[1]["name"]],
+                "where": where,
+                **({"by": bycol["name"]} if bycol else {}),
+            }
+        )
     best = metric(t, nums, additive=additive)
-    who = re.search(r"\b(?:who|which|what)\b(?:\s+(?:\w+\s+){0,2}?)?\b(?:has|had|got|made|scored|sold|earned|spent|is|was|with|did)?\s*(?:the\s+)?(highest|most|largest|biggest|best|top|lowest|least|smallest|worst|fewest)\b", c)
+    who = re.search(
+        r"\b(?:who|which|what)\b(?:\s+(?:\w+\s+){0,2}?)?\b(?:has|had|got|made|scored|sold|earned|spent|is|was|with|did)?\s*(?:the\s+)?(highest|most|largest|biggest|best|top|lowest|least|smallest|worst|fewest)\b",
+        c,
+    )
     nums = [best] + [x for x in nums if x is not best] if best else nums
     nums = nums[::-1]  # nums[-1] is the metric below
     if who and (vcol or nums):
-        return {"fn": "argmax" if who.group(1) in ("highest", "most", "largest", "biggest", "best", "top") else "argmin", "sheet": sh,
-                "col": (vcol or nums[-1])["name"], "where": where, **({"by": bycol["name"]} if bycol else {}), **({"label": label["name"]} if label else {})}
+        return {
+            "fn": "argmax" if who.group(1) in ("highest", "most", "largest", "biggest", "best", "top") else "argmin",
+            "sheet": sh,
+            "col": (vcol or nums[-1])["name"],
+            "where": where,
+            **({"by": bycol["name"]} if bycol else {}),
+            **({"label": label["name"]} if label else {}),
+        }
     top = re.search(r"\b(top|bottom|best|worst|highest|lowest)\s+(\d+)\b", c)
     if top and (vcol or nums):
-        return {"fn": "top", "sheet": sh, "col": (vcol or nums[-1])["name"], "n": int(top.group(2)), "desc": top.group(1) in ("top", "best", "highest"), "where": where,
-                **({"by": bycol["name"]} if bycol else {}), **({"label": label["name"]} if label else {})}
+        return {
+            "fn": "top",
+            "sheet": sh,
+            "col": (vcol or nums[-1])["name"],
+            "n": int(top.group(2)),
+            "desc": top.group(1) in ("top", "best", "highest"),
+            "where": where,
+            **({"by": bycol["name"]} if bycol else {}),
+            **({"label": label["name"]} if label else {}),
+        }
     if re.search(r"\bhow many (?:different|unique|distinct)\b|\bnumber of (?:different|unique|distinct)\b", c):
         dc = next((x for x in mentioned if x is not bycol), None) or (values_in(c, s) or [(None,)])[0][0]
         if dc:
             return {"fn": "distinct", "sheet": sh, "col": dc["name"], "where": where}
     fn = next((f for rx, f in FNS if re.search(rx, c)), None)
-    if fn in (None, "sum") and re.search(r"\bhow much\b|\b(?:sold|sell|sales|revenue|earned|spent|bought|turnover)\b", c) and not re.search(r"\bhow many\b", c):
+    if (
+        fn in (None, "sum")
+        and re.search(r"\bhow much\b|\b(?:sold|sell|sales|revenue|earned|spent|bought|turnover)\b", c)
+        and not re.search(r"\bhow many\b", c)
+    ):
         fn = "sum"  # "how much did Lahore sell?", "total sales": the money, summed
         if vcol is None:
             if vs:
-                return {"fn": "sum", "sheet": sh, "col": f"{vs[0]['name']} x {vs[1]['name']}", "product": [vs[0]["name"], vs[1]["name"]], "where": where,
-                        **({"by": bycol["name"]} if bycol else {})}
+                return {
+                    "fn": "sum",
+                    "sheet": sh,
+                    "col": f"{vs[0]['name']} x {vs[1]['name']}",
+                    "product": [vs[0]["name"], vs[1]["name"]],
+                    "where": where,
+                    **({"by": bycol["name"]} if bycol else {}),
+                }
             vcol = metric(t, [x for x in t["cols"] if x["kind"] in ("number", "money", "percent")], additive=True)
     if fn == "count" or re.search(r"\bhow many\b", c):
         return {"fn": "count", "sheet": sh, "where": where, **({"by": bycol["name"]} if bycol else {})}

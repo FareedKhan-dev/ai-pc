@@ -1,15 +1,16 @@
 """Reports from the postings, and the checks every set of books must pass.
 
-  trial_balance(b, upto)          every account's debits and credits (they must be equal)
-  profit_loss(b, start, end)      income less expenses, gross profit after the cost of goods sold
-  balance_sheet(b, upto)          assets = liabilities + equity (+ this year's profit)
-  ageing(b, kind, upto)           who owes you (or whom you owe), by how long: 0-30, 31-60, 61-90, over 90 days
-  statement(b, party, start, end) a customer's or supplier's account, with a running balance
-  stock(b)                        every tracked item: quantity, average cost, value (it must equal the Stock account)
-  sales_tax(b, start, end)        output tax per invoice (the return's sales annex), input tax per bill, the difference due
-  day_book(b, start, end)         every entry in order
-  verify(b) -> [problems]         the books' own checks (all must pass after every change)
+trial_balance(b, upto)          every account's debits and credits (they must be equal)
+profit_loss(b, start, end)      income less expenses, gross profit after the cost of goods sold
+balance_sheet(b, upto)          assets = liabilities + equity (+ this year's profit)
+ageing(b, kind, upto)           who owes you (or whom you owe), by how long: 0-30, 31-60, 61-90, over 90 days
+statement(b, party, start, end) a customer's or supplier's account, with a running balance
+stock(b)                        every tracked item: quantity, average cost, value (it must equal the Stock account)
+sales_tax(b, start, end)        output tax per invoice (the return's sales annex), input tax per bill, the difference due
+day_book(b, start, end)         every entry in order
+verify(b) -> [problems]         the books' own checks (all must pass after every change)
 """
+
 import datetime as dt
 from decimal import Decimal
 
@@ -41,7 +42,9 @@ def trial_balance(b, upto=None):
         if d == c == 0:
             continue
         bal = d - c
-        rows.append({"code": code, "name": accs[code]["name"], "type": accs[code]["type"], "debit": bal if bal > 0 else 0, "credit": -bal if bal < 0 else 0})
+        rows.append(
+            {"code": code, "name": accs[code]["name"], "type": accs[code]["type"], "debit": bal if bal > 0 else 0, "credit": -bal if bal < 0 else 0}
+        )
     td, tc = sum(r["debit"] for r in rows), sum(r["credit"] for r in rows)
     return {"rows": rows, "debit": td, "credit": tc, "balanced": td == tc}
 
@@ -61,8 +64,17 @@ def profit_loss(b, start, end):
     sales = sum(x["amount"] for x in income)
     gross = sales - cogs
     exp = sum(x["amount"] for x in expenses)
-    return {"start": str(start), "end": str(end), "income": income, "sales": sales, "cogs": cogs, "gross": gross, "expenses": expenses,
-            "total_expenses": exp, "net": gross - exp}
+    return {
+        "start": str(start),
+        "end": str(end),
+        "income": income,
+        "sales": sales,
+        "cogs": cogs,
+        "gross": gross,
+        "expenses": expenses,
+        "total_expenses": exp,
+        "net": gross - exp,
+    }
 
 
 def _fy_start(d):
@@ -123,8 +135,10 @@ def statement(b, party, start=None, end=None):
     end = end or dt.date.today()
     opening = b.balance(acc, p["id"], dt.date.fromisoformat(str(start)) - dt.timedelta(days=1))
     rows, bal = [], opening
-    q = ("SELECT j.date, j.memo, p.debit, p.credit, j.doc_id FROM postings p JOIN journal j ON j.id=p.entry_id WHERE p.account=? AND p.party_id=? "
-         "AND j.date>=? AND j.date<=? ORDER BY j.date, j.id")
+    q = (
+        "SELECT j.date, j.memo, p.debit, p.credit, j.doc_id FROM postings p JOIN journal j ON j.id=p.entry_id WHERE p.account=? AND p.party_id=? "
+        "AND j.date>=? AND j.date<=? ORDER BY j.date, j.id"
+    )
     for date, memo, d, c, doc_id in b.cx.execute(q, (acc, p["id"], str(start), str(end))):
         bal += d - c
         number = b.cx.execute("SELECT number FROM documents WHERE id=?", (doc_id,)).fetchone()
@@ -144,8 +158,16 @@ def stock(b):
     for (iid,) in b.cx.execute("SELECT DISTINCT item_id FROM stock").fetchall():
         it = b.item_by_id(iid)
         qty, avg, value = b.on_hand(iid)
-        rows.append({"item": it["name"], "unit": it.get("unit"), "qty": qty_str(qty), "avg_cost": avg, "value": value,
-                     "low": bool(it.get("reorder") is not None and qty <= Decimal(str(it["reorder"])))})
+        rows.append(
+            {
+                "item": it["name"],
+                "unit": it.get("unit"),
+                "qty": qty_str(qty),
+                "avg_cost": avg,
+                "value": value,
+                "low": bool(it.get("reorder") is not None and qty <= Decimal(str(it["reorder"]))),
+            }
+        )
     rows.sort(key=lambda r: r["item"].lower())
     return {"rows": rows, "value": sum(r["value"] for r in rows)}
 
@@ -156,29 +178,69 @@ def sales_tax(b, start, end):
         if d["status"] == "void":
             continue
         p = d["party"] or {}
-        sales.append({"number": d["number"], "date": d["date"], "buyer": p.get("name"), "ntn": p.get("ntn") or p.get("cnic"), "strn": p.get("strn"),
-                      "value": d["totals"]["subtotal"], "tax": d["totals"]["tax"], "further_tax": d["totals"]["further_tax"]})
+        sales.append(
+            {
+                "number": d["number"],
+                "date": d["date"],
+                "buyer": p.get("name"),
+                "ntn": p.get("ntn") or p.get("cnic"),
+                "strn": p.get("strn"),
+                "value": d["totals"]["subtotal"],
+                "tax": d["totals"]["tax"],
+                "further_tax": d["totals"]["further_tax"],
+            }
+        )
     for d in b.docs("credit_note", since=start, until=end):
-        sales.append({"number": d["number"], "date": d["date"], "buyer": (d["party"] or {}).get("name"), "value": -d["totals"]["subtotal"],
-                      "tax": -d["totals"]["tax"], "further_tax": -d["totals"]["further_tax"], "credit_note": True})
+        sales.append(
+            {
+                "number": d["number"],
+                "date": d["date"],
+                "buyer": (d["party"] or {}).get("name"),
+                "value": -d["totals"]["subtotal"],
+                "tax": -d["totals"]["tax"],
+                "further_tax": -d["totals"]["further_tax"],
+                "credit_note": True,
+            }
+        )
     for d in b.docs("bill", since=start, until=end):
         if d["status"] != "void" and d["totals"]["tax"]:
-            purchases.append({"number": d.get("ref") or d["number"], "date": d["date"], "supplier": (d["party"] or {}).get("name"),
-                              "strn": (d["party"] or {}).get("strn"), "value": d["totals"]["subtotal"], "tax": d["totals"]["tax"]})
+            purchases.append(
+                {
+                    "number": d.get("ref") or d["number"],
+                    "date": d["date"],
+                    "supplier": (d["party"] or {}).get("name"),
+                    "strn": (d["party"] or {}).get("strn"),
+                    "value": d["totals"]["subtotal"],
+                    "tax": d["totals"]["tax"],
+                }
+            )
     for d in b.docs("expense", since=start, until=end):
         if d.get("tax"):
             purchases.append({"number": d["number"], "date": d["date"], "supplier": d.get("what"), "value": d["amount"], "tax": d["tax"]})
     out_tax = sum(x["tax"] for x in sales)
     further = sum(x.get("further_tax") or 0 for x in sales)
     in_tax = sum(x["tax"] for x in purchases)
-    return {"start": str(start), "end": str(end), "sales": sales, "purchases": purchases, "output_tax": out_tax, "further_tax": further,
-            "input_tax": in_tax, "payable": out_tax + further - in_tax}
+    return {
+        "start": str(start),
+        "end": str(end),
+        "sales": sales,
+        "purchases": purchases,
+        "output_tax": out_tax,
+        "further_tax": further,
+        "input_tax": in_tax,
+        "payable": out_tax + further - in_tax,
+    }
 
 
 def day_book(b, start, end):
     out = []
-    for eid, date, memo, doc_id in b.cx.execute("SELECT id, date, memo, doc_id FROM journal WHERE date>=? AND date<=? ORDER BY date, id", (str(start), str(end))):
-        lines = [{"account": a, "debit": d, "credit": c} for a, d, c in b.cx.execute("SELECT account, debit, credit FROM postings WHERE entry_id=?", (eid,))]
+    for eid, date, memo, doc_id in b.cx.execute(
+        "SELECT id, date, memo, doc_id FROM journal WHERE date>=? AND date<=? ORDER BY date, id", (str(start), str(end))
+    ):
+        lines = [
+            {"account": a, "debit": d, "credit": c}
+            for a, d, c in b.cx.execute("SELECT account, debit, credit FROM postings WHERE entry_id=?", (eid,))
+        ]
         out.append({"date": date, "memo": memo, "doc_id": doc_id, "lines": lines})
     return out
 
@@ -194,7 +256,9 @@ def verify(b):
         problems.append(f"the trial balance does not balance ({tb['debit']} vs {tb['credit']})")
     bs = balance_sheet(b)
     if not bs["balanced"]:
-        problems.append(f"the balance sheet does not balance (assets {bs['total_assets']}, liabilities + equity {bs['total_liabilities'] + bs['total_equity']})")
+        problems.append(
+            f"the balance sheet does not balance (assets {bs['total_assets']}, liabilities + equity {bs['total_liabilities'] + bs['total_equity']})"
+        )
     st = stock(b)
     inv = b.balance("1200")
     if st["value"] != inv:
@@ -207,7 +271,9 @@ def verify(b):
         parties = sum(b.balance(acc, pid) for (pid,) in b.cx.execute("SELECT id FROM parties"))
         if ctrl != parties:
             problems.append(f"account {acc} ({ctrl}) is not the sum of its parties' balances ({parties})")
-    for i, kind, number, total, status in b.cx.execute("SELECT id, kind, number, total, status FROM documents WHERE kind IN ('invoice','bill','quote','credit_note')"):
+    for i, kind, number, total, status in b.cx.execute(
+        "SELECT id, kind, number, total, status FROM documents WHERE kind IN ('invoice','bill','quote','credit_note')"
+    ):
         d = b.doc(i)
         t = d["totals"]
         if sum(x["amount"] for x in d["lines"]) != t["subtotal"] or t["subtotal"] + t["tax"] + t["further_tax"] != t["total"] or t["total"] != total:

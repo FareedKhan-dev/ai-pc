@@ -10,6 +10,7 @@ plain backdrop), tilt, the main subject, a document in it, and where it is quiet
   describe(im)              one paragraph a person can read
 All measures are 0-1 unless said otherwise. Photos are measured at a reduced size (the longer side 800 px), so it is fast.
 """
+
 import math
 
 import cv2
@@ -78,12 +79,27 @@ def stats(im):
     m = a.reshape(-1, 3).mean(0)
     grey = m.mean()
     cast = (m - grey) / max(grey, 1e-3)
-    colourful = np.sqrt(np.std(a[..., 0] - a[..., 1]) ** 2 + np.std(0.5 * (a[..., 0] + a[..., 1]) - a[..., 2]) ** 2) + \
-        0.3 * np.sqrt(np.mean(a[..., 0] - a[..., 1]) ** 2 + np.mean(0.5 * (a[..., 0] + a[..., 1]) - a[..., 2]) ** 2)
-    out = {"width": im.width, "height": im.height, "brightness": float(L.mean()), "contrast": float(L.std()), "saturation": float(S.mean()),
-           "warmth": float(m[0] - m[2]), "cast": [round(float(c), 3) for c in cast], "clip_dark": float((L < 0.02).mean()), "clip_light": float((L > 0.98).mean()),
-           "colourful": float(colourful), "sharpness": sharpness(im), "edges": edge_sharpness(im), "noise": noise(im), "dark_mean": float(L[L < 0.3].mean()) if (L < 0.3).any() else 0.0,
-           "light_mean": float(L[L > 0.7].mean()) if (L > 0.7).any() else 1.0, "alpha": im.mode in ("RGBA", "LA") and np.asarray(im.getchannel("A")).min() < 250}
+    colourful = np.sqrt(np.std(a[..., 0] - a[..., 1]) ** 2 + np.std(0.5 * (a[..., 0] + a[..., 1]) - a[..., 2]) ** 2) + 0.3 * np.sqrt(
+        np.mean(a[..., 0] - a[..., 1]) ** 2 + np.mean(0.5 * (a[..., 0] + a[..., 1]) - a[..., 2]) ** 2
+    )
+    out = {
+        "width": im.width,
+        "height": im.height,
+        "brightness": float(L.mean()),
+        "contrast": float(L.std()),
+        "saturation": float(S.mean()),
+        "warmth": float(m[0] - m[2]),
+        "cast": [round(float(c), 3) for c in cast],
+        "clip_dark": float((L < 0.02).mean()),
+        "clip_light": float((L > 0.98).mean()),
+        "colourful": float(colourful),
+        "sharpness": sharpness(im),
+        "edges": edge_sharpness(im),
+        "noise": noise(im),
+        "dark_mean": float(L[L < 0.3].mean()) if (L < 0.3).any() else 0.0,
+        "light_mean": float(L[L > 0.7].mean()) if (L > 0.7).any() else 1.0,
+        "alpha": im.mode in ("RGBA", "LA") and np.asarray(im.getchannel("A")).min() < 250,
+    }
     return {k: (round(v, 4) if isinstance(v, float) else v) for k, v in out.items()}
 
 
@@ -92,6 +108,7 @@ def faces(im, min_score=0.55):
     """Faces in pixels of the photo, biggest first: [{"box": (x, y, w, h), "score", "eyes": ((x, y), (x, y))}]. Found by
     YuNet (models/yunet, checked by SHA-256) at up to 1600 px, so small faces in group photos are found too."""
     from ai_pc.media.frames import faces as yunet
+
     rgb = im.convert("RGB")
     s = min(1.0, 1600 / max(rgb.size))
     if s < 1:
@@ -101,8 +118,13 @@ def faces(im, min_score=0.55):
     out = []
     for f in found:
         x, y, w, h = f["box"]
-        out.append({"box": (int(x * W), int(y * H), max(1, int(w * W)), max(1, int(h * H))), "score": f["score"],
-                    "eyes": ((f["right_eye"][0] * W, f["right_eye"][1] * H), (f["left_eye"][0] * W, f["left_eye"][1] * H))})
+        out.append(
+            {
+                "box": (int(x * W), int(y * H), max(1, int(w * W)), max(1, int(h * H))),
+                "score": f["score"],
+                "eyes": ((f["right_eye"][0] * W, f["right_eye"][1] * H), (f["left_eye"][0] * W, f["left_eye"][1] * H)),
+            }
+        )
     return out
 
 
@@ -182,7 +204,7 @@ def person_mask(im, face_list=None, iters=5):
     if fl:  # the faces themselves are surely foreground: a second pass with them marked
         for f in fl:
             x, y, w, h = (int(v * sc) for v in f["box"])
-            mask[max(0, y):y + h, max(0, x):x + w] = cv2.GC_FGD
+            mask[max(0, y) : y + h, max(0, x) : x + w] = cv2.GC_FGD
         cv2.grabCut(img, mask, None, bgdm, fgdm, 2, cv2.GC_INIT_WITH_MASK)
     fg = np.where((mask == cv2.GC_FGD) | (mask == cv2.GC_PR_FGD), 1.0, 0.0).astype(np.float32)
     n, lab_img, st, _ = cv2.connectedComponentsWithStats((fg > 0.5).astype(np.uint8))
@@ -220,7 +242,9 @@ def saliency(im):
     sr = cv2.resize(sr / (sr.max() + 1e-9), s.size)
     lab = cv2.cvtColor(a, cv2.COLOR_RGB2LAB)
     # what touches the border is background (a sky, a wall, a floor): distance to the nearest of the border's colours
-    border = np.concatenate([lab[:4].reshape(-1, 3), lab[-4:].reshape(-1, 3), lab[:, :4].reshape(-1, 3), lab[:, -4:].reshape(-1, 3)]).astype(np.float32)
+    border = np.concatenate([lab[:4].reshape(-1, 3), lab[-4:].reshape(-1, 3), lab[:, :4].reshape(-1, 3), lab[:, -4:].reshape(-1, 3)]).astype(
+        np.float32
+    )
     k = min(8, len(border))
     _, _, centres = cv2.kmeans(border, k, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0), 2, cv2.KMEANS_PP_CENTERS)
     flat = lab.reshape(-1, 3)
@@ -251,8 +275,12 @@ def subject(im):
         m = (1.0 - (key_mask(im, bd["kind"]) if bd["kind"] in ("green", "blue") else plain_mask(im, bd["color"]))) > 0.5
         ys_, xs_ = np.nonzero(m)
         if len(xs_) > 0.01 * W * H:
-            return int(np.percentile(xs_, 1)), int(np.percentile(ys_, 1)), int(np.percentile(xs_, 99) - np.percentile(xs_, 1)), \
-                int(np.percentile(ys_, 99) - np.percentile(ys_, 1))
+            return (
+                int(np.percentile(xs_, 1)),
+                int(np.percentile(ys_, 1)),
+                int(np.percentile(xs_, 99) - np.percentile(xs_, 1)),
+                int(np.percentile(ys_, 99) - np.percentile(ys_, 1)),
+            )
     sal = saliency(im)
     h, w = sal.shape
     th = (sal > max(0.35, np.percentile(sal, 85))).astype(np.uint8)
@@ -341,7 +369,7 @@ def quiet_band(im, face_list=None, band=0.22):
     fl = face_list if face_list is not None else faces(im)
     scores = {}
     for name, (a0, a1) in {"top": (0.0, band), "bottom": (1 - band, 1.0), "middle": (0.5 - band / 2, 0.5 + band / 2)}.items():
-        sc = float(b[int(a0 * h):max(int(a0 * h) + 1, int(a1 * h))].mean())
+        sc = float(b[int(a0 * h) : max(int(a0 * h) + 1, int(a1 * h))].mean())
         for f in fl:
             fy0, fy1 = f["box"][1] / H, (f["box"][1] + f["box"][3]) / H
             if fy0 < a1 and fy1 > a0:
@@ -355,6 +383,7 @@ def contrast_ratio(c1, c2):
         v = [x / 255 for x in c[:3]]
         v = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in v]
         return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+
     a, b = sorted((rl(c1), rl(c2)), reverse=True)
     return (a + 0.05) / (b + 0.05)
 
@@ -372,9 +401,21 @@ def describe(im, st=None, fl=None, bd=None):
     b = st["brightness"]
     light = "very dark" if b < 0.2 else "dark" if b < 0.33 else "bright" if b > 0.68 else "well exposed"
     con = "flat (low contrast)" if st["contrast"] < 0.13 else "punchy (high contrast)" if st["contrast"] > 0.3 else "normal contrast"
-    sat = "black and white" if st["saturation"] < 0.04 else "muted colours" if st["saturation"] < 0.18 else "vivid colours" if st["saturation"] > 0.5 else "natural colours"
+    sat = (
+        "black and white"
+        if st["saturation"] < 0.04
+        else "muted colours"
+        if st["saturation"] < 0.18
+        else "vivid colours"
+        if st["saturation"] > 0.5
+        else "natural colours"
+    )
     cast = max(range(3), key=lambda i: abs(st["cast"][i]))
-    tint = f", a {['red', 'green', 'blue'][cast]}{'dish' if st['cast'][cast] > 0 else ''} tint" if abs(st["cast"][cast]) > 0.12 and st["cast"][cast] > 0 and bd["kind"] is None else ""
+    tint = (
+        f", a {['red', 'green', 'blue'][cast]}{'dish' if st['cast'][cast] > 0 else ''} tint"
+        if abs(st["cast"][cast]) > 0.12 and st["cast"][cast] > 0 and bd["kind"] is None
+        else ""
+    )
     sharp = "soft or blurry" if st["edges"] < 25 else "sharp"
     parts = [f"{W}x{H} {shape} ({asp}), {W * H / 1e6:.1f} MP", f"light: {light} ({b:.0%} average), {con}", f"{sat}{tint}", sharp]
     if st["noise"] > 0.025:

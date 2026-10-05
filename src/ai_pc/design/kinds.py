@@ -3,16 +3,44 @@
 Sizes: print kinds in millimetres with a 3 mm bleed and a 3 mm safe margin inside the trim (what print shops ask
 for); screen kinds in pixels with the margins the apps' own buttons and captions leave free.
 """
+
 KINDS = {
-    "card": {"label": "visiting card", "w": 88.9, "h": 50.8, "unit": "mm", "bleed": 3.0, "safe": 3.5, "pages": 2, "styles": ["modern", "classic", "bold"]},
+    "card": {
+        "label": "visiting card",
+        "w": 88.9,
+        "h": 50.8,
+        "unit": "mm",
+        "bleed": 3.0,
+        "safe": 3.5,
+        "pages": 2,
+        "styles": ["modern", "classic", "bold"],
+    },
     "post": {"label": "square post", "w": 1080, "h": 1080, "unit": "px", "safe": 60, "styles": ["headline", "photo", "split"]},
     "portrait": {"label": "portrait post", "w": 1080, "h": 1350, "unit": "px", "safe": 70, "styles": ["headline", "photo", "split"]},
     "story": {"label": "story", "w": 1080, "h": 1920, "unit": "px", "safe": 80, "safe_top": 260, "safe_bottom": 360, "styles": ["headline", "photo"]},
     "thumbnail": {"label": "YouTube thumbnail", "w": 1280, "h": 720, "unit": "px", "safe": 40, "safe_br": (300, 110), "styles": ["face", "center"]},
     "flyer": {"label": "flyer", "w": 148.0, "h": 210.0, "unit": "mm", "bleed": 3.0, "safe": 6.0, "pages": 1, "styles": ["sale", "event"]},
     "poster": {"label": "poster", "w": 297.0, "h": 420.0, "unit": "mm", "bleed": 3.0, "safe": 10.0, "pages": 1, "styles": ["sale", "event"]},
-    "certificate": {"label": "certificate", "w": 297.0, "h": 210.0, "unit": "mm", "bleed": 0.0, "safe": 10.0, "pages": 1, "styles": ["classic", "modern"]},
-    "invitation": {"label": "invitation", "w": 127.0, "h": 177.8, "unit": "mm", "bleed": 3.0, "safe": 6.0, "pages": 1, "styles": ["elegant", "modern"]},
+    "certificate": {
+        "label": "certificate",
+        "w": 297.0,
+        "h": 210.0,
+        "unit": "mm",
+        "bleed": 0.0,
+        "safe": 10.0,
+        "pages": 1,
+        "styles": ["classic", "modern"],
+    },
+    "invitation": {
+        "label": "invitation",
+        "w": 127.0,
+        "h": 177.8,
+        "unit": "mm",
+        "bleed": 3.0,
+        "safe": 6.0,
+        "pages": 1,
+        "styles": ["elegant", "modern"],
+    },
 }
 SIZES = {"a4": (210.0, 297.0), "a5": (148.0, 210.0), "a3": (297.0, 420.0), "a6": (105.0, 148.0), "letter": (215.9, 279.4)}
 
@@ -33,11 +61,39 @@ PALETTES = {
     "pink": {"bg": "#D6336C", "fg": "#FFFFFF", "accent": "#FFE3EC", "muted": "#FFC9DA", "light": "#FFF0F5", "ink": "#7A1238"},
     "gold": {"bg": "#1A1A1A", "fg": "#FFFFFF", "accent": "#E6B422", "muted": "#BFBFBF", "light": "#FAF6EA", "ink": "#1A1A1A"},
 }
-GRADIENTS = {"sunset": ("#FF5F6D", "#FFC371"), "ocean": ("#1D6FA3", "#58C6E8"), "night": ("#141E30", "#243B55"), "royal": ("#2D1B69", "#7B2FF7"),
-             "fire": ("#C31432", "#F37335"), "forest": ("#0B3D2E", "#2E8B57"), "gold": ("#8E6E1E", "#E6B422")}
-COLOR_WORDS = {"navy": "navy", "dark blue": "navy", "blue": "blue", "green": "green", "dark green": "emerald", "emerald": "emerald", "maroon": "maroon",
-               "red": "red", "black": "black", "dark": "charcoal", "grey": "charcoal", "gray": "charcoal", "charcoal": "charcoal", "purple": "purple",
-               "orange": "orange", "teal": "teal", "cream": "cream", "beige": "cream", "white": "white", "pink": "pink", "gold": "gold", "golden": "gold"}
+GRADIENTS = {
+    "sunset": ("#FF5F6D", "#FFC371"),
+    "ocean": ("#1D6FA3", "#58C6E8"),
+    "night": ("#141E30", "#243B55"),
+    "royal": ("#2D1B69", "#7B2FF7"),
+    "fire": ("#C31432", "#F37335"),
+    "forest": ("#0B3D2E", "#2E8B57"),
+    "gold": ("#8E6E1E", "#E6B422"),
+}
+COLOR_WORDS = {
+    "navy": "navy",
+    "dark blue": "navy",
+    "blue": "blue",
+    "green": "green",
+    "dark green": "emerald",
+    "emerald": "emerald",
+    "maroon": "maroon",
+    "red": "red",
+    "black": "black",
+    "dark": "charcoal",
+    "grey": "charcoal",
+    "gray": "charcoal",
+    "charcoal": "charcoal",
+    "purple": "purple",
+    "orange": "orange",
+    "teal": "teal",
+    "cream": "cream",
+    "beige": "cream",
+    "white": "white",
+    "pink": "pink",
+    "gold": "gold",
+    "golden": "gold",
+}
 
 # type pairs from the fonts every Windows PC has (no downloads): heading, body, and a script for names on certificates
 FONTS = {
@@ -54,8 +110,17 @@ FONTS = {
     "event": ("Bahnschrift", "Segoe UI"),
 }
 SCRIPT_FONT = "Segoe Script"
-DEFAULT_PALETTE = {"card": "navy", "post": "blue", "portrait": "blue", "story": "purple", "thumbnail": "red", "flyer": "red", "poster": "red",
-                   "certificate": "navy", "invitation": "cream"}
+DEFAULT_PALETTE = {
+    "card": "navy",
+    "post": "blue",
+    "portrait": "blue",
+    "story": "purple",
+    "thumbnail": "red",
+    "flyer": "red",
+    "poster": "red",
+    "certificate": "navy",
+    "invitation": "cream",
+}
 
 
 def size_of(spec):
@@ -73,7 +138,7 @@ def size_of(spec):
 
 def _lum(hexc):
     h = hexc.lstrip("#")
-    c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    c = [int(h[i : i + 2], 16) / 255 for i in (0, 2, 4)]
     c = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4 for v in c]
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
 
@@ -85,7 +150,7 @@ def _contrast(a, b):
 
 def _darken(hexc, k=0.45):
     h = hexc.lstrip("#")
-    return "#" + "".join(f"{int(int(h[i:i + 2], 16) * (1 - k)):02X}" for i in (0, 2, 4))
+    return "#" + "".join(f"{int(int(h[i : i + 2], 16) * (1 - k)):02X}" for i in (0, 2, 4))
 
 
 def palette(spec):
@@ -98,7 +163,7 @@ def palette(spec):
             p.update(fg="#1C1A22", muted="#3D3946")
         t = p["accent"]
         while _contrast(t, ground) < 4.5 and _lum(t) > 0.01:  # accent-coloured words get as much darker as the ground needs;
-            t = _darken(t, 0.2)                                # badges and buttons keep the accent itself
+            t = _darken(t, 0.2)  # badges and buttons keep the accent itself
         p["accent_text"] = t
     p.update({k: v for k, v in (spec.get("colors") or {}).items() if v})
     return p

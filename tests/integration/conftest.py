@@ -10,6 +10,7 @@ pytest runs each suite as one test, in its own process, from the project folder:
 
 Suites marked 'live' need API keys, online accounts or a visible desktop program; they run only with -m live.
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -48,8 +49,15 @@ class SuiteItem(pytest.Item):
 
     def runtest(self):
         try:
-            p = subprocess.run([sys.executable, str(self.path)], cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                               timeout=TIMEOUT.get(self.name, 15) * 60)
+            p = subprocess.run(
+                [sys.executable, str(self.path)],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=TIMEOUT.get(self.name, 15) * 60,
+            )
         except subprocess.TimeoutExpired as e:
             raise SuiteFailed(f"no result after {e.timeout:.0f} s") from None
         output = (p.stdout or "") + (p.stderr or "")

@@ -1,4 +1,5 @@
 """The ai-pc command line: help, version, aliases and mistakes."""
+
 import sys
 import types
 
@@ -43,6 +44,7 @@ def test_aliases_point_at_real_commands(alias):
 
 def test_every_command_has_a_function_to_run():
     import importlib
+
     for module, function, doc in cli.COMMANDS.values():
         assert callable(getattr(importlib.import_module(module), function)), module
         assert doc

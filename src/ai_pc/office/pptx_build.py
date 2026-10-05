@@ -13,6 +13,7 @@ Slide layouts (the designer picks one per slide):
   quote {text, by}                      closing {title, subtitle, contact}
 Every slide may have "notes" (what the presenter says).
 """
+
 import copy
 from pathlib import Path
 
@@ -45,8 +46,19 @@ def deck_theme(name=None, accent=None):
         th.update(bg="FFFBF5", card="FBEFDF")
     if dark:
         acc = th["accent"] if accent else "38BDF8"
-        th.update(name="dark", bg="0F172A", text="F1F5F9", muted="94A3B8", card="1E293B", line="334155", accent=acc, head_color="F8FAFC",
-                  chart=[acc, "A78BFA", "F472B6", "FBBF24", "34D399", "F87171"], chart_title="F1F5F9", dark=True)
+        th.update(
+            name="dark",
+            bg="0F172A",
+            text="F1F5F9",
+            muted="94A3B8",
+            card="1E293B",
+            line="334155",
+            accent=acc,
+            head_color="F8FAFC",
+            chart=[acc, "A78BFA", "F472B6", "FBBF24", "34D399", "F87171"],
+            chart_title="F1F5F9",
+            dark=True,
+        )
         th["table"] = {"header_fill": acc, "header_text": "0F172A", "stripe": "1E293B", "border": "334155", "size": 12}
     return th
 
@@ -56,8 +68,8 @@ def _rgb(h):
 
 
 def _lum(hx):
-    r, g, b = (int(str(hx)[i:i + 2], 16) / 255 for i in (0, 2, 4))
-    f = (lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+    r, g, b = (int(str(hx)[i : i + 2], 16) / 255 for i in (0, 2, 4))
+    f = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
     return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
 
 
@@ -67,8 +79,8 @@ def contrast(a, b):
 
 
 def _mix(hx, to, t):
-    a = [int(hx[i:i + 2], 16) for i in (0, 2, 4)]
-    b = [int(to[i:i + 2], 16) for i in (0, 2, 4)]
+    a = [int(hx[i : i + 2], 16) for i in (0, 2, 4)]
+    b = [int(to[i : i + 2], 16) for i in (0, 2, 4)]
     return "".join(f"{round(x + (y - x) * t):02X}" for x, y in zip(a, b))
 
 
@@ -96,13 +108,34 @@ def resolve_deck(deck):
         if not isinstance(s, dict):
             continue
         lay = str(s.get("layout") or "bullets").lower().replace(" ", "_").replace("-", "_")
-        lay = {"title_slide": "title", "cover": "title", "end": "closing", "thank_you": "closing", "thanks": "closing", "kpi": "stats",
-               "numbers": "stats", "big_number": "stats", "steps": "process", "timeline": "process", "two_columns": "two_column",
-               "columns": "two_column", "vs": "comparison", "pros_cons": "comparison", "graph": "chart", "picture": "image", "photo": "image",
-               "list": "bullets", "content": "bullets", "text": "bullets", "divider": "section", "contents": "agenda"}.get(lay, lay)
+        lay = {
+            "title_slide": "title",
+            "cover": "title",
+            "end": "closing",
+            "thank_you": "closing",
+            "thanks": "closing",
+            "kpi": "stats",
+            "numbers": "stats",
+            "big_number": "stats",
+            "steps": "process",
+            "timeline": "process",
+            "two_columns": "two_column",
+            "columns": "two_column",
+            "vs": "comparison",
+            "pros_cons": "comparison",
+            "graph": "chart",
+            "picture": "image",
+            "photo": "image",
+            "list": "bullets",
+            "content": "bullets",
+            "text": "bullets",
+            "divider": "section",
+            "contents": "agenda",
+        }.get(lay, lay)
         s = {**s, "layout": lay if lay in LAYOUTS else "bullets", "src": i}
         if s["layout"] == "chart":
             from ai_pc.office.docplan import _clean_block
+
             c = _clean_block({**(s.get("chart") or {}), "type": "chart"})
             if not c:
                 s["layout"] = "bullets"
@@ -110,6 +143,7 @@ def resolve_deck(deck):
                 s["chart"] = c
         if s["layout"] == "table":
             from ai_pc.office.docplan import _clean_block
+
             t = _clean_block({**(s.get("table") or {}), "type": "table"})
             if not t:
                 s["layout"] = "bullets"
@@ -211,8 +245,25 @@ class _Deck:
             s.adjustments[0] = 0.06
         return s
 
-    def text(self, slide, x, y, w, h, paras, size, color=None, font=None, bold=False, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
-             bullets=False, gap=8, italic=False, name=None):
+    def text(
+        self,
+        slide,
+        x,
+        y,
+        w,
+        h,
+        paras,
+        size,
+        color=None,
+        font=None,
+        bold=False,
+        align=PP_ALIGN.LEFT,
+        anchor=MSO_ANCHOR.TOP,
+        bullets=False,
+        gap=8,
+        italic=False,
+        name=None,
+    ):
         """A text box. paras: [str] or [(text, level)]; inline **bold** works."""
         tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
         if name:
@@ -225,7 +276,7 @@ class _Deck:
         tf.margin_top = tf.margin_bottom = Inches(0.03)
         first = True
         for item in paras:
-            t, lvl = (item if isinstance(item, tuple) else (item, 0))
+            t, lvl = item if isinstance(item, tuple) else (item, 0)
             p = tf.paragraphs[0] if first else tf.add_paragraph()
             first = False
             p.alignment = align
@@ -266,14 +317,29 @@ class _Deck:
         bg.fore_color.rgb = _rgb(self.th["bg"])
         if title:
             size = fit_size([title], W - 2 * M, TITLE_H, 34, 22, spacing=1.0, gap_pt=0, font=self.th["head"], bold=True)
-            self.text(slide, M, TITLE_Y, W - 2 * M, TITLE_H, [title], size, self.th["head_color"], self.th["head"],
-                      bold="semibold" not in self.th["head"].lower(), anchor=MSO_ANCHOR.BOTTOM, gap=0, name="Title")
+            self.text(
+                slide,
+                M,
+                TITLE_Y,
+                W - 2 * M,
+                TITLE_H,
+                [title],
+                size,
+                self.th["head_color"],
+                self.th["head"],
+                bold="semibold" not in self.th["head"].lower(),
+                anchor=MSO_ANCHOR.BOTTOM,
+                gap=0,
+                name="Title",
+            )
             self.rect(slide, M, BAR_Y, 1.1, 0.055, self.th["accent"])
         if number:
             self.text(slide, W - M - 1.0, H - 0.48, 1.0, 0.3, [str(self.n)], 11, self.th["muted"], align=PP_ALIGN.RIGHT, gap=0, name="SlideNumber")
         if s.get("notes"):
             slide.notes_slide.notes_text_frame.text = str(s["notes"])
-        self.out.append({"slide": self.n, "layout": s["layout"], "title": plain(title or s.get("title") or s.get("text") or "")[:80], "src": s.get("src")})
+        self.out.append(
+            {"slide": self.n, "layout": s["layout"], "title": plain(title or s.get("title") or s.get("text") or "")[:80], "src": s.get("src")}
+        )
         return slide
 
     def bullet_box(self, slide, items, x, y, w, h, max_pt=28, min_pt=14, scale=1.0, name="Body"):
@@ -292,15 +358,40 @@ class _Deck:
         self.rect(slide, M, 2.25, 0.12, 2.35, th["accent"])
         title = s.get("title") or self.d["title"]
         size = fit_size([title], W - 2 * M - 0.6, 1.75, 48, 30, spacing=1.0, gap_pt=0, font=self.th["head"], bold=True)
-        self.text(slide, M + 0.4, 2.1, W - 2 * M - 0.6, 1.75, [title], size, th["head_color"], th["head"], bold="semibold" not in th["head"].lower(),
-                  anchor=MSO_ANCHOR.BOTTOM, gap=0, name="Title")
+        self.text(
+            slide,
+            M + 0.4,
+            2.1,
+            W - 2 * M - 0.6,
+            1.75,
+            [title],
+            size,
+            th["head_color"],
+            th["head"],
+            bold="semibold" not in th["head"].lower(),
+            anchor=MSO_ANCHOR.BOTTOM,
+            gap=0,
+            name="Title",
+        )
         if s.get("subtitle") or self.d.get("subtitle"):
-            self.text(slide, M + 0.4, 3.95, W - 2 * M - 0.6, 0.9, [s.get("subtitle") or self.d.get("subtitle")], 22, th["muted"], gap=0, name="Subtitle")
+            self.text(
+                slide, M + 0.4, 3.95, W - 2 * M - 0.6, 0.9, [s.get("subtitle") or self.d.get("subtitle")], 22, th["muted"], gap=0, name="Subtitle"
+            )
         meta = self.d.get("meta") or {}
         vals = list(dict.fromkeys(str(meta[k]).strip() for k in ("author", "org", "date") if meta.get(k)))
         if vals:
-            self.text(slide, M + 0.4, 6.15, W - 2 * M - 0.6, 0.5, ["   ·   ".join(vals)], 16, th["text"] if not th["dark"] else th["muted"], gap=0,
-                      name="Meta")
+            self.text(
+                slide,
+                M + 0.4,
+                6.15,
+                W - 2 * M - 0.6,
+                0.5,
+                ["   ·   ".join(vals)],
+                16,
+                th["text"] if not th["dark"] else th["muted"],
+                gap=0,
+                name="Meta",
+            )
 
     def l_agenda(self, s):
         th = self.th
@@ -317,8 +408,18 @@ class _Deck:
             p.runs[0].font.size, p.runs[0].font.bold = Pt(16), True
             p.runs[0].font.color.rgb = _rgb("FFFFFF" if not th["dark"] else "0F172A")
             p.runs[0].font.name = th["body"]
-            self.text(slide, M + 0.75, y - 0.06, W - 2 * M - 0.9, 0.6, [it], fit_size([it], W - 2 * M - 0.9, 0.6, 26, 16, gap_pt=0, font=self.th["body"]),
-                      anchor=MSO_ANCHOR.MIDDLE, gap=0, name=f"Item{k + 1}")
+            self.text(
+                slide,
+                M + 0.75,
+                y - 0.06,
+                W - 2 * M - 0.9,
+                0.6,
+                [it],
+                fit_size([it], W - 2 * M - 0.9, 0.6, 26, 16, gap_pt=0, font=self.th["body"]),
+                anchor=MSO_ANCHOR.MIDDLE,
+                gap=0,
+                name=f"Item{k + 1}",
+            )
 
     def l_section(self, s):
         th = self.th
@@ -327,17 +428,30 @@ class _Deck:
         self.rect(slide, 0, 0, W * 0.38, H, readable(th["accent"], ink))  # the panel darkens until its number reads
         num = str(s.get("number") or "")
         if num:
-            self.text(slide, 0.6, 2.4, W * 0.38 - 1.0, 1.6, [num.zfill(2) if num.isdigit() else num], 80,
-                      ink, th["head"], bold=True, gap=0)
-        self.text(slide, W * 0.38 + 0.6, 2.6, W * 0.62 - 1.2, 1.4, [s.get("title") or ""],
-                  fit_size([s.get("title") or ""], W * 0.62 - 1.2, 1.4, 42, 26, gap_pt=0, font=self.th["head"], bold=True),
-                  th["head_color"], th["head"], bold=True, anchor=MSO_ANCHOR.BOTTOM, gap=0, name="Title")
+            self.text(slide, 0.6, 2.4, W * 0.38 - 1.0, 1.6, [num.zfill(2) if num.isdigit() else num], 80, ink, th["head"], bold=True, gap=0)
+        self.text(
+            slide,
+            W * 0.38 + 0.6,
+            2.6,
+            W * 0.62 - 1.2,
+            1.4,
+            [s.get("title") or ""],
+            fit_size([s.get("title") or ""], W * 0.62 - 1.2, 1.4, 42, 26, gap_pt=0, font=self.th["head"], bold=True),
+            th["head_color"],
+            th["head"],
+            bold=True,
+            anchor=MSO_ANCHOR.BOTTOM,
+            gap=0,
+            name="Title",
+        )
         if s.get("subtitle"):
             self.text(slide, W * 0.38 + 0.6, 4.1, W * 0.62 - 1.2, 1.0, [s["subtitle"]], 20, th["muted"], gap=0, name="Subtitle")
 
     def l_bullets(self, s):
         slide = self.new_slide(s, s.get("title"))
-        self.bullet_box(slide, s["bullets"] or [{"text": "", "items": []}], M, BODY_Y + 0.1, W - 2 * M, BODY_B - BODY_Y - 0.1, scale=s.get("scale", 1.0))
+        self.bullet_box(
+            slide, s["bullets"] or [{"text": "", "items": []}], M, BODY_Y + 0.1, W - 2 * M, BODY_B - BODY_Y - 0.1, scale=s.get("scale", 1.0)
+        )
 
     def _column(self, slide, part, x, y, w, h, card=False, colour=None, scale=1.0):
         th = self.th
@@ -356,8 +470,20 @@ class _Deck:
         if part.get("heading"):
             if card:
                 self.rect(slide, x - 0.3, y, w + 0.6, 0.08, colour or th["accent"])
-            self.text(slide, x, top, w, 0.55, [part["heading"]], 22, readable(colour or th["accent"], th["card"] if card else th["bg"]), th["head"], bold=True, gap=0,
-                      name="ColumnHeading")
+            self.text(
+                slide,
+                x,
+                top,
+                w,
+                0.55,
+                [part["heading"]],
+                22,
+                readable(colour or th["accent"], th["card"] if card else th["bg"]),
+                th["head"],
+                bold=True,
+                gap=0,
+                name="ColumnHeading",
+            )
             top += 0.65
         items = _items(part.get("bullets") or part.get("items") or ([part["text"]] if part.get("text") else []))
         if items:
@@ -368,8 +494,17 @@ class _Deck:
         gap = 0.45
         cw = (W - 2 * M - gap) / 2
         self._column(slide, s.get("left") or {}, M, BODY_Y + 0.1, cw, BODY_B - BODY_Y - 0.1, card, None, s.get("scale", 1.0))
-        self._column(slide, s.get("right") or {}, M + cw + gap, BODY_Y + 0.1, cw, BODY_B - BODY_Y - 0.1, card,
-                     self.th["accent2"] if card else None, s.get("scale", 1.0))
+        self._column(
+            slide,
+            s.get("right") or {},
+            M + cw + gap,
+            BODY_Y + 0.1,
+            cw,
+            BODY_B - BODY_Y - 0.1,
+            card,
+            self.th["accent2"] if card else None,
+            s.get("scale", 1.0),
+        )
 
     def l_comparison(self, s):
         self.l_two_column(s, card=True)
@@ -381,8 +516,10 @@ class _Deck:
         take = s.get("takeaway")
         cw = (W - 2 * M) * (0.66 if take else 1.0)
         from pptx.enum.chart import XL_CHART_TYPE  # noqa: F401
-        gf = slide.shapes.add_chart(CH.TYPES[spec["chart"]], Inches(M), Inches(BODY_Y + 0.05), Inches(cw), Inches(BODY_B - BODY_Y - 0.05),
-                                    CH.chart_data(spec))
+
+        gf = slide.shapes.add_chart(
+            CH.TYPES[spec["chart"]], Inches(M), Inches(BODY_Y + 0.05), Inches(cw), Inches(BODY_B - BODY_Y - 0.05), CH.chart_data(spec)
+        )
         gf.name = "Chart"
         ch = CH.style(gf.chart, spec, th, th["body"], 16, text_colour=th["text"] if th["dark"] else "404040", grid_colour=th["line"])
         try:
@@ -397,8 +534,18 @@ class _Deck:
             x = M + cw + 0.35
             self.rect(slide, x, BODY_Y + 0.4, W - M - x, 3.4, th["card"], MSO_SHAPE.ROUNDED_RECTANGLE)
             self.rect(slide, x, BODY_Y + 0.4, 0.09, 3.4, th["accent"])
-            self.text(slide, x + 0.3, BODY_Y + 0.6, W - M - x - 0.5, 3.0, [take], fit_size([take], W - M - x - 0.5, 3.0, 24, 14, gap_pt=0, font=th["body"]), th["text"],
-                      anchor=MSO_ANCHOR.MIDDLE, name="Takeaway")
+            self.text(
+                slide,
+                x + 0.3,
+                BODY_Y + 0.6,
+                W - M - x - 0.5,
+                3.0,
+                [take],
+                fit_size([take], W - M - x - 0.5, 3.0, 24, 14, gap_pt=0, font=th["body"]),
+                th["text"],
+                anchor=MSO_ANCHOR.MIDDLE,
+                name="Takeaway",
+            )
 
     def l_table(self, s):
         th = self.th
@@ -439,8 +586,18 @@ class _Deck:
                 cell.vertical_anchor = MSO_ANCHOR.MIDDLE
         if take:
             x = M + tw + 0.35
-            self.text(slide, x, BODY_Y + 0.3, W - M - x, 4.0, [take], fit_size([take], W - M - x, 4.0, 22, 14, gap_pt=0, font=th["body"]), th["text"], anchor=MSO_ANCHOR.TOP,
-                      name="Takeaway")
+            self.text(
+                slide,
+                x,
+                BODY_Y + 0.3,
+                W - M - x,
+                4.0,
+                [take],
+                fit_size([take], W - M - x, 4.0, 22, 14, gap_pt=0, font=th["body"]),
+                th["text"],
+                anchor=MSO_ANCHOR.TOP,
+                name="Takeaway",
+            )
 
     def l_stats(self, s):
         th = self.th
@@ -456,15 +613,38 @@ class _Deck:
             val = plain(str(st.get("value") or ""))
             token = " " not in val.strip()
             one = fit_size([val], cw - 0.4, 1.0, 60, 14 if token else 26, spacing=1.0, gap_pt=0, font=th["head"], bold=True)  # one line
-            tb = self.text(slide, x + 0.2, BODY_Y + 0.85, cw - 0.4, 1.5, [val], one if (one > 26 or token) else fit_size([val], cw - 0.4, 1.45, 44, 22, spacing=1.0,
-                                                                                                                 gap_pt=0, font=th["head"], bold=True),
-                      readable(th["accent"] if k % 2 == 0 else th["accent2"], th["card"]), th["head"], bold=True, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, gap=0,
-                      name=f"Stat{k + 1}")
+            tb = self.text(
+                slide,
+                x + 0.2,
+                BODY_Y + 0.85,
+                cw - 0.4,
+                1.5,
+                [val],
+                one if (one > 26 or token) else fit_size([val], cw - 0.4, 1.45, 44, 22, spacing=1.0, gap_pt=0, font=th["head"], bold=True),
+                readable(th["accent"] if k % 2 == 0 else th["accent2"], th["card"]),
+                th["head"],
+                bold=True,
+                align=PP_ALIGN.CENTER,
+                anchor=MSO_ANCHOR.MIDDLE,
+                gap=0,
+                name=f"Stat{k + 1}",
+            )
             if token:  # "5,634,700" never breaks in the middle: one line, sized to fit
                 tb.text_frame.word_wrap = False
             lab = str(st.get("label") or "")
-            self.text(slide, x + 0.25, BODY_Y + 2.45, cw - 0.5, 1.5, [lab], fit_size([lab], cw - 0.5, 1.5, 20, 12, gap_pt=0, font=th["body"]), th["muted"], align=PP_ALIGN.CENTER,
-                      gap=0, name=f"StatLabel{k + 1}")
+            self.text(
+                slide,
+                x + 0.25,
+                BODY_Y + 2.45,
+                cw - 0.5,
+                1.5,
+                [lab],
+                fit_size([lab], cw - 0.5, 1.5, 20, 12, gap_pt=0, font=th["body"]),
+                th["muted"],
+                align=PP_ALIGN.CENTER,
+                gap=0,
+                name=f"StatLabel{k + 1}",
+            )
         if s.get("note"):
             self.text(slide, M, 6.2, W - 2 * M, 0.55, [s["note"]], 16, th["muted"], italic=True, gap=0, name="Note")
 
@@ -487,12 +667,36 @@ class _Deck:
             p.runs[0].font.color.rgb = _rgb(ink)
             p.runs[0].font.name = th["body"]
             t = plain(str(st.get("title") or ""))
-            self.text(slide, M + k * cw + 0.12, y + 0.95, cw - 0.24, 0.9, [t], fit_size([t], cw - 0.24, 0.9, 22, 13, gap_pt=0, font=th["head"], bold=True), th["head_color"], th["head"],
-                      bold=True, align=PP_ALIGN.CENTER, gap=0, name=f"Step{k + 1}")
+            self.text(
+                slide,
+                M + k * cw + 0.12,
+                y + 0.95,
+                cw - 0.24,
+                0.9,
+                [t],
+                fit_size([t], cw - 0.24, 0.9, 22, 13, gap_pt=0, font=th["head"], bold=True),
+                th["head_color"],
+                th["head"],
+                bold=True,
+                align=PP_ALIGN.CENTER,
+                gap=0,
+                name=f"Step{k + 1}",
+            )
             if st.get("text"):
                 tx = str(st["text"])
-                self.text(slide, M + k * cw + 0.12, y + 1.9, cw - 0.24, 2.4, [tx], fit_size([tx], cw - 0.24, 2.4, 18, 11, gap_pt=0, font=th["body"]), th["muted"],
-                          align=PP_ALIGN.CENTER, gap=0, name=f"StepText{k + 1}")
+                self.text(
+                    slide,
+                    M + k * cw + 0.12,
+                    y + 1.9,
+                    cw - 0.24,
+                    2.4,
+                    [tx],
+                    fit_size([tx], cw - 0.24, 2.4, 18, 11, gap_pt=0, font=th["body"]),
+                    th["muted"],
+                    align=PP_ALIGN.CENTER,
+                    gap=0,
+                    name=f"StepText{k + 1}",
+                )
 
     def l_image(self, s):
         th = self.th
@@ -501,6 +705,7 @@ class _Deck:
         bx, bw = (M + (W - 2 * M) * 0.45, (W - 2 * M) * 0.55) if items else (M, W - 2 * M)
         by, bh = BODY_Y + 0.1, BODY_B - BODY_Y - (0.55 if s.get("caption") else 0.1)
         from PIL import Image
+
         with Image.open(s["image"]) as im:
             iw, ih = im.size
         sc = min(bw / iw, bh / ih)
@@ -517,8 +722,21 @@ class _Deck:
         slide = self.new_slide(s)
         self.text(slide, M + 0.3, 0.6, 2.2, 2.4, ["“"], 140, th["accent"], "Georgia", gap=0, name="QuoteMark")
         q = str(s.get("text") or s.get("quote") or "")
-        self.text(slide, M + 1.2, 2.2, W - 2 * M - 2.0, 2.8, [q], fit_size([q], W - 2 * M - 2.0, 2.8, 36, 20, gap_pt=0, font=th["head"]), th["head_color"], th["head"], italic=True,
-                  anchor=MSO_ANCHOR.MIDDLE, gap=0, name="Quote")
+        self.text(
+            slide,
+            M + 1.2,
+            2.2,
+            W - 2 * M - 2.0,
+            2.8,
+            [q],
+            fit_size([q], W - 2 * M - 2.0, 2.8, 36, 20, gap_pt=0, font=th["head"]),
+            th["head_color"],
+            th["head"],
+            italic=True,
+            anchor=MSO_ANCHOR.MIDDLE,
+            gap=0,
+            name="Quote",
+        )
         if s.get("by"):
             self.text(slide, M + 1.2, 5.2, W - 2 * M - 2.0, 0.5, [f"— {s['by']}"], 18, th["muted"], gap=0, name="By")
 
@@ -527,8 +745,22 @@ class _Deck:
         slide = self.new_slide(s, number=False)
         self.rect(slide, 0, H - 0.25, W, 0.25, th["accent"])
         t = s.get("title") or "Thank you"
-        self.text(slide, M, 2.3, W - 2 * M, 1.4, [t], fit_size([t], W - 2 * M, 1.4, 54, 32, spacing=1.0, gap_pt=0, font=th["head"], bold=True), th["head_color"], th["head"],
-                  bold=True, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.BOTTOM, gap=0, name="Title")
+        self.text(
+            slide,
+            M,
+            2.3,
+            W - 2 * M,
+            1.4,
+            [t],
+            fit_size([t], W - 2 * M, 1.4, 54, 32, spacing=1.0, gap_pt=0, font=th["head"], bold=True),
+            th["head_color"],
+            th["head"],
+            bold=True,
+            align=PP_ALIGN.CENTER,
+            anchor=MSO_ANCHOR.BOTTOM,
+            gap=0,
+            name="Title",
+        )
         sub = s.get("subtitle") or ""
         if sub:
             self.text(slide, M, 3.85, W - 2 * M, 0.8, [sub], 22, th["muted"], align=PP_ALIGN.CENTER, gap=0, name="Subtitle")

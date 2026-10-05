@@ -7,6 +7,7 @@ tall as the model. Says the print time and filament.
 
   'slice cube 20 mm for ender 3 in pla, 20% infill'   '3d print bracket.stl on a prusa mk4s, petg, supports, fine'
 """
+
 import re
 import shutil
 import struct
@@ -23,21 +24,38 @@ HOME = ROOT / "tools" / "prusaslicer"
 APP = HOME / "PrusaSlicer-2.9.6"
 EXE = APP / "prusa-slicer-console.exe"
 DATA = HOME / "data"
-CREALITY = {"draft": "0.28 mm SUPERDRAFT (0.4 mm nozzle) @CREALITY", "normal": "0.20 mm NORMAL (0.4 mm nozzle) @CREALITY",
-            "fine": "0.12 mm DETAIL (0.4 mm nozzle) @CREALITY"}
+CREALITY = {
+    "draft": "0.28 mm SUPERDRAFT (0.4 mm nozzle) @CREALITY",
+    "normal": "0.20 mm NORMAL (0.4 mm nozzle) @CREALITY",
+    "fine": "0.12 mm DETAIL (0.4 mm nozzle) @CREALITY",
+}
 # words -> (vendor bundle, model id, printer profile, print profile per quality, material profile pattern)
 PRINTERS = {
     "Ender-3 V2": ("Creality", "ENDER3V2", "Creality Ender-3 V2 (0.4 mm nozzle)", CREALITY, "Generic {m} @CREALITY"),
     "Ender-3 S1": ("Creality", "ENDER3S1", "Creality Ender-3 S1 (0.4 mm nozzle)", CREALITY, "Generic {m} @CREALITY"),
     "Ender-3": ("Creality", "ENDER3", "Creality Ender-3 (0.4 mm nozzle)", CREALITY, "Generic {m} @CREALITY"),
-    "Prusa MK4S": ("PrusaResearch", "MK4S", "Original Prusa MK4S 0.4 nozzle",
-                   {"draft": "0.20mm SPEED @MK4S 0.4", "normal": "0.20mm STRUCTURAL @MK4S 0.4", "fine": "0.10mm FAST DETAIL @MK4S 0.4"}, "Generic {m} @PG"),
-    "Prusa CORE One": ("PrusaResearch", "COREONE", "Prusa CORE One 0.4 nozzle",
-                       {"draft": "0.20mm SPEED @COREONE 0.4", "normal": "0.20mm BALANCED @COREONE 0.4", "fine": "0.10mm FAST DETAIL @COREONE 0.4"},
-                       "Generic {m} @COREONE"),
+    "Prusa MK4S": (
+        "PrusaResearch",
+        "MK4S",
+        "Original Prusa MK4S 0.4 nozzle",
+        {"draft": "0.20mm SPEED @MK4S 0.4", "normal": "0.20mm STRUCTURAL @MK4S 0.4", "fine": "0.10mm FAST DETAIL @MK4S 0.4"},
+        "Generic {m} @PG",
+    ),
+    "Prusa CORE One": (
+        "PrusaResearch",
+        "COREONE",
+        "Prusa CORE One 0.4 nozzle",
+        {"draft": "0.20mm SPEED @COREONE 0.4", "normal": "0.20mm BALANCED @COREONE 0.4", "fine": "0.10mm FAST DETAIL @COREONE 0.4"},
+        "Generic {m} @COREONE",
+    ),
 }
-WORDS = {"Ender-3 V2": r"ender[- ]?3\s*v2", "Ender-3 S1": r"ender[- ]?3\s*s1", "Ender-3": r"ender[- ]?3|ender\b|creality",
-         "Prusa MK4S": r"mk4s?\b|prusa\s+mk4", "Prusa CORE One": r"core\s*one"}
+WORDS = {
+    "Ender-3 V2": r"ender[- ]?3\s*v2",
+    "Ender-3 S1": r"ender[- ]?3\s*s1",
+    "Ender-3": r"ender[- ]?3|ender\b|creality",
+    "Prusa MK4S": r"mk4s?\b|prusa\s+mk4",
+    "Prusa CORE One": r"core\s*one",
+}
 MODELS = {".stl", ".3mf", ".obj"}
 
 
@@ -48,8 +66,10 @@ def setup():
         dest = DATA / "vendor" / f"{vendor}.ini"
         if not dest.exists():
             shutil.copy2(APP / "resources" / "profiles" / f"{vendor}.ini", dest)
-    want = "".join(f"[vendor:{v}]\n" + "".join(f"model:{p[1]} = 0.4\n" for p in PRINTERS.values() if p[0] == v) + "\n"
-                   for v in sorted({p[0] for p in PRINTERS.values()}))
+    want = "".join(
+        f"[vendor:{v}]\n" + "".join(f"model:{p[1]} = 0.4\n" for p in PRINTERS.values() if p[0] == v) + "\n"
+        for v in sorted({p[0] for p in PRINTERS.values()})
+    )
     ini = DATA / "PrusaSlicer.ini"
     if not ini.exists() or ini.read_text(encoding="utf-8") != want:
         ini.write_text(want, encoding="utf-8")
@@ -78,8 +98,12 @@ def cylinder(d, h, n=96):
     tris = []
     for k in range(n):
         (x0, y0), (x1, y1) = ring[k], ring[(k + 1) % n]
-        tris += [((r, r, 0), (x1, y1, 0), (x0, y0, 0)), ((r, r, h), (x0, y0, h), (x1, y1, h)),
-                 ((x0, y0, 0), (x1, y1, 0), (x1, y1, h)), ((x0, y0, 0), (x1, y1, h), (x0, y0, h))]
+        tris += [
+            ((r, r, 0), (x1, y1, 0), (x0, y0, 0)),
+            ((r, r, h), (x0, y0, h), (x1, y1, h)),
+            ((x0, y0, 0), (x1, y1, 0), (x1, y1, h)),
+            ((x0, y0, 0), (x1, y1, h), (x0, y0, h)),
+        ]
     return tris
 
 
@@ -100,8 +124,13 @@ def shape(c):
 
 
 def cli(*args, timeout=600):
-    return subprocess.run([str(EXE), "--datadir", str(DATA), *args], capture_output=True, text=True, timeout=timeout,
-                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    return subprocess.run(
+        [str(EXE), "--datadir", str(DATA), *args],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
 
 
 def info(model):
@@ -125,7 +154,7 @@ def gcode_facts(path):
             e_rel = True
         elif line.startswith("M82"):
             e_rel = False
-        elif line.startswith(("G92", )) and " E" in line:
+        elif line.startswith(("G92",)) and " E" in line:
             last_e = 0.0
         elif line.startswith(("G1 ", "G0 ", "G2 ", "G3 ")):
             vals = dict(re.findall(r"([XYZE])(-?\d*\.?\d+)", line.split(";")[0]))
@@ -146,15 +175,28 @@ def check(facts, lo, hi, top, height, op, printer, model_info, three_mf):
     bx = (min(p[0] for p in bed), max(p[0] for p in bed))
     by = (min(p[1] for p in bed), max(p[1] for p in bed))
     layer = float(facts.get("layer_height", 0.2))
-    out = [("the model is watertight (manifold), so it slices cleanly", model_info.get("manifold") == "yes"),
-           (f"the G-code is for the {printer}", facts.get("printer_settings_id", "").strip('"') == PRINTERS[printer][2]),
-           ("every printed line is on the bed and under the printer's height limit",
-            bx[0] - 0.01 <= lo[0] and hi[0] <= bx[1] + 0.01 and by[0] - 0.01 <= lo[1] and hi[1] <= by[1] + 0.01 and top <= float(facts.get("max_print_height", 1e9))),
-           (f"{op['infill']}% infill, supports {'on' if op['supports'] else 'off'}" + (", a brim" if op["brim"] else ""),
-            facts.get("fill_density") == f"{op['infill']}%" and facts.get("support_material") == str(int(op["supports"])) and
-            (float(facts.get("brim_width", 0)) > 0) == op["brim"]),
-           (".3mf project made (opens in Bambu Studio, OrcaSlicer, Cura, PrusaSlicer)", zipfile.is_zipfile(three_mf) and
-            "3D/3dmodel.model" in zipfile.ZipFile(three_mf).namelist())]
+    out = [
+        ("the model is watertight (manifold), so it slices cleanly", model_info.get("manifold") == "yes"),
+        (f"the G-code is for the {printer}", facts.get("printer_settings_id", "").strip('"') == PRINTERS[printer][2]),
+        (
+            "every printed line is on the bed and under the printer's height limit",
+            bx[0] - 0.01 <= lo[0]
+            and hi[0] <= bx[1] + 0.01
+            and by[0] - 0.01 <= lo[1]
+            and hi[1] <= by[1] + 0.01
+            and top <= float(facts.get("max_print_height", 1e9)),
+        ),
+        (
+            f"{op['infill']}% infill, supports {'on' if op['supports'] else 'off'}" + (", a brim" if op["brim"] else ""),
+            facts.get("fill_density") == f"{op['infill']}%"
+            and facts.get("support_material") == str(int(op["supports"]))
+            and (float(facts.get("brim_width", 0)) > 0) == op["brim"],
+        ),
+        (
+            ".3mf project made (opens in Bambu Studio, OrcaSlicer, Cura, PrusaSlicer)",
+            zipfile.is_zipfile(three_mf) and "3D/3dmodel.model" in zipfile.ZipFile(three_mf).namelist(),
+        ),
+    ]
     if height:
         out.insert(3, (f"the print is as tall as the model ({height:g} mm)", abs(top - height) <= layer + 0.05))
     return out
@@ -162,6 +204,7 @@ def check(facts, lo, hi, top, height, op, printer, model_info, three_mf):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\b3d[- ]?print|\bslice\b|\bslicer\b|\bprusa\s*slicer\b|\bprusaslicer\b|\bg-?code\b|\bcura\b|\bbambu\b|\borca\s*slicer\b", c):
         return None
@@ -176,14 +219,25 @@ def parse(text, ctx):
     infill = re.search(r"\b(\d{1,3})\s*%\s*infill\b|\binfill\s*(?:of\s*)?(\d{1,3})\s*%", c)
     copies = re.search(r"\b(\d{1,2})\s*(?:copies|pieces|pcs|of them)\b", c)
     scale = re.search(r"\bscale(?:d)?\s*(?:to|by)?\s*(\d{1,4})\s*%", c)
-    return {"op": "slice", "file": f, "shape": s[0] if s else None, "words": c, "printer": printer,
-            "quality": "draft" if re.search(r"\b(?:draft|fast|quick)\b", c) else "fine" if re.search(r"\b(?:fine|detail(?:ed)?|high quality|smooth)\b", c) else "normal",
-            "material": next((m for m in ("PETG", "ABS", "PLA") if re.search(rf"\b{m.lower()}\b", c)), "PLA"),
-            "infill": max(0, min(100, int(infill.group(1) or infill.group(2)))) if infill else 15,
-            "supports": bool(re.search(r"\bsupports?\b", c)) and not re.search(r"\bno\s+supports?\b|\bwithout\s+supports?\b", c),
-            "brim": bool(re.search(r"\bbrim\b", c)) and not re.search(r"\bno\s+brim\b", c),
-            "copies": int(copies.group(1)) if copies else 1, "scale": int(scale.group(1)) if scale else 100,
-            "bambu": bool(re.search(r"\bbambu\b|\bcura\b|\borca", c))}
+    return {
+        "op": "slice",
+        "file": f,
+        "shape": s[0] if s else None,
+        "words": c,
+        "printer": printer,
+        "quality": "draft"
+        if re.search(r"\b(?:draft|fast|quick)\b", c)
+        else "fine"
+        if re.search(r"\b(?:fine|detail(?:ed)?|high quality|smooth)\b", c)
+        else "normal",
+        "material": next((m for m in ("PETG", "ABS", "PLA") if re.search(rf"\b{m.lower()}\b", c)), "PLA"),
+        "infill": max(0, min(100, int(infill.group(1) or infill.group(2)))) if infill else 15,
+        "supports": bool(re.search(r"\bsupports?\b", c)) and not re.search(r"\bno\s+supports?\b|\bwithout\s+supports?\b", c),
+        "brim": bool(re.search(r"\bbrim\b", c)) and not re.search(r"\bno\s+brim\b", c),
+        "copies": int(copies.group(1)) if copies else 1,
+        "scale": int(scale.group(1)) if scale else 100,
+        "bambu": bool(re.search(r"\bbambu\b|\bcura\b|\borca", c)),
+    }
 
 
 def run(op, ctx):
@@ -210,9 +264,20 @@ def run(op, ctx):
     if height:
         height = height * op["scale"] / 100
     stem = re.sub(r"[^\w-]+", "_", f"{model.stem}_{op['printer']}_{op['material']}").strip("_")
-    common = ["--printer-profile", printer_profile, "--print-profile", prints[op["quality"]], "--material-profile", material,
-              "--fill-density", f"{op['infill']}%", "--support-material" if op["supports"] else "--no-support-material",
-              "--brim-width", "5" if op["brim"] else "0", "--no-binary-gcode"]
+    common = [
+        "--printer-profile",
+        printer_profile,
+        "--print-profile",
+        prints[op["quality"]],
+        "--material-profile",
+        material,
+        "--fill-density",
+        f"{op['infill']}%",
+        "--support-material" if op["supports"] else "--no-support-material",
+        "--brim-width",
+        "5" if op["brim"] else "0",
+        "--no-binary-gcode",
+    ]
     if op["scale"] != 100:
         common += ["--scale", f"{op['scale']}%"]
     if op["copies"] > 1:
@@ -232,8 +297,12 @@ def run(op, ctx):
     grams = facts.get("total filament used [g]", "?")
     metres = float(facts.get("filament used [mm]", 0) or 0) / 1000
     extras = (", supports" if op["supports"] else "") + (", brim" if op["brim"] else "") + (f", {op['copies']} copies" if op["copies"] > 1 else "")
-    return (f"Sliced {model.name} for the {op['printer']} ({op['quality']} {facts.get('layer_height', '?')} mm layers, {op['material']}, {op['infill']}% infill"
-            f"{extras}): "
-            f"about {t}, {grams} g of filament ({metres:.2f} m), {layers} layers. G-code: {gcode} (copy it to the printer's SD card or USB). "
-            f"Project: {three_mf.name}" + (" (open it in Bambu Studio or Cura to slice for that printer)" if op.get("bambu") else "") + ". " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + "."))
+    return (
+        f"Sliced {model.name} for the {op['printer']} ({op['quality']} {facts.get('layer_height', '?')} mm layers, {op['material']}, {op['infill']}% infill"
+        f"{extras}): "
+        f"about {t}, {grams} g of filament ({metres:.2f} m), {layers} layers. G-code: {gcode} (copy it to the printer's SD card or USB). "
+        f"Project: {three_mf.name}"
+        + (" (open it in Bambu Studio or Cura to slice for that printer)" if op.get("bambu") else "")
+        + ". "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ".")
+    )

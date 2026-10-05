@@ -4,6 +4,7 @@ honoured), secrets never written to a log, and a transport that tests replace wi
   api = Api("https://slack.com/api", headers={"Authorization": "Bearer ..."}, service="slack")
   api.post("chat.postMessage", json={...}) -> dict      api.get("conversations.list", params={...})
 """
+
 import json
 import time
 import urllib.error
@@ -98,8 +99,11 @@ class Api:
                 js = {"_text": content[:500].decode("utf-8", "replace")}
             if status >= 400:
                 first = js[0] if isinstance(js, list) and js else js  # Salesforce answers errors as a list
-                msg = (first.get("error_description") or first.get("message") or first.get("error") or first.get("errorMessages") or str(js)[:200]) \
-                    if isinstance(first, dict) else str(js)[:200]
+                msg = (
+                    (first.get("error_description") or first.get("message") or first.get("error") or first.get("errorMessages") or str(js)[:200])
+                    if isinstance(first, dict)
+                    else str(js)[:200]
+                )
                 if isinstance(msg, dict):
                     msg = msg.get("message") or str(msg)[:200]
                 raise HubError(f"{self.service or 'service'}: {status} {vault.redact(msg)}", status, js)
@@ -135,6 +139,8 @@ def multipart(fields, files):
     for k, v in fields.items():
         out.append(f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
     for k, (fn, content, mime) in files.items():
-        out.append(f'--{b}\r\nContent-Disposition: form-data; name="{k}"; filename="{fn}"\r\nContent-Type: {mime}\r\n\r\n'.encode() + content + b"\r\n")
+        out.append(
+            f'--{b}\r\nContent-Disposition: form-data; name="{k}"; filename="{fn}"\r\nContent-Type: {mime}\r\n\r\n'.encode() + content + b"\r\n"
+        )
     out.append(f"--{b}--\r\n".encode())
     return b"".join(out), f"multipart/form-data; boundary={b}"

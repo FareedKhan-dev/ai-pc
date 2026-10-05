@@ -6,6 +6,7 @@ About a minute. Real photos from media\\ (a green-screen presenter, a dark car i
 car at sunset, a landscape) and made-up ones for what those do not have: a leaning horizon, a photographed page, a
 date stamp, grain, and a photo carrying GPS location. Everything is written under out\\_tests\\photo.
 """
+
 import os
 import shutil
 import sys
@@ -101,7 +102,11 @@ def main():
     check("faces: 1 presenter, 9 at the party, none in a landscape", len(A.faces(gs)) == 1 and len(A.faces(party)) >= 8 and not A.faces(land))
     check("backdrop: a green screen; a dark garage is a scene, not a backdrop", A.backdrop(gs)["kind"] == "green" and A.backdrop(car)["kind"] is None)
     x, y, w, h = A.subject(car)
-    check("the subject of the garage shot is the red car (in the middle band)", 0.3 < (y + h / 2) / car.height < 0.85 and w < car.width * 0.8, f"{(x, y, w, h)}")
+    check(
+        "the subject of the garage shot is the red car (in the middle band)",
+        0.3 < (y + h / 2) / car.height < 0.85 and w < car.width * 0.8,
+        f"{(x, y, w, h)}",
+    )
     t = A.tilt(tilted)
     check("a leaning horizon is measured", 2.5 < abs(t) < 5.5, f"{t}")
     check("a photographed page's four corners are found", A.document_quad(doc) is not None)
@@ -109,18 +114,57 @@ def main():
     check("the garage shot reads as very dark and flat", st["brightness"] < 0.2 and st["contrast"] < 0.12)
 
     # ---------------------------------------------------------------- edits, each with its own check
-    cases = [("brightness", car, {"amount": 0.5}), ("brightness", land, {"amount": -0.2}), ("contrast", car, {"amount": 0.3}), ("saturation", party, {"amount": 0.3}),
-             ("warmth", party, {"amount": 0.4}), ("warmth", land, {"amount": -0.4}), ("shadows", car, {"amount": 0.5}), ("white_balance", party, {}),
-             ("clarity", land, {"amount": 0.6}), ("auto", car, {}), ("auto", bmw, {}), ("auto", gs, {}), ("bw", bmw, {}), ("sepia", land, {}), ("vintage", party, {}),
-             ("cinematic", bmw, {}), ("sketch", land, {}), ("cartoon", party, {}), ("invert", land, {}), ("crop", gs, {"aspect": "1:1"}), ("crop", gs, {"aspect": "9:16"}),
-             ("crop", car, {"subject": True}), ("rotate", bmw, {"degrees": 90}), ("flip", land, {"how": "horizontal"}), ("resize", bmw, {"width": 1080}),
-             ("canvas", bmw, {"aspect": "9:16", "size": (1080, 1920)}), ("border", party, {"color": "white"}), ("rounded", land, {}), ("vignette", land, {"amount": 0.4}),
-             ("sharpen", land, {}), ("blur_faces", party, {}), ("blur_faces", party, {"style": "pixelate"}), ("blur_background", gs, {}), ("remove_background", gs, {}),
-             ("replace_background", gs, {"color": "white"}), ("smooth_skin", gs, {}), ("brighten_faces", party, {}),
-             ("text", bmw, {"text": "New Arrival", "style": "title"}), ("text", car, {"text": "FOR SALE", "where": "top", "color": "red"}),
-             ("meme", party, {"top": "when the beat drops", "bottom": "and you know every word"}), ("watermark", bmw, {"text": "© Fareed Motors"}),
-             ("watermark", land, {"text": "PREVIEW", "tiled": True}), ("passport", gs, {}), ("passport", gs, {"standard": "us"}), ("passport", gs, {"sheet": "4x6"}),
-             ("straighten", tilted, {}), ("document", doc, {}), ("erase", stamped, {"where": "bottom-right"}), ("denoise", grainy, {})]
+    cases = [
+        ("brightness", car, {"amount": 0.5}),
+        ("brightness", land, {"amount": -0.2}),
+        ("contrast", car, {"amount": 0.3}),
+        ("saturation", party, {"amount": 0.3}),
+        ("warmth", party, {"amount": 0.4}),
+        ("warmth", land, {"amount": -0.4}),
+        ("shadows", car, {"amount": 0.5}),
+        ("white_balance", party, {}),
+        ("clarity", land, {"amount": 0.6}),
+        ("auto", car, {}),
+        ("auto", bmw, {}),
+        ("auto", gs, {}),
+        ("bw", bmw, {}),
+        ("sepia", land, {}),
+        ("vintage", party, {}),
+        ("cinematic", bmw, {}),
+        ("sketch", land, {}),
+        ("cartoon", party, {}),
+        ("invert", land, {}),
+        ("crop", gs, {"aspect": "1:1"}),
+        ("crop", gs, {"aspect": "9:16"}),
+        ("crop", car, {"subject": True}),
+        ("rotate", bmw, {"degrees": 90}),
+        ("flip", land, {"how": "horizontal"}),
+        ("resize", bmw, {"width": 1080}),
+        ("canvas", bmw, {"aspect": "9:16", "size": (1080, 1920)}),
+        ("border", party, {"color": "white"}),
+        ("rounded", land, {}),
+        ("vignette", land, {"amount": 0.4}),
+        ("sharpen", land, {}),
+        ("blur_faces", party, {}),
+        ("blur_faces", party, {"style": "pixelate"}),
+        ("blur_background", gs, {}),
+        ("remove_background", gs, {}),
+        ("replace_background", gs, {"color": "white"}),
+        ("smooth_skin", gs, {}),
+        ("brighten_faces", party, {}),
+        ("text", bmw, {"text": "New Arrival", "style": "title"}),
+        ("text", car, {"text": "FOR SALE", "where": "top", "color": "red"}),
+        ("meme", party, {"top": "when the beat drops", "bottom": "and you know every word"}),
+        ("watermark", bmw, {"text": "© Fareed Motors"}),
+        ("watermark", land, {"text": "PREVIEW", "tiled": True}),
+        ("passport", gs, {}),
+        ("passport", gs, {"standard": "us"}),
+        ("passport", gs, {"sheet": "4x6"}),
+        ("straighten", tilted, {}),
+        ("document", doc, {}),
+        ("erase", stamped, {"where": "bottom-right"}),
+        ("denoise", grainy, {}),
+    ]
     bad = []
     t1 = time.perf_counter()
     for name, im, args in cases:
@@ -134,10 +178,15 @@ def main():
             bad.append(f"{name}: {e}")
     check(f"every edit passes its own check: {len(cases) - len(bad)}/{len(cases)} ({time.perf_counter() - t1:.0f} s)", not bad, "; ".join(bad[:4]))
     out, info, chk = edit("straighten", tilted)
-    check("straightened: the lean is gone and no empty corners", abs(A.tilt(out)) < 1.0 and min(out.convert("L").getpixel((1, 1)), out.convert("L").getpixel((out.width - 2, out.height - 2))) > 20,
-          f"{A.tilt(out)}")
+    check(
+        "straightened: the lean is gone and no empty corners",
+        abs(A.tilt(out)) < 1.0 and min(out.convert("L").getpixel((1, 1)), out.convert("L").getpixel((out.width - 2, out.height - 2))) > 20,
+        f"{A.tilt(out)}",
+    )
     out, info, chk = edit("document", doc)
-    check("the page comes out flat: about A4 in shape, white paper, dark ink", 1.25 < out.height / out.width < 1.6 and all_ok(chk), f"{out.size} {chk}")
+    check(
+        "the page comes out flat: about A4 in shape, white paper, dark ink", 1.25 < out.height / out.width < 1.6 and all_ok(chk), f"{out.size} {chk}"
+    )
     out, info, chk = edit("erase", stamped, {"where": "bottom-right"})
     corner = np.asarray(out.crop((out.width - 340, out.height - 80, out.width, out.height)).convert("RGB"), dtype=np.int16)
     orange = ((corner[..., 0] > 200) & (corner[..., 1] > 100) & (corner[..., 1] < 180) & (corner[..., 2] < 80)).sum()
@@ -145,20 +194,34 @@ def main():
     out, info, chk = edit("text", gs, {"text": "Meet our new host"})
     fx, fy, fw, fh = A.faces(gs)[0]["box"]
     bx = info["box"]
-    check("text placed by itself is not over the face and can be read", all_ok(chk) and (bx[3] < fy or bx[1] > fy + fh), f"{bx} vs face {(fx, fy, fw, fh)}")
+    check(
+        "text placed by itself is not over the face and can be read",
+        all_ok(chk) and (bx[3] < fy or bx[1] > fy + fh),
+        f"{bx} vs face {(fx, fy, fw, fh)}",
+    )
     cut, _ = O.run("remove_background", gs)
     out, info, chk = edit("text", cut, {"text": "Live every Friday", "where": "top"})
     a = np.asarray(out.getchannel("A"))
-    check("words written on a transparent part can be seen (they are solid there)", (a[info["box"][1]:info["box"][3], info["box"][0]:info["box"][2]] > 200).mean() > 0.05)
+    check(
+        "words written on a transparent part can be seen (they are solid there)",
+        (a[info["box"][1] : info["box"][3], info["box"][0] : info["box"][2]] > 200).mean() > 0.05,
+    )
     out, info = O.canvas(cut, size=(1080, 1920))
-    check("a cut-out fitted into a story stays a cut-out (no blurred green filling the sides)", out.mode == "RGBA" and out.getchannel("A").getpixel((5, 5)) == 0)
+    check(
+        "a cut-out fitted into a story stays a cut-out (no blurred green filling the sides)",
+        out.mode == "RGBA" and out.getchannel("A").getpixel((5, 5)) == 0,
+    )
 
     # ---------------------------------------------------------------- saving
     c = PhotoChat.start(gps, chats_dir=OUT / "chats")
     r = c.say("save it")
     saved = Path(c.state["exports"][-1]["path"])
     ex = Image.open(saved).getexif()
-    check("a saved photo carries no location; the camera is kept; the reply says so", not ex.get_ifd(0x8825) and ex.get(0x010F) == "TestCam" and "location removed" in r, r)
+    check(
+        "a saved photo carries no location; the camera is kept; the reply says so",
+        not ex.get_ifd(0x8825) and ex.get(0x010F) == "TestCam" and "location removed" in r,
+        r,
+    )
     r = c.say("save it as webp under 60 kb")
     kb = Path(c.state["exports"][-1]["path"]).stat().st_size / 1024
     check("under a size asked (WebP, 60 KB)", kb <= 60 and Path(c.state["exports"][-1]["path"]).suffix == ".webp", f"{kb:.0f} KB; {r}")
@@ -171,37 +234,64 @@ def main():
 
     # ---------------------------------------------------------------- requests read by rules
     cases = [
-        ("make it brighter", lambda o: o[0] == {"op": "brightness", "amount": 0.25}), ("a bit darker", lambda o: o[0]["op"] == "brightness" and o[0]["amount"] == -0.1),
-        ("it's too dark, fix it", lambda o: o[0]["op"] == "auto" and o[0].get("brighter") and len(o) == 1), ("make it look better", lambda o: o[0]["op"] == "auto"),
+        ("make it brighter", lambda o: o[0] == {"op": "brightness", "amount": 0.25}),
+        ("a bit darker", lambda o: o[0]["op"] == "brightness" and o[0]["amount"] == -0.1),
+        ("it's too dark, fix it", lambda o: o[0]["op"] == "auto" and o[0].get("brighter") and len(o) == 1),
+        ("make it look better", lambda o: o[0]["op"] == "auto"),
         ("more contrast and much more colourful", lambda o: [x["op"] for x in o] == ["contrast", "saturation"] and o[1]["amount"] > 0.4),
-        ("warmer", lambda o: o[0]["op"] == "warmth" and o[0]["amount"] > 0), ("make it cooler", lambda o: o[0]["amount"] < 0),
-        ("black and white", lambda o: o[0]["op"] == "bw"), ("give it a vintage look", lambda o: o[0]["op"] == "vintage"), ("cinematic please", lambda o: o[0]["op"] == "cinematic"),
-        ("turn it into a pencil sketch", lambda o: o[0]["op"] == "sketch"), ("crop it square", lambda o: o[0] == {"op": "crop", "aspect": "1:1"}),
-        ("crop to 16:9", lambda o: o[0]["aspect"] == "16:9"), ("crop to the car", lambda o: o[0].get("subject")), ("crop it for an instagram story", lambda o: o[0]["aspect"] == "9:16"),
-        ("fit it in a story without cropping", lambda o: o[0]["op"] == "canvas" and o[0]["size"] == [1080, 1920]), ("rotate it left", lambda o: o[0] == {"op": "rotate", "degrees": 270}),
-        ("turn it upside down", lambda o: o[0]["degrees"] == 180), ("the horizon is crooked, straighten it", lambda o: o[0]["op"] == "straighten"),
-        ("resize it to 1080 wide", lambda o: o[0] == {"op": "resize", "width": 1080}), ("make it half the size", lambda o: o[0].get("percent") == 50),
-        ("blur the faces", lambda o: o[0] == {"op": "blur_faces", "style": "blur"}), ("pixelate their faces", lambda o: o[0]["style"] == "pixelate"),
-        ("blur the background", lambda o: o[0]["op"] == "blur_background"), ("remove the background", lambda o: o[0]["op"] == "remove_background"),
+        ("warmer", lambda o: o[0]["op"] == "warmth" and o[0]["amount"] > 0),
+        ("make it cooler", lambda o: o[0]["amount"] < 0),
+        ("black and white", lambda o: o[0]["op"] == "bw"),
+        ("give it a vintage look", lambda o: o[0]["op"] == "vintage"),
+        ("cinematic please", lambda o: o[0]["op"] == "cinematic"),
+        ("turn it into a pencil sketch", lambda o: o[0]["op"] == "sketch"),
+        ("crop it square", lambda o: o[0] == {"op": "crop", "aspect": "1:1"}),
+        ("crop to 16:9", lambda o: o[0]["aspect"] == "16:9"),
+        ("crop to the car", lambda o: o[0].get("subject")),
+        ("crop it for an instagram story", lambda o: o[0]["aspect"] == "9:16"),
+        ("fit it in a story without cropping", lambda o: o[0]["op"] == "canvas" and o[0]["size"] == [1080, 1920]),
+        ("rotate it left", lambda o: o[0] == {"op": "rotate", "degrees": 270}),
+        ("turn it upside down", lambda o: o[0]["degrees"] == 180),
+        ("the horizon is crooked, straighten it", lambda o: o[0]["op"] == "straighten"),
+        ("resize it to 1080 wide", lambda o: o[0] == {"op": "resize", "width": 1080}),
+        ("make it half the size", lambda o: o[0].get("percent") == 50),
+        ("blur the faces", lambda o: o[0] == {"op": "blur_faces", "style": "blur"}),
+        ("pixelate their faces", lambda o: o[0]["style"] == "pixelate"),
+        ("blur the background", lambda o: o[0]["op"] == "blur_background"),
+        ("remove the background", lambda o: o[0]["op"] == "remove_background"),
         ("make the background white", lambda o: o[0] == {"op": "replace_background", "color": "white"}),
         ("replace the background with beach.jpg", lambda o: o[0] == {"op": "replace_background", "image": "beach.jpg"}),
-        ("smooth the skin", lambda o: o[0]["op"] == "smooth_skin"), ("make a passport photo", lambda o: o[0]["op"] == "passport" and "standard" not in o[0]),
-        ("US visa photo please", lambda o: o[0]["standard"] == "us"), ("print 6 of them on a 4x6 sheet", lambda o: o[0]["op"] == "passport" and o[0]["sheet"] == "4x6" and o[0]["want"] == 6),
-        ("scan this document", lambda o: o[0]["op"] == "document"), ("remove the date stamp in the corner", lambda o: o[0]["op"] == "erase"),
+        ("smooth the skin", lambda o: o[0]["op"] == "smooth_skin"),
+        ("make a passport photo", lambda o: o[0]["op"] == "passport" and "standard" not in o[0]),
+        ("US visa photo please", lambda o: o[0]["standard"] == "us"),
+        ("print 6 of them on a 4x6 sheet", lambda o: o[0]["op"] == "passport" and o[0]["sheet"] == "4x6" and o[0]["want"] == 6),
+        ("scan this document", lambda o: o[0]["op"] == "document"),
+        ("remove the date stamp in the corner", lambda o: o[0]["op"] == "erase"),
         ("add 'FOR SALE' at the top in red", lambda o: o[0] == {"op": "text", "text": "FOR SALE", "where": "top", "color": "red"}),
-        ('write "Happy Birthday Ali" in big yellow letters at the bottom', lambda o: o[0]["text"] == "Happy Birthday Ali" and o[0]["color"] == "yellow" and o[0]["size"] == "large"),
+        (
+            'write "Happy Birthday Ali" in big yellow letters at the bottom',
+            lambda o: o[0]["text"] == "Happy Birthday Ali" and o[0]["color"] == "yellow" and o[0]["size"] == "large",
+        ),
         ("add a banner saying SALE 50% OFF", lambda o: o[0]["op"] == "text" and o[0]["style"] == "banner" and o[0]["text"] == "SALE 50% OFF"),
-        ("make it a meme: 'when the beat drops' / 'and you know every word'", lambda o: o[0]["op"] == "meme" and o[0]["bottom"] == "and you know every word"),
-        ("watermark '© Fareed' across the photo", lambda o: o[0]["op"] == "watermark" and o[0]["tiled"]), ("move the text to the top", lambda o: o[0] == {"op": "text", "modify": True, "where": "top"}),
+        (
+            "make it a meme: 'when the beat drops' / 'and you know every word'",
+            lambda o: o[0]["op"] == "meme" and o[0]["bottom"] == "and you know every word",
+        ),
+        ("watermark '© Fareed' across the photo", lambda o: o[0]["op"] == "watermark" and o[0]["tiled"]),
+        ("move the text to the top", lambda o: o[0] == {"op": "text", "modify": True, "where": "top"}),
         ("make the text bigger and red", lambda o: o[0]["modify"] and o[0]["color"] == "red" and o[0]["size_rel"] == 1),
         ("change the text to 'Saturday night'", lambda o: o[0]["modify"] and o[0]["text"] == "Saturday night"),
-        ("sepia instead", lambda o: o[0] == {"op": "sepia", "instead": True}), ("make it vintage instead of sepia", lambda o: o[0]["op"] == "vintage" and o[0]["instead"]),
+        ("sepia instead", lambda o: o[0] == {"op": "sepia", "instead": True}),
+        ("make it vintage instead of sepia", lambda o: o[0]["op"] == "vintage" and o[0]["instead"]),
         ("add a thin black border", lambda o: o[0]["op"] == "border" and o[0]["color"] == "black" and o[0]["percent"] == 0.02),
         ("polaroid frame with the caption 'Dream car'", lambda o: o[0] == {"op": "polaroid", "caption": "Dream car"}),
-        ("remove the grain", lambda o: o[0]["op"] == "denoise"), ("sharpen it a bit", lambda o: o[0]["op"] == "sharpen" and o[0]["amount"] == 0.3),
+        ("remove the grain", lambda o: o[0]["op"] == "denoise"),
+        ("sharpen it a bit", lambda o: o[0]["op"] == "sharpen" and o[0]["amount"] == 0.3),
         ("save it for instagram under 300 kb", lambda o: o[0]["op"] == "export" and o[0]["preset"] == "instagram" and o[0]["max_kb"] == 300),
-        ("export as png", lambda o: o[0] == {"op": "export", "fmt": "png"}), ("remove the location", lambda o: o[0] == {"op": "strip", "what": "gps"}),
-        ("make a collage", lambda o: o[0]["op"] == "collage"), ("what's in the photo?", lambda o: o[0]["op"] == "describe"),
+        ("export as png", lambda o: o[0] == {"op": "export", "fmt": "png"}),
+        ("remove the location", lambda o: o[0] == {"op": "strip", "what": "gps"}),
+        ("make a collage", lambda o: o[0]["op"] == "collage"),
+        ("what's in the photo?", lambda o: o[0]["op"] == "describe"),
     ]
     bad = []
     for msg, ok in cases:

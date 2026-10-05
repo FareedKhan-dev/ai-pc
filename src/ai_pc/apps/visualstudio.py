@@ -9,6 +9,7 @@ the NuGet.Config and marker folder NuGet always writes to AppData are removed af
   "visual studio web api called 'Shop' with tests"   'c# console app called Stock, publish an exe'   'dotnet winforms app called Till'
   'visual studio build and test C:\\code\\MyApp\\MyApp.sln'
 """
+
 import json
 import os
 import re
@@ -182,11 +183,23 @@ static class Program
 
 def env():
     home = (HOME / "home").resolve()
-    return dict(os.environ, DOTNET_ROOT=str(HOME.resolve()), DOTNET_CLI_HOME=str(home), NUGET_PACKAGES=str(home / "nuget-packages"),
-                NUGET_HTTP_CACHE_PATH=str(home / "nuget-http-cache"), NUGET_PLUGINS_CACHE_PATH=str(home / "nuget-plugins"), DOTNET_CLI_TELEMETRY_OPTOUT="1",
-                DOTNET_NOLOGO="1", DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1", DOTNET_GENERATE_ASPNET_CERTIFICATE="false", DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="0",
-                MSBUILDDISABLENODEREUSE="1", DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER="1", UseSharedCompilation="false",
-                PATH=str(HOME.resolve()) + os.pathsep + os.environ["PATH"])
+    return dict(
+        os.environ,
+        DOTNET_ROOT=str(HOME.resolve()),
+        DOTNET_CLI_HOME=str(home),
+        NUGET_PACKAGES=str(home / "nuget-packages"),
+        NUGET_HTTP_CACHE_PATH=str(home / "nuget-http-cache"),
+        NUGET_PLUGINS_CACHE_PATH=str(home / "nuget-plugins"),
+        DOTNET_CLI_TELEMETRY_OPTOUT="1",
+        DOTNET_NOLOGO="1",
+        DOTNET_SKIP_FIRST_TIME_EXPERIENCE="1",
+        DOTNET_GENERATE_ASPNET_CERTIFICATE="false",
+        DOTNET_ADD_GLOBAL_TOOLS_TO_PATH="0",
+        MSBUILDDISABLENODEREUSE="1",
+        DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER="1",
+        UseSharedCompilation="false",
+        PATH=str(HOME.resolve()) + os.pathsep + os.environ["PATH"],
+    )
 
 
 class Session:
@@ -199,6 +212,7 @@ class Session:
 
     def run(self, *args, cwd=None, timeout=900):
         from ai_pc.core import hidden_desktop
+
         rc, out, err, timed_out = hidden_desktop.run([str(DOTNET), *map(str, args)], timeout=timeout, cwd=str(cwd) if cwd else None, env=env())
         self.log.append((" ".join(map(str, args)), rc, out + err))
         return rc == 0 and not timed_out, out + err
@@ -249,6 +263,7 @@ def http(method, url, body=None):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bvisual\s+studio\b|\bc#|\bcsharp\b|(?<!\w)\.net\b|\bdotnet\b|\basp\.?net\b|\bwinforms\b|\brider\b", c):
         return None
@@ -256,8 +271,13 @@ def parse(text, ctx):
     if sol:
         return {"op": "build", "file": sol}
     m = re.search(r"\b(?:called|named)\s+['\"]?([A-Za-z][A-Za-z0-9]*)['\"]?", text)
-    kind = "api" if re.search(r"\bweb\s*api\b|\bapi\b|\basp\.?net\b|\brest\b", c) else "winforms" if re.search(r"\bwinforms\b|\bdesktop\b|\bwindows\s+(?:forms|app)\b", c) \
+    kind = (
+        "api"
+        if re.search(r"\bweb\s*api\b|\bapi\b|\basp\.?net\b|\brest\b", c)
+        else "winforms"
+        if re.search(r"\bwinforms\b|\bdesktop\b|\bwindows\s+(?:forms|app)\b", c)
         else "console"
+    )
     return {"op": "new", "kind": kind, "name": m.group(1) if m else "Shop", "publish": bool(re.search(r"\bpublish\b|\bexe\b|\bsingle\s*file\b", c))}
 
 
@@ -280,8 +300,12 @@ def _build_existing(op, s):
         return f"Build of {target.name} FAILED with {len(errs)} error(s): " + "; ".join(errs[:8]) + "."
     ok_t, out_t = s.run("test", target, "--no-build", cwd=target.parent)
     passed, failed, total = test_summary(out_t)
-    return (f"{target.name} builds with 0 errors" + (f" ({warn.group(1)} warnings)" if warn else "") + ". " +
-            (f"Tests: {passed} passed, {failed} failed of {total}." if total else "No test projects found."))
+    return (
+        f"{target.name} builds with 0 errors"
+        + (f" ({warn.group(1)} warnings)" if warn else "")
+        + ". "
+        + (f"Tests: {passed} passed, {failed} failed of {total}." if total else "No test projects found.")
+    )
 
 
 def _new(op, ctx, s):
@@ -292,7 +316,12 @@ def _new(op, ctx, s):
     out.mkdir(parents=True)
     app = {"console": f"{ns}.App", "api": f"{ns}.Api", "winforms": f"{ns}.Desktop"}[kind]
     template = {"console": "console", "api": "web", "winforms": "winforms"}[kind]
-    for args in (("new", "sln", "-n", ns), ("new", "classlib", "-n", f"{ns}.Core"), ("new", template, "-n", app), ("new", "xunit", "-n", f"{ns}.Tests")):
+    for args in (
+        ("new", "sln", "-n", ns),
+        ("new", "classlib", "-n", f"{ns}.Core"),
+        ("new", template, "-n", app),
+        ("new", "xunit", "-n", f"{ns}.Tests"),
+    ):
         ok, txt = s.run(*args, cwd=out)
         if not ok:
             return f"dotnet {' '.join(args)} failed: {txt.strip()[-300:]}"
@@ -311,7 +340,11 @@ def _new(op, ctx, s):
         (out / app / "MainForm.cs").write_text(FORM.format(ns=ns, title=f"{ns} Inventory"), encoding="utf-8")
         (out / app / "Program.cs").write_text(FORM_MAIN.format(ns=ns), encoding="utf-8")
     sln = next(out.glob(f"{ns}.sln*"))
-    for args in (("sln", sln.name, "add", f"{ns}.Core", app, f"{ns}.Tests"), ("add", app, "reference", f"{ns}.Core"), ("add", f"{ns}.Tests", "reference", f"{ns}.Core")):
+    for args in (
+        ("sln", sln.name, "add", f"{ns}.Core", app, f"{ns}.Tests"),
+        ("add", app, "reference", f"{ns}.Core"),
+        ("add", f"{ns}.Tests", "reference", f"{ns}.Core"),
+    ):
         ok, txt = s.run(*args, cwd=out)
         if not ok:
             return f"dotnet {' '.join(args)} failed: {txt.strip()[-300:]}"
@@ -328,20 +361,43 @@ def _new(op, ctx, s):
         extra = " Output: " + " | ".join(ln.strip() for ln in txt_r.strip().splitlines()[-3:])
         if op.get("publish"):
             pub = out / "publish"
-            ok_p, txt_p = s.run("publish", app, "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:PublishSingleFile=true", "-o", pub,
-                                cwd=out, timeout=1200)
+            ok_p, txt_p = s.run(
+                "publish",
+                app,
+                "-c",
+                "Release",
+                "-r",
+                "win-x64",
+                "--self-contained",
+                "true",
+                "-p:PublishSingleFile=true",
+                "-o",
+                pub,
+                cwd=out,
+                timeout=1200,
+            )
             exe = pub / f"{app}.exe"
             ran = ""
             if exe.exists():
                 from ai_pc.core import hidden_desktop
+
                 rc, o, e, _ = hidden_desktop.run([str(exe)], timeout=60)
                 ran = o
-            checks.append((f"a single-file {exe.name} published ({exe.stat().st_size / 1e6:.0f} MB, runs without .NET installed) and it runs" if exe.exists()
-                           else "a single-file exe published", exe.exists() and "Total value" in ran))
+            checks.append(
+                (
+                    f"a single-file {exe.name} published ({exe.stat().st_size / 1e6:.0f} MB, runs without .NET installed) and it runs"
+                    if exe.exists()
+                    else "a single-file exe published",
+                    exe.exists() and "Total value" in ran,
+                )
+            )
     elif kind == "api":
         from ai_pc.core import hidden_desktop
+
         port = free_port()
-        proc = hidden_desktop.start([str(DOTNET), "run", "--project", app, "--no-build", "--urls", f"http://127.0.0.1:{port}"], cwd=str(out), env=env())
+        proc = hidden_desktop.start(
+            [str(DOTNET), "run", "--project", app, "--no-build", "--urls", f"http://127.0.0.1:{port}"], cwd=str(out), env=env()
+        )
         base, up = f"http://127.0.0.1:{port}", False
         try:
             end = time.monotonic() + 90
@@ -358,8 +414,12 @@ def _new(op, ctx, s):
                 st3, _ = http("POST", base + "/products/Fan/sell/5")
                 st4, val = http("GET", base + "/value")
                 st5, items = http("GET", base + "/products")
-                checks.append(("the API runs: POST a product 201, a negative stock 400, overselling 409, value and list 200 with the right numbers",
-                               (st1, st2, st3, st4, st5) == (201, 400, 409, 200, 200) and float(val["total"]) == 13500 and len(items) == 1))
+                checks.append(
+                    (
+                        "the API runs: POST a product 201, a negative stock 400, overselling 409, value and list 200 with the right numbers",
+                        (st1, st2, st3, st4, st5) == (201, 400, 409, 200, 200) and float(val["total"]) == 13500 and len(items) == 1,
+                    )
+                )
                 extra = f" Called it on {base}: /products, /value (13,500), /products/Fan/sell."
             else:
                 checks.append(("the API started and answered", False))
@@ -367,6 +427,7 @@ def _new(op, ctx, s):
             proc.stop()
     else:
         from ai_pc.core import hidden_desktop
+
         exe = next((out / app / "bin").rglob(f"{app}.exe"), None)
         seen = False
         if exe:
@@ -381,5 +442,9 @@ def _new(op, ctx, s):
         checks.append((f"the desktop app opens its window '{ns} Inventory' (on the hidden desktop)", seen))
     bad = [w for w, good in checks if not good]
     ctx.setdefault("memo", {})["project"] = str(Path(sln).parent)  # for VS Code and the other tools
-    return (f"Visual Studio solution {sln} ({kind}: {ns}.Core with an inventory, {app}, {ns}.Tests with xUnit; opens in Visual Studio, Rider, VS Code)."
-            + extra + " " + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(errs[:5])))
+    return (
+        f"Visual Studio solution {sln} ({kind}: {ns}.Core with an inventory, {app}, {ns}.Tests with xUnit; opens in Visual Studio, Rider, VS Code)."
+        + extra
+        + " "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(errs[:5]))
+    )

@@ -9,6 +9,7 @@ own DLLs. A Cargo.toml given is built and tested the same way, every compile err
 
   "rustrover rust project called 'Shop'"   'rust app called Stock'   'cargo build C:\\code\\tool\\Cargo.toml'
 """
+
 import os
 import re
 import shutil
@@ -20,7 +21,25 @@ NAME, LABEL = "rustrover", "Rust (RustRover, VS Code): Cargo packages formatted,
 EXAMPLES = ["rustrover rust project called 'Shop'", "rust app called Stock", "cargo build Cargo.toml"]
 TOOLCHAIN = ROOT / "tools" / "rust" / "toolchain"
 CARGO = TOOLCHAIN / "bin" / "cargo.exe"
-RESERVED = {"test", "std", "core", "alloc", "proc_macro", "self", "super", "crate", "type", "fn", "mod", "use", "impl", "trait", "struct", "enum", "match"}
+RESERVED = {
+    "test",
+    "std",
+    "core",
+    "alloc",
+    "proc_macro",
+    "self",
+    "super",
+    "crate",
+    "type",
+    "fn",
+    "mod",
+    "use",
+    "impl",
+    "trait",
+    "struct",
+    "enum",
+    "match",
+}
 
 CARGO_TOML = """[package]
 name = "__CRATE__"
@@ -217,6 +236,7 @@ def env():
 
 def cargo(*args, cwd, timeout=900):
     from ai_pc.core import hidden_desktop
+
     rc, out, err, timed_out = hidden_desktop.run([str(CARGO), *map(str, args)], timeout=timeout, cwd=str(cwd), env=env())
     return rc == 0 and not timed_out, out + err
 
@@ -236,12 +256,14 @@ def imports(exe):
     if not objdump.exists():
         return None
     from ai_pc.core import hidden_desktop
+
     rc, out, err, _ = hidden_desktop.run([str(objdump), "-p", str(exe)], timeout=60)
     return sorted({m.lower() for m in re.findall(r"DLL Name:\s*(\S+)", out)})
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\brust\b|\brustrover\b|\bcargo\.toml\b|\bcargo\s+(?:build|test|run|project|new)\b", c):
         return None
@@ -249,7 +271,9 @@ def parse(text, ctx):
     if f and Path(f).name.lower() == "cargo.toml":
         return {"op": "build", "file": f}
     m = re.search(r"\b(?:called|named)\s+['\"]?([A-Za-z][A-Za-z0-9_]*)['\"]?", text)
-    return {"op": "new", "name": m.group(1) if m else "Shop"} if re.search(r"\bproject\b|\bapp\b|\bprogram\b|\bcrate\b|\bpackage\b|\bcli\b", c) else None
+    return (
+        {"op": "new", "name": m.group(1) if m else "Shop"} if re.search(r"\bproject\b|\bapp\b|\bprogram\b|\bcrate\b|\bpackage\b|\bcli\b", c) else None
+    )
 
 
 def run(op, ctx):
@@ -261,8 +285,15 @@ def run(op, ctx):
         errs = compile_errors(tests)
         if not ok_t:
             failed = re.findall(r"^test (\S+) \.\.\. FAILED", tests, re.M)
-            return (f"Cargo build of {folder.name} FAILED" + (f" with {len(errs)} error(s): " + "; ".join(errs[:8]) if errs else
-                    (f": tests failed: {', '.join(failed[:6])}" if failed else ": " + tests.strip()[-300:])) + ".")
+            return (
+                f"Cargo build of {folder.name} FAILED"
+                + (
+                    f" with {len(errs)} error(s): " + "; ".join(errs[:8])
+                    if errs
+                    else (f": tests failed: {', '.join(failed[:6])}" if failed else ": " + tests.strip()[-300:])
+                )
+                + "."
+            )
         results = re.findall(r"test result: ok\. (\d+) passed; (\d+) failed", tests)
         return f"{folder.name} builds with Cargo (Rust 1.99): {sum(int(p) for p, _ in results)} tests passed, none failed."
     name = op["name"]
@@ -282,21 +313,30 @@ def run(op, ctx):
     ok_b, built = cargo("build", "--release", cwd=out)
     exe = out / "target" / "release" / f"{crate}.exe"
     from ai_pc.core import hidden_desktop
+
     rc, ran, _, _ = hidden_desktop.run([str(exe)], timeout=60) if exe.exists() else (None, "", "", False)
     dlls = imports(exe) if exe.exists() else None
     foreign = [d for d in (dlls or []) if re.search(r"gcc|stdc|winpthread|rust|std-", d)]
     passed = sum(int(p) for p in re.findall(r"test result: ok\. (\d+) passed", tests))
     errs = compile_errors(clippy + tests + built)
-    checks = [("rustfmt formatted it", ok_f), ("clippy finds nothing (warnings count as errors)", ok_c),
-              (f"cargo test: {passed} of 5 unit tests passed", ok_t and passed == 5),
-              (f"cargo build --release made {exe.name} and it prints the stock's value (Rs 22,000)", ok_b and rc == 0 and "Total value: Rs 22,000" in ran)]
+    checks = [
+        ("rustfmt formatted it", ok_f),
+        ("clippy finds nothing (warnings count as errors)", ok_c),
+        (f"cargo test: {passed} of 5 unit tests passed", ok_t and passed == 5),
+        (f"cargo build --release made {exe.name} and it prints the stock's value (Rs 22,000)", ok_b and rc == 0 and "Total value: Rs 22,000" in ran),
+    ]
     if dlls is not None:
         checks.append((f"the .exe needs only Windows' own DLLs ({', '.join(dlls[:3])}{'...' if len(dlls) > 3 else ''})", bool(dlls) and not foreign))
     ctx.setdefault("memo", {})["project"] = str(out)  # for VS Code and the other tools
     bad = [w for w, good in checks if not good]
     size = f" ({exe.stat().st_size / 1024:,.0f} KB)" if exe.exists() else ""
-    return (f"Rust package {out} (Cargo: src/lib.rs with unit tests, src/main.rs; open the folder in RustRover or VS Code, toolchain "
-            f"{TOOLCHAIN / 'bin'}). Program: {exe}{size}. " +
-            (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else "") +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(errs[:5]) +
-             ("" if errs else " " + (clippy + tests).strip()[-300:])))
+    return (
+        f"Rust package {out} (Cargo: src/lib.rs with unit tests, src/main.rs; open the folder in RustRover or VS Code, toolchain "
+        f"{TOOLCHAIN / 'bin'}). Program: {exe}{size}. "
+        + (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else "")
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + ". " + "; ".join(errs[:5]) + ("" if errs else " " + (clippy + tests).strip()[-300:])
+        )
+    )

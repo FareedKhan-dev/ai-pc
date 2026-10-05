@@ -5,6 +5,7 @@ kinds and formulas), summary sheets as label / value pairs, charts, conditional 
   t = find_table(F, V, fmts)     the same detection on any grid (the Excel worker uses it on what Excel reads)
   col(m, sheet, "maths")         a column by its name (case, plurals, a prefix), or by its letter
 """
+
 import datetime as _dt
 import re
 
@@ -42,13 +43,22 @@ def _empty(v):
 def plain(v):
     """A cell value as JSON can carry it."""
     if isinstance(v, (_dt.datetime, _dt.date)):
-        return v.isoformat()[:10] if isinstance(v, _dt.date) and not isinstance(v, _dt.datetime) or (isinstance(v, _dt.datetime) and not v.time().hour and not v.time().minute) else v.isoformat()
+        return (
+            v.isoformat()[:10]
+            if isinstance(v, _dt.date)
+            and not isinstance(v, _dt.datetime)
+            or (isinstance(v, _dt.datetime) and not v.time().hour and not v.time().minute)
+            else v.isoformat()
+        )
     if isinstance(v, float) and v.is_integer() and abs(v) < 1e15:
         return int(v)
     return v
 
 
-AGG_OWN = re.compile(r"^=\s*(?:SUM|AVERAGE|COUNT|COUNTA|MAX|MIN|MEDIAN|SUBTOTAL\(\s*\d+\s*,)\s*\(?\s*\$?([A-Z]{1,3})\$?(\d+)\s*:\s*\$?([A-Z]{1,3})\$?(\d+)\s*\)\s*$", re.I)
+AGG_OWN = re.compile(
+    r"^=\s*(?:SUM|AVERAGE|COUNT|COUNTA|MAX|MIN|MEDIAN|SUBTOTAL\(\s*\d+\s*,)\s*\(?\s*\$?([A-Z]{1,3})\$?(\d+)\s*:\s*\$?([A-Z]{1,3})\$?(\d+)\s*\)\s*$",
+    re.I,
+)
 
 
 def _sums_above(frow, vrow, j0, j1, c0, first, prev):
@@ -98,6 +108,7 @@ def find_table(F, V, fmts=None, r0=1, c0=1):
                 return False
             vals = [(F[r][j], V[r][j] if j < len(V[r]) else None) for j in range(j0, j1 + 1) if j < len(F[r]) and not _empty(F[r][j])]
             return any(is_num(v) or is_formula(f) or isinstance(v, (_dt.date, _dt.datetime)) for f, v in vals) or len(vals) < 2
+
         k, last = header + 1, header
         while k < nrows:
             if filled(k):
@@ -112,8 +123,11 @@ def find_table(F, V, fmts=None, r0=1, c0=1):
             lab = next((F[last][j] for j in range(j0, j1 + 1) if j < len(F[last]) and not _empty(F[last][j])), None)
             aggs = sum(1 for j in range(j0, j1 + 1) if j < len(F[last]) and is_formula(F[last][j]) and AGG_FN.search(str(F[last][j])))
             prev = sum(1 for j in range(j0, j1 + 1) if j < len(F[last - 1]) and is_formula(F[last - 1][j]) and AGG_FN.search(str(F[last - 1][j])))
-            if (isinstance(lab, str) and LABEL_TOTAL.match(lab)) or (aggs >= max(1, (j1 - j0 + 1) // 3) and not prev) or \
-                    _sums_above(F[last], V[last], j0, j1, c0, r0 + header + 1, r0 + last - 1):
+            if (
+                (isinstance(lab, str) and LABEL_TOTAL.match(lab))
+                or (aggs >= max(1, (j1 - j0 + 1) // 3) and not prev)
+                or _sums_above(F[last], V[last], j0, j1, c0, r0 + header + 1, r0 + last - 1)
+            ):
                 total = last
                 last -= 1
         cols = []
@@ -125,7 +139,9 @@ def find_table(F, V, fmts=None, r0=1, c0=1):
             nums = [v for v in vals if is_num(v)]
             filled = [v for v in vals if not _empty(v)]
             fmt = (fmts or {}).get(c0 + j) or ""
-            if any(isinstance(v, (_dt.datetime, _dt.date)) for v in filled) and sum(isinstance(v, (_dt.datetime, _dt.date)) for v in filled) >= 0.6 * len(filled):
+            if any(isinstance(v, (_dt.datetime, _dt.date)) for v in filled) and sum(
+                isinstance(v, (_dt.datetime, _dt.date)) for v in filled
+            ) >= 0.6 * len(filled):
                 kind = "date"
             elif filled and len(nums) >= 0.8 * len(filled):
                 kind = "percent" if "%" in fmt else "money" if re.search(r"[$€£₨]|Rs|PKR|USD", fmt) else "number"
@@ -133,13 +149,31 @@ def find_table(F, V, fmts=None, r0=1, c0=1):
                 kind = "text"
             f0 = next((f for f in forms if is_formula(f)), None)
             tf = F[total][j] if total is not None and j < len(F[total]) else None
-            cols.append({"name": name, "idx": c0 + j, "letter": letter(c0 + j), "kind": kind, "fmt": fmt, "formula": f0,
-                         "formulas": sum(1 for f in forms if is_formula(f)), "blank": len(vals) - len(filled),
-                         "total": tf if is_formula(tf) else None})
+            cols.append(
+                {
+                    "name": name,
+                    "idx": c0 + j,
+                    "letter": letter(c0 + j),
+                    "kind": kind,
+                    "fmt": fmt,
+                    "formula": f0,
+                    "formulas": sum(1 for f in forms if is_formula(f)),
+                    "blank": len(vals) - len(filled),
+                    "total": tf if is_formula(tf) else None,
+                }
+            )
         rows = [[(V[r][j] if j < len(V[r]) else None) for j in range(j0, j1 + 1)] for r in range(header + 1, last + 1)]
-        return {"header": r0 + header, "first": r0 + header + 1, "last": r0 + last, "total": r0 + total if total is not None else None,
-                "c0": c0 + j0, "c1": c0 + j1, "cols": cols, "rows": rows,
-                "total_label": (next((F[total][j] for j in range(j0, j1 + 1) if not _empty(F[total][j])), None) if total is not None else None)}
+        return {
+            "header": r0 + header,
+            "first": r0 + header + 1,
+            "last": r0 + last,
+            "total": r0 + total if total is not None else None,
+            "c0": c0 + j0,
+            "c1": c0 + j1,
+            "cols": cols,
+            "rows": rows,
+            "total_label": (next((F[total][j] for j in range(j0, j1 + 1) if not _empty(F[total][j])), None) if total is not None else None),
+        }
     return None
 
 
@@ -149,8 +183,15 @@ def _pairs(F, V, r0=1):
         cells = [(j, x) for j, x in enumerate(row) if not _empty(x)]
         if len(cells) >= 2 and isinstance(cells[0][1], str) and not is_formula(cells[0][1]):
             j = cells[1][0]
-            out.append({"row": r0 + i, "label": cells[0][1].strip(), "value": plain(V[i][j] if j < len(V[i]) else None),
-                        "formula": cells[1][1] if is_formula(cells[1][1]) else None, "cell": f"{letter(j + 1)}{r0 + i}"})
+            out.append(
+                {
+                    "row": r0 + i,
+                    "label": cells[0][1].strip(),
+                    "value": plain(V[i][j] if j < len(V[i]) else None),
+                    "formula": cells[1][1] if is_formula(cells[1][1]) else None,
+                    "cell": f"{letter(j + 1)}{r0 + i}",
+                }
+            )
     return out
 
 
@@ -158,6 +199,7 @@ def book_map(path, max_rows=5000):
     import warnings
 
     import openpyxl
+
     with warnings.catch_warnings():  # parts openpyxl cannot read (it never writes this file) are not news
         warnings.simplefilter("ignore")
         wf = openpyxl.load_workbook(str(path), data_only=False)
@@ -178,12 +220,24 @@ def book_map(path, max_rows=5000):
         except Exception:  # noqa: BLE001
             pass
         pivots = len(getattr(ws, "_pivots", []) or [])
-        sheets.append({"name": ws.title, "dims": ws.dimensions, "max_row": ws.max_row, "max_col": ws.max_column, "pivots": pivots,
-                       "kind": "pivot" if pivots else "table" if t else ("summary" if any(not _empty(x) for r in F for x in r) else "empty"),
-                       "table": t, "pairs": _pairs(F[:t["header"] - 1], V[:t["header"] - 1]) if t else _pairs(F, V), "charts": len(getattr(ws, "_charts", [])),
-                       "cf": cfs, "freeze": ws.freeze_panes, "filter": ws.auto_filter.ref,
-                       "validations": len(ws.data_validations.dataValidation) if ws.data_validations else 0,
-                       "state": ws.sheet_state})
+        sheets.append(
+            {
+                "name": ws.title,
+                "dims": ws.dimensions,
+                "max_row": ws.max_row,
+                "max_col": ws.max_column,
+                "pivots": pivots,
+                "kind": "pivot" if pivots else "table" if t else ("summary" if any(not _empty(x) for r in F for x in r) else "empty"),
+                "table": t,
+                "pairs": _pairs(F[: t["header"] - 1], V[: t["header"] - 1]) if t else _pairs(F, V),
+                "charts": len(getattr(ws, "_charts", [])),
+                "cf": cfs,
+                "freeze": ws.freeze_panes,
+                "filter": ws.auto_filter.ref,
+                "validations": len(ws.data_validations.dataValidation) if ws.data_validations else 0,
+                "state": ws.sheet_state,
+            }
+        )
     tables = [s for s in sheets if s["table"] and not s["pivots"]]
     main = max(tables, key=lambda s: len(s["table"]["rows"]) * len(s["table"]["cols"]))["name"] if tables else (sheets[0]["name"] if sheets else None)
     return {"sheets": sheets, "main": main, "names": [s["name"] for s in sheets], "active": wf.active.title if wf.active else None}
@@ -255,13 +309,19 @@ def outline(m, rows=3):
     for s in m["sheets"]:
         t = s["table"]
         if t:
-            out.append(f"SHEET '{s['name']}': table at row {t['header']} with {len(t['rows'])} data rows"
-                       + (f" and a '{t['total_label']}' row" if t["total"] else "") + "; columns: "
-                       + ", ".join(f"{c['letter']} {c['name']} ({c['kind']}{', formula ' + c['formula'] if c['formula'] else ''})" for c in t["cols"]))
+            out.append(
+                f"SHEET '{s['name']}': table at row {t['header']} with {len(t['rows'])} data rows"
+                + (f" and a '{t['total_label']}' row" if t["total"] else "")
+                + "; columns: "
+                + ", ".join(f"{c['letter']} {c['name']} ({c['kind']}{', formula ' + c['formula'] if c['formula'] else ''})" for c in t["cols"])
+            )
             for r in t["rows"][:rows]:
                 out.append("   " + " | ".join(str(x) for x in r))
         if s["pairs"]:
-            out.append(f"  {'above the table' if t else 'SHEET ' + repr(s['name']) + ':'} " + "; ".join(f"{p['label']} = {p['value']}" for p in s["pairs"][:12]))
+            out.append(
+                f"  {'above the table' if t else 'SHEET ' + repr(s['name']) + ':'} "
+                + "; ".join(f"{p['label']} = {p['value']}" for p in s["pairs"][:12])
+            )
         if not t and not s["pairs"]:
             out.append(f"SHEET '{s['name']}': empty")
         if s["charts"]:
@@ -270,9 +330,44 @@ def outline(m, rows=3):
 
 
 # ------------------------------------------------------------------------------------------------ formulas in Python
-CALC_FUNCS = {"SUM", "AVERAGE", "AVG", "MIN", "MAX", "COUNT", "ROUND", "ROUNDUP", "ROUNDDOWN", "ABS", "INT", "MOD", "SQRT", "POWER", "IF",
-              "IFERROR", "AND", "OR", "NOT", "UPPER", "LOWER", "PROPER", "LEN", "LEFT", "RIGHT", "MID", "TRIM", "CONCAT", "CONCATENATE",
-              "TODAY", "NOW", "YEAR", "MONTH", "DAY", "DATE", "DAYS"}
+CALC_FUNCS = {
+    "SUM",
+    "AVERAGE",
+    "AVG",
+    "MIN",
+    "MAX",
+    "COUNT",
+    "ROUND",
+    "ROUNDUP",
+    "ROUNDDOWN",
+    "ABS",
+    "INT",
+    "MOD",
+    "SQRT",
+    "POWER",
+    "IF",
+    "IFERROR",
+    "AND",
+    "OR",
+    "NOT",
+    "UPPER",
+    "LOWER",
+    "PROPER",
+    "LEN",
+    "LEFT",
+    "RIGHT",
+    "MID",
+    "TRIM",
+    "CONCAT",
+    "CONCATENATE",
+    "TODAY",
+    "NOW",
+    "YEAR",
+    "MONTH",
+    "DAY",
+    "DATE",
+    "DAYS",
+}
 EPOCH = _dt.datetime(1899, 12, 30)
 
 
@@ -297,6 +392,7 @@ def _xl_str(v):
 
 def _xl_round(x, d=0, mode="half"):
     import math
+
     f = 10 ** int(d)
     a = abs(float(x)) * f
     r = math.floor(a + 0.5 + 1e-9) if mode == "half" else math.ceil(a - 1e-9) if mode == "up" else math.floor(a + 1e-9)
@@ -312,6 +408,7 @@ def calc(expr, rec):
     computes. "#DIV/0!" for a division by zero; None when the formula uses something this does not know."""
     import ast
     import math
+
     s = str(expr).strip()
     s = s[1:] if s.startswith("=") else s
     names = {}
@@ -326,6 +423,7 @@ def calc(expr, rec):
             k = f"c{len(names)}"
             names[k] = m.group(1).strip().lower()
             return k
+
         p = re.sub(r"\[([^\]]+)\]", nm, p)
         p = re.sub(r"(\d+(?:\.\d+)?)\s*%", r"(\1/100)", p)
         p = p.replace("<>", "!=")
@@ -395,7 +493,7 @@ def calc(expr, rec):
                     raise _CalcError("#DIV/0!")
                 return a / b
             if isinstance(n.op, ast.Pow):
-                return a ** b
+                return a**b
             raise KeyError("op")
         if isinstance(n, ast.Compare) and len(n.ops) == 1:
             return cmp(ev(n.left), ev(n.comparators[0]), n.ops[0])
@@ -458,18 +556,19 @@ def calc(expr, rec):
             if f == "LEN":
                 return float(len(t))
             if f == "LEFT":
-                return t[:int(num(vals[1])) if len(vals) > 1 else 1]
+                return t[: int(num(vals[1])) if len(vals) > 1 else 1]
             if f == "RIGHT":
                 k = int(num(vals[1])) if len(vals) > 1 else 1
                 return t[-k:] if k else ""
             if f == "MID":
                 a = int(num(vals[1])) - 1
-                return t[a:a + int(num(vals[2]))]
+                return t[a : a + int(num(vals[2]))]
             if f == "TRIM":
                 return " ".join(t.split())
             if f in ("CONCAT", "CONCATENATE"):
                 return "".join(_xl_str(v) for v in vals)
         raise KeyError("unknown")
+
     try:
         return ev(tree)
     except _CalcError as e:

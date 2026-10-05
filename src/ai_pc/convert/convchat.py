@@ -11,6 +11,7 @@ is read back and checked, and its look measured against the original.
   c.say("undo") / c.say("go back to v1") / c.say("history") / c.say("record my screen for 20 seconds")
   c = ConvertChat.load(chat_id)                   a saved chat again
 """
+
 import datetime as dt
 import json
 import re
@@ -28,22 +29,110 @@ from ai_pc.core.config import ROOT
 from ai_pc.core.util import parse_json
 
 CHATS = ROOT / "out" / "convert" / "chats"
-UNDO = re.compile(r"^\s*(?:please\s+)?(?:undo(?: that| it| the last (?:change|one))?|revert(?: that| it)?|go back(?: one)?|take (?:that|it) back)"
-                  r"(?:\s+please)?\s*[.!]*\s*$", re.I)  # the whole message: 'go back to the video and make it 720p' is a change, not an undo
+UNDO = re.compile(
+    r"^\s*(?:please\s+)?(?:undo(?: that| it| the last (?:change|one))?|revert(?: that| it)?|go back(?: one)?|take (?:that|it) back)"
+    r"(?:\s+please)?\s*[.!]*\s*$",
+    re.I,
+)  # the whole message: 'go back to the video and make it 720p' is a change, not an undo
 REDO = re.compile(r"^\s*redo\b", re.I)
-GOTO = re.compile(r"\b(?:go back to|back to|restore|use|switch to)\s+(?:version\s*|v)(\d+)\b|\bback to the original\b|^\s*(?:the )?original\s*$", re.I)
+GOTO = re.compile(
+    r"\b(?:go back to|back to|restore|use|switch to)\s+(?:version\s*|v)(\d+)\b|\bback to the original\b|^\s*(?:the )?original\s*$", re.I
+)
 HISTORY = re.compile(r"^\s*(?:history|versions|show (?:me )?(?:the )?(?:history|versions))\b", re.I)
-SPLIT = re.compile(r"(?<=[.!?;])\s+|,?\s+(?:and then|then|and also|also|after that)\s+|,?\s+and\s+(?=(?:make|remove|cut|add|put|take|reduce|fade|speed|slow|"
-                   r"normali[sz]e|save|export|convert|give|burn|trim|keep|turn|rotate|crop|split|join|merge|change|fix|extract|compress|shrink|send|"
-                   r"stabili[sz]e|mute|flip|mirror)\b)", re.I)
+SPLIT = re.compile(
+    r"(?<=[.!?;])\s+|,?\s+(?:and then|then|and also|also|after that)\s+|,?\s+and\s+(?=(?:make|remove|cut|add|put|take|reduce|fade|speed|slow|"
+    r"normali[sz]e|save|export|convert|give|burn|trim|keep|turn|rotate|crop|split|join|merge|change|fix|extract|compress|shrink|send|"
+    r"stabili[sz]e|mute|flip|mirror)\b)",
+    re.I,
+)
 # a later change of one of these kinds replaces the earlier one; trims, cuts, joins, speed, turns, volume and sync stack
-FAMILIES = [{"target"}, {"format", "extract_audio", "gif", "video"}, {"codec"}, {"compress", "quality"}, {"resize"}, {"fps"}, {"aspect"}, {"bars"},
-            {"crop"}, {"stabilize"}, {"denoise"}, {"sharpen"}, {"gray"}, {"logo"}, {"subtitles"}, {"fade"}, {"mute", "audio"}, {"normalize"}, {"mono"},
-            {"split"}, {"hw"}, {"deinterlace"}, {"exact", "lossless"}, {"smooth"}]
-PICTURE_OPS = {"resize", "fps", "aspect", "rotate", "flip", "bars", "crop", "stabilize", "denoise", "sharpen", "gray", "logo", "subtitles", "deinterlace"}
-KNOWN = {"trim", "cut", "join", "speed", "format", "codec", "compress", "quality", "target", "resize", "fps", "aspect", "rotate", "flip", "bars", "crop",
-         "deinterlace", "stabilize", "denoise", "sharpen", "gray", "logo", "subtitles", "fade", "mute", "audio", "volume", "normalize", "sync", "mono",
-         "extract_audio", "gif", "frames", "split", "video", "hw", "lossless", "exact", "smooth", "ask", "save", "record", "record_stop"}
+FAMILIES = [
+    {"target"},
+    {"format", "extract_audio", "gif", "video"},
+    {"codec"},
+    {"compress", "quality"},
+    {"resize"},
+    {"fps"},
+    {"aspect"},
+    {"bars"},
+    {"crop"},
+    {"stabilize"},
+    {"denoise"},
+    {"sharpen"},
+    {"gray"},
+    {"logo"},
+    {"subtitles"},
+    {"fade"},
+    {"mute", "audio"},
+    {"normalize"},
+    {"mono"},
+    {"split"},
+    {"hw"},
+    {"deinterlace"},
+    {"exact", "lossless"},
+    {"smooth"},
+]
+PICTURE_OPS = {
+    "resize",
+    "fps",
+    "aspect",
+    "rotate",
+    "flip",
+    "bars",
+    "crop",
+    "stabilize",
+    "denoise",
+    "sharpen",
+    "gray",
+    "logo",
+    "subtitles",
+    "deinterlace",
+}
+KNOWN = {
+    "trim",
+    "cut",
+    "join",
+    "speed",
+    "format",
+    "codec",
+    "compress",
+    "quality",
+    "target",
+    "resize",
+    "fps",
+    "aspect",
+    "rotate",
+    "flip",
+    "bars",
+    "crop",
+    "deinterlace",
+    "stabilize",
+    "denoise",
+    "sharpen",
+    "gray",
+    "logo",
+    "subtitles",
+    "fade",
+    "mute",
+    "audio",
+    "volume",
+    "normalize",
+    "sync",
+    "mono",
+    "extract_audio",
+    "gif",
+    "frames",
+    "split",
+    "video",
+    "hw",
+    "lossless",
+    "exact",
+    "smooth",
+    "ask",
+    "save",
+    "record",
+    "record_stop",
+}
 CONVERT_SYSTEM = """You turn a person's request about a video or sound file into changes for a converter program. Reply with ONE JSON
 object: {"ops": [...]} or {"ask": "<short question back>"}. Each op is {"op": NAME, "args": {...}}:
  target {"name": "whatsapp|email|discord|telegram|slack|instagram|instagram_post|instagram_story|tiktok|youtube|youtube_shorts|facebook|linkedin|x|web|iphone|android|tv|powerpoint|editing|archive|everywhere"}
@@ -82,9 +171,21 @@ class ConvertChat:
             folder = base / f"convert_{stem}_{time.strftime('%H%M%S')}_{k}"
             k += 1
         folder.mkdir(parents=True)
-        state = {"id": folder.name, "folder": str(folder), "sources": [], "versions": [], "cur": -1, "redo": [], "turns": [], "exports": [], "extras": [],
-                 "recording": None, "earlier": [], "said_notes": [],
-                 "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in list(files or []) + ([src] if src else [])}}
+        state = {
+            "id": folder.name,
+            "folder": str(folder),
+            "sources": [],
+            "versions": [],
+            "cur": -1,
+            "redo": [],
+            "turns": [],
+            "exports": [],
+            "extras": [],
+            "recording": None,
+            "earlier": [],
+            "said_notes": [],
+            "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in list(files or []) + ([src] if src else [])},
+        }
         c = cls(state, planner=planner, log=log)
         if src:
             c._open(Path(src).resolve())
@@ -104,8 +205,22 @@ class ConvertChat:
             self.state["earlier"].append({"sources": self.state["sources"], "versions": self.state["versions"], "cur": self.state["cur"]})
         self.state["sources"] = [p]
         self.state["files"][Path(src).name.lower()] = str(src)
-        self.state["versions"] = [{"v": 0, "ops": [], "outputs": [str(src)], "kind": "original", "size": p["size"], "summary": MD.describe(p), "checks": [],
-                                   "notes": [], "quality": None, "said": "(the original)", "parent": -1, "when": _when()}]
+        self.state["versions"] = [
+            {
+                "v": 0,
+                "ops": [],
+                "outputs": [str(src)],
+                "kind": "original",
+                "size": p["size"],
+                "summary": MD.describe(p),
+                "checks": [],
+                "notes": [],
+                "quality": None,
+                "said": "(the original)",
+                "parent": -1,
+                "when": _when(),
+            }
+        ]
         self.state["cur"], self.state["redo"] = 0, []
 
     def cur(self):
@@ -151,8 +266,10 @@ class ConvertChat:
                 ops += r["ops"]
             if ops:
                 out.append(self._apply(ops, message, instead))
-        reply = "\n".join(x for x in out if x).strip() or ("Tell me what to do with it, e.g. 'make it ready for WhatsApp', 'under 10 MB', 'convert to mp4', "
-                                                          "'cut the first 5 seconds', 'make a GIF of 0:05 to 0:08', 'extract the audio as mp3'.")
+        reply = "\n".join(x for x in out if x).strip() or (
+            "Tell me what to do with it, e.g. 'make it ready for WhatsApp', 'under 10 MB', 'convert to mp4', "
+            "'cut the first 5 seconds', 'make a GIF of 0:05 to 0:08', 'extract the audio as mp3'."
+        )
         turn.update(reply=reply, seconds=round(time.perf_counter() - t0, 2), v_to=self.state["cur"])
         self.state["turns"].append(turn)
         self.last_turn = turn
@@ -161,12 +278,19 @@ class ConvertChat:
 
     def _ctx(self):
         s = self.src
-        return {"duration": (self.cur() or {}).get("duration") or (s or {}).get("duration"), "has_video": bool(s and s.get("video")),
-                "has_audio": bool(s and s.get("audio")), "files": self.state["files"]}
+        return {
+            "duration": (self.cur() or {}).get("duration") or (s or {}).get("duration"),
+            "has_video": bool(s and s.get("video")),
+            "has_audio": bool(s and s.get("audio")),
+            "files": self.state["files"],
+        }
 
     def _adopt(self, message):
         """A chat started without a file takes the first video or sound file the message names."""
-        for name in re.findall(r"([A-Za-z]:\\[^\"'<>|]+?\.\w{2,4}|[\w\-.()]+\.(?:mp4|mov|mkv|webm|avi|m4v|wmv|flv|3gp|ts|mpg|mp3|wav|m4a|aac|flac|ogg|opus|wma))\b", message):
+        for name in re.findall(
+            r"([A-Za-z]:\\[^\"'<>|]+?\.\w{2,4}|[\w\-.()]+\.(?:mp4|mov|mkv|webm|avi|m4v|wmv|flv|3gp|ts|mpg|mp3|wav|m4a|aac|flac|ogg|opus|wma))\b",
+            message,
+        ):
             p = self._resolve(name)
             if p:
                 try:
@@ -185,19 +309,33 @@ class ConvertChat:
 
     def _llm(self, clause, message):
         if self.planner is None:
-            return {"ops": [], "ask": f"I could not read '{clause}'. Try e.g. 'make it ready for WhatsApp', 'under 10 MB', 'convert to mp4', "
-                                       "'cut the first 5 seconds', 'make a GIF', 'extract the audio as mp3'."}
+            return {
+                "ops": [],
+                "ask": f"I could not read '{clause}'. Try e.g. 'make it ready for WhatsApp', 'under 10 MB', 'convert to mp4', "
+                "'cut the first 5 seconds', 'make a GIF', 'extract the audio as mp3'.",
+            }
         self._turn["llm"] = True
         v, s = self.cur(), self.src
-        ctx = (f"FILE: {MD.describe(s)}; now v{self.state['cur']}: {(v or {}).get('summary', '')}; changes so far: "
-               f"{[o['op'] for o in (v or {}).get('ops', [])]}; files named before: {list(self.state['files'])}") if s else "FILE: none open yet"
+        ctx = (
+            (
+                f"FILE: {MD.describe(s)}; now v{self.state['cur']}: {(v or {}).get('summary', '')}; changes so far: "
+                f"{[o['op'] for o in (v or {}).get('ops', [])]}; files named before: {list(self.state['files'])}"
+            )
+            if s
+            else "FILE: none open yet"
+        )
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": CONVERT_SYSTEM},
-                                            {"role": "user", "content": f"{ctx}\nMESSAGE: {message}\nREQUEST: {clause}"}])
+            r = self.planner._call(
+                "fast", [{"role": "system", "content": CONVERT_SYSTEM}, {"role": "user", "content": f"{ctx}\nMESSAGE: {message}\nREQUEST: {clause}"}]
+            )
             d = parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return {"ops": [], "ask": f"I could not work that out ({type(e).__name__})."}
-        ops = [o if "args" in o else {"op": o.get("op"), "args": {k: v_ for k, v_ in o.items() if k != "op"}} for o in d.get("ops") or [] if isinstance(o, dict)]
+        ops = [
+            o if "args" in o else {"op": o.get("op"), "args": {k: v_ for k, v_ in o.items() if k != "op"}}
+            for o in d.get("ops") or []
+            if isinstance(o, dict)
+        ]
         ops = [o for o in ops if o.get("op") in KNOWN and isinstance(o.get("args") or {}, dict)]
         for o in ops:
             o["args"] = o.get("args") or {}
@@ -256,8 +394,11 @@ class ConvertChat:
             if o["op"] == "join":
                 names = a.get("files") or []
                 if names == "all":
-                    names = [n for n in self.state["files"] if Path(self.state["files"][n]) != Path(self.src["path"])
-                             and Path(n).suffix.lower() in MD.VIDEO_EXTS]
+                    names = [
+                        n
+                        for n in self.state["files"]
+                        if Path(self.state["files"][n]) != Path(self.src["path"]) and Path(n).suffix.lower() in MD.VIDEO_EXTS
+                    ]
                 srcs = []
                 for n in names:
                     p = self._resolve(n)
@@ -292,12 +433,28 @@ class ConvertChat:
         except (P.PlanError, MD.MediaError, E.EncodeError, R.RecordError) as e:
             return f"Couldn't do that: {e}."
         if r["status"] == "no_gain":
-            return (f"It is already compressed about as far as it goes: at the same look it would still be about {MD.human(r['predicted'])} "
-                    f"(it is {MD.human(r['est'])} now). Say e.g. 'under {max(1, int(r['est'] / 1e6 * 0.6))} MB' to squeeze it anyway, trading some quality.")
+            return (
+                f"It is already compressed about as far as it goes: at the same look it would still be about {MD.human(r['predicted'])} "
+                f"(it is {MD.human(r['est'])} now). Say e.g. 'under {max(1, int(r['est'] / 1e6 * 0.6))} MB' to squeeze it anyway, trading some quality."
+            )
         p = r["probe"]
-        nv = {"v": n, "ops": chain, "outputs": r["outputs"], "kind": r["kind"], "size": r["size"], "summary": MD.describe(p) if p else f"{len(r['outputs'])} files",
-              "duration": (p or {}).get("duration"), "checks": r["checks"], "notes": r["notes"], "quality": r["quality"], "said": said,
-              "parent": self.state["cur"], "when": _when(), "seconds": r["seconds"], "search": r.get("search")}
+        nv = {
+            "v": n,
+            "ops": chain,
+            "outputs": r["outputs"],
+            "kind": r["kind"],
+            "size": r["size"],
+            "summary": MD.describe(p) if p else f"{len(r['outputs'])} files",
+            "duration": (p or {}).get("duration"),
+            "checks": r["checks"],
+            "notes": r["notes"],
+            "quality": r["quality"],
+            "said": said,
+            "parent": self.state["cur"],
+            "when": _when(),
+            "seconds": r["seconds"],
+            "search": r.get("search"),
+        }
         self.state["versions"].append(nv)
         self.state["cur"], self.state["redo"] = n, []
         made = self._words(nv)
@@ -317,13 +474,18 @@ class ConvertChat:
             if v and nv["kind"] in ("gif", "webp"):
                 what = f"{nv['kind'].upper()} {v['w']}x{v['h']}, {round(v['fps'])} fps"
             elif v:
-                what = f"{v['w']}x{v['h']} at {v['fps']:g} fps, {MD.CODEC_WORDS.get(v['codec'], v['codec'])}" + (f" + {MD.CODEC_WORDS.get(a['codec'], a['codec'])}" if a else
-                                                                                                                 ", no sound")
+                what = f"{v['w']}x{v['h']} at {v['fps']:g} fps, {MD.CODEC_WORDS.get(v['codec'], v['codec'])}" + (
+                    f" + {MD.CODEC_WORDS.get(a['codec'], a['codec'])}" if a else ", no sound"
+                )
             else:
                 what = f"{MD.CODEC_WORDS.get(a['codec'], a['codec'])} sound, {round(p['bitrate'] / 1000)} kbps"
             change = ""
-            whole = src and abs(p["duration"] - src["duration"]) < max(2.0, src["duration"] * 0.03) and bool(v) == bool(src.get("video")) and \
-                nv["kind"] not in ("gif", "webp")
+            whole = (
+                src
+                and abs(p["duration"] - src["duration"]) < max(2.0, src["duration"] * 0.03)
+                and bool(v) == bool(src.get("video"))
+                and nv["kind"] not in ("gif", "webp")
+            )
             if whole and src["size"]:
                 pct = (1 - p["size"] / src["size"]) * 100
                 change = f" (was {MD.human(src['size'])}, {pct:.0f}% smaller)" if pct >= 1 else f" (was {MD.human(src['size'])})"
@@ -355,7 +517,9 @@ class ConvertChat:
 
     def _frames(self, o):
         v = self.cur()
-        chain = [x for x in v["ops"] if x["op"] not in ("format", "extract_audio", "gif", "video", "compress", "quality", "target", "codec", "split")] + [o]
+        chain = [
+            x for x in v["ops"] if x["op"] not in ("format", "extract_audio", "gif", "video", "compress", "quality", "target", "codec", "split")
+        ] + [o]
         k = len(self.state["extras"]) + 1
         try:
             r = E.render(chain, self._resolve_ops(chain), self.folder, f"pictures{k}", log=self.log)
@@ -397,14 +561,16 @@ class ConvertChat:
                 return f"Couldn't finish the recording: {e}."
             return self._recorded(path, rec)
         self.state["recording"] = rec
-        return (f"Recording screen {rec['screen']}" + (" with the microphone" if rec.get("mic") else "") + ". Say 'stop recording' when you are done.")
+        return f"Recording screen {rec['screen']}" + (" with the microphone" if rec.get("mic") else "") + ". Say 'stop recording' when you are done."
 
     def _recorded(self, path, rec):
         self._open(Path(path))
         p = self.src
         mic = " with the microphone" if rec.get("mic") else " (no sound)" if not p.get("audio") else ""
-        return (f"Recorded {MD.mmss(p['duration'])} of screen {rec['screen']}{mic}: {Path(path).name}, {p['video']['w']}x{p['video']['h']}, "
-                f"{MD.human(p['size'])}. Say what to do with it, e.g. 'cut the first 3 seconds', 'make it a GIF' or 'save it to my desktop'.")
+        return (
+            f"Recorded {MD.mmss(p['duration'])} of screen {rec['screen']}{mic}: {Path(path).name}, {p['video']['w']}x{p['video']['h']}, "
+            f"{MD.human(p['size'])}. Say what to do with it, e.g. 'cut the first 3 seconds', 'make it a GIF' or 'save it to my desktop'."
+        )
 
     # ---------------------------------------------------------------- answers
     def answer(self, a):
@@ -430,8 +596,15 @@ class ConvertChat:
         if what == "quality":
             if v["v"] and v.get("quality") is not None:
                 q = v["quality"]
-                word = "hard to tell apart from the original" if q >= 93 else "close to the original" if q >= 85 else \
-                    "a little softer than the original" if q >= 75 else "visibly worse than the original"
+                word = (
+                    "hard to tell apart from the original"
+                    if q >= 93
+                    else "close to the original"
+                    if q >= 85
+                    else "a little softer than the original"
+                    if q >= 75
+                    else "visibly worse than the original"
+                )
                 return f"v{v['v']} looks {q:.0f}/100 like the original (VMAF): {word}."
             vv = cur_p.get("video")
             if not vv:
@@ -439,7 +612,9 @@ class ConvertChat:
                 return f"It is sound only: {MD.CODEC_WORDS.get(a_.get('codec'), a_.get('codec'))} at about {round((a_.get('bitrate') or cur_p['bitrate']) / 1000)} kbps."
             bpp = cur_p["bitrate"] / max(1, vv["w"] * vv["h"] * (vv["fps"] or 30))
             word = "plenty of detail kept" if bpp > 0.12 else "normal for its size" if bpp > 0.05 else "quite compressed already"
-            return f"{cur_p['name']}: {vv['w']}x{vv['h']} at {cur_p['bitrate'] / 1e6:.1f} Mbps - {word}. (Only changed versions get a measured score.)"
+            return (
+                f"{cur_p['name']}: {vv['w']}x{vv['h']} at {cur_p['bitrate'] / 1e6:.1f} Mbps - {word}. (Only changed versions get a measured score.)"
+            )
         if what == "compare":
             if not v["v"]:
                 return "Nothing has been changed yet: this is the original."
@@ -464,8 +639,17 @@ class ConvertChat:
             dest = Path(s["path"]).parent
         else:
             from ai_pc.windows import fs as WF
-            dest = WF.known({"download": "downloads", "document": "documents", "video": "videos", "picture": "pictures", "photo": "pictures",
-                             "photos": "pictures"}.get(where, where))
+
+            dest = WF.known(
+                {
+                    "download": "downloads",
+                    "document": "documents",
+                    "video": "videos",
+                    "picture": "pictures",
+                    "photo": "pictures",
+                    "photos": "pictures",
+                }.get(where, where)
+            )
             if not dest:
                 return f"I don't know the folder '{where}'."
         files = v["outputs"] if v["v"] else []

@@ -14,6 +14,7 @@ resolve() turns a plan into a resolved plan, which is the only thing the builder
   - character effects are checked against where faces actually are, and text is kept inside the platform's safe zone;
   - every problem and every fix is written to notes.
 """
+
 import difflib
 import hashlib
 import json
@@ -30,8 +31,15 @@ MEDIA = ROOT / "media"
 DERIVED = MEDIA / "derived"
 NO_WINDOW = 0x08000000
 
-ASPECTS = {"16:9": (1920, 1080), "9:16": (1080, 1920), "1:1": (1080, 1080), "4:5": (1080, 1350), "3:4": (1080, 1440),
-           "4:3": (1440, 1080), "21:9": (2520, 1080)}
+ASPECTS = {
+    "16:9": (1920, 1080),
+    "9:16": (1080, 1920),
+    "1:1": (1080, 1080),
+    "4:5": (1080, 1350),
+    "3:4": (1080, 1440),
+    "4:3": (1440, 1080),
+    "21:9": (2520, 1080),
+}
 # where the app's own buttons and captions cover the picture (fractions of the frame), and other platform facts
 PLATFORMS = {
     "instagram_reels": {"aspect": "9:16", "max_s": 90, "safe": {"top": 0.13, "bottom": 0.22, "left": 0.05, "right": 0.12}},
@@ -45,34 +53,116 @@ DEFAULT_SAFE = {"top": 0.05, "bottom": 0.08, "left": 0.04, "right": 0.04}
 
 EFFECT_CATS = ("scene_effect", "character_effect")
 # recipe / camera-move names a planner sometimes writes as an effect name: done as the move itself
-MOVE_NAMES = {"zoom punch": "zoom", "punch zoom": "zoom", "punch in": "zoom", "zoom hit": "zoom", "punch in zoom": "zoom",
-              "camera shake": "shake", "shake hit": "shake", "screen shake": "shake", "shake": "shake"}
+MOVE_NAMES = {
+    "zoom punch": "zoom",
+    "punch zoom": "zoom",
+    "punch in": "zoom",
+    "zoom hit": "zoom",
+    "punch in zoom": "zoom",
+    "camera shake": "shake",
+    "shake hit": "shake",
+    "screen shake": "shake",
+    "shake": "shake",
+}
 CLIP_ANIM = {"intro": "clip_intro", "outro": "clip_outro", "combo": "clip_combo"}
 TEXT_ANIM = {"intro": "text_intro", "outro": "text_outro", "loop": "text_loop"}
 AUDIO_FX = ("audio_effect", "voice", "speech_to_song")
 MASKS = {"linear": "线性", "mirror": "镜面", "circle": "圆形", "rectangle": "矩形", "rect": "矩形", "heart": "爱心", "star": "星形"}
-BLENDS = {"multiply": "正片叠底", "color dodge": "颜色减淡", "color burn": "颜色加深", "linear burn": "线性加深",
-          "soft light": "柔光", "hard light": "强光", "screen": "滤色", "overlay": "叠加", "lighten": "变亮", "darken": "变暗"}
+BLENDS = {
+    "multiply": "正片叠底",
+    "color dodge": "颜色减淡",
+    "color burn": "颜色加深",
+    "linear burn": "线性加深",
+    "soft light": "柔光",
+    "hard light": "强光",
+    "screen": "滤色",
+    "overlay": "叠加",
+    "lighten": "变亮",
+    "darken": "变暗",
+}
 # edit types the planner may write -> (our type, animation kind)
-TYPE_ALIASES = {"character_effect": ("effect", None), "scene_effect": ("effect", None), "effects": ("effect", None),
-                "video_effect": ("effect", None), "fx": ("effect", None), "filters": ("filter", None), "look": ("filter", None),
-                "color_grade": ("filter", None), "transitions": ("transition", None), "clip_intro": ("animation", "intro"),
-                "clip_outro": ("animation", "outro"), "clip_combo": ("animation", "combo"), "text_intro": ("animation", "intro"),
-                "text_outro": ("animation", "outro"), "text_loop": ("animation", "loop"), "anim": ("animation", None),
-                "animations": ("animation", None), "camera_shake": ("shake", None), "zoom_punch": ("zoom", None),
-                "punch_in": ("zoom", None), "push_in": ("zoom", None), "keyframe": ("keyframes", None), "title": ("text", None),
-                "label": ("text", None), "titles": ("text", None), "subtitle": ("captions", None), "subtitles": ("captions", None),
-                "caption": ("captions", None), "music": ("audio", None), "sound": ("audio", None),
-                "voiceover": ("audio", None), "sound_effect": ("sfx", None), "sound_fx": ("sfx", None), "sfx": ("sfx", None)}
-SFX_ALIASES = {"boom": "impact", "bass_hit": "hit", "punch": "hit", "kick": "hit", "swish": "swoosh", "rise": "riser",
-               "build_up": "riser", "buildup": "riser", "uplifter": "riser", "drop": "sub_drop", "bass_drop": "sub_drop",
-               "lightning": "thunder", "crack": "thunder", "digital": "glitch", "stutter": "glitch", "woosh": "whoosh"}
-KF_PROPS = {"scale": "scale", "zoom": "scale", "x": "x", "position_x": "x", "y": "y", "position_y": "y", "rotation": "rotation",
-            "rotate": "rotation", "opacity": "alpha", "alpha": "alpha", "brightness": "brightness", "contrast": "contrast",
-            "saturation": "saturation", "volume": "volume"}
+TYPE_ALIASES = {
+    "character_effect": ("effect", None),
+    "scene_effect": ("effect", None),
+    "effects": ("effect", None),
+    "video_effect": ("effect", None),
+    "fx": ("effect", None),
+    "filters": ("filter", None),
+    "look": ("filter", None),
+    "color_grade": ("filter", None),
+    "transitions": ("transition", None),
+    "clip_intro": ("animation", "intro"),
+    "clip_outro": ("animation", "outro"),
+    "clip_combo": ("animation", "combo"),
+    "text_intro": ("animation", "intro"),
+    "text_outro": ("animation", "outro"),
+    "text_loop": ("animation", "loop"),
+    "anim": ("animation", None),
+    "animations": ("animation", None),
+    "camera_shake": ("shake", None),
+    "zoom_punch": ("zoom", None),
+    "punch_in": ("zoom", None),
+    "push_in": ("zoom", None),
+    "keyframe": ("keyframes", None),
+    "title": ("text", None),
+    "label": ("text", None),
+    "titles": ("text", None),
+    "subtitle": ("captions", None),
+    "subtitles": ("captions", None),
+    "caption": ("captions", None),
+    "music": ("audio", None),
+    "sound": ("audio", None),
+    "voiceover": ("audio", None),
+    "sound_effect": ("sfx", None),
+    "sound_fx": ("sfx", None),
+    "sfx": ("sfx", None),
+}
+SFX_ALIASES = {
+    "boom": "impact",
+    "bass_hit": "hit",
+    "punch": "hit",
+    "kick": "hit",
+    "swish": "swoosh",
+    "rise": "riser",
+    "build_up": "riser",
+    "buildup": "riser",
+    "uplifter": "riser",
+    "drop": "sub_drop",
+    "bass_drop": "sub_drop",
+    "lightning": "thunder",
+    "crack": "thunder",
+    "digital": "glitch",
+    "stutter": "glitch",
+    "woosh": "whoosh",
+}
+KF_PROPS = {
+    "scale": "scale",
+    "zoom": "scale",
+    "x": "x",
+    "position_x": "x",
+    "y": "y",
+    "position_y": "y",
+    "rotation": "rotation",
+    "rotate": "rotation",
+    "opacity": "alpha",
+    "alpha": "alpha",
+    "brightness": "brightness",
+    "contrast": "contrast",
+    "saturation": "saturation",
+    "volume": "volume",
+}
 MAX_SCALE = 5.0  # JianYing caps clip scale at 500%: keyframes above it are flattened (measured: x1.4 zoom on a 506% clip = no zoom)
-KF_RANGE = {"scale": (0.05, 10), "x": (-3, 3), "y": (-3, 3), "rotation": (-3600, 3600), "alpha": (0, 1),
-            "brightness": (-1, 1), "contrast": (-1, 1), "saturation": (-1, 1), "volume": (0, 4)}
+KF_RANGE = {
+    "scale": (0.05, 10),
+    "x": (-3, 3),
+    "y": (-3, 3),
+    "rotation": (-3600, 3600),
+    "alpha": (0, 1),
+    "brightness": (-1, 1),
+    "contrast": (-1, 1),
+    "saturation": (-1, 1),
+    "volume": (0, 4),
+}
 
 
 def _n(v, lo, hi, d):
@@ -92,7 +182,7 @@ def _hex(v, d=None):
 
 def _rgb(hexcolor):
     h = hexcolor.lstrip("#")
-    return tuple(round(int(h[i:i + 2], 16) / 255, 4) for i in (0, 2, 4))
+    return tuple(round(int(h[i : i + 2], 16) / 255, 4) for i in (0, 2, 4))
 
 
 # ------------------------------------------------------------------------------------------------ catalogue lookups
@@ -108,6 +198,7 @@ class Catalog:
 
     def __init__(self, engine="jianying"):
         from ai_pc.video import jyres
+
         self.index = kb.Index(engine)
         self.engine = engine
         st = jyres.states() if engine == "jianying" else {}
@@ -142,6 +233,7 @@ class Catalog:
 
     def enum(self, key):
         import pyJianYingDraft as jy
+
         it = self.index.items[key]
         return getattr(getattr(jy, kb.CATEGORIES[it["category"]][0]), it["name"])
 
@@ -154,8 +246,7 @@ class Catalog:
         cats = [categories] if isinstance(categories, str) else list(categories)
         pro_hit = None
         for c in cats:
-            for table, k in ((self.by_name, (c, w.lower())), (self.by_en, (c, w.lower())),
-                             (self.by_name, (c, w.lower().replace(" ", "_")))):
+            for table, k in ((self.by_name, (c, w.lower())), (self.by_en, (c, w.lower())), (self.by_name, (c, w.lower().replace(" ", "_")))):
                 key = table.get(k)
                 if key:
                     if not self.index.items[key]["pro"] and key not in self.missing:
@@ -164,16 +255,23 @@ class Catalog:
         if not pro_hit:
             other = [k for k in self.exact(w) if self.index.items[k]["category"] not in cats]
             if other:  # it is a real item of ANOTHER kind (a text animation written as an effect...): never guess a stand-in
-                notes.append(f"{where}'{w}' is a {self.index.items[other[0]]['category'].replace('_', ' ')}, not a "
-                             f"{'/'.join(c.replace('_', ' ') for c in cats)}; dropped")
+                notes.append(
+                    f"{where}'{w}' is a {self.index.items[other[0]]['category'].replace('_', ' ')}, not a "
+                    f"{'/'.join(c.replace('_', ' ') for c in cats)}; dropped"
+                )
                 return None
         if pro_hit:
             # a VIP item: its own words are the best query for a free look-alike; its own category first
             n = self.index.notes.get(pro_hit, {})
             f"{n.get('en', '')} {n.get('desc', '')} {' '.join(n.get('tags', []))} {n.get('target', '')}"
             own = self.index.items[pro_hit]["category"]
-            why = ("is VIP-only" if pro_hit not in self.missing else
-                   {"login": "needs a JianYing account to export", "invisible": "did not render in earlier exports"}.get(jyres_state(pro_hit), "does not download here"))
+            why = (
+                "is VIP-only"
+                if pro_hit not in self.missing
+                else {"login": "needs a JianYing account to export", "invisible": "did not render in earlier exports"}.get(
+                    jyres_state(pro_hit), "does not download here"
+                )
+            )
             for cs in ([own], cats):
                 key = self.lookalike(pro_hit, cs)
                 if key:
@@ -184,8 +282,11 @@ class Catalog:
                 return None
         # close spelling of an original name (e.g. a dropped "_II")
         for c in cats:
-            names = [n for (cc, n) in self.by_name if cc == c and not self.index.items[self.by_name[(cc, n)]]["pro"]
-                     and self.by_name[(cc, n)] not in self.missing]
+            names = [
+                n
+                for (cc, n) in self.by_name
+                if cc == c and not self.index.items[self.by_name[(cc, n)]]["pro"] and self.by_name[(cc, n)] not in self.missing
+            ]
             best = difflib.get_close_matches(w.lower(), names, n=1, cutoff=0.8)
             if best:
                 key = self.by_name[(c, best[0])]
@@ -240,8 +341,11 @@ class Catalog:
         """Items of `categories` known to work here (exported first, then downloaded), the ones most like `query`
         first; then (unless related_only) the remaining known ones, most proven first."""
         cats = [categories] if isinstance(categories, str) else list(categories)
-        known = {k: f for k, f in self.boost.items() if k.split(":", 1)[0] in cats and k not in self.missing and k not in exclude
-                 and k in self.index.items and not self.index.items[k]["pro"]}
+        known = {
+            k: f
+            for k, f in self.boost.items()
+            if k.split(":", 1)[0] in cats and k not in self.missing and k not in exclude and k in self.index.items and not self.index.items[k]["pro"]
+        }
         if not known:
             return []
         hits = self.index.search(query, categories=cats, free_only=True, k=400, exclude=self.missing | set(exclude), boost=self.rank)
@@ -271,6 +375,7 @@ class Catalog:
 # ------------------------------------------------------------------------------------------------ derived media
 def jyres_state(key):
     from ai_pc.video import jyres
+
     return jyres.states().get(key)
 
 
@@ -284,9 +389,35 @@ def reversed_clip(path, start, span):
     tag = hashlib.sha1(f"{Path(path).name}|{start:.3f}|{span:.3f}".encode()).hexdigest()[:10]
     out = _derived(f"{Path(path).stem[:30]}_rev_{tag}.mp4")
     if not out.exists():
-        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{start:.3f}", "-t", f"{span:.3f}", "-i", str(path),
-                            "-vf", "reverse", "-af", "areverse", "-c:v", "libx264", "-preset", "veryfast", "-crf", "16",
-                            "-c:a", "aac", str(out)], capture_output=True, creationflags=NO_WINDOW)
+        r = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-ss",
+                f"{start:.3f}",
+                "-t",
+                f"{span:.3f}",
+                "-i",
+                str(path),
+                "-vf",
+                "reverse",
+                "-af",
+                "areverse",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "16",
+                "-c:a",
+                "aac",
+                str(out),
+            ],
+            capture_output=True,
+            creationflags=NO_WINDOW,
+        )
         if r.returncode != 0 or not out.exists():
             raise RuntimeError("reverse failed: " + r.stderr.decode("utf-8", "ignore")[-200:])
     return out
@@ -296,8 +427,11 @@ def still_frame(path, t):
     """One frame of a video as a PNG (for freeze frames)."""
     out = _derived(f"{Path(path).stem[:30]}_still_{t:.2f}.png".replace(":", "_"))
     if not out.exists():
-        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0, t):.3f}", "-i", str(path), "-frames:v", "1", str(out)],
-                           capture_output=True, creationflags=NO_WINDOW)
+        r = subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0, t):.3f}", "-i", str(path), "-frames:v", "1", str(out)],
+            capture_output=True,
+            creationflags=NO_WINDOW,
+        )
         if r.returncode != 0 or not out.exists():
             raise RuntimeError("still frame failed: " + r.stderr.decode("utf-8", "ignore")[-200:])
     return out
@@ -317,7 +451,7 @@ def framing(src_w, src_h, W, H, mode, focus=None, target=(0.5, 0.5), zoom=1.0):
     fx, fy = focus or (0.5, 0.5)
     tx, ty = target
     sx = (tx - 0.5) * W - (fx - 0.5) * dw
-    sy = (ty - 0.5) * H - (fy - 0.5) * dh                 # pixels, y down
+    sy = (ty - 0.5) * H - (fy - 0.5) * dh  # pixels, y down
     mx, my = max(0.0, (dw - W) / 2), max(0.0, (dh - H) / 2)
     sx, sy = min(max(sx, -mx), mx), min(max(sy, -my), my)
     return {"scale": round(k, 4), "x": round(sx / (W / 2), 4), "y": round(-sy / (H / 2), 4)}
@@ -327,7 +461,7 @@ def visible_box(src_w, src_h, W, H, st):
     """Which part of the source (x, y, w, h as 0-1, y down) is visible on the canvas with clip settings `st`."""
     s = min(W / src_w, H / src_h) * st["scale"]
     dw, dh = src_w * s, src_h * s
-    cx, cy = W / 2 + st["x"] * W / 2, H / 2 - st["y"] * H / 2   # where the clip's centre lands on the canvas
+    cx, cy = W / 2 + st["x"] * W / 2, H / 2 - st["y"] * H / 2  # where the clip's centre lands on the canvas
     x0, y0 = (0 - (cx - dw / 2)) / dw, (0 - (cy - dh / 2)) / dh
     return [round(x0, 4), round(y0, 4), round(W / dw, 4), round(H / dh, 4)]
 
@@ -338,8 +472,8 @@ def _shake_offsets(t, dur, amp, seed):
     if t < 0 or t > dur:
         return 0.0, 0.0
     env = (1 - t / dur) ** 0.7 if dur > 0 else 0
-    a = (math.sin(2 * math.pi * 7.3 * t + seed) * 0.6 + math.sin(2 * math.pi * 12.1 * t + 2 * seed) * 0.4)
-    b = (math.sin(2 * math.pi * 6.1 * t + 3 * seed) * 0.6 + math.sin(2 * math.pi * 10.7 * t + seed) * 0.4)
+    a = math.sin(2 * math.pi * 7.3 * t + seed) * 0.6 + math.sin(2 * math.pi * 12.1 * t + 2 * seed) * 0.4
+    b = math.sin(2 * math.pi * 6.1 * t + 3 * seed) * 0.6 + math.sin(2 * math.pi * 10.7 * t + seed) * 0.4
     return amp * env * a, amp * env * b * 0.8
 
 
@@ -348,7 +482,7 @@ def _zoom_factor(t, dur, to, back):
         return 1.0
     if not back:
         u = min(1.0, t / dur) if dur > 0 else 1.0
-        return 1 + (to - 1) * (1 - (1 - u) ** 2)              # ease out, then hold
+        return 1 + (to - 1) * (1 - (1 - u) ** 2)  # ease out, then hold
     if t >= dur:
         return 1.0
     rise = max(0.06, min(0.15, dur * 0.25))
@@ -407,9 +541,16 @@ class Resolver:
         """The point of a source worth keeping in view over [t0, t1]: the main face, else the centre."""
         if a["kind"] == "image":
             f = a.get("faces") or []
-            return ((f[0]["box"][0] + f[0]["box"][2] / 2, f[0]["box"][1] + f[0]["box"][3] / 2), True) if f and f[0]["box"][2] * f[0]["box"][3] > 0.002 else ((0.5, 0.5), False)
-        pts = [x["faces"][0] for x in a.get("faces", []) if t0 - 0.3 <= x["t"] <= t1 + 0.3 and x["faces"]
-               and x["faces"][0]["box"][2] * x["faces"][0]["box"][3] > 0.0015]
+            return (
+                ((f[0]["box"][0] + f[0]["box"][2] / 2, f[0]["box"][1] + f[0]["box"][3] / 2), True)
+                if f and f[0]["box"][2] * f[0]["box"][3] > 0.002
+                else ((0.5, 0.5), False)
+            )
+        pts = [
+            x["faces"][0]
+            for x in a.get("faces", [])
+            if t0 - 0.3 <= x["t"] <= t1 + 0.3 and x["faces"] and x["faces"][0]["box"][2] * x["faces"][0]["box"][3] > 0.0015
+        ]
         if len(pts) >= 2:
             xs = sorted(f["box"][0] + f["box"][2] / 2 for f in pts)
             ys = sorted(f["box"][1] + f["box"][3] / 2 for f in pts)
@@ -448,8 +589,9 @@ class Resolver:
         elif c.get("freeze") is not None:
             t = _n(c.get("freeze"), 0, max(0, src_len - 0.05), 0)
             dur = dur_req or 1.5
-            pieces.append({"path": str(still_frame(a["path"], t)), "kind": "image", "src_from": 0.0, "src_span": dur, "speed": 1.0,
-                           "dur": dur, "freeze_of": t})
+            pieces.append(
+                {"path": str(still_frame(a["path"], t)), "kind": "image", "src_from": 0.0, "src_span": dur, "speed": 1.0, "dur": dur, "freeze_of": t}
+            )
             win = (t, t)
         else:
             src_from = _n(c.get("from"), 0, max(0, src_len - 0.2), 0)
@@ -477,13 +619,23 @@ class Resolver:
                     if dur_req and acc >= dur_req - 1e-6:
                         break
                 if not pieces:
-                    pieces.append({"path": a["path"], "kind": "video", "src_from": src_from, "src_span": min(1.0, src_len - src_from),
-                                   "speed": 1.0, "dur": min(1.0, src_len - src_from)})
+                    pieces.append(
+                        {
+                            "path": a["path"],
+                            "kind": "video",
+                            "src_from": src_from,
+                            "src_span": min(1.0, src_len - src_from),
+                            "speed": 1.0,
+                            "dur": min(1.0, src_len - src_from),
+                        }
+                    )
                 end_src = pieces[-1]["src_from"] + pieces[-1]["src_span"]
                 if dur_req and acc < dur_req - 0.1:
                     self.notes.append(f"{where}: the file ends before the planned {dur_req:.1f} s; the ramp lasts {acc:.1f} s")
                 elif dur_req and to is not None and abs(end_src - to) > 0.3:
-                    self.notes.append(f"{where}: the ramp reaches {end_src:.1f} s of the file (not 'to' {to:.1f}) to last the planned {dur_req:.1f} s")
+                    self.notes.append(
+                        f"{where}: the ramp reaches {end_src:.1f} s of the file (not 'to' {to:.1f}) to last the planned {dur_req:.1f} s"
+                    )
                 win = (src_from, end_src)
             else:
                 speed = _n(c.get("speed"), 0.1, 10, 1.0)
@@ -533,8 +685,12 @@ class Resolver:
             st["x"], st["y"] = pos
         else:
             st = framing(sw, sh, self.W, self.H, mode, focus, target, zoom)
-        st.update(rotation=_n(c.get("rotation"), -360, 360, 0.0), alpha=_n(c.get("opacity", c.get("alpha")), 0, 1, 1.0),
-                  flip_h="h" in str(c.get("flip") or "").lower(), flip_v="v" in str(c.get("flip") or "").lower())
+        st.update(
+            rotation=_n(c.get("rotation"), -360, 360, 0.0),
+            alpha=_n(c.get("opacity", c.get("alpha")), 0, 1, 1.0),
+            flip_h="h" in str(c.get("flip") or "").lower(),
+            flip_v="v" in str(c.get("flip") or "").lower(),
+        )
         out["settings"] = st
         out["focus"] = [round(focus[0], 3), round(focus[1], 3)] if has_face else None
         out["aim"] = [[round(focus[0], 3), round(focus[1], 3)], list(target), mode]  # how the framing was chosen
@@ -559,8 +715,13 @@ class Resolver:
                 color = (a.get("screen") or {}).get("color")
             if color:
                 d = ch if isinstance(ch, dict) else {}
-                out["chroma"] = {"color": color, "intensity": _n(d.get("intensity"), 0, 100, 30), "shadow": _n(d.get("shadow"), 0, 100, 0),
-                                 "edge_smooth": _n(d.get("edge_smooth"), 0, 100, 0), "spill": _n(d.get("spill"), 0, 100, 0)}
+                out["chroma"] = {
+                    "color": color,
+                    "intensity": _n(d.get("intensity"), 0, 100, 30),
+                    "shadow": _n(d.get("shadow"), 0, 100, 0),
+                    "edge_smooth": _n(d.get("edge_smooth"), 0, 100, 0),
+                    "spill": _n(d.get("spill"), 0, 100, 0),
+                }
                 if isinstance(out.get("background"), (list, tuple)) or out.get("background") in ("blur", None):
                     # a blur fill is the UN-keyed clip blurred: the screen colour would show through. A dark colour instead.
                     if out.get("background") is not None:
@@ -572,9 +733,17 @@ class Resolver:
         if isinstance(m, dict) and m.get("type"):
             mt = MASKS.get(str(m["type"]).lower(), str(m["type"]))
             if mt in MASKS.values():
-                out["mask"] = {"type": mt, "x": _n(m.get("x"), 0, 1, 0.5), "y": _n(m.get("y"), 0, 1, 0.5), "size": _n(m.get("size"), 0.02, 3, 0.5),
-                               "rotation": _n(m.get("rotation"), -360, 360, 0), "feather": _n(m.get("feather"), 0, 100, 0),
-                               "invert": bool(m.get("invert")), "width": _n(m.get("width"), 0.02, 3, None), "round": _n(m.get("round"), 0, 100, None)}
+                out["mask"] = {
+                    "type": mt,
+                    "x": _n(m.get("x"), 0, 1, 0.5),
+                    "y": _n(m.get("y"), 0, 1, 0.5),
+                    "size": _n(m.get("size"), 0.02, 3, 0.5),
+                    "rotation": _n(m.get("rotation"), -360, 360, 0),
+                    "feather": _n(m.get("feather"), 0, 100, 0),
+                    "invert": bool(m.get("invert")),
+                    "width": _n(m.get("width"), 0.02, 3, None),
+                    "round": _n(m.get("round"), 0, 100, None),
+                }
             else:
                 self.notes.append(f"{where}: unknown mask '{m['type']}'")
         if c.get("blend"):
@@ -591,10 +760,18 @@ class Resolver:
         """Canvas position in engine units (x right, y up, -1..1 = canvas edges) from a name or [x, y]."""
         top, bottom = 1 - 2 * self.safe["top"], -1 + 2 * self.safe["bottom"]
         portrait = self.H > self.W
-        names = {"top": (0, top - (0.12 if portrait else 0.15)), "upper": (0, 0.45 if portrait else 0.5), "center": (0, 0), "middle": (0, 0),
-                 "lower": (0, bottom + (0.25 if portrait else 0.2)), "bottom": (0, bottom + (0.1 if portrait else 0.12)),
-                 "top_left": (-0.55, top - 0.12), "top_right": (0.45, top - 0.12), "bottom_left": (-0.55, bottom + 0.12),
-                 "bottom_right": (0.45, bottom + 0.12)}
+        names = {
+            "top": (0, top - (0.12 if portrait else 0.15)),
+            "upper": (0, 0.45 if portrait else 0.5),
+            "center": (0, 0),
+            "middle": (0, 0),
+            "lower": (0, bottom + (0.25 if portrait else 0.2)),
+            "bottom": (0, bottom + (0.1 if portrait else 0.12)),
+            "top_left": (-0.55, top - 0.12),
+            "top_right": (0.45, top - 0.12),
+            "bottom_left": (-0.55, bottom + 0.12),
+            "bottom_right": (0.45, bottom + 0.12),
+        }
         if isinstance(v, str) and v.lower().replace(" ", "_") in names:
             return names[v.lower().replace(" ", "_")]
         if isinstance(v, (list, tuple)) and len(v) == 2:
@@ -609,8 +786,15 @@ class Resolver:
     # -------------------------------------------------------------- the whole plan
     def resolve(self):
         p = self.p
-        out = {"name": str(p.get("name") or "edit")[:40], "aspect": self.aspect, "canvas": [self.W, self.H], "fps": 30,
-               "platform": self.platform, "safe": self.safe, "notes": self.notes}
+        out = {
+            "name": str(p.get("name") or "edit")[:40],
+            "aspect": self.aspect,
+            "canvas": [self.W, self.H],
+            "fps": 30,
+            "platform": self.platform,
+            "safe": self.safe,
+            "notes": self.notes,
+        }
         if isinstance(p.get("template"), dict) and p["template"].get("draft"):
             out["template"] = self._template(p["template"])
         clips = []
@@ -661,8 +845,12 @@ class Resolver:
         texts = {}
         edits = []
         # texts first, so animations / keyframes can point at them
-        order = sorted(edits_in, key=lambda e: 0 if TYPE_ALIASES.get(str(e.get("type")).lower(), (str(e.get("type")).lower(),))[0] in ("text", "captions")
-                       or e.get("text") else 1)
+        order = sorted(
+            edits_in,
+            key=lambda e: (
+                0 if TYPE_ALIASES.get(str(e.get("type")).lower(), (str(e.get("type")).lower(),))[0] in ("text", "captions") or e.get("text") else 1
+            ),
+        )
         for e in order:
             typ = str(e.get("type") or "").lower().strip().replace(" ", "_").replace("-", "_")
             if typ in TYPE_ALIASES:
@@ -672,8 +860,11 @@ class Resolver:
             if typ == "animation" and e.get("text") and e.get("on") not in texts:
                 # a title written as one "text_intro" edit with its words: the text, with that animation
                 k = str(e.get("kind") or "intro").lower()
-                e = {**{x: v for x, v in e.items() if x not in ("type", "name", "kind")}, "type": "text",
-                     (k if k in ("intro", "outro", "loop") else "intro"): e.get("name")}
+                e = {
+                    **{x: v for x, v in e.items() if x not in ("type", "name", "kind")},
+                    "type": "text",
+                    (k if k in ("intro", "outro", "loop") else "intro"): e.get("name"),
+                }
                 typ = "text"
             where = f"edit {e.get('id') or typ}"
             fn = getattr(self, f"_e_{typ}", None)
@@ -685,7 +876,7 @@ class Resolver:
             except Exception as ex:  # noqa: BLE001  (one bad edit must not sink the plan)
                 self.notes.append(f"{where}: {type(ex).__name__}: {str(ex)[:120]}")
                 r = None
-            for x in (r if isinstance(r, list) else [r] if r else []):
+            for x in r if isinstance(r, list) else [r] if r else []:
                 if x["type"] == "text":
                     texts[x["id"]] = x
                 edits.append(x)
@@ -772,11 +963,15 @@ class Resolver:
                 media[str(old_name)] = a["path"]
             else:
                 self.notes.append(f"template: '{f}' is not an available file; '{old_name}' kept")
-        texts = [{"track": x.get("track", 0), "index": int(_n(x.get("index"), 0, 999, 0)), "text": str(x.get("text") or "")[:400]}
-                 for x in (t.get("texts") or []) if isinstance(x, dict) and x.get("text")]
+        texts = [
+            {"track": x.get("track", 0), "index": int(_n(x.get("index"), 0, 999, 0)), "text": str(x.get("text") or "")[:400]}
+            for x in (t.get("texts") or [])
+            if isinstance(x, dict) and x.get("text")
+        ]
         seconds = 0.0
         try:  # the template's own length, so edits on top of it can be placed and clamped
             from ai_pc.video.jybuild import DRAFTS
+
             d = json.loads((DRAFTS / str(t["draft"]) / "draft_content.json").read_text(encoding="utf-8"))
             seconds = d.get("duration", 0) / 1e6
         except Exception as e:  # noqa: BLE001
@@ -892,8 +1087,14 @@ class Resolver:
         if dur > craft + 1e-3:
             dur = round(craft, 3)
         r = self._base(e, "transition", "tr")
-        r.update(item=key, after=after["id"], before=nxt["id"], duration=round(dur, 3),
-                 window=[round(after["end"] - dur / 2, 3), round(after["end"] + dur / 2, 3)], cut=after["end"])
+        r.update(
+            item=key,
+            after=after["id"],
+            before=nxt["id"],
+            duration=round(dur, 3),
+            window=[round(after["end"] - dur / 2, 3), round(after["end"] + dur / 2, 3)],
+            cut=after["end"],
+        )
         r["expect"] = r["expect"] or f"{self.cat.card(key).get('en')}: {self.cat.card(key).get('desc')}"
         return r
 
@@ -928,8 +1129,9 @@ class Resolver:
                 c = tgt if tgt is not None and tgt.get("pieces") is not None else self._clip_at(min(max(0.0, t0), out["end"] - 0.05), items)
                 if c is not None:
                     self.notes.append(f"{where}: '{e.get('name')}' is a clip {cat.split('_')[1]} animation; applied to {c['id']}")
-                    return self._e_animation({**e, "on": c["id"], "kind": cat.split("_")[1], "duration": min(1.0, max(0.3, t1 - t0))},
-                                             where, items, texts, out)
+                    return self._e_animation(
+                        {**e, "on": c["id"], "kind": cat.split("_")[1], "duration": min(1.0, max(0.3, t1 - t0))}, where, items, texts, out
+                    )
             if typ == "filter" and cat in EFFECT_CATS:
                 self.notes.append(f"{where}: '{e.get('name')}' is an effect; applied as an effect")
                 return self._e_effect(e, where, items, texts, out)
@@ -951,8 +1153,15 @@ class Resolver:
         r = self._base(e, "effect", "fx")
         if e.get("layer") in ("texture", "accent"):
             r["layer"] = e["layer"]  # texture = over the whole video (grain, vignette, bars); accent = a quick hit (flash, blur)
-        r.update(item=key, category=it["category"], window=[t0, t1], params=self.cat.param_list(key, e.get("params"), self.notes, where + ": "),
-                 target=card.get("target"), moves_image=bool(card.get("moves_image")), over_text=bool(e.get("over_text")))
+        r.update(
+            item=key,
+            category=it["category"],
+            window=[t0, t1],
+            params=self.cat.param_list(key, e.get("params"), self.notes, where + ": "),
+            target=card.get("target"),
+            moves_image=bool(card.get("moves_image")),
+            over_text=bool(e.get("over_text")),
+        )
         whole = tgt is not None and tgt.get("pieces") is not None and abs(t0 - tgt["start"]) < 0.05 and abs(t1 - tgt["end"]) < 0.05
         r["mode"] = "segment" if whole else "track"
         r["on"] = tgt["id"] if tgt is not None and tgt.get("pieces") is not None else None
@@ -960,8 +1169,10 @@ class Resolver:
             share = self._faces_in_window(t0, t1, items)
             r["face_share"] = round(share, 2)
             if share < 0.3:
-                self.notes.append(f"{where}: '{it['name']}' follows a person, but a clear face is visible in only "
-                                  f"{share * 100:.0f}% of {t0:.1f}-{t1:.1f} s; it may show little")
+                self.notes.append(
+                    f"{where}: '{it['name']}' follows a person, but a clear face is visible in only "
+                    f"{share * 100:.0f}% of {t0:.1f}-{t1:.1f} s; it may show little"
+                )
         r["expect"] = r["expect"] or f"{card.get('en')}: {card.get('desc')}"
         return r
 
@@ -979,8 +1190,13 @@ class Resolver:
         card = self.cat.card(key)
         r = self._base(e, "filter", "fl")
         whole = tgt is not None and tgt.get("pieces") is not None and abs(t0 - tgt["start"]) < 0.05 and abs(t1 - tgt["end"]) < 0.05
-        r.update(item=key, window=[t0, t1], strength=_n(e.get("strength", e.get("intensity")), 0, 100, 80),
-                 mode="segment" if whole else "track", on=tgt["id"] if whole else None)
+        r.update(
+            item=key,
+            window=[t0, t1],
+            strength=_n(e.get("strength", e.get("intensity")), 0, 100, 80),
+            mode="segment" if whole else "track",
+            on=tgt["id"] if whole else None,
+        )
         r["expect"] = r["expect"] or f"{card.get('en')} look: {card.get('look') or card.get('desc')}"
         return r
 
@@ -1091,34 +1307,61 @@ class Resolver:
             if sum(ch.isascii() for ch in words) >= 0.8 * max(1, len(words)):  # English text: a font designed for Latin letters
                 alt.sort(key=lambda k: self.cat.index.notes.get(k, {}).get("script") != "latin")  # (CJK fonts' Latin glyphs look off)
             if alt:
-                self.notes.append(f"{where}: font '{self.cat.item(font)['name']}' is untried here; using '{self.cat.item(alt[0])['name']}', known to work")
+                self.notes.append(
+                    f"{where}: font '{self.cat.item(font)['name']}' is untried here; using '{self.cat.item(alt[0])['name']}', known to work"
+                )
                 font = alt[0]
         if font and e.get("font_asked") and font not in self.cat.boost:
             self.notes.append(f"{where}: font '{self.cat.item(font)['name']}' was asked for; first use here (checked at export)")
-        st = {"font": font, "asked": bool(e.get("font_asked")), "size": _n(e.get("size"), 2, 40, 10), "color": _hex(e.get("color"), "#FFFFFF"),
-              "bold": bool(e.get("bold", True)), "italic": bool(e.get("italic")), "underline": bool(e.get("underline")),
-              "align": {"left": 0, "center": 1, "right": 2}.get(str(e.get("align", "center")).lower(), 1),
-              "letter_spacing": int(_n(e.get("letter_spacing"), -20, 100, 0)), "line_spacing": int(_n(e.get("line_spacing"), -20, 100, 0)),
-              "alpha": _n(e.get("opacity", e.get("alpha")), 0, 1, 1.0), "scale": _n(e.get("scale"), 0.1, 10, 1.0),
-              "rotation": _n(e.get("rotation"), -360, 360, 0), "vertical": bool(e.get("vertical")),
-              "max_width": _n(e.get("max_width"), 0.1, 1.0, 0.82)}
+        st = {
+            "font": font,
+            "asked": bool(e.get("font_asked")),
+            "size": _n(e.get("size"), 2, 40, 10),
+            "color": _hex(e.get("color"), "#FFFFFF"),
+            "bold": bool(e.get("bold", True)),
+            "italic": bool(e.get("italic")),
+            "underline": bool(e.get("underline")),
+            "align": {"left": 0, "center": 1, "right": 2}.get(str(e.get("align", "center")).lower(), 1),
+            "letter_spacing": int(_n(e.get("letter_spacing"), -20, 100, 0)),
+            "line_spacing": int(_n(e.get("line_spacing"), -20, 100, 0)),
+            "alpha": _n(e.get("opacity", e.get("alpha")), 0, 1, 1.0),
+            "scale": _n(e.get("scale"), 0.1, 10, 1.0),
+            "rotation": _n(e.get("rotation"), -360, 360, 0),
+            "vertical": bool(e.get("vertical")),
+            "max_width": _n(e.get("max_width"), 0.1, 1.0, 0.82),
+        }
         ol = e.get("outline")
         if ol is True or (ol is None and not e.get("background")):
             ol = {"color": "#000000", "width": 40}
         if isinstance(ol, dict):
-            st["outline"] = {"color": _hex(ol.get("color"), "#000000"), "width": _n(ol.get("width"), 0, 100, 40), "alpha": _n(ol.get("alpha"), 0, 1, 1)}
+            st["outline"] = {
+                "color": _hex(ol.get("color"), "#000000"),
+                "width": _n(ol.get("width"), 0, 100, 40),
+                "alpha": _n(ol.get("alpha"), 0, 1, 1),
+            }
         sh = e.get("shadow")
         if sh:
             sh = sh if isinstance(sh, dict) else {}
-            st["shadow"] = {"color": _hex(sh.get("color"), "#000000"), "alpha": _n(sh.get("alpha"), 0, 1, 0.7), "diffuse": _n(sh.get("diffuse"), 0, 100, 15),
-                            "distance": _n(sh.get("distance"), 0, 100, 5), "angle": _n(sh.get("angle"), -180, 180, -45)}
+            st["shadow"] = {
+                "color": _hex(sh.get("color"), "#000000"),
+                "alpha": _n(sh.get("alpha"), 0, 1, 0.7),
+                "diffuse": _n(sh.get("diffuse"), 0, 100, 15),
+                "distance": _n(sh.get("distance"), 0, 100, 5),
+                "angle": _n(sh.get("angle"), -180, 180, -45),
+            }
         bg = e.get("background")
         if isinstance(bg, dict) or (isinstance(bg, str) and _hex(bg)):
             bg = bg if isinstance(bg, dict) else {"color": bg}
-            st["background"] = {"color": _hex(bg.get("color"), "#000000"), "alpha": _n(bg.get("alpha"), 0, 1, 0.6),
-                                "round": _n(bg.get("round", bg.get("round_radius")), 0, 1, 0.2), "style": 2 if str(bg.get("style")) == "2" else 1,
-                                "height": _n(bg.get("height"), 0, 1, 0.14), "width": _n(bg.get("width"), 0, 1, 0.14),
-                                "x_offset": _n(bg.get("x_offset"), 0, 1, 0.5), "y_offset": _n(bg.get("y_offset"), 0, 1, 0.5)}
+            st["background"] = {
+                "color": _hex(bg.get("color"), "#000000"),
+                "alpha": _n(bg.get("alpha"), 0, 1, 0.6),
+                "round": _n(bg.get("round", bg.get("round_radius")), 0, 1, 0.2),
+                "style": 2 if str(bg.get("style")) == "2" else 1,
+                "height": _n(bg.get("height"), 0, 1, 0.14),
+                "width": _n(bg.get("width"), 0, 1, 0.14),
+                "x_offset": _n(bg.get("x_offset"), 0, 1, 0.5),
+                "y_offset": _n(bg.get("y_offset"), 0, 1, 0.5),
+            }
         return st
 
     def _e_text(self, e, where, items, texts, out):
@@ -1128,7 +1371,9 @@ class Resolver:
         t0, t1, _ = self._window(e, items, texts, default_dur=3.0)
         if t0 >= out["end"] - 0.3:  # planned past the end (the clips came out shorter): show it at the end
             d = min(max(1.2, t1 - t0), 2.5, out["end"])
-            self.notes.append(f"{where}: text planned at {t0:.1f} s, after the video ends ({out['end']:.1f} s); moved to {out['end'] - d:.1f}-{out['end']:.1f} s")
+            self.notes.append(
+                f"{where}: text planned at {t0:.1f} s, after the video ends ({out['end']:.1f} s); moved to {out['end'] - d:.1f}-{out['end']:.1f} s"
+            )
             t0, t1 = out["end"] - d, out["end"]
         t1 = min(t1, out["end"])
         if not str(e.get("id") or "").startswith(("kt", "lb")):  # kinetic words are short by design; labels belong to their shot
@@ -1145,7 +1390,9 @@ class Resolver:
             st["size"] = lim
         txt = self.wrap_words(txt, st)
         pos = self._pos(e.get("position"), default=(0, 0))
-        r.update(text=txt, start=t0, duration=round(t1 - t0, 3), window=[t0, round(t1, 3)], style=st, position=list(self._safe_pos(pos, txt, st, where)))
+        r.update(
+            text=txt, start=t0, duration=round(t1 - t0, 3), window=[t0, round(t1, 3)], style=st, position=list(self._safe_pos(pos, txt, st, where))
+        )
         r["box"] = self.frame_box(r["position"], txt, st)
         for k in ("intro", "outro", "loop"):  # inline animations become animation edits
             if e.get(k):
@@ -1231,8 +1478,13 @@ class Resolver:
             b = min(out["end"], max(a + 0.2, _n(l.get("end"), 0, 3600, a + 2)))
             if b - a >= 0.15:
                 res.append({"text": str(l["text"]).strip()[:200], "start": round(a, 3), "end": round(b, 3)})
-        r.update(lines=res, style=st, position=list(self._safe_pos(pos, max((x["text"] for x in res), key=len), st, where)),
-                 window=[res[0]["start"], res[-1]["end"]] if res else [0, 0], intro=None)
+        r.update(
+            lines=res,
+            style=st,
+            position=list(self._safe_pos(pos, max((x["text"] for x in res), key=len), st, where)),
+            window=[res[0]["start"], res[-1]["end"]] if res else [0, 0],
+            intro=None,
+        )
         if e.get("intro"):
             r["intro"] = self.cat.resolve("text_intro", e.get("intro"), self.notes, where + ": ")
         r["expect"] = r["expect"] or "captions are visible, readable and match the words"
@@ -1252,9 +1504,19 @@ class Resolver:
         if dur < 0.2:
             return None
         r = self._base(e, "audio", "au")
-        r.update(file=a["file"], path=a["path"], at=round(at, 3), src_from=round(src_from, 3), duration=round(dur, 3), speed=speed,
-                 window=[round(at, 3), round(at + dur, 3)], volume=_n(e.get("volume"), 0, 4, 1.0),
-                 fade_in=_n(e.get("fade_in"), 0, 20, 0), fade_out=_n(e.get("fade_out"), 0, 20, 0), pitch_with_speed=bool(e.get("pitch_with_speed")))
+        r.update(
+            file=a["file"],
+            path=a["path"],
+            at=round(at, 3),
+            src_from=round(src_from, 3),
+            duration=round(dur, 3),
+            speed=speed,
+            window=[round(at, 3), round(at + dur, 3)],
+            volume=_n(e.get("volume"), 0, 4, 1.0),
+            fade_in=_n(e.get("fade_in"), 0, 20, 0),
+            fade_out=_n(e.get("fade_out"), 0, 20, 0),
+            pitch_with_speed=bool(e.get("pitch_with_speed")),
+        )
         if e.get("effect"):
             r["effect"] = self.cat.resolve(AUDIO_FX, e.get("effect"), self.notes, where + ": ")
             r["effect_params"] = self.cat.param_list(r["effect"], e.get("params"), self.notes, where + ": ") if r["effect"] else None
@@ -1273,6 +1535,7 @@ class Resolver:
     def _e_sfx(self, e, where, items, texts, out):
         """A synthesised sound effect (sfx.py) at a moment: impacts start there, risers end there."""
         from ai_pc.media import sfx
+
         kind = str(e.get("sound") or e.get("name") or "").lower().strip().replace(" ", "_").replace("-", "_")
         kind = SFX_ALIASES.get(kind, kind)
         if kind not in sfx.KINDS:
@@ -1286,9 +1549,20 @@ class Resolver:
             self.notes.append(f"{where}: {kind} at {t0:.1f} s is after the end; skipped")
             return None
         r = self._base(e, "audio", "sfx")
-        r.update(file=p.name, path=str(p), at=round(at, 3), src_from=0.0, duration=round(dur, 3), speed=1.0, sfx=kind,
-                 window=[round(at, 3), round(at + dur, 3)], volume=_n(e.get("volume"), 0, 2, 0.9), keyframes=[],
-                 fade_in=0.0, fade_out=round(min(0.3, dur / 3), 3) if kind in ("impact", "thunder", "sub_drop") else 0.0)
+        r.update(
+            file=p.name,
+            path=str(p),
+            at=round(at, 3),
+            src_from=0.0,
+            duration=round(dur, 3),
+            speed=1.0,
+            sfx=kind,
+            window=[round(at, 3), round(at + dur, 3)],
+            volume=_n(e.get("volume"), 0, 2, 0.9),
+            keyframes=[],
+            fade_in=0.0,
+            fade_out=round(min(0.3, dur / 3), 3) if kind in ("impact", "thunder", "sub_drop") else 0.0,
+        )
         r["expect"] = r["expect"] or f"a {kind.replace('_', ' ')} sound at {t0:.1f} s"
         return r
 
@@ -1342,8 +1616,11 @@ def motion_keyframes(clip, edits, piece):
     zoom and keyframe edit on that clip folded in (scale multiplies, position adds), sampled where it changes."""
     st = clip["settings"]
     p0, p1 = piece["start"], piece["start"] + piece["dur"]
-    mine = [e for e in edits if e.get("on") == clip["id"] and e["type"] in ("shake", "zoom", "keyframes")
-            and e["window"][1] >= p0 - 1e-6 and e["window"][0] <= p1 + 1e-6]
+    mine = [
+        e
+        for e in edits
+        if e.get("on") == clip["id"] and e["type"] in ("shake", "zoom", "keyframes") and e["window"][1] >= p0 - 1e-6 and e["window"][0] <= p1 + 1e-6
+    ]
     if not mine:
         return {}
     times = {p0, p1}
@@ -1372,8 +1649,19 @@ def motion_keyframes(clip, edits, piece):
             if ta <= rel <= tb:
                 return va + (vb - va) * (rel - ta) / max(1e-6, tb - ta)
         return pts[-1][1]
+
     props = {}
-    used = {"scale": False, "x": False, "y": False, "rotation": False, "alpha": False, "brightness": False, "contrast": False, "saturation": False, "volume": False}
+    used = {
+        "scale": False,
+        "x": False,
+        "y": False,
+        "rotation": False,
+        "alpha": False,
+        "brightness": False,
+        "contrast": False,
+        "saturation": False,
+        "volume": False,
+    }
     for e in mine:
         if e["type"] in ("shake", "zoom"):
             used["scale"] = True

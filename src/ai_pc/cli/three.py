@@ -16,6 +16,7 @@ above', 'make a video going round it', 'the first floor', 'grey walls', 'cream w
 <picture> on a box / business card / laptop / phone / mug / poster', 'make it 20 x 30 x 8 cm', 'from the side', 'show me
 <file>.glb', 'how big is it?', 'convert it to glb / obj / fbx / stl', 'undo', 'go back to v1', 'history', 'save it to my desktop'.
 """
+
 import argparse
 import sys
 
@@ -33,9 +34,11 @@ def main(argv=None):
     t.add_argument("--offline", action="store_true", help="rules only, no model")
     a = ap.parse_args(argv)
     from ai_pc.three.threechat import ThreeChat
+
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     c = ThreeChat.load(a.chat, planner=planner) if a.chat else ThreeChat.start(planner=planner, files=a.extra)
     print(f"Chat {c.state['id']} (now v{c.state['cur']}). 'quit' to leave.")

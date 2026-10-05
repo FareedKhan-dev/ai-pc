@@ -6,6 +6,7 @@ stopped, never posting twice), metric snapshots, comments seen and answered, and
   db.add_job(job) / db.job(id) / db.jobs(post_id=..., status=...) / db.update_job(id, **fields) / db.checkpoint(id, key, value)
   db.due(now) -> jobs to work on     db.snapshot(job_id, metrics)     db.comment(...)     db.log(job_id, kind, detail)
 """
+
 import datetime as dt
 import json
 import sqlite3
@@ -63,8 +64,10 @@ class Store:
         post.setdefault("created", iso(now()))
         post.setdefault("status", "draft")
         with self._lock:
-            self.cx.execute("INSERT OR REPLACE INTO posts VALUES (?,?,?,?,?)", (post["id"], post["created"], post.get("when"), post["status"],
-                                                                               json.dumps(post, ensure_ascii=False)))
+            self.cx.execute(
+                "INSERT OR REPLACE INTO posts VALUES (?,?,?,?,?)",
+                (post["id"], post["created"], post.get("when"), post["status"], json.dumps(post, ensure_ascii=False)),
+            )
         return post
 
     def post(self, pid):
@@ -83,7 +86,9 @@ class Store:
         with self._lock:
             p = self.post(pid)
             p.update(fields)
-            self.cx.execute("UPDATE posts SET due=?, status=?, body=? WHERE id=?", (p.get("when"), p["status"], json.dumps(p, ensure_ascii=False), pid))
+            self.cx.execute(
+                "UPDATE posts SET due=?, status=?, body=? WHERE id=?", (p.get("when"), p["status"], json.dumps(p, ensure_ascii=False), pid)
+            )
             return p
 
     # ---------------------------------------------------------------- jobs (one per platform)
@@ -94,9 +99,21 @@ class Store:
         job.setdefault("remote", {})
         job["updated"] = iso(now())
         with self._lock:
-            self.cx.execute("INSERT OR REPLACE INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?)",
-                            (job["id"], job["post_id"], job["platform"], job.get("format"), job.get("account"), job["status"], job["attempts"],
-                             job.get("next_try"), job["updated"], json.dumps(job, ensure_ascii=False)))
+            self.cx.execute(
+                "INSERT OR REPLACE INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    job["id"],
+                    job["post_id"],
+                    job["platform"],
+                    job.get("format"),
+                    job.get("account"),
+                    job["status"],
+                    job["attempts"],
+                    job.get("next_try"),
+                    job["updated"],
+                    json.dumps(job, ensure_ascii=False),
+                ),
+            )
         return job
 
     def job(self, jid):
@@ -124,8 +141,10 @@ class Store:
             j = self.job(jid)
             j.update(fields)
             j["updated"] = iso(now())
-            self.cx.execute("UPDATE jobs SET status=?, attempts=?, next_try=?, updated=?, body=? WHERE id=?",
-                            (j["status"], j.get("attempts", 0), j.get("next_try"), j["updated"], json.dumps(j, ensure_ascii=False), jid))
+            self.cx.execute(
+                "UPDATE jobs SET status=?, attempts=?, next_try=?, updated=?, body=? WHERE id=?",
+                (j["status"], j.get("attempts", 0), j.get("next_try"), j["updated"], json.dumps(j, ensure_ascii=False), jid),
+            )
             return j
 
     def checkpoint(self, jid, **remote):
@@ -159,8 +178,10 @@ class Store:
 
     def comment(self, platform, remote_id, job_id, created, author, text, body=None):
         """A comment, stored once; -> True when it is new."""
-        cur = self.cx.execute("INSERT OR IGNORE INTO comments VALUES (?,?,?,?,?,?,?,?)",
-                              (platform, remote_id, job_id, created, author, text, "new", json.dumps(body or {})))
+        cur = self.cx.execute(
+            "INSERT OR IGNORE INTO comments VALUES (?,?,?,?,?,?,?,?)",
+            (platform, remote_id, job_id, created, author, text, "new", json.dumps(body or {})),
+        )
         return cur.rowcount == 1
 
     def comments(self, state=None, platform=None, limit=100):
@@ -182,7 +203,9 @@ class Store:
 
     def add_usage(self, platform, units, day=None):
         day = day or dt.date.today().isoformat()
-        self.cx.execute("INSERT INTO usage VALUES (?,?,?) ON CONFLICT(platform, day) DO UPDATE SET units = units + excluded.units", (platform, day, int(units)))
+        self.cx.execute(
+            "INSERT INTO usage VALUES (?,?,?) ON CONFLICT(platform, day) DO UPDATE SET units = units + excluded.units", (platform, day, int(units))
+        )
 
     def usage(self, platform, day=None):
         r = self.cx.execute("SELECT units FROM usage WHERE platform=? AND day=?", (platform, day or dt.date.today().isoformat())).fetchone()

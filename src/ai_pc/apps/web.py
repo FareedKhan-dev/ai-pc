@@ -5,6 +5,7 @@ saved as a PDF or a full-length picture.
   'read https://example.com/article'   'tables from https://example.com/prices'   'links on https://example.com'
   'save https://example.com as pdf'   'screenshot of https://example.com'
 """
+
 import re
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
@@ -19,6 +20,7 @@ def page(url):
     from lxml import html as lh
 
     from ai_pc.core import headless
+
     return lh.fromstring(headless.dom(url, wait_ms=2500, lane="apps")), url
 
 
@@ -105,9 +107,11 @@ def run(op, ctx):
     out.mkdir(parents=True, exist_ok=True)
     stem = re.sub(r"[^\w-]+", "_", (urlparse(op["url"]).netloc + urlparse(op["url"]).path).strip("/"))[:60] or "page"
     from ai_pc.core import headless
+
     if op["op"] == "pdf":
         r = headless.pdf(op["url"], out / f"{stem}.pdf", wait_ms=2500, lane="apps")
         from pypdf import PdfReader
+
         return f"Saved as PDF: {r['path']} ({len(PdfReader(r['path']).pages)} pages)."
     if op["op"] == "shot":
         r = headless.png(op["url"], out / f"{stem}.png", size=(1366, 2400), wait_ms=2500, lane="apps")
@@ -125,6 +129,7 @@ def run(op, ctx):
         if not ts:
             return "No tables on that page."
         from openpyxl import Workbook
+
         wb = Workbook()
         wb.remove(wb.active)
         for i, rows in enumerate(ts, 1):
@@ -137,6 +142,7 @@ def run(op, ctx):
     ls = links(tree, url)
     dest = out / f"{stem}.links.csv"
     import csv
+
     with dest.open("w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         w.writerow(["Text", "Address"])

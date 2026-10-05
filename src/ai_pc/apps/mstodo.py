@@ -5,6 +5,7 @@ notebook section. Each is read back from Microsoft.
   'todo: call Haier about the TV order by Friday'   'my microsoft tasks'   'complete microsoft task call Haier'
   "onenote page 'Meeting with Ali' in Work: prices agreed at 84,000"
 """
+
 import datetime as dt
 import html
 import re
@@ -25,10 +26,12 @@ class Client:
         tok = self._token
         if not tok:
             from ai_pc.hub.oauth import access_token
+
             tok = access_token("microsoft")
         try:
             return Api(GRAPH, headers={"Authorization": f"Bearer {tok}"}, service="microsoft", transport=self.transport).request(
-                method, path, json_body=body, params=params, data=data, headers=headers, retries=0 if method in ("POST", "PATCH") else 3)
+                method, path, json_body=body, params=params, data=data, headers=headers, retries=0 if method in ("POST", "PATCH") else 3
+            )
         except HubError as e:
             if e.status == 403:
                 raise RuntimeError("Microsoft needs your permission for To Do and OneNote: run 'ai-pc hub connect microsoft' again") from e
@@ -63,8 +66,10 @@ class Client:
         s = next((x for x in secs if x["displayName"].lower() == (section or "").lower()), secs[0] if secs else None)
         if not s:
             raise RuntimeError("no OneNote section to write into: make a notebook in OneNote first")
-        body = (f"<!DOCTYPE html><html><head><title>{html.escape(title)}</title><meta name='created' content='{dt.datetime.now().isoformat(timespec='seconds')}'/>"
-                "</head><body>" + "".join(f"<p>{html.escape(p)}</p>" for p in text.split("\n") if p.strip()) + "</body></html>")
+        body = (
+            f"<!DOCTYPE html><html><head><title>{html.escape(title)}</title><meta name='created' content='{dt.datetime.now().isoformat(timespec='seconds')}'/>"
+            "</head><body>" + "".join(f"<p>{html.escape(p)}</p>" for p in text.split("\n") if p.strip()) + "</body></html>"
+        )
         p = self.call("POST", f"me/onenote/sections/{s['id']}/pages", data=body.encode("utf-8"), headers={"Content-Type": "text/html"})
         return s, p
 
@@ -100,8 +105,11 @@ def run(op, ctx):
         due = dt.date.fromisoformat(op["due"]) if op.get("due") else None
         lst, t, back = c.add(op["title"], due)
         ok = back.get("title") == op["title"] and (not due or (back.get("dueDateTime") or {}).get("dateTime", "").startswith(due.isoformat()))
-        return f"Added to Microsoft To Do ({lst['displayName']}): '{op['title']}'" + (f", due {due:%a %d %b}" if due else "") + \
-            (" (read back)." if ok else " (NOT the same when read back).")
+        return (
+            f"Added to Microsoft To Do ({lst['displayName']}): '{op['title']}'"
+            + (f", due {due:%a %d %b}" if due else "")
+            + (" (read back)." if ok else " (NOT the same when read back).")
+        )
     if op["op"] == "list":
         lst, ts = c.open_tasks()
         return f"{len(ts)} open tasks in {lst['displayName']}:\n" + "\n".join(f"- {t['title']}" for t in ts) if ts else "No open tasks."

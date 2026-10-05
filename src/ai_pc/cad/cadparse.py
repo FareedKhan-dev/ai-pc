@@ -7,15 +7,24 @@ Parts: "a 200 x 100 x 10 plate with 4 holes of 12 mm 20 mm from the corners and 
 "flange OD 150 ID 60, 6 holes of 14 on a 110 PCD, 12 thick", "make the holes 14", "round the corners 10".
 Saving: "export the pdf", "give me the dxf", "dwg", "a cut file for the laser", "on A2", "scale 1:50".
 """
+
 import math
 import re
 
 from ai_pc.cad.units import WORDS, plot_of
 
-ROOM_WORDS = [(r"\bkitchen\b", "kitchen"), (r"\b(?:tv |family )?lounge\b|\bliving(?: room)?\b|\bsitting(?: room)?\b", "lounge"),
-              (r"\bdrawing(?: room)?\b|\bguest sitting\b", "drawing"), (r"\bdining(?: room| area)?\b", "dining"), (r"\b(?:car )?porch\b|\bgarage\b", "porch"),
-              (r"\bstore(?: room)?\b", "store"), (r"\bpowder(?: room)?\b|\bguest (?:toilet|washroom|bath)\b", "powder"), (r"\bservant(?:s)?(?: room| quarter)?\b", "servant"),
-              (r"\bguest room\b|\bguest bed ?room\b", "guest"), (r"\bstairs?\b|\bstaircase\b", "stairs")]
+ROOM_WORDS = [
+    (r"\bkitchen\b", "kitchen"),
+    (r"\b(?:tv |family )?lounge\b|\bliving(?: room)?\b|\bsitting(?: room)?\b", "lounge"),
+    (r"\bdrawing(?: room)?\b|\bguest sitting\b", "drawing"),
+    (r"\bdining(?: room| area)?\b", "dining"),
+    (r"\b(?:car )?porch\b|\bgarage\b", "porch"),
+    (r"\bstore(?: room)?\b", "store"),
+    (r"\bpowder(?: room)?\b|\bguest (?:toilet|washroom|bath)\b", "powder"),
+    (r"\bservant(?:s)?(?: room| quarter)?\b", "servant"),
+    (r"\bguest room\b|\bguest bed ?room\b", "guest"),
+    (r"\bstairs?\b|\bstaircase\b", "stairs"),
+]
 
 
 def _num(s):
@@ -24,7 +33,10 @@ def _num(s):
 
 
 def room_in(c):
-    m = re.search(r"\b(?:bed ?room|bedroom|room)\s*(?:no\.?\s*)?(\d+|one|two|three|four|five|six)\b|\b(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\s+bed ?room\b", c)
+    m = re.search(
+        r"\b(?:bed ?room|bedroom|room)\s*(?:no\.?\s*)?(\d+|one|two|three|four|five|six)\b|\b(first|second|third|fourth|fifth|1st|2nd|3rd|4th|5th)\s+bed ?room\b",
+        c,
+    )
     if m:
         n = m.group(1) or m.group(2)
         n = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5th": 5}.get(n) or int(_num(n))
@@ -56,9 +68,12 @@ def house_brief(c):
     if m and not re.search(r"\bplate|flange|mm\b", c):
         unit = m.group(3) or ""
         w, d = _feet(float(m.group(1)), unit), _feet(float(m.group(2)), unit)
-        if w >= 15 and d >= 25 and not room_in(c[:m.start()]):
+        if w >= 15 and d >= 25 and not room_in(c[: m.start()]):
             b["plot"] = [round(min(w, d), 1), round(max(w, d), 1)]  # the road side is usually the narrow one
-    m = re.search(r"\b(\d+(?:\.\d+)?)\s*(?:'|ft|feet|foot)\s*(?:wide|width|front(?:age)?)\b.{0,12}?\b(\d+(?:\.\d+)?)\s*(?:'|ft|feet|foot)\s*(?:deep|long|depth|length)\b", c)
+    m = re.search(
+        r"\b(\d+(?:\.\d+)?)\s*(?:'|ft|feet|foot)\s*(?:wide|width|front(?:age)?)\b.{0,12}?\b(\d+(?:\.\d+)?)\s*(?:'|ft|feet|foot)\s*(?:deep|long|depth|length)\b",
+        c,
+    )
     if m and "plot" not in b:  # '40 feet wide and 80 feet deep'
         b["plot"] = [float(m.group(1)), float(m.group(2))]
     m = re.search(r"\b(\d+|one|two|three|four|five|six)\s*(?:bed ?rooms?|beds?|bhk|bedroom|kamr[ae]y?|kamron|bed ?room wala)\b", c)
@@ -67,12 +82,20 @@ def house_brief(c):
     m = re.search(r"\bfamily of (\d+|three|four|five|six|seven|eight|nine|ten)\b", c)
     if m and "bedrooms" not in b:  # the parents share a room, the children two to a room
         b["bedrooms"] = max(2, 1 + math.ceil((int(_num(m.group(1))) - 2) / 2))
-    if re.search(r"\bdouble[ -]stor(?:e)?y\b|\b(?:2|two)[ -]stor(?:e)?y\b|\b(?:with|add)(?: a)? first floor\b|\bg ?\+ ?1\b|\bground (?:\+|and|plus) first\b|\bupper floor\b", c):
+    if re.search(
+        r"\bdouble[ -]stor(?:e)?y\b|\b(?:2|two)[ -]stor(?:e)?y\b|\b(?:with|add)(?: a)? first floor\b|\bg ?\+ ?1\b|\bground (?:\+|and|plus) first\b|\bupper floor\b",
+        c,
+    ):
         b["floors"] = 2
     if re.search(r"\bsingle[ -]stor(?:e)?y\b|\b(?:1|one)[ -]stor(?:e)?y\b|\bground floor only\b|\bno first floor\b|\bremove the first floor\b", c):
         b["floors"] = 1
-    for rx, key in ((r"\bdining\b", "dining"), (r"\bstore\b", "store"), (r"\bpowder\b|\bguest (?:toilet|washroom|bath)\b", "powder"),
-                    (r"\bservant", "servant"), (r"\bguest room\b|\bguest bed ?room\b", "guest")):
+    for rx, key in (
+        (r"\bdining\b", "dining"),
+        (r"\bstore\b", "store"),
+        (r"\bpowder\b|\bguest (?:toilet|washroom|bath)\b", "powder"),
+        (r"\bservant", "servant"),
+        (r"\bguest room\b|\bguest bed ?room\b", "guest"),
+    ):
         if re.search(rx, c):
             neg = re.search(r"\b(?:no|without|remove|delete|drop|take out|get rid of)\b[^,.]*" + rx, c)
             b[key] = not neg
@@ -126,13 +149,16 @@ def part_spec(c):
 
         def fits(od, bore):  # '150 od 60 bore' and 'od 150 bore 60' both read right: the pairing where bore < pcd < od
             return not ((od and bore and bore >= od) or (pcd and od and pcd >= od) or (pcd and bore and bore >= pcd))
+
         pairs = [(od_a, id_a), (od_b, id_b), (od_a, id_b), (od_b, id_a)]
         od, bore = max((p for p in pairs if fits(*p)), key=lambda p: (p[0] is not None) + (p[1] is not None), default=(None, None))
         if od:
             s["od"] = od
         if bore:
             s["id"] = bore
-        m = re.search(r"\b(\d+|four|six|eight|three|five|ten|twelve)\s*(?:x\s*)?(?:bolt )?holes?\s*(?:of\s*)?(?:ø|dia(?:meter)?\s*)?(\d+(?:\.\d+)?)?", c)
+        m = re.search(
+            r"\b(\d+|four|six|eight|three|five|ten|twelve)\s*(?:x\s*)?(?:bolt )?holes?\s*(?:of\s*)?(?:ø|dia(?:meter)?\s*)?(\d+(?:\.\d+)?)?", c
+        )
         if m:
             s["n"] = int(_num(m.group(1)))
             if m.group(2):
@@ -144,14 +170,20 @@ def part_spec(c):
             if m.group(3):
                 s["t"] = float(m.group(3))
         holes = []
-        m = re.search(r"\b(\d+|two|three|four|six|eight)\s*holes?\s*(?:of\s*)?(?:ø|dia(?:meter)?\s*)?(\d+(?:\.\d+)?)?\s*(?:mm)?(?:[^,.]*?(\d+(?:\.\d+)?)\s*(?:mm)?\s*from (?:the )?(?:corners?|edges?|sides?))?", c)
+        m = re.search(
+            r"\b(\d+|two|three|four|six|eight)\s*holes?\s*(?:of\s*)?(?:ø|dia(?:meter)?\s*)?(\d+(?:\.\d+)?)?\s*(?:mm)?(?:[^,.]*?(\d+(?:\.\d+)?)\s*(?:mm)?\s*from (?:the )?(?:corners?|edges?|sides?))?",
+            c,
+        )
         if m:
             n = int(_num(m.group(1)))
             h = {"d": float(m.group(2)) if m.group(2) else 10.0, "pattern": "corners" if n == 4 else "row", "n": n}
             if m.group(3):
                 h["e"] = float(m.group(3))
             holes.append(h)
-        m = re.search(r"\b(?:a|one)?\s*(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:dia(?:meter)?\s*)?hole (?:in|at) the (?:cent(?:re|er)|middle)\b|\b(?:cent(?:re|er)|middle) hole (?:of\s*)?(\d+(?:\.\d+)?)", c)
+        m = re.search(
+            r"\b(?:a|one)?\s*(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:dia(?:meter)?\s*)?hole (?:in|at) the (?:cent(?:re|er)|middle)\b|\b(?:cent(?:re|er)|middle) hole (?:of\s*)?(\d+(?:\.\d+)?)",
+            c,
+        )
         if m:
             holes.append({"d": float(m.group(1) or m.group(2)), "pattern": "center"})
         if holes:
@@ -182,10 +214,23 @@ def parse(clause, kind=None):
     def done(*ops):
         out["ops"] = list(ops)
         return out
+
     # ---------------------------------------------------------------- saving
-    if re.search(r"\b(?:export|save|download|give me|send|print|need)\b.*\b(?:pdf|dxf|dwg|png|image|picture|cad file|autocad|file|cut ?file|laser|cnc)\b|^\s*(?:pdf|dxf|dwg)\b", c):
-        fmt = "dwg" if re.search(r"\bdwg\b", c) else "cut" if re.search(r"\bcut ?file|laser|cnc|plasma|water ?jet", c) else \
-            "dxf" if re.search(r"\bdxf\b|\bcad file\b|\bautocad\b", c) else "png" if re.search(r"\bpng|image|picture|photo\b", c) else "pdf"
+    if re.search(
+        r"\b(?:export|save|download|give me|send|print|need)\b.*\b(?:pdf|dxf|dwg|png|image|picture|cad file|autocad|file|cut ?file|laser|cnc)\b|^\s*(?:pdf|dxf|dwg)\b",
+        c,
+    ):
+        fmt = (
+            "dwg"
+            if re.search(r"\bdwg\b", c)
+            else "cut"
+            if re.search(r"\bcut ?file|laser|cnc|plasma|water ?jet", c)
+            else "dxf"
+            if re.search(r"\bdxf\b|\bcad file\b|\bautocad\b", c)
+            else "png"
+            if re.search(r"\bpng|image|picture|photo\b", c)
+            else "pdf"
+        )
         op = {"op": "export", "fmt": fmt}
         m = re.search(r"\b(a[1-4])\b", c)
         if m:
@@ -213,11 +258,16 @@ def parse(clause, kind=None):
     ps = part_spec(c)
     if kind == "part" and not ps.get("kind"):  # a change to the part on the drawing
         ed = dict(ps)
-        m = re.search(r"\bmake the holes?\s*(\d+(?:\.\d+)?)\b(?!\s*(?:mm\s*)?(?:in\s*)?from)|\bholes?\s*(?:to\s*)?(\d+(?:\.\d+)?)\s*mm\b(?!\s*(?:in\s*)?from)"
-                      r"|\bhole (?:size|dia(?:meter)?)\s*(?:to\s*|of\s*)?(\d+(?:\.\d+)?)", c)
+        m = re.search(
+            r"\bmake the holes?\s*(\d+(?:\.\d+)?)\b(?!\s*(?:mm\s*)?(?:in\s*)?from)|\bholes?\s*(?:to\s*)?(\d+(?:\.\d+)?)\s*mm\b(?!\s*(?:in\s*)?from)"
+            r"|\bhole (?:size|dia(?:meter)?)\s*(?:to\s*|of\s*)?(\d+(?:\.\d+)?)",
+            c,
+        )
         if m:
             ed["hole_size"] = float(next(g for g in m.groups() if g))
-        m = re.search(r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:in\s*)?from (?:the )?(?:corners?|edges?|sides?)\b|\bedge distance\s*(?:of\s*|to\s*)?(\d+(?:\.\d+)?)", c)
+        m = re.search(
+            r"(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:in\s*)?from (?:the )?(?:corners?|edges?|sides?)\b|\bedge distance\s*(?:of\s*|to\s*)?(\d+(?:\.\d+)?)", c
+        )
         if m and not (ed.get("holes") and re.search(r"\badd\b", c)):
             ed["hole_edge"] = float(m.group(1) or m.group(2))
             if ed.get("holes") and all(h.get("pattern") != "center" for h in ed["holes"]):
@@ -225,8 +275,11 @@ def parse(clause, kind=None):
         if re.search(r"\b(?:remove|delete|drop|no|without|take out)\b[^,.]*\b(?:cent(?:re|er)|middle) hole\b", c):
             ed["drop_center"] = True
             ed.pop("holes", None)
-        m = re.search(r"^\s*(?:make it|change it to|resize(?: it)? to|now)?\s*(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:x|by|×)\s*(\d+(?:\.\d+)?)"
-                      r"(?:\s*(?:mm)?\s*(?:x|by|×)\s*(\d+(?:\.\d+)?))?\s*(?:mm)?\s*$", c)
+        m = re.search(
+            r"^\s*(?:make it|change it to|resize(?: it)? to|now)?\s*(\d+(?:\.\d+)?)\s*(?:mm)?\s*(?:x|by|×)\s*(\d+(?:\.\d+)?)"
+            r"(?:\s*(?:mm)?\s*(?:x|by|×)\s*(\d+(?:\.\d+)?))?\s*(?:mm)?\s*$",
+            c,
+        )
         if m:
             ed.update(w=float(m.group(1)), h=float(m.group(2)))
             if m.group(3):
@@ -246,7 +299,10 @@ def parse(clause, kind=None):
         if not ps.get("kind") and kind != "part" and not ps:
             out["ask"] = "What size? e.g. 'a 200 x 100 x 10 plate with 4 holes of 12 mm 20 mm from the corners'."
             return out
-        m = re.search(r"\bmake the holes?\s*(\d+(?:\.\d+)?)|\bholes?\s*(?:to\s*)?(\d+(?:\.\d+)?)\s*mm\b|\bhole (?:size|dia(?:meter)?)\s*(?:to\s*)?(\d+(?:\.\d+)?)", c)
+        m = re.search(
+            r"\bmake the holes?\s*(\d+(?:\.\d+)?)|\bholes?\s*(?:to\s*)?(\d+(?:\.\d+)?)\s*mm\b|\bhole (?:size|dia(?:meter)?)\s*(?:to\s*)?(\d+(?:\.\d+)?)",
+            c,
+        )
         if m and not ps.get("holes") and kind == "part":
             ps["hole_size"] = float(next(g for g in m.groups() if g))
         m = re.search(r"\bholes?\s*(\d+(?:\.\d+)?)\s*(?:mm)?\s*from the (?:corners?|edges?|sides?)\b", c)
@@ -257,7 +313,9 @@ def parse(clause, kind=None):
         return done({"op": "part", "spec": ps, "new": bool(ps.get("kind")) and kind != "part"})
     # ---------------------------------------------------------------- houses
     hb = house_brief(c)
-    new_house = bool(re.search(r"\b(?:house|home|plan|villa|bungalow|map|naqsha|nuqsha|ghar|makan|design)\b", c)) and ("plot" in hb or re.search(r"\b(?:new|make|draw|design|create|need|want)\b", c))
+    new_house = bool(re.search(r"\b(?:house|home|plan|villa|bungalow|map|naqsha|nuqsha|ghar|makan|design)\b", c)) and (
+        "plot" in hb or re.search(r"\b(?:new|make|draw|design|create|need|want)\b", c)
+    )
     if kind is None and hb and not hb.get("plot") and not new_house and re.search(r"\b(?:bed ?rooms?|beds?|kamr|stor(?:e)?y|dining|porch)\b", c):
         out["ask"] = "What plot is it for? e.g. '5 marla', '10 marla', '1 kanal' or '30 x 60 feet'."
         return out

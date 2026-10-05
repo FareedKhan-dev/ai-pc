@@ -3,6 +3,7 @@
 Compared with walking the tree element by element (what most Python wrappers do), this avoids a COM round trip per
 property. Actions use UIA patterns (Invoke/Toggle/Value/...) so they need no mouse and no sleeps.
 """
+
 import ctypes
 import ctypes.wintypes
 import difflib
@@ -29,19 +30,87 @@ P_VALUEVAL = 30045  # ValuePattern.Value (the text in a field)
 P_TOGGLESTATE = 30086  # TogglePattern.ToggleState (0 off, 1 on, 2 indeterminate)
 PAT_INVOKE, PAT_VALUE, PAT_TOGGLE, PAT_EXPAND, PAT_SELITEM, PAT_SCROLLITEM = 10000, 10002, 10015, 10005, 10010, 10017
 
-ROLES = {50000: "Button", 50001: "Calendar", 50002: "CheckBox", 50003: "ComboBox", 50004: "Edit", 50005: "Hyperlink",
-         50006: "Image", 50007: "ListItem", 50008: "List", 50009: "Menu", 50010: "MenuBar", 50011: "MenuItem",
-         50012: "ProgressBar", 50013: "RadioButton", 50014: "ScrollBar", 50015: "Slider", 50016: "Spinner",
-         50017: "StatusBar", 50018: "Tab", 50019: "TabItem", 50020: "Text", 50021: "ToolBar", 50022: "ToolTip",
-         50023: "Tree", 50024: "TreeItem", 50025: "Custom", 50026: "Group", 50027: "Thumb", 50028: "DataGrid",
-         50029: "DataItem", 50030: "Document", 50031: "SplitButton", 50032: "Window", 50033: "Pane", 50034: "Header",
-         50035: "HeaderItem", 50036: "Table", 50037: "TitleBar", 50038: "Separator"}
-STRUCTURAL = {"Pane", "Group", "Custom", "Window", "Separator", "Image", "ScrollBar", "Thumb", "TitleBar", "ToolBar",
-              "List", "Tree", "Table", "Menu", "MenuBar", "Tab", "Header", "StatusBar"}
+ROLES = {
+    50000: "Button",
+    50001: "Calendar",
+    50002: "CheckBox",
+    50003: "ComboBox",
+    50004: "Edit",
+    50005: "Hyperlink",
+    50006: "Image",
+    50007: "ListItem",
+    50008: "List",
+    50009: "Menu",
+    50010: "MenuBar",
+    50011: "MenuItem",
+    50012: "ProgressBar",
+    50013: "RadioButton",
+    50014: "ScrollBar",
+    50015: "Slider",
+    50016: "Spinner",
+    50017: "StatusBar",
+    50018: "Tab",
+    50019: "TabItem",
+    50020: "Text",
+    50021: "ToolBar",
+    50022: "ToolTip",
+    50023: "Tree",
+    50024: "TreeItem",
+    50025: "Custom",
+    50026: "Group",
+    50027: "Thumb",
+    50028: "DataGrid",
+    50029: "DataItem",
+    50030: "Document",
+    50031: "SplitButton",
+    50032: "Window",
+    50033: "Pane",
+    50034: "Header",
+    50035: "HeaderItem",
+    50036: "Table",
+    50037: "TitleBar",
+    50038: "Separator",
+}
+STRUCTURAL = {
+    "Pane",
+    "Group",
+    "Custom",
+    "Window",
+    "Separator",
+    "Image",
+    "ScrollBar",
+    "Thumb",
+    "TitleBar",
+    "ToolBar",
+    "List",
+    "Tree",
+    "Table",
+    "Menu",
+    "MenuBar",
+    "Tab",
+    "Header",
+    "StatusBar",
+}
 
 _CR = IUIA.CreateCacheRequest()
-for _p in (P_RECT, P_CTYPE, P_NAME, P_FOCUS, P_ENABLED, P_AID, P_CLASS, P_PASSWORD, P_INVOKE, P_VALUE, P_TOGGLE,
-           P_EXPAND, P_SELITEM, P_SCROLL, P_VALUEVAL, P_TOGGLESTATE):
+for _p in (
+    P_RECT,
+    P_CTYPE,
+    P_NAME,
+    P_FOCUS,
+    P_ENABLED,
+    P_AID,
+    P_CLASS,
+    P_PASSWORD,
+    P_INVOKE,
+    P_VALUE,
+    P_TOGGLE,
+    P_EXPAND,
+    P_SELITEM,
+    P_SCROLL,
+    P_VALUEVAL,
+    P_TOGGLESTATE,
+):
     _CR.AddProperty(_p)
 _CR.TreeScope = 1  # cache only the element itself
 _COND_VISIBLE = IUIA.CreateAndCondition(IUIA.ControlViewCondition, IUIA.CreatePropertyCondition(P_OFFSCREEN, False))
@@ -107,8 +176,14 @@ def proc_name(pid):
 
 def window_info(hwnd):
     _, pid = win32process.GetWindowThreadProcessId(hwnd)
-    return {"hwnd": hwnd, "title": win32gui.GetWindowText(hwnd), "cls": win32gui.GetClassName(hwnd), "pid": pid,
-            "proc": proc_name(pid), "rect": win32gui.GetWindowRect(hwnd)}
+    return {
+        "hwnd": hwnd,
+        "title": win32gui.GetWindowText(hwnd),
+        "cls": win32gui.GetClassName(hwnd),
+        "pid": pid,
+        "proc": proc_name(pid),
+        "rect": win32gui.GetWindowRect(hwnd),
+    }
 
 
 def snapshot(hwnd, max_elements=300, visible_only=True):
@@ -158,10 +233,24 @@ def snapshot(hwnd, max_elements=300, visible_only=True):
                 tog = int(el.GetCachedPropertyValue(P_TOGGLESTATE))
             except Exception:  # noqa: BLE001
                 tog = None
-        els.append(El(f"e{k}", role, name, aid, el.CachedClassName or "", (r.left, r.top, r.right, r.bottom),
-                      bool(el.CachedIsEnabled), bool(el.CachedHasKeyboardFocus), pw, tuple(ops), el, val, tog))
-    return Snapshot(hwnd, info["title"], info["pid"], info["proc"], info["rect"], els,
-                    (time.perf_counter() - t0) * 1000, n, n > max_elements * 4)
+        els.append(
+            El(
+                f"e{k}",
+                role,
+                name,
+                aid,
+                el.CachedClassName or "",
+                (r.left, r.top, r.right, r.bottom),
+                bool(el.CachedIsEnabled),
+                bool(el.CachedHasKeyboardFocus),
+                pw,
+                tuple(ops),
+                el,
+                val,
+                tog,
+            )
+        )
+    return Snapshot(hwnd, info["title"], info["pid"], info["proc"], info["rect"], els, (time.perf_counter() - t0) * 1000, n, n > max_elements * 4)
 
 
 # ---------------------------------------------------------------- acting through patterns

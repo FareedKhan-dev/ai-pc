@@ -1,12 +1,21 @@
 """One connector per platform, all on ai_pc.hub.http.Api (tests pass a fake transport).
 
-  connector("youtube") -> YouTube()       connected(store) -> {name: connector} for the platforms with keys in the vault
+connector("youtube") -> YouTube()       connected(store) -> {name: connector} for the platforms with keys in the vault
 """
+
 import importlib
 
 from ai_pc.social.base import Platform
 
-MODULES = {"facebook": "meta", "instagram": "meta", "threads": "threads", "youtube": "youtube", "tiktok": "tiktok", "linkedin": "linkedin", "x": "xcom"}
+MODULES = {
+    "facebook": "meta",
+    "instagram": "meta",
+    "threads": "threads",
+    "youtube": "youtube",
+    "tiktok": "tiktok",
+    "linkedin": "linkedin",
+    "x": "xcom",
+}
 
 
 def _cls(name):
@@ -20,6 +29,7 @@ def connector(name, creds=None, transport=None, store=None):
 
 def connected(store=None):
     from ai_pc.core import vault
+
     have = set(vault.names())
     out = {}
     for n in MODULES:

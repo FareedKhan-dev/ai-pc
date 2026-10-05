@@ -10,6 +10,7 @@ Every change makes a version; every version is rendered and checked.
   c.say("show me chair.glb") / c.say("convert it to stl") / c.say("is it ready for 3D printing?")
   c.say("undo") / c.say("go back to v1") / c.say("history") / c.say("save it to my desktop")
 """
+
 import datetime as dt
 import json
 import re
@@ -25,15 +26,51 @@ from ai_pc.three.threeparse import parse
 
 CHATS = ROOT / "out" / "three" / "chats"
 CAD_CHATS = ROOT / "out" / "cad" / "chats"
-UNDO = re.compile(r"^\s*(?:please\s+)?(?:undo(?: that| it)?|revert(?: that| it)?|go back(?: one)?|take (?:that|it) back)(?:\s+please)?\s*[.!]*\s*$", re.I)
+UNDO = re.compile(
+    r"^\s*(?:please\s+)?(?:undo(?: that| it)?|revert(?: that| it)?|go back(?: one)?|take (?:that|it) back)(?:\s+please)?\s*[.!]*\s*$", re.I
+)
 REDO = re.compile(r"^\s*redo\b", re.I)
 GOTO = re.compile(r"\b(?:go back to|back to|restore|use|switch to)\s+(?:version\s*|v)(\d+)\b", re.I)
 HISTORY = re.compile(r"^\s*(?:history|versions|show (?:me )?(?:the )?(?:history|versions))\b", re.I)
-SPLIT = re.compile(r"(?<=[.!?;])\s+|,?\s+(?:and then|then|also)\s+|,?\s+and\s+(?=(?:make|show|add|put|remove|give|turn|render|convert|save|change|use)\b)", re.I)
-HOUSE = {"views": ["plan3d", "front"], "style": "modern", "colors": {}, "storey": "ground", "furniture": True, "labels": True, "quality": "normal",
-         "big": False, "seconds": 6}
-KNOWN = {"house_new", "house_from_cad", "cad", "view", "storey", "colors", "style", "furniture", "labels", "quality", "big", "seconds", "text_new",
-         "text_style", "mockup", "mockup_image", "mockup_kind", "mockup_size", "angle", "model", "model_export", "ask", "save"}
+SPLIT = re.compile(
+    r"(?<=[.!?;])\s+|,?\s+(?:and then|then|also)\s+|,?\s+and\s+(?=(?:make|show|add|put|remove|give|turn|render|convert|save|change|use)\b)", re.I
+)
+HOUSE = {
+    "views": ["plan3d", "front"],
+    "style": "modern",
+    "colors": {},
+    "storey": "ground",
+    "furniture": True,
+    "labels": True,
+    "quality": "normal",
+    "big": False,
+    "seconds": 6,
+}
+KNOWN = {
+    "house_new",
+    "house_from_cad",
+    "cad",
+    "view",
+    "storey",
+    "colors",
+    "style",
+    "furniture",
+    "labels",
+    "quality",
+    "big",
+    "seconds",
+    "text_new",
+    "text_style",
+    "mockup",
+    "mockup_image",
+    "mockup_kind",
+    "mockup_size",
+    "angle",
+    "model",
+    "model_export",
+    "ask",
+    "save",
+}
 THREE_SYSTEM = """You turn a person's request about 3D work into changes for a program. Reply with ONE JSON object: {"ops": [...]}
 or {"ask": "<short question back>"}. Each op is {"op": NAME, "args": {...}}:
  house_new {"brief": "<the house described, e.g. 5 marla, 3 bedrooms, double story>"}   house_from_cad {} (the plan they already drew)
@@ -69,8 +106,19 @@ class ThreeChat:
             folder = base / f"three_{time.strftime('%H%M%S')}_{k}"
             k += 1
         folder.mkdir(parents=True)
-        state = {"id": folder.name, "folder": str(folder), "versions": [], "cur": -1, "redo": [], "turns": [], "exports": [], "subject": None, "params": {},
-                 "cad_chat": None, "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in (files or [])}}
+        state = {
+            "id": folder.name,
+            "folder": str(folder),
+            "versions": [],
+            "cur": -1,
+            "redo": [],
+            "turns": [],
+            "exports": [],
+            "subject": None,
+            "params": {},
+            "cad_chat": None,
+            "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in (files or [])},
+        }
         c = cls(state, planner=planner, log=log)
         c.save()
         return c
@@ -119,8 +167,10 @@ class ThreeChat:
                 ops += r["ops"]
             if ops:
                 out.append(self._apply(ops, message))
-        reply = "\n".join(x for x in out if x).strip() or ("Tell me what to make in 3D, e.g. 'a 3D model of a 5 marla house with 3 bedrooms', 'a 3D intro "
-                                                          "for Khan Electronics in gold', 'put card.png on a box', 'show me chair.glb'.")
+        reply = "\n".join(x for x in out if x).strip() or (
+            "Tell me what to make in 3D, e.g. 'a 3D model of a 5 marla house with 3 bedrooms', 'a 3D intro "
+            "for Khan Electronics in gold', 'put card.png on a box', 'show me chair.glb'."
+        )
         turn.update(reply=reply, seconds=round(time.perf_counter() - t0, 2), v_to=self.state["cur"])
         self.state["turns"].append(turn)
         self.last_turn = turn
@@ -128,7 +178,9 @@ class ThreeChat:
         return reply
 
     def _remember_files(self, message):
-        for name in re.findall(r"([A-Za-z]:\\[^\"'<>|]+?\.\w{2,5}|[\w\-.()]+\.(?:png|jpe?g|webp|glb|gltf|obj|fbx|stl|ply|usdz?|blend))\b", message, re.I):
+        for name in re.findall(
+            r"([A-Za-z]:\\[^\"'<>|]+?\.\w{2,5}|[\w\-.()]+\.(?:png|jpe?g|webp|glb|gltf|obj|fbx|stl|ply|usdz?|blend))\b", message, re.I
+        ):
             p = Path(name)
             for c in (p, Path.cwd() / name):
                 if c.is_file():
@@ -137,16 +189,25 @@ class ThreeChat:
 
     def _llm(self, clause, message):
         if self.planner is None:
-            return {"ops": [], "ask": f"I could not read '{clause}'. Try e.g. 'a 3D model of a 5 marla house', 'show the front', 'a 3D intro for <name>', "
-                                       "'put logo.png on a mug', 'show me chair.glb'."}
+            return {
+                "ops": [],
+                "ask": f"I could not read '{clause}'. Try e.g. 'a 3D model of a 5 marla house', 'show the front', 'a 3D intro for <name>', "
+                "'put logo.png on a mug', 'show me chair.glb'.",
+            }
         self._turn["llm"] = True
         ctx = f"NOW: {self.state['subject'] or 'nothing yet'} {json.dumps(self.state['params'])[:400]}; files named: {list(self.state['files'])}"
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": THREE_SYSTEM}, {"role": "user", "content": f"{ctx}\nMESSAGE: {message}\nREQUEST: {clause}"}])
+            r = self.planner._call(
+                "fast", [{"role": "system", "content": THREE_SYSTEM}, {"role": "user", "content": f"{ctx}\nMESSAGE: {message}\nREQUEST: {clause}"}]
+            )
             d = parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return {"ops": [], "ask": f"I could not work that out ({type(e).__name__})."}
-        ops = [o if "args" in o else {"op": o.get("op"), "args": {k: v for k, v in o.items() if k != "op"}} for o in d.get("ops") or [] if isinstance(o, dict)]
+        ops = [
+            o if "args" in o else {"op": o.get("op"), "args": {k: v for k, v in o.items() if k != "op"}}
+            for o in d.get("ops") or []
+            if isinstance(o, dict)
+        ]
         ops = [o for o in ops if o.get("op") in KNOWN and isinstance(o.get("args") or {}, dict)]
         for o in ops:
             o["args"] = o.get("args") or {}
@@ -205,7 +266,11 @@ class ThreeChat:
                 if subject == "model":
                     p["views"] = ["orbit"]
             elif k == "text_new":
-                subject, p, render = "text", {"text": a.get("text", "Hello"), "material": "gold", "background": "dark", "anim": "dolly", "seconds": 5}, True
+                subject, p, render = (
+                    "text",
+                    {"text": a.get("text", "Hello"), "material": "gold", "background": "dark", "anim": "dolly", "seconds": 5},
+                    True,
+                )
             elif k == "text_style" and subject == "text":
                 p.update({kk: vv for kk, vv in a.items() if vv})
                 render = True
@@ -249,6 +314,7 @@ class ThreeChat:
     def _cad(self, text, new=False):
         """The plan side: a CAD chat of this 3D chat's own (made on the first house), told the brief or the change."""
         from ai_pc.cad.cadchat import CadChat
+
         quiet = lambda *_: None  # noqa: E731
         if new or not self.state.get("cad_chat"):
             cc = CadChat.start(chats_dir=self.folder / "cad", planner=self.planner, log=quiet)
@@ -285,9 +351,21 @@ class ThreeChat:
         try:
             if subject == "house":
                 lay = json.loads(Path(p["plan"]).read_text(encoding="utf-8"))
-                r = MK.house(lay, self.folder, name, views=tuple(p.get("views") or HOUSE["views"]), style=p.get("style", "modern"), storey=p.get("storey", "ground"),
-                             furniture=p.get("furniture", True), labels=p.get("labels", True), quality=p.get("quality", "normal"), colors=p.get("colors") or None,
-                             log=self.log, seconds=p.get("seconds", 6), big=p.get("big", False))
+                r = MK.house(
+                    lay,
+                    self.folder,
+                    name,
+                    views=tuple(p.get("views") or HOUSE["views"]),
+                    style=p.get("style", "modern"),
+                    storey=p.get("storey", "ground"),
+                    furniture=p.get("furniture", True),
+                    labels=p.get("labels", True),
+                    quality=p.get("quality", "normal"),
+                    colors=p.get("colors") or None,
+                    log=self.log,
+                    seconds=p.get("seconds", 6),
+                    big=p.get("big", False),
+                )
             elif subject == "text":
                 r = MK.text(p, self.folder, name, log=self.log)
             elif subject == "mockup":
@@ -298,8 +376,19 @@ class ThreeChat:
                 return "Tell me what to make first."
         except (B.BlenderError, OSError, ValueError, KeyError) as e:
             return f"Couldn't make it: {e}."
-        nv = {"v": n, "subject": subject, "params": p, "outputs": r["outputs"], "checks": r["checks"], "said": said, "parent": self.state["cur"],
-              "when": _when(), "seconds": r["seconds"], "engine": r.get("engine"), "stats": r.get("stats")}
+        nv = {
+            "v": n,
+            "subject": subject,
+            "params": p,
+            "outputs": r["outputs"],
+            "checks": r["checks"],
+            "said": said,
+            "parent": self.state["cur"],
+            "when": _when(),
+            "seconds": r["seconds"],
+            "engine": r.get("engine"),
+            "stats": r.get("stats"),
+        }
         self.state["versions"].append(nv)
         self.state["cur"], self.state["redo"] = n, []
         self.state["subject"], self.state["params"] = subject, p
@@ -307,9 +396,20 @@ class ThreeChat:
 
     def _words(self, v):
         outs = v["outputs"]
-        what = {"house": "house", "text": "3D title", "mockup": f"{v['params'].get('kind')} mockup", "model": Path(v["params"].get("file", "")).name}[v["subject"]]
-        names = {"plan3d": "3D floor plan", "top": "top view", "front": "front view", "aerial": "view from above", "orbit": "turn-around video", "video": "video",
-                 "still": "last frame", "three_quarter": "picture", "export": "converted file"}
+        what = {"house": "house", "text": "3D title", "mockup": f"{v['params'].get('kind')} mockup", "model": Path(v["params"].get("file", "")).name}[
+            v["subject"]
+        ]
+        names = {
+            "plan3d": "3D floor plan",
+            "top": "top view",
+            "front": "front view",
+            "aerial": "view from above",
+            "orbit": "turn-around video",
+            "video": "video",
+            "still": "last frame",
+            "three_quarter": "picture",
+            "export": "converted file",
+        }
         made = ", ".join(names.get(k, k) for k in outs)
         bad = [c for c in v["checks"] if not c["ok"] and c["level"] == "fail"]
         warn = [c for c in v["checks"] if not c["ok"] and c["level"] == "warn"]
@@ -318,11 +418,17 @@ class ThreeChat:
             lines[0] = lines[0].replace("3D floor plan", "3D floor plan of the first floor")
         if v["subject"] == "model" and v.get("stats"):
             s = v["stats"]
-            lines.append(f"{s['size_m'][0] * 1000:.0f} x {s['size_m'][1] * 1000:.0f} x {s['size_m'][2] * 1000:.0f} mm, {s['triangles']:,} triangles, "
-                         + ("watertight (ready for 3D printing)" if s["watertight"] else f"not watertight ({s['open_edges']} open edges)") + ".")
+            lines.append(
+                f"{s['size_m'][0] * 1000:.0f} x {s['size_m'][1] * 1000:.0f} x {s['size_m'][2] * 1000:.0f} mm, {s['triangles']:,} triangles, "
+                + ("watertight (ready for 3D printing)" if s["watertight"] else f"not watertight ({s['open_edges']} open edges)")
+                + "."
+            )
         ok = sum(1 for c in v["checks"] if c["ok"])
-        lines.append(f"Checked: {ok} of {len(v['checks'])} passed." if not bad and not warn else
-                     "Not right: " + "; ".join(f"{c['what']} ({c['detail']})" for c in bad + warn) + ".")
+        lines.append(
+            f"Checked: {ok} of {len(v['checks'])} passed."
+            if not bad and not warn
+            else "Not right: " + "; ".join(f"{c['what']} ({c['detail']})" for c in bad + warn) + "."
+        )
         lines.append("Files: " + ", ".join(Path(f).name for f in outs.values()))
         return "\n".join(lines)
 
@@ -339,8 +445,10 @@ class ThreeChat:
             if what == "print":
                 if s["watertight"]:
                     return f"Yes: it is watertight ({size}, {s['volume_m3'] * 1e6:.1f} cm3 of material) - a slicer can print it."
-                return (f"Not yet: it is not watertight ({s['open_edges']} open edges, {s['many_faced_edges']} edges shared by more than two faces), "
-                        f"so a slicer may fail or fill it wrongly. Close the holes first.")
+                return (
+                    f"Not yet: it is not watertight ({s['open_edges']} open edges, {s['many_faced_edges']} edges shared by more than two faces), "
+                    f"so a slicer may fail or fill it wrongly. Close the holes first."
+                )
             return f"{size}, {s['objects']} part(s), {s['vertices']:,} points, {s['triangles']:,} triangles, {s['materials']} material(s)."
         return f"v{v['v']}: {v['subject']} - " + ", ".join(Path(f).name for f in v["outputs"].values())
 
@@ -349,8 +457,17 @@ class ThreeChat:
         if not v:
             return "Nothing has been made yet."
         from ai_pc.windows import fs as WF
-        dest = WF.known({"download": "downloads", "document": "documents", "video": "videos", "picture": "pictures", "photo": "pictures",
-                         "photos": "pictures"}.get(where, where or "pictures"))
+
+        dest = WF.known(
+            {
+                "download": "downloads",
+                "document": "documents",
+                "video": "videos",
+                "picture": "pictures",
+                "photo": "pictures",
+                "photos": "pictures",
+            }.get(where, where or "pictures")
+        )
         if not dest:
             return f"I don't know the folder '{where}'."
         saved = []
@@ -395,5 +512,7 @@ class ThreeChat:
     def history(self):
         if not self.state["versions"]:
             return "Nothing yet."
-        return "\n".join(f"{'*' if v['v'] == self.state['cur'] else ' '} v{v['v']}: {v['said'][:60]} -> {', '.join(Path(f).name for f in v['outputs'].values())}"
-                         for v in self.state["versions"])
+        return "\n".join(
+            f"{'*' if v['v'] == self.state['cur'] else ' '} v{v['v']}: {v['said'][:60]} -> {', '.join(Path(f).name for f in v['outputs'].values())}"
+            for v in self.state["versions"]
+        )

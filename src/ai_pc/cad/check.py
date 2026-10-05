@@ -25,8 +25,13 @@ def design(lay):
     for fl in _floors(lay):
         name = fl.get("floor", "plan").lower()
         un = unreachable(fl, fl["doors"])
-        out.append(_c(not un, f"{name}: every room can be reached from the {'stairs' if fl.get('floor') == 'FIRST FLOOR' else 'entrance'}"
-                      + (f" (not: {', '.join(un)})" if un else "")))
+        out.append(
+            _c(
+                not un,
+                f"{name}: every room can be reached from the {'stairs' if fl.get('floor') == 'FIRST FLOOR' else 'entrance'}"
+                + (f" (not: {', '.join(un)})" if un else ""),
+            )
+        )
         small = []
         for r in fl["rooms"]:
             mn = KINDS[r["kind"]][2]
@@ -40,13 +45,23 @@ def design(lay):
                 small.append(f"{r['label']} bath")
         out.append(_c(not small, f"{name}: no room under its minimum size" + (f" ({'; '.join(small)})" if small else "")))
         rooms = fl["rooms"]
-        over = [(a["label"], b["label"]) for i, a in enumerate(rooms) for b in rooms[i + 1:]
-                if a["x0"] < b["x1"] - 0.5 and b["x0"] < a["x1"] - 0.5 and a["y0"] < b["y1"] - 0.5 and b["y0"] < a["y1"] - 0.5]
+        over = [
+            (a["label"], b["label"])
+            for i, a in enumerate(rooms)
+            for b in rooms[i + 1 :]
+            if a["x0"] < b["x1"] - 0.5 and b["x0"] < a["x1"] - 0.5 and a["y0"] < b["y1"] - 0.5 and b["y0"] < a["y1"] - 0.5
+        ]
         out.append(_c(not over, f"{name}: no two rooms overlap" + (f" ({over[:2]})" if over else "")))
         ex0, ey0, ex1, ey1 = fl["envelope"]
-        outside = [r["label"] for r in rooms if r["x0"] < ex0 + OUTER - 0.5 or r["x1"] > ex1 - OUTER + 0.5 or r["y0"] < ey0 + OUTER - 0.5 or r["y1"] > ey1 - OUTER + 0.5]
+        outside = [
+            r["label"]
+            for r in rooms
+            if r["x0"] < ex0 + OUTER - 0.5 or r["x1"] > ex1 - OUTER + 0.5 or r["y0"] < ey0 + OUTER - 0.5 or r["y1"] > ey1 - OUTER + 0.5
+        ]
         out.append(_c(not outside, f"{name}: every room is inside the walls" + (f" ({outside})" if outside else "")))
-        dark = [r["label"] for r in rooms if r["kind"] == "bedroom" and not any(w["room"] == r["id"] and w["kind"] == "window" for w in fl["windows"])]
+        dark = [
+            r["label"] for r in rooms if r["kind"] == "bedroom" and not any(w["room"] == r["id"] and w["kind"] == "window" for w in fl["windows"])
+        ]
         out.append(_c(not dark, f"{name}: every bedroom has a window" + (f" (not: {', '.join(dark)})" if dark else ""), "warn"))
     if lay.get("upper"):
         a = next((r for r in lay["rooms"] if r["kind"] == "stairs"), None)
@@ -89,8 +104,13 @@ def dxf_file(path, lay, plans=None):
             else:
                 pt = e.dxf.align_point if e.dxf.hasattr("align_point") and e.dxf.halign else e.dxf.insert
                 marks.append(("".join(e.dxf.text.upper().split()), pt[0], pt[1]))
-        missing = [r["label"] for fl in plans for r in fl["rooms"] if r["kind"] != "stairs" and not any(
-            t == "".join(r["label"].split()) and r["x0"] - 1 <= x <= r["x1"] + 1 and r["y0"] - 1 <= y <= r["y1"] + 1 for t, x, y in marks)]
+        missing = [
+            r["label"]
+            for fl in plans
+            for r in fl["rooms"]
+            if r["kind"] != "stairs"
+            and not any(t == "".join(r["label"].split()) and r["x0"] - 1 <= x <= r["x1"] + 1 and r["y0"] - 1 <= y <= r["y1"] + 1 for t, x, y in marks)
+        ]
     else:
         flat = "".join(texts.split())  # names may be written on two lines
         missing = [r["label"] for fl in _floors(lay) for r in fl["rooms"] if r["kind"] != "stairs" and "".join(r["label"].split()) not in flat]
@@ -114,7 +134,7 @@ def dxf_file(path, lay, plans=None):
             bad.append(t)
             continue
         if abs(abs(meas) - told) > 0.6:
-            bad.append(f"{t} measures {meas:.1f}\"")
+            bad.append(f'{t} measures {meas:.1f}"')
     out.append(_c(n > 0 and not bad, f"{n} dimension(s), each one's text equal to the distance it measures" + (f" (not: {bad[:3]})" if bad else "")))
     return out
 
@@ -124,14 +144,21 @@ def sheet(files, sheet_info):
     out = []
     if files.get("pdf"):
         from pypdf import PdfReader
+
         r = PdfReader(files["pdf"])
         box = r.pages[0].mediabox
         w, h = float(box.width) / 72 * 25.4, float(box.height) / 72 * 25.4
         pw, ph = sheet_info["paper_mm"]
-        out.append(_c(abs(w - pw) < 1.5 and abs(h - ph) < 1.5 and len(r.pages) == 1, f"PDF: one page {w:.0f} x {h:.0f} mm ({sheet_info['paper']} at 1:{sheet_info['scale']})"))
+        out.append(
+            _c(
+                abs(w - pw) < 1.5 and abs(h - ph) < 1.5 and len(r.pages) == 1,
+                f"PDF: one page {w:.0f} x {h:.0f} mm ({sheet_info['paper']} at 1:{sheet_info['scale']})",
+            )
+        )
     if files.get("png"):
         import numpy as np
         from PIL import Image
+
         g = np.asarray(Image.open(files["png"]).convert("L"), dtype=np.float32) / 255
         ink = float((g < 0.6).mean())
         out.append(_c(0.01 < ink < 0.35, f"preview: a drawing ({ink:.1%} ink)"))
@@ -152,5 +179,8 @@ def _area(pts):
 def text_of(checks):
     bad = [c for c in checks if not c["ok"] and c["level"] == "fail"]
     warn = [c for c in checks if not c["ok"] and c["level"] == "warn"]
-    return f"checked {len(checks) - len(bad) - len(warn)}/{len(checks)}" + (f"; not right: {'; '.join(c['what'] for c in bad[:3])}" if bad else "") + \
-        (f"; to look at: {'; '.join(c['what'] for c in warn[:2])}" if warn else "")
+    return (
+        f"checked {len(checks) - len(bad) - len(warn)}/{len(checks)}"
+        + (f"; not right: {'; '.join(c['what'] for c in bad[:3])}" if bad else "")
+        + (f"; to look at: {'; '.join(c['what'] for c in warn[:2])}" if warn else "")
+    )

@@ -3,6 +3,7 @@ headless browser prints that to a vector PDF (true scale: 1:100 measures 1:100 o
 
   files = render(doc, sheet, out_stem)    -> {"svg", "pdf", "png", "seconds"}
 """
+
 import time
 from pathlib import Path
 
@@ -14,8 +15,12 @@ from ai_pc.core import headless
 def to_svg(doc, sheet):
     msp = doc.modelspace()
     backend = svg.SVGBackend()
-    cfg = config.Configuration(background_policy=config.BackgroundPolicy.WHITE, color_policy=config.ColorPolicy.COLOR,
-                               lineweight_policy=config.LineweightPolicy.ABSOLUTE, min_lineweight=0.12)
+    cfg = config.Configuration(
+        background_policy=config.BackgroundPolicy.WHITE,
+        color_policy=config.ColorPolicy.COLOR,
+        lineweight_policy=config.LineweightPolicy.ABSOLUTE,
+        min_lineweight=0.12,
+    )
     Frontend(RenderContext(doc), backend, config=cfg).draw_layout(msp, finalize=True)
     pw, ph = sheet["paper_mm"]
     page = layout.Page(pw, ph, layout.Units.mm, margins=layout.Margins.all(0))
@@ -31,9 +36,11 @@ def render(doc, sheet, out_stem, png=True, pdf=True):
     svg_p = out_stem.with_suffix(".svg")
     svg_p.write_text(s, encoding="utf-8")
     pw, ph = sheet["paper_mm"]
-    html = (f'<!doctype html><html><head><meta charset="utf-8"><style>@page{{size:{pw}mm {ph}mm;margin:0}}html,body{{margin:0;padding:0;'
-            f'width:{pw}mm;height:{ph}mm;overflow:hidden;background:#fff}}svg{{display:block;width:{pw}mm;height:{ph}mm}}</style></head>'
-            f'<body>{s[s.index("<svg"):]}</body></html>')
+    html = (
+        f'<!doctype html><html><head><meta charset="utf-8"><style>@page{{size:{pw}mm {ph}mm;margin:0}}html,body{{margin:0;padding:0;'
+        f"width:{pw}mm;height:{ph}mm;overflow:hidden;background:#fff}}svg{{display:block;width:{pw}mm;height:{ph}mm}}</style></head>"
+        f"<body>{s[s.index('<svg') :]}</body></html>"
+    )
     html_p = out_stem.with_suffix(".html")
     html_p.write_text(html, encoding="utf-8")
     out = {"svg": str(svg_p)}

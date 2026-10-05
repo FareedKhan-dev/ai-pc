@@ -13,6 +13,7 @@ text      every paragraph and list item made it into the PDF
 look      (with a planner) one vision look at all the pages for overlaps, cut-off text, empty pages, odd spacing
 A result with "fix" says what the fixer can change (ai-pc video applies it and checks again).
 """
+
 import ctypes
 import re
 
@@ -35,6 +36,7 @@ def glyph_fonts(pdf):
     """{font name: number of characters drawn in it} for the whole PDF (what was really used, per character)."""
     import pypdfium2 as pdfium
     import pypdfium2.raw as raw
+
     doc = pdfium.PdfDocument(str(pdf))
     out = {}
     try:
@@ -43,7 +45,7 @@ def glyph_fonts(pdf):
             tp = doc[i].get_textpage()
             for k in range(tp.count_chars()):
                 n = raw.FPDFText_GetFontInfo(tp.raw, k, buf, 256, ctypes.byref(flags))
-                f = buf.raw[:max(0, n - 1)].decode("latin-1")
+                f = buf.raw[: max(0, n - 1)].decode("latin-1")
                 if f and tp.get_text_range(k, 1).strip():
                     out[f] = out.get(f, 0) + 1
             tp.close()
@@ -56,6 +58,7 @@ def image_counts(pdf):
     """Images drawn on each page (charts are vector drawings, not images)."""
     import pypdfium2 as pdfium
     import pypdfium2.raw as raw
+
     doc = pdfium.PdfDocument(str(pdf))
     try:
         return [sum(1 for o in doc[i].get_objects(max_depth=3) if o.type == raw.FPDF_PAGEOBJ_IMAGE) for i in range(len(doc))]
@@ -87,6 +90,7 @@ def check(plan, built, rendered, planner=None, log=print, look_budget=25):
         if ev:
             r["evidence"] = ev
         res.append(r)
+
     if not rendered.get("ok"):
         add("global", "global", "fail", f"not rendered: {rendered.get('error')}")
         return {"counts": {"pass": 0, "warn": 0, "fail": 1}, "results": res, "facts": facts}
@@ -148,11 +152,17 @@ def check(plan, built, rendered, planner=None, log=print, look_budget=25):
         probs.append("drawn in other fonts: " + ", ".join(f"{f} ({n} chars)" for f, n in list(stray.items())[:3]))
         status = "fail" if status == "fail" else "warn"
     if "error!" in full:
-        probs.append("a field shows an error (" + full[full.index("error!"):full.index("error!") + 60] + ")")
+        probs.append("a field shows an error (" + full[full.index("error!") : full.index("error!") + 60] + ")")
         status = "fail"
-    add("global", "global", status, "; ".join(probs) or f"{n_pages} pages, {plan['page']['size']} {plan['page']['orientation']}, fonts as designed",
-        fix={"op": "length", "pages": body_pages, "want": want} if want and any("asked" in p for p in probs) else
-        ({"op": "blank_pages", "pages": [b + 1 for b in blank]} if blank else fit))
+    add(
+        "global",
+        "global",
+        status,
+        "; ".join(probs) or f"{n_pages} pages, {plan['page']['size']} {plan['page']['orientation']}, fonts as designed",
+        fix={"op": "length", "pages": body_pages, "want": want}
+        if want and any("asked" in p for p in probs)
+        else ({"op": "blank_pages", "pages": [b + 1 for b in blank]} if blank else fit),
+    )
 
     # ---- table of contents
     [b for b in plan["blocks"] if b["type"] == "heading"]
@@ -194,8 +204,14 @@ def check(plan, built, rendered, planner=None, log=print, look_budget=25):
         body = [x for x in by_page.get(pg, []) if x["box"][1] < sizes[pg][1] - margin * 0.75]
         last = max(body, key=lambda x: x["box"][3]) if body else None
         if last is not None and _norm(last["text"]).startswith(hn[:30]) and pg + 1 < n_pages:
-            add(f"b{bi}", "heading", "warn", f"'{b['text'][:40]}' is alone at the bottom of page {pg + 1}", page=pg,
-                fix={"op": "page_break_before", "block": bi})
+            add(
+                f"b{bi}",
+                "heading",
+                "warn",
+                f"'{b['text'][:40]}' is alone at the bottom of page {pg + 1}",
+                page=pg,
+                fix={"op": "page_break_before", "block": bi},
+            )
         else:
             add(f"b{bi}", "heading", "pass", f"on page {pg + 1}", page=pg)
 
@@ -229,7 +245,9 @@ def check(plan, built, rendered, planner=None, log=print, look_budget=25):
             last_cell = _norm(b["rows"][-1][0]) if b["type"] == "table" and b["rows"] and _norm(b["rows"][-1][0]) else None
             end_pg = pg
             if last_cell and len(last_cell) > 3:
-                end_pg = next((p_ for p_ in range(n_pages - 1, pg - 1, -1) if any(_norm(x["text"]).startswith(last_cell[:20]) for x in by_page.get(p_, []))), pg)
+                end_pg = next(
+                    (p_ for p_ in range(n_pages - 1, pg - 1, -1) if any(_norm(x["text"]).startswith(last_cell[:20]) for x in by_page.get(p_, []))), pg
+                )
             for p_ in range(pg + 1, end_pg + 1):
                 if not any(_norm(x["text"]).startswith(want_h[0][:12]) for x in by_page.get(p_, [])):
                     probs.append(f"header not repeated on page {p_ + 1}")
@@ -240,9 +258,14 @@ def check(plan, built, rendered, planner=None, log=print, look_budget=25):
                 amount = f"{tot:,.{b['computed']['decimals']}f}"
                 if amount.lower() not in full:
                     probs.append(f"total {amount} not on the page")
-            add(f"b{bi}", "table", "warn" if probs else "pass", "; ".join(probs) or
-                f"on page {pg + 1}" + (f"-{end_pg + 1}, header repeated" if end_pg > pg else "") + ", inside the margins", page=pg,
-                fix={"op": "table_smaller", "block": bi} if any("wider" in p for p in probs) else None)
+            add(
+                f"b{bi}",
+                "table",
+                "warn" if probs else "pass",
+                "; ".join(probs) or f"on page {pg + 1}" + (f"-{end_pg + 1}, header repeated" if end_pg > pg else "") + ", inside the margins",
+                page=pg,
+                fix={"op": "table_smaller", "block": bi} if any("wider" in p for p in probs) else None,
+            )
         elif b["type"] == "chart":
             want_txt = [_norm(c) for c in b["categories"]][:6]
             if b.get("title"):
@@ -278,12 +301,17 @@ def check(plan, built, rendered, planner=None, log=print, look_budget=25):
             if " ".join(words) not in full:
                 missing.append(" ".join(words))
     if total:
-        add("text", "text", "pass" if not missing else ("warn" if len(missing) <= max(1, total // 20) else "fail"),
-            f"all {total} paragraphs and items are in the PDF" if not missing else f"{len(missing)}/{total} not found: " + "; ".join(missing[:3]))
+        add(
+            "text",
+            "text",
+            "pass" if not missing else ("warn" if len(missing) <= max(1, total // 20) else "fail"),
+            f"all {total} paragraphs and items are in the PDF" if not missing else f"{len(missing)}/{total} not found: " + "; ".join(missing[:3]),
+        )
 
     # ---- one look at the pages (with a planner), on a time budget: a slow model never holds up the run
     if planner is not None:
         import threading
+
         box = {}
 
         def go():
@@ -291,6 +319,7 @@ def check(plan, built, rendered, planner=None, log=print, look_budget=25):
                 box["r"] = look(pdf, plan, planner)
             except Exception as e:  # noqa: BLE001
                 box["r"] = {"id": "look", "type": "look", "status": "skip", "why": f"visual check failed: {type(e).__name__}: {str(e)[:80]}"}
+
         th_ = threading.Thread(target=go, daemon=True)
         th_.start()
         th_.join(timeout=look_budget)
@@ -310,15 +339,20 @@ Reply with ONE JSON object: {"ok": true/false, "problems": [{"page": <n>, "what"
 
 def look(pdf, plan, planner):
     from ai_pc.llm.vlm import ask
+
     imgs = RN.pages(pdf, scale=0.9, last=11)
     jpeg = RN.sheet(imgs, [f"p{i + 1}" for i in range(len(imgs))], cols=min(4, len(imgs)), cell_w=340 if len(imgs) > 2 else 520)
     d, secs = ask(planner, LOOK_SYSTEM, f"A {plan['doctype']} of {len(imgs)} page(s): '{plan.get('title') or ''}'.", [jpeg], tier="vision")
     if not isinstance(d, dict):
         return {"id": "look", "type": "look", "status": "warn", "why": "the visual check gave no answer"}
     probs = [p for p in d.get("problems") or [] if isinstance(p, dict) and p.get("what")]
-    return {"id": "look", "type": "look", "status": "pass" if d.get("ok", not probs) and not probs else "warn",
-            "why": "; ".join(f"p{p.get('page')}: {p['what']}" for p in probs[:4]) or str(d.get("impression") or "looks clean")[:160],
-            "evidence": {"impression": d.get("impression"), "seconds": secs}}
+    return {
+        "id": "look",
+        "type": "look",
+        "status": "pass" if d.get("ok", not probs) and not probs else "warn",
+        "why": "; ".join(f"p{p.get('page')}: {p['what']}" for p in probs[:4]) or str(d.get("impression") or "looks clean")[:160],
+        "evidence": {"impression": d.get("impression"), "seconds": secs},
+    }
 
 
 # ------------------------------------------------------------------------------------------------ slide decks
@@ -338,6 +372,7 @@ def check_deck(deck, built, rendered, planner=None, png_dir=None, look_budget=25
         if fix:
             r["fix"] = fix
         res.append(r)
+
     if not rendered.get("ok"):
         add("global", "global", "fail", f"not rendered: {rendered.get('error')}")
         return {"counts": {"pass": 0, "warn": 0, "fail": 1, "skip": 0}, "results": res, "facts": {}}
@@ -371,6 +406,7 @@ def check_deck(deck, built, rendered, planner=None, png_dir=None, look_budget=25
         from pptx import Presentation
 
         from ai_pc.office import pptx_ops as PO
+
         prs = Presentation(built["path"])
         for b in PO.unreadable(prs, range(1, len(prs.slides) + 1)):
             hard.setdefault(b["slide"], []).append(b)
@@ -380,11 +416,23 @@ def check_deck(deck, built, rendered, planner=None, png_dir=None, look_budget=25
         sl = k + 1
         if sl in hard and sl not in over:
             b = hard[sl][0]
-            add(f"r{sl}", "slide", "warn", f"slide {sl}: hard to read: '{b['text']}' ({b['colour']} on {b['behind']}, contrast {b['contrast']}:1)", slide=sl)
+            add(
+                f"r{sl}",
+                "slide",
+                "warn",
+                f"slide {sl}: hard to read: '{b['text']}' ({b['colour']} on {b['behind']}, contrast {b['contrast']}:1)",
+                slide=sl,
+            )
         if sl in over:
             sh = over[sl][0]
-            add(f"s{sl}", "slide", "fail", f"slide {sl}: text runs out of its box ({sh['name']}: {sh['text_height']:.0f} pt of text in {sh['height']:.0f} pt)",
-                slide=sl, fix={"op": "shrink", "src": s.get("src")})
+            add(
+                f"s{sl}",
+                "slide",
+                "fail",
+                f"slide {sl}: text runs out of its box ({sh['name']}: {sh['text_height']:.0f} pt of text in {sh['height']:.0f} pt)",
+                slide=sl,
+                fix={"op": "shrink", "src": s.get("src")},
+            )
             continue
         txt = _norm(pages[k]) if k < len(pages) else ""
         want_txt = [x for x in [s.get("title")] + [it["text"] for it in s.get("bullets") or []] if x]
@@ -400,15 +448,18 @@ def check_deck(deck, built, rendered, planner=None, png_dir=None, look_budget=25
     if planner is not None and png_dir:
         import threading
         from pathlib import Path
+
         box = {}
 
         def go():
             try:
                 from PIL import Image
+
                 imgs = [Image.open(p).convert("RGB") for p in sorted(Path(png_dir).glob("*.png"))][:16]
                 box["r"] = look_images(imgs, f"a slide deck of {len(imgs)} slides: '{deck.get('title') or ''}'", planner, SLIDES_SYSTEM)
             except Exception as e:  # noqa: BLE001
                 box["r"] = {"id": "look", "type": "look", "status": "skip", "why": f"visual check failed: {type(e).__name__}: {str(e)[:80]}"}
+
         t = threading.Thread(target=go, daemon=True)
         t.start()
         t.join(timeout=look_budget)
@@ -428,14 +479,19 @@ Reply with ONE JSON object: {"ok": true/false, "problems": [{"slide": <n>, "what
 
 def look_images(images, what, planner, system):
     from ai_pc.llm.vlm import ask
+
     jpeg = RN.sheet(images, [f"s{i + 1}" for i in range(len(images))], cols=min(4, len(images)), cell_w=340 if len(images) > 2 else 520)
     d, secs = ask(planner, system, f"{what}.", [jpeg], tier="vision")
     if not isinstance(d, dict):
         return {"id": "look", "type": "look", "status": "warn", "why": "the visual check gave no answer"}
     probs = [p for p in d.get("problems") or [] if isinstance(p, dict) and p.get("what")]
-    return {"id": "look", "type": "look", "status": "pass" if d.get("ok", not probs) and not probs else "warn",
-            "why": "; ".join(f"s{p.get('slide') or p.get('page')}: {p['what']}" for p in probs[:4]) or str(d.get("impression") or "looks clean")[:160],
-            "evidence": {"impression": d.get("impression"), "seconds": secs}}
+    return {
+        "id": "look",
+        "type": "look",
+        "status": "pass" if d.get("ok", not probs) and not probs else "warn",
+        "why": "; ".join(f"s{p.get('slide') or p.get('page')}: {p['what']}" for p in probs[:4]) or str(d.get("impression") or "looks clean")[:160],
+        "evidence": {"impression": d.get("impression"), "seconds": secs},
+    }
 
 
 # ------------------------------------------------------------------------------------------------ workbooks
@@ -446,6 +502,7 @@ def check_book(book, built, rendered):
 
     def add(id_, typ, status, why):
         res.append({"id": id_, "type": typ, "status": status, "why": why})
+
     if not rendered.get("ok"):
         add("global", "global", "fail", f"Excel could not open it: {rendered.get('error')}")
         return {"counts": {"pass": 0, "warn": 0, "fail": 1, "skip": 0}, "results": res, "facts": {}}
@@ -454,9 +511,20 @@ def check_book(book, built, rendered):
     want_charts = sum(1 for s in book["sheets"] if s["kind"] == "summary" for g in s.get("groups") or [] if g.get("chart"))
     if (rendered.get("charts") or 0) < want_charts:
         probs.append(f"{rendered.get('charts')} chart(s) for {want_charts} planned")
-    add("global", "global", "fail" if errs or probs else "pass",
-        "; ".join(([f"{len(errs)} cell(s) show errors: " + ", ".join(f"{e['sheet']}!R{e['row']}C{e['col']} {e['error']}" for e in errs[:4])] if errs else [])
-                  + probs) or f"Excel recalculated {len(rendered.get('sheets') or [])} sheet(s): no errors, {rendered.get('charts')} chart(s)")
+    add(
+        "global",
+        "global",
+        "fail" if errs or probs else "pass",
+        "; ".join(
+            (
+                [f"{len(errs)} cell(s) show errors: " + ", ".join(f"{e['sheet']}!R{e['row']}C{e['col']} {e['error']}" for e in errs[:4])]
+                if errs
+                else []
+            )
+            + probs
+        )
+        or f"Excel recalculated {len(rendered.get('sheets') or [])} sheet(s): no errors, {rendered.get('charts')} chart(s)",
+    )
     vals = rendered.get("values") or {}
     bad = []
     for c in built.get("checks") or []:
@@ -465,7 +533,11 @@ def check_book(book, built, rendered):
         if not ok:
             bad.append(f"{c['what']} ({c['sheet']}!{c['cell']}): Excel {got}, expected {c['expect']}")
     if built.get("checks"):
-        add("values", "values", "fail" if bad else "pass",
-            "; ".join(bad[:4]) or f"all {len(built['checks'])} totals and summaries Excel computed equal the numbers computed here")
+        add(
+            "values",
+            "values",
+            "fail" if bad else "pass",
+            "; ".join(bad[:4]) or f"all {len(built['checks'])} totals and summaries Excel computed equal the numbers computed here",
+        )
     counts = {k: sum(1 for r in res if r["status"] == k) for k in ("pass", "warn", "fail", "skip")}
     return {"counts": counts, "results": res, "facts": {"sheets": rendered.get("sheets"), "charts": rendered.get("charts")}}

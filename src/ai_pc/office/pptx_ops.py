@@ -14,6 +14,7 @@ Operations:
   style {part: titles|body|all, target, set: {font, size, color, bold, italic}}    background {color, target}
   notes {target, text | write: true}       shrink {target}       bullet_add {slide, text, at}       bullet_delete {slide, n}
 """
+
 import copy
 import re
 
@@ -67,7 +68,7 @@ def para_md(p):
         b, i = bool(r.font.bold), bool(r.font.italic)
         core = t.strip()
         if core and (b or i) and not (b and i):
-            lead, trail = t[:len(t) - len(t.lstrip())], t[len(t.rstrip()):]
+            lead, trail = t[: len(t) - len(t.lstrip())], t[len(t.rstrip()) :]
             mark = "**" if b else "*"
             out.append(f"{lead}{mark}{core}{mark}{trail}")
         else:
@@ -111,20 +112,46 @@ def deck_map(src):
         texts = []
         for k, sh in enumerate(s.shapes):
             if sh.has_text_frame and sh.text_frame.text.strip() and sh.name not in DECO:
-                texts.append({"shape": k, "name": sh.name, "kind": "title" if is_title(sh) else "text", "text": sh.text_frame.text.strip(),
-                              "paras": [{"level": p.level, "text": "".join(r.text for r in p.runs)} for p in sh.text_frame.paragraphs if "".join(r.text for r in p.runs).strip()]})
+                texts.append(
+                    {
+                        "shape": k,
+                        "name": sh.name,
+                        "kind": "title" if is_title(sh) else "text",
+                        "text": sh.text_frame.text.strip(),
+                        "paras": [
+                            {"level": p.level, "text": "".join(r.text for r in p.runs)}
+                            for p in sh.text_frame.paragraphs
+                            if "".join(r.text for r in p.runs).strip()
+                        ],
+                    }
+                )
         kinds = {sh.shape_type for sh in s.shapes}
         notes = s.notes_slide.notes_text_frame.text.strip() if s.has_notes_slide else ""
         cover = any(sh.name == "Meta" for sh in s.shapes) or any(
-            getattr(sh, "is_placeholder", False) and sh.placeholder_format.type == PP_PLACEHOLDER.CENTER_TITLE for sh in s.shapes)
-        slides.append({"n": i, "layout": s.slide_layout.name, "title": slide_title(s), "texts": texts, "notes": notes, "cover": cover,
-                       "chart": any(getattr(sh, "has_chart", False) and sh.has_chart for sh in s.shapes),
-                       "table": any(getattr(sh, "has_table", False) and sh.has_table for sh in s.shapes),
-                       "picture": MSO_SHAPE_TYPE.PICTURE in kinds})
+            getattr(sh, "is_placeholder", False) and sh.placeholder_format.type == PP_PLACEHOLDER.CENTER_TITLE for sh in s.shapes
+        )
+        slides.append(
+            {
+                "n": i,
+                "layout": s.slide_layout.name,
+                "title": slide_title(s),
+                "texts": texts,
+                "notes": notes,
+                "cover": cover,
+                "chart": any(getattr(sh, "has_chart", False) and sh.has_chart for sh in s.shapes),
+                "table": any(getattr(sh, "has_table", False) and sh.has_table for sh in s.shapes),
+                "picture": MSO_SHAPE_TYPE.PICTURE in kinds,
+            }
+        )
     cp = prs.core_properties
-    return {"slides": slides, "count": len(slides), "title": cp.title or (slides[0]["title"] if slides else ""), "keywords": cp.keywords or "",
-            "size": [round(prs.slide_width / 914400, 2), round(prs.slide_height / 914400, 2)],
-            "words": sum(len(t["text"].split()) for s in slides for t in s["texts"])}
+    return {
+        "slides": slides,
+        "count": len(slides),
+        "title": cp.title or (slides[0]["title"] if slides else ""),
+        "keywords": cp.keywords or "",
+        "size": [round(prs.slide_width / 914400, 2), round(prs.slide_height / 914400, 2)],
+        "words": sum(len(t["text"].split()) for s in slides for t in s["texts"]),
+    }
 
 
 def find(m, t):
@@ -215,7 +242,9 @@ def op_slide_delete(prs, op, ctx):
         prs.part.drop_rel(el.get(qn("r:id")))
         lst.remove(el)
     renumber(prs)
-    return f"deleted slide{'s' if len(ns) > 1 else ''} {', '.join(str(x) for x in ns)} ({', '.join(repr(m['slides'][k - 1]['title'][:25]) for k in ns)})"
+    return (
+        f"deleted slide{'s' if len(ns) > 1 else ''} {', '.join(str(x) for x in ns)} ({', '.join(repr(m['slides'][k - 1]['title'][:25]) for k in ns)})"
+    )
 
 
 def op_slide_move(prs, op, ctx):
@@ -280,6 +309,7 @@ def op_slide_duplicate(prs, op, ctx):
                 el.getparent().remove(el)
                 ch = sh.chart
                 from pptx.chart.data import CategoryChartData
+
                 cd = CategoryChartData()
                 cd.categories = [str(c) for c in ch.plots[0].categories]
                 for s_ in ch.plots[0].series:
@@ -308,6 +338,7 @@ def _clone_chart(prs, sh, el, new_slide):
     colour, label and title of the original."""
     from pptx.opc.constants import RELATIONSHIP_TYPE as RT
     from pptx.parts.chart import ChartPart
+
     src = sh.chart.part
     pkg = prs.part.package
     part = ChartPart.load(pkg.next_partname("/ppt/charts/chart%d.xml"), src.content_type, pkg, src.blob)
@@ -341,6 +372,7 @@ def op_slide_add(prs, op, ctx):
         if ctx.get("planner") is None:
             raise OpError("writing a slide needs the model")
         from ai_pc.office.edit_llm import _ask
+
         titles = "; ".join(f"{s['n']}. {s['title']}" for s in m["slides"])
         lay = f" Use the '{op['layout']}' layout." if op.get("layout") else ""
         spec = _ask(ctx["planner"], SLIDE_SYSTEM, f"DECK: {m['title']}\nSLIDES: {titles}\nWRITE A SLIDE: {op['about']}.{lay}")
@@ -419,10 +451,10 @@ def _replace_runs(p, find, repl):
             continue
         f = idx[0]
         a, b = bounds[f]
-        texts[f] = texts[f][:s - a] + new + (texts[f][e - a:] if e <= b else "")
+        texts[f] = texts[f][: s - a] + new + (texts[f][e - a :] if e <= b else "")
         for i in idx[1:]:
             a2, b2 = bounds[i]
-            texts[i] = texts[i][e - a2:] if e < b2 else ""
+            texts[i] = texts[i][e - a2 :] if e < b2 else ""
     for r, t in zip(runs, texts):
         if r.text != t:
             r.text = t
@@ -453,6 +485,7 @@ def op_replace(prs, op, ctx):
 
 def _rewrite_shapes(prs, op, ctx, translate=None):
     from ai_pc.office import edit_llm as EL
+
     if ctx.get("planner") is None:
         raise OpError("rewriting needs the model")
     m, ns = _slides_of(prs, op.get("target"))
@@ -469,8 +502,13 @@ def _rewrite_shapes(prs, op, ctx, translate=None):
     if translate:
         new = EL.translate(ctx["planner"], paras, translate, title=m["title"])
     else:
-        new = EL.rewrite(ctx["planner"], paras, str(op.get("instruction") or "make it clearer") + ". These are slide texts: titles and short bullets.",
-                         keep_count=True, title=m["title"])
+        new = EL.rewrite(
+            ctx["planner"],
+            paras,
+            str(op.get("instruction") or "make it clearer") + ". These are slide texts: titles and short bullets.",
+            keep_count=True,
+            title=m["title"],
+        )
     if len(new) != len(paras):
         raise OpError("the rewrite came back in a different shape; nothing changed")
     if new == paras:
@@ -492,6 +530,7 @@ def op_translate(prs, op, ctx):
 
 def _colour(v):
     from ai_pc.office.docx_ops import colour
+
     try:
         return colour(v)
     except Exception as e:  # noqa: BLE001
@@ -531,6 +570,7 @@ def op_style(prs, op, ctx):
             if s.get("size") is not None:
                 cur = r.font.size.pt if r.font.size else 18.0
                 from ai_pc.office.docx_ops import _new_size
+
                 r.font.size = Pt(_new_size(cur, s["size"]))
             if s.get("color"):
                 r.font.color.rgb = RGBColor.from_string(_colour(s["color"]))
@@ -541,6 +581,7 @@ def op_style(prs, op, ctx):
     if not n:
         raise OpError("no text there")
     from ai_pc.office.docx_ops import _say_set
+
     return f"{'titles' if part == 'titles' else 'body text' if part == 'body' else 'table text' if part == 'table' else 'text'} on {describe_target(m, op.get('target') or {'kind': 'all'})}: {_say_set(s)}"
 
 
@@ -675,6 +716,7 @@ def unreadable(prs, ns, limit=3.0):
 def _chart_text(chart, old_bg, new_bg):
     """A chart's labels, legend and titles readable on a new background (labels inside bars or slices keep theirs)."""
     from pptx.text.text import Font
+
     n = 0
     els = list(chart._chartSpace.iter(qn("a:defRPr"), qn("a:rPr")))
     if not els:
@@ -698,8 +740,8 @@ def _chart_text(chart, old_bg, new_bg):
 
 
 def _lum(hx):
-    r, g, b = (int(hx[i:i + 2], 16) / 255 for i in (0, 2, 4))
-    f = (lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+    r, g, b = (int(hx[i : i + 2], 16) / 255 for i in (0, 2, 4))
+    f = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
     return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
 
 
@@ -748,7 +790,9 @@ def op_background(prs, op, ctx):
                                         fixed += 1
             if getattr(sh, "has_chart", False) and sh.has_chart:
                 fixed += _chart_text(sh.chart, old, hx)
-    return f"background {op.get('color')} on {describe_target(m, op.get('target') or {'kind': 'all'})}" + (f" ({fixed} text(s) recoloured so they still read)" if fixed else "")
+    return f"background {op.get('color')} on {describe_target(m, op.get('target') or {'kind': 'all'})}" + (
+        f" ({fixed} text(s) recoloured so they still read)" if fixed else ""
+    )
 
 
 NOTES_SYSTEM = """You write speaker notes for slides: what the presenter says, 2-4 natural sentences per slide, adding the context the
@@ -764,6 +808,7 @@ def op_notes(prs, op, ctx):
     if ctx.get("planner") is None:
         raise OpError("writing notes needs the model")
     from ai_pc.office.edit_llm import _ask
+
     lines = [f"SLIDE {k}: " + " | ".join(t["text"].replace("\n", " / ") for t in m["slides"][k - 1]["texts"])[:600] for k in ns]
     d = _ask(ctx["planner"], NOTES_SYSTEM, f"DECK: {m['title']}\n" + "\n".join(lines)) or {}
     raw = d.get("notes") if isinstance(d, dict) else d
@@ -815,7 +860,11 @@ def op_shrink(prs, op, ctx):
             said.append(f"{sh.name} on slide {k} to {round(f * 100)}%")
     if not n:
         raise OpError("no text to shrink there")
-    return "text made smaller: " + ", ".join(said[:6]) if fit else f"text made {round((1 - float(op.get('factor') or 0.85)) * 100)}% smaller on {describe_target(m, op.get('target'))}"
+    return (
+        "text made smaller: " + ", ".join(said[:6])
+        if fit
+        else f"text made {round((1 - float(op.get('factor') or 0.85)) * 100)}% smaller on {describe_target(m, op.get('target'))}"
+    )
 
 
 def _body_shape(slide):
@@ -843,6 +892,7 @@ def op_bullet_add(prs, op, ctx):
     new = copy.deepcopy(model._p)
     model._p.addnext(new)
     from pptx.text.text import _Paragraph
+
     p = _Paragraph(new, model._parent)
     set_para_md(p, str(op.get("text") or ""))
     return f"bullet added to slide {n}: '{op.get('text')}'"
@@ -867,9 +917,23 @@ def op_bullet_delete(prs, op, ctx):
     return f"bullet removed from slide {n}: '{txt[:40]}'"
 
 
-OPS = {"slide_delete": op_slide_delete, "slide_move": op_slide_move, "slide_swap": op_slide_swap, "slide_duplicate": op_slide_duplicate, "slide_add": op_slide_add,
-       "title_set": op_title_set, "replace": op_replace, "rewrite": op_rewrite, "translate": op_translate, "style": op_style,
-       "background": op_background, "notes": op_notes, "shrink": op_shrink, "bullet_add": op_bullet_add, "bullet_delete": op_bullet_delete}
+OPS = {
+    "slide_delete": op_slide_delete,
+    "slide_move": op_slide_move,
+    "slide_swap": op_slide_swap,
+    "slide_duplicate": op_slide_duplicate,
+    "slide_add": op_slide_add,
+    "title_set": op_title_set,
+    "replace": op_replace,
+    "rewrite": op_rewrite,
+    "translate": op_translate,
+    "style": op_style,
+    "background": op_background,
+    "notes": op_notes,
+    "shrink": op_shrink,
+    "bullet_add": op_bullet_add,
+    "bullet_delete": op_bullet_delete,
+}
 
 
 def _bad_keys(bad):
@@ -880,6 +944,7 @@ def renumber_parts(prs):
     """Slide part names in slide order. python-pptx names a new slide by the number of slides, so after a deletion that
     name can belong to a slide still there: two parts with one name make a file PowerPoint cannot open."""
     from pptx.opc.packuri import PackURI
+
     slides = list(prs.slides)
     if all(str(sl.part.partname) == f"/ppt/slides/slide{i}.xml" for i, sl in enumerate(slides, start=1)):
         return
@@ -907,8 +972,11 @@ def _style_misses(prs, op):
     for k in find(m, op.get("target") or {"kind": "all"}):
         for r in _part_runs(prs.slides[k - 1], op.get("part") or "all"):
             n += 1
-            if (s.get("font") and r.font.name != s["font"]) or (s.get("color") and _rgb_of(r.font.color) != _colour(s["color"])) or \
-                    any(s.get(kk) is not None and bool(getattr(r.font, kk)) != bool(s[kk]) for kk in ("bold", "italic")):
+            if (
+                (s.get("font") and r.font.name != s["font"])
+                or (s.get("color") and _rgb_of(r.font.color) != _colour(s["color"]))
+                or any(s.get(kk) is not None and bool(getattr(r.font, kk)) != bool(s[kk]) for kk in ("bold", "italic"))
+            ):
                 miss += 1
     return n, miss
 
@@ -926,8 +994,12 @@ def check(op, before, after, info=None, prs=None):
         if k == "background":
             hx = _colour(op.get("color") or "white")
             wrong = [n for n in ns if slide_bg(prs.slides[n - 1]) != hx]
-            return not wrong and not bad, f"background {hx} on {len(ns) - len(wrong)}/{len(ns)} slides; every text reads" if not bad else \
-                f"background {hx} on {len(ns) - len(wrong)}/{len(ns)} slides{say}"
+            return (
+                not wrong and not bad,
+                f"background {hx} on {len(ns) - len(wrong)}/{len(ns)} slides; every text reads"
+                if not bad
+                else f"background {hx} on {len(ns) - len(wrong)}/{len(ns)} slides{say}",
+            )
         n, miss = _style_misses(prs, op)
         return n > 0 and not miss and not bad, f"{n - miss}/{n} texts styled{say}"
     if k == "slide_delete":
@@ -939,12 +1011,18 @@ def check(op, before, after, info=None, prs=None):
             ok = ok and (not info["added"]["title"] or str(info["added"]["title"])[:15].lower() in got.lower())
         return ok, f"{before['count']} -> {after['count']} slides"
     if k in ("slide_move", "slide_swap"):
-        return [s["title"] for s in after["slides"]] != [s["title"] for s in before["slides"]], "order: " + " / ".join(s["title"][:14] for s in after["slides"][:8])
+        return [s["title"] for s in after["slides"]] != [s["title"] for s in before["slides"]], "order: " + " / ".join(
+            s["title"][:14] for s in after["slides"][:8]
+        )
     if k == "title_set":
         n = int(op.get("slide") or 0)
-        return after["slides"][n - 1]["title"].lower().startswith(str(op.get("text"))[:20].lower()), f"slide {n}: '{after['slides'][n - 1]['title'][:40]}'"
+        return after["slides"][n - 1]["title"].lower().startswith(
+            str(op.get("text"))[:20].lower()
+        ), f"slide {n}: '{after['slides'][n - 1]['title'][:40]}'"
     if k == "replace":
-        left = sum(1 for s in after["slides"] for t in s["texts"] if re.search(r"(?<!\w)" + re.escape(str(op.get("find"))) + r"(?!\w)", t["text"], re.I))
+        left = sum(
+            1 for s in after["slides"] for t in s["texts"] if re.search(r"(?<!\w)" + re.escape(str(op.get("find"))) + r"(?!\w)", t["text"], re.I)
+        )
         return left == 0, f"{info.get('replaced', '?')} replaced; {left} left"
     if k == "notes":
         ns = find(after, op.get("target") or {"kind": "all"})
@@ -956,7 +1034,10 @@ def check(op, before, after, info=None, prs=None):
         letters = sum(1 for ch in txt if ch.isalpha())
         script = sum(1 for ch in txt if "\u0600" <= ch <= "\u06ff")
         if str(op.get("language", "")).lower() in ("urdu", "ur", "arabic", "persian", "farsi"):
-            return letters > 0 and script >= 0.5 * letters, f"{script}/{letters} letters in Arabic script on {describe_target(after, op.get('target') or {'kind': 'all'})}"
+            return (
+                letters > 0 and script >= 0.5 * letters,
+                f"{script}/{letters} letters in Arabic script on {describe_target(after, op.get('target') or {'kind': 'all'})}",
+            )
         return txt != " ".join(t["text"] for n in ns for t in before["slides"][n - 1]["texts"]), "text changed"
     if k == "rewrite":
         w0, w1 = info.get("words_before"), info.get("words_after")
@@ -983,6 +1064,7 @@ def describe(op):
         return f"move slide {op.get('slide')}"
     if k == "style":
         from ai_pc.office.docx_ops import _say_set
+
         return f"{op.get('part') or 'text'}{where}: {_say_set(op.get('set') or {})}"
     return k.replace("_", " ") + where
 
@@ -1021,6 +1103,7 @@ def _takeaway(data, spec):
 
 def op_data_slide(prs, op, ctx):
     from ai_pc.office.docx_data import chart_spec
+
     data = op.get("data") or {}
     if not data.get("rows"):
         raise OpError("no data for the slide")
@@ -1032,8 +1115,11 @@ def op_data_slide(prs, op, ctx):
         spec = {"layout": "table", "title": op.get("title") or data.get("title") or "Figures", "table": {"columns": data["header"], "rows": rows}}
     else:
         cs = chart_spec(data, op)
-        spec = {"layout": "chart", "title": op.get("title") or data.get("title") or cs["caption"],
-                "chart": {"chart": cs["chart"], "categories": cs["categories"], "series": cs["series"]}}
+        spec = {
+            "layout": "chart",
+            "title": op.get("title") or data.get("title") or cs["caption"],
+            "chart": {"chart": cs["chart"], "categories": cs["categories"], "series": cs["series"]},
+        }
         take = op.get("takeaway") if isinstance(op.get("takeaway"), str) else _takeaway(data, cs)
         if take:
             spec["takeaway"] = take
@@ -1071,6 +1157,7 @@ def op_data_refresh(prs, op, ctx):
     from pptx.chart.data import CategoryChartData
 
     from ai_pc.office.docx_data import chart_spec
+
     k, sh = linked(prs, op.get("link"))
     if sh is None:
         raise OpError("that chart or table is no longer in the deck")
@@ -1111,6 +1198,7 @@ def op_data_refresh(prs, op, ctx):
 def check_data(op, prs):
     """The linked chart holds exactly the workbook's values; the linked table shows exactly Excel's cells."""
     from ai_pc.office.docx_data import chart_spec
+
     k, sh = linked(prs, op.get("link"))
     if sh is None:
         return False, "the linked chart or table is missing"
@@ -1121,7 +1209,9 @@ def check_data(op, prs):
         cats = [str(c) for c in plot.categories]
         vals = [list(s.values) for s in plot.series]
         ok = cats == [str(c) for c in cs["categories"]] and all(
-            all((a is None and b is None) or (a is not None and b is not None and abs(a - b) < 1e-6) for a, b in zip(x, y["values"])) for x, y in zip(vals, cs["series"]))
+            all((a is None and b is None) or (a is not None and b is not None and abs(a - b) < 1e-6) for a, b in zip(x, y["values"]))
+            for x, y in zip(vals, cs["series"])
+        )
         return ok, f"slide {k}: {len(cats)} categories, {len(vals)} series {'equal to' if ok else 'different from'} the workbook's"
     rows = [data["header"]] + data["rows"] + ([data["total"]] if data.get("total") else [])
     t = sh.table

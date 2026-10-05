@@ -8,6 +8,7 @@ Input/output format follows the authors' tinyclick_utils.py:
   prompt = ("what to do to execute the command? " + command).lower(); image resized to 768x768
   output = "click <loc_X><loc_Y>" with X,Y in 0..1000 (relative to the original image)
 """
+
 import json
 import os
 import re
@@ -65,7 +66,10 @@ def load():
     with patch("transformers.dynamic_module_utils.get_imports", no_flash):
         processor = AutoProcessor.from_pretrained(REPO, trust_remote_code=True)
         model = AutoModelForCausalLM.from_pretrained(REPO, trust_remote_code=True).eval()
-    print(f"model loaded in {time.perf_counter() - t:.1f}s | params: {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M | threads: {torch.get_num_threads()}", flush=True)
+    print(
+        f"model loaded in {time.perf_counter() - t:.1f}s | params: {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M | threads: {torch.get_num_threads()}",
+        flush=True,
+    )
     return torch, processor, model
 
 
@@ -115,7 +119,7 @@ def main():
             d.text((pt[0] + r + 2, pt[1] - r), str(i), fill=(255, 255, 255))
     lat = sorted(r["preprocess_ms"] + r["generate_ms"] for r in rows)
     print(f"\naccuracy: {hits}/{len(QUERIES)} clicks inside the true element")
-    print(f"latency per query (CPU, warm): median {lat[len(lat)//2]} ms, min {lat[0]} ms, max {lat[-1]} ms")
+    print(f"latency per query (CPU, warm): median {lat[len(lat) // 2]} ms, min {lat[0]} ms, max {lat[-1]} ms")
     os.makedirs(os.path.join(ROOT, "out"), exist_ok=True)
     overlay.save(os.path.join(ROOT, "shots", "tinyclick_result.png"))
     json.dump(rows, open(os.path.join(ROOT, "out", "tinyclick_results.json"), "w"), indent=1)

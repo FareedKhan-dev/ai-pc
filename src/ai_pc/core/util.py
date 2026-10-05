@@ -1,4 +1,5 @@
 """Small shared helpers."""
+
 import json
 import re
 import time
@@ -15,7 +16,7 @@ def parse_json(text):
     s, e = t.find("{"), t.rfind("}")
     if s != -1 and e > s:
         try:
-            return json.loads(t[s:e + 1])
+            return json.loads(t[s : e + 1])
         except Exception:  # noqa: BLE001 - no JSON in the text
             return None
     return None

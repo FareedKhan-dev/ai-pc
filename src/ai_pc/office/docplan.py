@@ -19,14 +19,36 @@ resolve(plan) checks and completes it: types and fields cleaned, tables' numbers
 summed by code), invoice amounts computed, tables and figures numbered, headings numbered for academic work, a cover
 and a table of contents decided from the document type and its length.
 """
+
 import copy
 import datetime as dt
 import re
 
 from ai_pc.office import themes
 
-BLOCKS = {"heading", "paragraph", "bullets", "table", "chart", "image", "callout", "kv", "quote", "entry", "invoice_items", "address", "date",
-          "subject", "salutation", "closing", "signature", "references", "page_break", "toc", "spacer"}
+BLOCKS = {
+    "heading",
+    "paragraph",
+    "bullets",
+    "table",
+    "chart",
+    "image",
+    "callout",
+    "kv",
+    "quote",
+    "entry",
+    "invoice_items",
+    "address",
+    "date",
+    "subject",
+    "salutation",
+    "closing",
+    "signature",
+    "references",
+    "page_break",
+    "toc",
+    "spacer",
+}
 CHARTS = {"column", "bar", "line", "pie", "doughnut", "area", "stacked", "stacked_bar"}
 COVER_TYPES = {"report", "proposal", "assignment", "thesis", "research", "business_plan", "manual"}
 TOC_TYPES = COVER_TYPES
@@ -66,10 +88,29 @@ def _clean_block(b):
     if not isinstance(b, dict):
         return None
     t = str(b.get("type") or "").lower().strip()
-    t = {"h": "heading", "title": "heading", "para": "paragraph", "p": "paragraph", "list": "bullets", "bullet": "bullets",
-         "numbered": "bullets", "ol": "bullets", "ul": "bullets", "figure": "image", "graph": "chart", "break": "page_break",
-         "pagebreak": "page_break", "note": "callout", "box": "callout", "keyvalue": "kv", "items": "invoice_items",
-         "experience": "entry", "job": "entry", "reference": "references", "bibliography": "references"}.get(t, t)
+    t = {
+        "h": "heading",
+        "title": "heading",
+        "para": "paragraph",
+        "p": "paragraph",
+        "list": "bullets",
+        "bullet": "bullets",
+        "numbered": "bullets",
+        "ol": "bullets",
+        "ul": "bullets",
+        "figure": "image",
+        "graph": "chart",
+        "break": "page_break",
+        "pagebreak": "page_break",
+        "note": "callout",
+        "box": "callout",
+        "keyvalue": "kv",
+        "items": "invoice_items",
+        "experience": "entry",
+        "job": "entry",
+        "reference": "references",
+        "bibliography": "references",
+    }.get(t, t)
     if t not in BLOCKS:
         return None
     b = {**b, "type": t}
@@ -81,6 +122,7 @@ def _clean_block(b):
         b["text"] = str(b.get("text") or "").strip()
         return b if b["text"] else None
     if t == "bullets":
+
         def items(xs):
             out = []
             for x in xs or []:
@@ -94,6 +136,7 @@ def _clean_block(b):
                 elif _text(x):
                     out.append({"text": _text(x), "items": []})
             return out
+
         b["items"] = items(b.get("items"))
         b["numbered"] = bool(b.get("numbered")) or str(b.get("style", "")).lower() in ("numbered", "number", "ol") or b.get("type0") == "numbered"
         return b if b["items"] else None
@@ -110,8 +153,16 @@ def _clean_block(b):
         return b
     if t == "chart":
         kind = str(b.get("chart") or b.get("kind") or "column").lower().replace(" ", "_")
-        kind = {"bar_chart": "bar", "column_chart": "column", "pie_chart": "pie", "line_chart": "line", "donut": "doughnut",
-                "horizontal_bar": "bar", "stacked_column": "stacked", "histogram": "column"}.get(kind, kind)
+        kind = {
+            "bar_chart": "bar",
+            "column_chart": "column",
+            "pie_chart": "pie",
+            "line_chart": "line",
+            "donut": "doughnut",
+            "horizontal_bar": "bar",
+            "stacked_column": "stacked",
+            "histogram": "column",
+        }.get(kind, kind)
         b["chart"] = kind if kind in CHARTS else "column"
         cats = [_text(c) for c in b.get("categories") or b.get("labels") or []]
         series = []
@@ -119,7 +170,7 @@ def _clean_block(b):
             if not isinstance(s, dict):
                 continue
             vals = []
-            for v in (s.get("values") or [])[:len(cats)]:
+            for v in (s.get("values") or [])[: len(cats)]:
                 p = number(v)
                 vals.append(p[0] if p else None)
             if cats and len(vals) == len(cats) and any(v is not None for v in vals):
@@ -180,15 +231,17 @@ def resolve(plan):
     tight = int(p.get("tight") or 0)  # the fixer's answer to a last page that is almost empty
     if tight:
         th["size"] = max(9.5, th["size"] - 0.5 * tight)
-        th["after"] = max(2.0, round(th["after"] * 0.65 ** tight, 1))
+        th["after"] = max(2.0, round(th["after"] * 0.65**tight, 1))
         th["line"] = max(1.0, round(th["line"] - 0.05 * tight, 2))
-        th["h_scale"] = 0.7 ** tight
+        th["h_scale"] = 0.7**tight
         th["margins"] = max(1.6, th["margins"] - 0.4 * tight)
     p["th"] = th
     page = p.get("page") or {}
-    p["page"] = {"size": "Letter" if str(page.get("size", "")).lower() in ("letter", "us letter") else "A4",
-                 "orientation": "landscape" if str(page.get("orientation", "")).lower() == "landscape" or p["doctype"] == "certificate" else "portrait",
-                 "margins": float(page.get("margins") or th["margins"])}
+    p["page"] = {
+        "size": "Letter" if str(page.get("size", "")).lower() in ("letter", "us letter") else "A4",
+        "orientation": "landscape" if str(page.get("orientation", "")).lower() == "landscape" or p["doctype"] == "certificate" else "portrait",
+        "margins": float(page.get("margins") or th["margins"]),
+    }
     p["language"] = "ur" if str(p.get("language", "")).lower() in ("ur", "urdu") else "en"
     blocks = []
     for i, b in enumerate(p.get("blocks") or []):
@@ -232,14 +285,22 @@ def resolve(plan):
                 if d:
                     disc = sub * d[0] / 100 if d[2] == "%" else d[0]
             rate = number(b.get("tax_rate") or 0)
-            r = (rate[0] / 100 if rate and (rate[2] == "%" or rate[0] > 1) else (rate[0] if rate else 0.0))
+            r = rate[0] / 100 if rate and (rate[2] == "%" or rate[0] > 1) else (rate[0] if rate else 0.0)
             tax = round((sub - disc) * r, 2)
             total = sub - disc + tax
             if not float(tax).is_integer() or not float(total).is_integer():
                 dec = 2
-            b["computed"] = {"currency": cur, "decimals": dec, "lines": [x["qty"] * x["price"] for x in b["items"]], "subtotal": sub,
-                             "discount": disc, "tax_rate": r, "tax": tax, "total": total,
-                             "tax_label": _text(b.get("tax_label")) or (f"Sales tax ({r * 100:g}%)" if r else "")}
+            b["computed"] = {
+                "currency": cur,
+                "decimals": dec,
+                "lines": [x["qty"] * x["price"] for x in b["items"]],
+                "subtotal": sub,
+                "discount": disc,
+                "tax_rate": r,
+                "tax": tax,
+                "total": total,
+                "tax_label": _text(b.get("tax_label")) or (f"Sales tax ({r * 100:g}%)" if r else ""),
+            }
     # numbering: tables, figures; academic headings 1 / 1.1 / 1.1.1
     nt = nf = 0
     counters = [0, 0, 0]
@@ -253,7 +314,8 @@ def resolve(plan):
         elif b["type"] == "heading" and th["numbered"] and p["doctype"] not in ("letter", "application", "cv", "certificate", "invoice"):
             lv = b["level"]
             if not re.match(r"^(?:\d+(?:\.\d+)*\.?|[IVX]+\.|[A-Z]\.)\s", b["text"]) and not re.match(
-                    r"^(?:references|bibliography|acknowledg|abstract|appendix|table of contents|contents)", b["text"], re.I):
+                r"^(?:references|bibliography|acknowledg|abstract|appendix|table of contents|contents)", b["text"], re.I
+            ):
                 counters[lv - 1] += 1
                 for k in range(lv, 3):
                     counters[k] = 0
@@ -267,8 +329,10 @@ def resolve(plan):
     if p.get("header") is None:
         p["header"] = "" if p["doctype"] in NO_HEADER else (p["title"][:80] if p["cover"] or long_doc else "")
     foot = p.get("footer") if isinstance(p.get("footer"), dict) else {}
-    p["footer"] = {"page_numbers": foot.get("page_numbers", p["doctype"] not in ("certificate", "cv", "letter", "application", "notice", "invoice")),
-                   "text": _text(foot.get("text"))}
+    p["footer"] = {
+        "page_numbers": foot.get("page_numbers", p["doctype"] not in ("certificate", "cv", "letter", "application", "notice", "invoice")),
+        "text": _text(foot.get("text")),
+    }
     p["blocks"] = blocks
     return p
 

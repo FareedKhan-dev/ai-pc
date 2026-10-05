@@ -7,6 +7,7 @@ picture (design | page | differences) is saved to .out/compare.png.
   r = check(folder)  -> {"ok", "placed": [in place, total], "worst": [...], "texts": {...}, "fonts_missing": [...],
                          "picture": {"ssim", "delta_e", "cells"} or None, "lines": [sentences for the person]}
 """
+
 import html
 import json
 import re
@@ -53,8 +54,11 @@ def measure(folder, meta, wait_ms=4000):
     """The page's own measurements, taken in headless Chrome at the design's width (a copy of the page with a measuring script)."""
     folder = Path(folder)
     src = (folder / "index.html").read_text(encoding="utf-8")
-    script = MEASURE % {"root": json.dumps(meta["root"]), "classes": json.dumps(list(meta["elements"])),
-                        "families": json.dumps(sorted(meta.get("fonts") or {}))}
+    script = MEASURE % {
+        "root": json.dumps(meta["root"]),
+        "classes": json.dumps(list(meta["elements"])),
+        "families": json.dumps(sorted(meta.get("fonts") or {})),
+    }
     out = folder / ".out"
     out.mkdir(exist_ok=True)
     page = src.replace("<head>", '<head>\n  <base href="../">', 1)
@@ -62,8 +66,12 @@ def measure(folder, meta, wait_ms=4000):
     tmp = out / "measure.html"
     tmp.write_text(page, encoding="utf-8")
     w, h = int(round(meta["w"])), int(round(meta["h"]))
-    dom, err, _ = headless._run(["--dump-dom", f"--window-size={max(w, 320)},{max(min(h, 16000), 240)}", f"--virtual-time-budget={int(wait_ms)}"],
-                                tmp.resolve().as_uri(), 120, "code")
+    dom, err, _ = headless._run(
+        ["--dump-dom", f"--window-size={max(w, 320)},{max(min(h, 16000), 240)}", f"--virtual-time-budget={int(wait_ms)}"],
+        tmp.resolve().as_uri(),
+        120,
+        "code",
+    )
     m = re.search(r'<pre id="__measure">(.*?)</pre>', dom, re.S)
     if not m:
         raise CheckError("the page did not report its measurements (" + err.strip()[-200:] + ")")
@@ -142,6 +150,7 @@ def texts(meta, got):
 def _load(path):
     import cv2
     import numpy as np
+
     img = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
     if img is None:
         raise CheckError(f"cannot read {path}")
@@ -156,6 +165,7 @@ def _load(path):
 def _ssim(x, y):
     import cv2
     import numpy as np
+
     x, y = x.astype(np.float64), y.astype(np.float64)
     c1, c2 = (0.01 * 255) ** 2, (0.03 * 255) ** 2
     mx, my = cv2.GaussianBlur(x, (11, 11), 1.5), cv2.GaussianBlur(y, (11, 11), 1.5)
@@ -169,6 +179,7 @@ def picture(render_png, ref_png, out_png=None, meta=None, rows=None):
     """The page's screenshot against the design's own picture -> {"ssim", "delta_e", "cells": [(score, where, near)]}."""
     import cv2
     import numpy as np
+
     a, b = _load(render_png), _load(ref_png)
     hb, wb = b.shape[:2]
     a = cv2.resize(a, (wb, max(1, int(round(a.shape[0] * wb / a.shape[1])))), interpolation=cv2.INTER_AREA)
@@ -227,7 +238,9 @@ def check(folder, shot=True):
     meta = json.loads((folder / "design" / "design.json").read_text(encoding="utf-8"))
     got = measure(folder, meta)
     rows, ok, total = boxes(meta, got)
-    bad = sorted((r for r in rows if r[2] is None or max(abs(v) for v in r[2:]) > 0), key=lambda r: -1e9 if r[2] is None else -max(abs(v) for v in r[2:]))
+    bad = sorted(
+        (r for r in rows if r[2] is None or max(abs(v) for v in r[2:]) > 0), key=lambda r: -1e9 if r[2] is None else -max(abs(v) for v in r[2:])
+    )
     tx = texts(meta, got)
     fonts_missing = sorted(f for f, has in (got.get("fonts") or {}).items() if not has)
     pic = None
@@ -241,20 +254,38 @@ def check(folder, shot=True):
     lines = [f"{ok}/{total} elements where the design puts them (within {TOL:.0f} px)"]
     if bad:
         lines.append("off: " + "; ".join(describe(r) for r in bad[:4]))
-    lines.append(f"{tx['present']}/{tx['total']} texts on the page" + (f" (missing or changed: {', '.join(tx['missing'][:4])})" if tx["missing"] else ""))
+    lines.append(
+        f"{tx['present']}/{tx['total']} texts on the page" + (f" (missing or changed: {', '.join(tx['missing'][:4])})" if tx["missing"] else "")
+    )
     if tx["spill"]:
         lines.append("spilling out of their boxes: " + "; ".join(tx["spill"][:3]))
     if tx["longer"]:
         lines.append("wrapping differently: " + "; ".join(tx["longer"][:3]))
     fams = sorted(meta.get("fonts") or {})
     if fams:
-        lines.append(("fonts loaded: " + ", ".join(f for f in fams if f not in fonts_missing)) if not fonts_missing else
-                     f"fonts not available here (a stand-in is used): {', '.join(fonts_missing)}")
+        lines.append(
+            ("fonts loaded: " + ", ".join(f for f in fams if f not in fonts_missing))
+            if not fonts_missing
+            else f"fonts not available here (a stand-in is used): {', '.join(fonts_missing)}"
+        )
     if pic:
         verdict = "looks the same as" if pic["ssim"] >= 0.9 else "is close to" if pic["ssim"] >= 0.8 else "differs from"
-        lines.append(f"the page {verdict} the design's picture (similarity {pic['ssim']:.2f}, colour difference {pic['delta_e']:.1f})"
-                     + (f"; least alike: {pic['cells'][0][2]}" + (f" (near {', '.join(pic['cells'][0][3])})" if pic['cells'][0][3] else "")
-                        if pic["ssim"] < 0.95 else ""))
+        lines.append(
+            f"the page {verdict} the design's picture (similarity {pic['ssim']:.2f}, colour difference {pic['delta_e']:.1f})"
+            + (
+                f"; least alike: {pic['cells'][0][2]}" + (f" (near {', '.join(pic['cells'][0][3])})" if pic["cells"][0][3] else "")
+                if pic["ssim"] < 0.95
+                else ""
+            )
+        )
     good = total and ok / total >= 0.9 and not tx["missing"] and not tx["spill"] and (pic is None or pic["ssim"] >= 0.8)
-    return {"ok": bool(good), "placed": [ok, total], "worst": [describe(r) for r in bad[:8]], "texts": tx, "fonts_missing": fonts_missing,
-            "picture": pic, "lines": lines, "height": got.get("height")}
+    return {
+        "ok": bool(good),
+        "placed": [ok, total],
+        "worst": [describe(r) for r in bad[:8]],
+        "texts": tx,
+        "fonts_missing": fonts_missing,
+        "picture": pic,
+        "lines": lines,
+        "height": got.get("height"),
+    }

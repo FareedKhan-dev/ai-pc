@@ -20,6 +20,7 @@ changes are kept as an override list and applied again after any re-cut, so "tit
 30 s". Every change is checked on the new timeline, and the reply says what was done, what was not and why.
 Chats are saved in out/video/chats/<id>.json; every version is also a JianYing draft (<chat>_v<n>).
 """
+
 import copy
 import json
 import re
@@ -41,90 +42,206 @@ TEMPLATE_USE = re.compile(
     r"\b(?:use|apply|try|follow|pick|choose|switch to|change to|go with|recut (?:it |this )?(?:on|with|like|using)|"
     r"(?:edit|make|do|redo|cut|turn) (?:it|this|the video|my video|the edit|everything)\s+(?:like|with|using|on|in|into))\s+"
     r"(?:the |this |that |a |an |your |my )?(?:template\s+(?:called\s+|named\s+)?['\"]?([\w\-'& ]{2,40}?)['\"]?(?=\s*(?:$|[,.!?]|\band\b|\bplease\b|\bpls\b))|"
-    r"['\"]?([\w\-'& ]{1,40}?)['\"]?\s+template)\b", re.I)
-TEMPLATE_WORDS = re.compile(r"\b(?:can you |could you |please |pls |plz )?(?:use|apply|try|follow|edit (?:it |this )?(?:with|like)|make (?:it|this) (?:like|with)|"
-                            r"do (?:it|this) (?:like|with)|recut (?:it )?(?:with|on|like))?\s*(?:this|that|the|a)?\s*(?:capcut\s+)?template\b[:\s]*", re.I)
-TEMPLATE_CATALOG = re.compile(r"\b(?:any|which|what|suggest|recommend|show|list|do you have|have you got|got|options?|available|fit|fits|good for|best|"
-                              r"other|others|else|more|library|saved)\b", re.I)
-TEMPLATE_THIS = re.compile(r"\b(?:did you use|is this|is it|are you using|you used|this edit|current(?:ly)?|following|follows|is used|in use)\b", re.I)
-GENERIC_NAME = {"this", "that", "a", "the", "another", "other", "new", "different", "some", "any", "one", "your", "my", "same", "that one", "this one", "a new"}
+    r"['\"]?([\w\-'& ]{1,40}?)['\"]?\s+template)\b",
+    re.I,
+)
+TEMPLATE_WORDS = re.compile(
+    r"\b(?:can you |could you |please |pls |plz )?(?:use|apply|try|follow|edit (?:it |this )?(?:with|like)|make (?:it|this) (?:like|with)|"
+    r"do (?:it|this) (?:like|with)|recut (?:it )?(?:with|on|like))?\s*(?:this|that|the|a)?\s*(?:capcut\s+)?template\b[:\s]*",
+    re.I,
+)
+TEMPLATE_CATALOG = re.compile(
+    r"\b(?:any|which|what|suggest|recommend|show|list|do you have|have you got|got|options?|available|fit|fits|good for|best|"
+    r"other|others|else|more|library|saved)\b",
+    re.I,
+)
+TEMPLATE_THIS = re.compile(
+    r"\b(?:did you use|is this|is it|are you using|you used|this edit|current(?:ly)?|following|follows|is used|in use)\b", re.I
+)
+GENERIC_NAME = {
+    "this",
+    "that",
+    "a",
+    "the",
+    "another",
+    "other",
+    "new",
+    "different",
+    "some",
+    "any",
+    "one",
+    "your",
+    "my",
+    "same",
+    "that one",
+    "this one",
+    "a new",
+}
 ORDINAL = {"first": 0, "1st": 0, "second": 1, "2nd": 1, "third": 2, "3rd": 2, "fourth": 3, "4th": 3, "last": -1}
-FILLER = re.compile(r"\b(?:please|pls|plz|and|it|now|for|me|with|this|that|on|my|the|a|an|video|clips?|edit|template|link|here|is|can|you|could|would|u|"
-                    r"ok|okay|thanks?|thank you|bro|just|to|of|in|use|apply|try|follow|like|one)\b", re.I)
+FILLER = re.compile(
+    r"\b(?:please|pls|plz|and|it|now|for|me|with|this|that|on|my|the|a|an|video|clips?|edit|template|link|here|is|can|you|could|would|u|"
+    r"ok|okay|thanks?|thank you|bro|just|to|of|in|use|apply|try|follow|like|one)\b",
+    re.I,
+)
 
 # ------------------------------------------------------------------------------------------------ what a clause is
-LEAD = re.compile(r"^(?:(?:no|nope|nah)[,!.]+\s*|(?:hey|hi|hello|yo|ok(?:ay)?|so|um+|uh+|hmm+|well|also|and|now|then|alright|right|actually|oh|ah|wait|"
-                  r"listen|bro|dude|man|sir|boss|please|pls|plz|kindly|just|quickly|one more thing|another thing|one more|one last thing|"
-                  r"last thing|next|oh and|and also|lastly|finally)\b[,!.:]*(?:\s+|$))+", re.I)
-POLITE = re.compile(r"^(?:(?:can|could|would|will|cud|wud) (?:you|u|ya|we|i)(?: please| pls| plz| maybe| just| also)?|"
-                    r"i (?:want|need|would like|'d like|wanna|wish)(?: you| u)?(?: to)?|i'd love(?: it)? if you|let'?s|maybe|"
-                    r"how about|what about|why not|what if (?:we|you)?|is it possible to|would it be possible to|possible to|"
-                    r"any chance (?:you could|to)|do you mind|go ahead and|try(?: to)?|you should|we should|you need to|we need to)\s+", re.I)
-QUESTION = re.compile(r"^(?:what|what's|which|who|why|how|when|where|is|are|does|do|did|was|were|have|has|any|show me|tell me|"
-                      r"list|explain|got any|whats)\b|\?\s*$", re.I)
-RHETORICAL = re.compile(r"^(?:isn'?t|aren'?t|don'?t you think|doesn'?t (?:it|this|that) (?:feel|look|seem)|wouldn'?t it be (?:better|nicer|cooler) (?:if|to)|"
-                        r"shouldn'?t)\s+", re.I)
+LEAD = re.compile(
+    r"^(?:(?:no|nope|nah)[,!.]+\s*|(?:hey|hi|hello|yo|ok(?:ay)?|so|um+|uh+|hmm+|well|also|and|now|then|alright|right|actually|oh|ah|wait|"
+    r"listen|bro|dude|man|sir|boss|please|pls|plz|kindly|just|quickly|one more thing|another thing|one more|one last thing|"
+    r"last thing|next|oh and|and also|lastly|finally)\b[,!.:]*(?:\s+|$))+",
+    re.I,
+)
+POLITE = re.compile(
+    r"^(?:(?:can|could|would|will|cud|wud) (?:you|u|ya|we|i)(?: please| pls| plz| maybe| just| also)?|"
+    r"i (?:want|need|would like|'d like|wanna|wish)(?: you| u)?(?: to)?|i'd love(?: it)? if you|let'?s|maybe|"
+    r"how about|what about|why not|what if (?:we|you)?|is it possible to|would it be possible to|possible to|"
+    r"any chance (?:you could|to)|do you mind|go ahead and|try(?: to)?|you should|we should|you need to|we need to)\s+",
+    re.I,
+)
+QUESTION = re.compile(
+    r"^(?:what|what's|which|who|why|how|when|where|is|are|does|do|did|was|were|have|has|any|show me|tell me|"
+    r"list|explain|got any|whats)\b|\?\s*$",
+    re.I,
+)
+RHETORICAL = re.compile(
+    r"^(?:isn'?t|aren'?t|don'?t you think|doesn'?t (?:it|this|that) (?:feel|look|seem)|wouldn'?t it be (?:better|nicer|cooler) (?:if|to)|"
+    r"shouldn'?t)\s+",
+    re.I,
+)
 TOO_Q = re.compile(r"^(?:is|are|was|does|do)\b.*\b(?:too|enough)\b", re.I)
 
-ACK = re.compile(r"^\s*(?:ok(?:ay)?|cool|nice|great|perfect|awesome|amazing|love it|i love it|looks (?:good|great|amazing|perfect|fire|sick)|"
-                 r"that'?s (?:good|great|perfect|it|better|nice|much better|way better|fine)|good|thanks?|thank you|thx|ty|sweet|dope|fire|lit|sick|"
-                 r"much better|better|way better|well done|good job|nice work|wow|yes that'?s it|exactly|nailed it|beautiful|"
-                 r"zabardast|kamaal|bohat acha|ok|great work)\b[\s!.,]*(?:thanks?|thank you|bro|man|dude)?[\s!.]*$", re.I)
-EXPORT = re.compile(r"\b(?:export|render|download (?:it|the video|the file|the mp4|link)|save (?:it|the video|the file)|send (?:it|me (?:the )?(?:video|file|final))|finali[sz]e|"
-                    r"ship it|final (?:version|cut)|i'?m (?:done|happy with it)|that'?s final|let'?s export|give me the (?:video|file|mp4))\b", re.I)
-VAGUE = re.compile(r"\b(?:make it better|improve (?:it|this|the (?:video|edit))|something(?:'s| is) (?:off|missing|wrong)|i don'?t (?:like|love) it|"
-                   r"not (?:feeling|vibing (?:with)?) it|meh|could be better|not (?:great|good enough)|needs? (?:something|work|more work)|"
-                   r"make it (?:more )?(?:professional|pro|nicer|cooler|amazing|awesome|good|great|insane|viral)|fix it|do your magic|"
-                   r"it'?s (?:ok|okay|fine|alright) but|not quite (?:there|right)|feels? off|looks? (?:amateur|cheap|bad))\b", re.I)
+ACK = re.compile(
+    r"^\s*(?:ok(?:ay)?|cool|nice|great|perfect|awesome|amazing|love it|i love it|looks (?:good|great|amazing|perfect|fire|sick)|"
+    r"that'?s (?:good|great|perfect|it|better|nice|much better|way better|fine)|good|thanks?|thank you|thx|ty|sweet|dope|fire|lit|sick|"
+    r"much better|better|way better|well done|good job|nice work|wow|yes that'?s it|exactly|nailed it|beautiful|"
+    r"zabardast|kamaal|bohat acha|ok|great work)\b[\s!.,]*(?:thanks?|thank you|bro|man|dude)?[\s!.]*$",
+    re.I,
+)
+EXPORT = re.compile(
+    r"\b(?:export|render|download (?:it|the video|the file|the mp4|link)|save (?:it|the video|the file)|send (?:it|me (?:the )?(?:video|file|final))|finali[sz]e|"
+    r"ship it|final (?:version|cut)|i'?m (?:done|happy with it)|that'?s final|let'?s export|give me the (?:video|file|mp4))\b",
+    re.I,
+)
+VAGUE = re.compile(
+    r"\b(?:make it better|improve (?:it|this|the (?:video|edit))|something(?:'s| is) (?:off|missing|wrong)|i don'?t (?:like|love) it|"
+    r"not (?:feeling|vibing (?:with)?) it|meh|could be better|not (?:great|good enough)|needs? (?:something|work|more work)|"
+    r"make it (?:more )?(?:professional|pro|nicer|cooler|amazing|awesome|good|great|insane|viral)|fix it|do your magic|"
+    r"it'?s (?:ok|okay|fine|alright) but|not quite (?:there|right)|feels? off|looks? (?:amateur|cheap|bad))\b",
+    re.I,
+)
 
-UNDO = re.compile(r"\b(?:undo|revert|scratch that|never ?mind|cancel (?:that|it|the last)|take (?:that|it) back|change it back|go back|"
-                  r"bring (?:it|them|that|those|these) back|put (?:them|those|these) back|"
-                  r"put it back|back to how it was|(?:previous|old|last|earlier|other) (?:one|version|edit|cut) (?:was|is|looked|looks) better|"
-                  r"(?:liked|prefer(?:red)?|preferred) (?:it|the (?:previous|old|last|earlier) (?:one|version)) (?:better|more|before)|"
-                  r"(?:it )?(?:was|looked) better before|liked it before|before was better|wapis)\b", re.I)
+UNDO = re.compile(
+    r"\b(?:undo|revert|scratch that|never ?mind|cancel (?:that|it|the last)|take (?:that|it) back|change it back|go back|"
+    r"bring (?:it|them|that|those|these) back|put (?:them|those|these) back|"
+    r"put it back|back to how it was|(?:previous|old|last|earlier|other) (?:one|version|edit|cut) (?:was|is|looked|looks) better|"
+    r"(?:liked|prefer(?:red)?|preferred) (?:it|the (?:previous|old|last|earlier) (?:one|version)) (?:better|more|before)|"
+    r"(?:it )?(?:was|looked) better before|liked it before|before was better|wapis)\b",
+    re.I,
+)
 REDO = re.compile(r"\bredo\b|\bundo the undo\b|\bput (?:it|that) back again\b|\bbring (?:it|that) back again\b", re.I)
-GOTO = re.compile(r"\b(?:go|jump|switch|get|take me|revert) (?:back )?to (?:version|v) ?(\d+)\b|\buse (?:version|v) ?(\d+)\b|^\s*v(\d+)\s*$|"
-                  r"\b(?:version|v) ?(\d+) (?:was|is|looked) (?:better|best|perfect)\b|\bback to (?:version|v) ?(\d+)\b", re.I)
-RESET = re.compile(r"\b(?:start over|from scratch|reset (?:it|everything|all|the edit)|undo (?:all|everything)|"
-                   r"(?:the|back to the) (?:very )?(?:first|original) (?:version|edit|cut)|back to the (?:very )?(?:first|original) one|as it was at the start|"
-                   r"(?:go back|back|return|revert|restore|reset) to (?:the )?(?:very )?(?:first|original)(?: (?:version|edit|cut|one))?\s*$)", re.I)
-HISTORY = re.compile(r"\bwhat (?:did you|have you|did u|you) (?:just )?(?:change|do|did)\b|\bwhat(?:'s| is| has)? (?:changed|different)\b|"
-                     r"\bwhat changed\b|\bwhat was (?:changed|done)\b", re.I)
-VERSIONS = re.compile(r"\b(?:show|list|see) (?:me )?(?:the |all )?(?:the )?(?:versions|history|changes)\b|\bhow many versions\b|"
-                      r"\bwhich version (?:is this|am i on|are we on)\b|\bversion history\b", re.I)
-COMPARE = re.compile(r"\bcompare\b|\bdifference between\b|\bwhat'?s the difference\b|\bdifferent (?:from|than|to) (?:the )?(?:original|first|v\d|version)|"
-                     r"\bchanged? (?:from|since) (?:the )?(?:original|first|start|beginning|scratch|v\d)|\bsince (?:the beginning|the start|we started)|"
-                     r"\bvs\.? (?:v\d|the original)|\bversus\b", re.I)
-OLD = re.compile(r"\b(?:old|older|previous|earlier|original|first version'?s?|other)\b|\bv\d+'?s?\b|\bversion \d+'?s?\b|\b(?:like|as) (?:it was )?before\b|\bbefore was\b|"
-                 r"\b(?:was|were|looked|sounded) better before\b|\bthe one before\b|\bback\b|\bbring back\b|\bput back\b|\breturn\b|\bpehle\b", re.I)
+GOTO = re.compile(
+    r"\b(?:go|jump|switch|get|take me|revert) (?:back )?to (?:version|v) ?(\d+)\b|\buse (?:version|v) ?(\d+)\b|^\s*v(\d+)\s*$|"
+    r"\b(?:version|v) ?(\d+) (?:was|is|looked) (?:better|best|perfect)\b|\bback to (?:version|v) ?(\d+)\b",
+    re.I,
+)
+RESET = re.compile(
+    r"\b(?:start over|from scratch|reset (?:it|everything|all|the edit)|undo (?:all|everything)|"
+    r"(?:the|back to the) (?:very )?(?:first|original) (?:version|edit|cut)|back to the (?:very )?(?:first|original) one|as it was at the start|"
+    r"(?:go back|back|return|revert|restore|reset) to (?:the )?(?:very )?(?:first|original)(?: (?:version|edit|cut|one))?\s*$)",
+    re.I,
+)
+HISTORY = re.compile(
+    r"\bwhat (?:did you|have you|did u|you) (?:just )?(?:change|do|did)\b|\bwhat(?:'s| is| has)? (?:changed|different)\b|"
+    r"\bwhat changed\b|\bwhat was (?:changed|done)\b",
+    re.I,
+)
+VERSIONS = re.compile(
+    r"\b(?:show|list|see) (?:me )?(?:the |all )?(?:the )?(?:versions|history|changes)\b|\bhow many versions\b|"
+    r"\bwhich version (?:is this|am i on|are we on)\b|\bversion history\b",
+    re.I,
+)
+COMPARE = re.compile(
+    r"\bcompare\b|\bdifference between\b|\bwhat'?s the difference\b|\bdifferent (?:from|than|to) (?:the )?(?:original|first|v\d|version)|"
+    r"\bchanged? (?:from|since) (?:the )?(?:original|first|start|beginning|scratch|v\d)|\bsince (?:the beginning|the start|we started)|"
+    r"\bvs\.? (?:v\d|the original)|\bversus\b",
+    re.I,
+)
+OLD = re.compile(
+    r"\b(?:old|older|previous|earlier|original|first version'?s?|other)\b|\bv\d+'?s?\b|\bversion \d+'?s?\b|\b(?:like|as) (?:it was )?before\b|\bbefore was\b|"
+    r"\b(?:was|were|looked|sounded) better before\b|\bthe one before\b|\bback\b|\bbring back\b|\bput back\b|\breturn\b|\bpehle\b",
+    re.I,
+)
 
 IMPOSSIBLE = [
-    (r"\bstickers?\b|\bemojis?\b|\bgifs?\b|\bmemes? (?:image|picture)s?\b",
-     "Stickers, emojis and GIFs can't be placed in these projects.", "I can put a text, an effect or a sound there instead."),
+    (
+        r"\bstickers?\b|\bemojis?\b|\bgifs?\b|\bmemes? (?:image|picture)s?\b",
+        "Stickers, emojis and GIFs can't be placed in these projects.",
+        "I can put a text, an effect or a sound there instead.",
+    ),
     (r"\b4k\b|\b2160p?\b|\b60 ?fps\b|\b120 ?fps\b|\bhdr\b|\b8k\b", "Exports here are 1080p at 30 fps.", None),
     (r"\b(?:face ?swap|deep ?fake|swap (?:his|her|their|the) faces?)\b", "Face swapping isn't offered.", None),
-    (r"\b(?:remove|erase|delete|get rid of|take out) (?:the |that |this )?(?:person|people|guy|man|woman|object|logo|watermark|sign|"
-     r"car|tree|crowd|background people)s? (?:in|from|behind|at the back of) (?:the )?(?:background|shot|clip|frame|footage|picture|back)\b",
-     "Removing things from inside the picture isn't possible here.", "I can crop or reframe the shot, cover the spot with a text or effect, or leave that shot out."),
-    (r"\b(?:change|recolou?r) (?:his|her|their|the) (?:shirt|clothes|dress|hair|eye|car|jacket|shoes?) colou?r\b|"
-     r"\bmake (?:him|her|them|the (?:guy|man|woman|girl|boy)) (?:smile|look happier|look taller|wear|dance|jump)\b",
-     "Changing what happens in the footage itself isn't possible.", "I can change the colour look of the shot or pick another moment."),
-    (r"\b(?:upload|post|publish) (?:it )?(?:to|on) (?:instagram|insta|tiktok|youtube|facebook|snapchat|twitter|x)\b",
-     "I can't post to social media.", "I export the file ready for that platform; you upload it."),
-    (r"\b(?:text to speech|tts|ai voice|robot voice reading|voice ?over (?:that )?(?:says|saying)|narrate (?:it|this|the video)|read (?:it|this|the text) out)\b",
-     "There is no text-to-speech voice here.", "Record the voiceover and send the file: I add it with subtitles and duck the music under it."),
-    (r"\b(?:despacito|taylor swift|drake|bad bunny|the weeknd|eminem|beyonce|bollywood song|trending (?:song|audio|sound)|popular song|"
-     r"that song from|spotify|apple music|copyrighted song|famous song|a real song)\b",
-     "I can't fetch songs from a library or the internet.", "I generate a music bed in any style (hype, phonk, epic, pop, chill, cinematic) or use a music file you send."),
-    (r"\b(?:ai[- ]generate|generate (?:a|an|some|new) (?:video|footage|clip|image|shot|scene)s?|create (?:a|an|some) (?:new )?(?:shot|clip|footage|scene)s? of|"
-     r"film (?:a|some) new)\b", "I can't create new footage.", "Send the clip and I'll cut it in."),
+    (
+        r"\b(?:remove|erase|delete|get rid of|take out) (?:the |that |this )?(?:person|people|guy|man|woman|object|logo|watermark|sign|"
+        r"car|tree|crowd|background people)s? (?:in|from|behind|at the back of) (?:the )?(?:background|shot|clip|frame|footage|picture|back)\b",
+        "Removing things from inside the picture isn't possible here.",
+        "I can crop or reframe the shot, cover the spot with a text or effect, or leave that shot out.",
+    ),
+    (
+        r"\b(?:change|recolou?r) (?:his|her|their|the) (?:shirt|clothes|dress|hair|eye|car|jacket|shoes?) colou?r\b|"
+        r"\bmake (?:him|her|them|the (?:guy|man|woman|girl|boy)) (?:smile|look happier|look taller|wear|dance|jump)\b",
+        "Changing what happens in the footage itself isn't possible.",
+        "I can change the colour look of the shot or pick another moment.",
+    ),
+    (
+        r"\b(?:upload|post|publish) (?:it )?(?:to|on) (?:instagram|insta|tiktok|youtube|facebook|snapchat|twitter|x)\b",
+        "I can't post to social media.",
+        "I export the file ready for that platform; you upload it.",
+    ),
+    (
+        r"\b(?:text to speech|tts|ai voice|robot voice reading|voice ?over (?:that )?(?:says|saying)|narrate (?:it|this|the video)|read (?:it|this|the text) out)\b",
+        "There is no text-to-speech voice here.",
+        "Record the voiceover and send the file: I add it with subtitles and duck the music under it.",
+    ),
+    (
+        r"\b(?:despacito|taylor swift|drake|bad bunny|the weeknd|eminem|beyonce|bollywood song|trending (?:song|audio|sound)|popular song|"
+        r"that song from|spotify|apple music|copyrighted song|famous song|a real song)\b",
+        "I can't fetch songs from a library or the internet.",
+        "I generate a music bed in any style (hype, phonk, epic, pop, chill, cinematic) or use a music file you send.",
+    ),
+    (
+        r"\b(?:ai[- ]generate|generate (?:a|an|some|new) (?:video|footage|clip|image|shot|scene)s?|create (?:a|an|some) (?:new )?(?:shot|clip|footage|scene)s? of|"
+        r"film (?:a|some) new)\b",
+        "I can't create new footage.",
+        "Send the clip and I'll cut it in.",
+    ),
 ]
 IMPOSSIBLE = [(re.compile(p, re.I), a, b) for p, a, b in IMPOSSIBLE]
-NEED_FOOTAGE = re.compile(r"\b(?:add|show|use|put|include|insert|need|want) (?:a |an |some |more |the |another )?(?:\w+ )?(?:shots?|clips?|footage|scenes?|parts?|"
-                          r"b-?roll) (?:of|with|where|showing) (?:a |an |the |some |my |our )?(.+)$", re.I)
+NEED_FOOTAGE = re.compile(
+    r"\b(?:add|show|use|put|include|insert|need|want) (?:a |an |some |more |the |another )?(?:\w+ )?(?:shots?|clips?|footage|scenes?|parts?|"
+    r"b-?roll) (?:of|with|where|showing) (?:a |an |the |some |my |our )?(.+)$",
+    re.I,
+)
 
-ORD = {"first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3, "fourth": 4, "4th": 4, "fifth": 5, "5th": 5, "last": -1,
-       "option one": 1, "option two": 2, "option three": 3, "option four": 4, "number one": 1, "number two": 2, "number three": 3}
+ORD = {
+    "first": 1,
+    "1st": 1,
+    "second": 2,
+    "2nd": 2,
+    "third": 3,
+    "3rd": 3,
+    "fourth": 4,
+    "4th": 4,
+    "fifth": 5,
+    "5th": 5,
+    "last": -1,
+    "option one": 1,
+    "option two": 2,
+    "option three": 3,
+    "option four": 4,
+    "number one": 1,
+    "number two": 2,
+    "number three": 3,
+}
 
 
 def _picked(text, n):
@@ -139,27 +256,67 @@ def _picked(text, n):
         if re.search(r"\b" + w + r"\b(?: one| option| idea)?", t) and (w != "one" or re.search(r"\b(?:the|that|this) one\b", t) is None):
             nums.append(n if k == -1 else k)
     picks = sorted({i - 1 for i in nums if 1 <= i <= n})
-    if picks and (len(t.split()) <= 6 or re.search(r"\b(?:option|number|#)\s*\d|\b(?:the )?(?:first|second|third|fourth|fifth|last) (?:one|option|idea)\b", t)) \
-            and not re.search(r"\b(?:export|render|make it|change|remove|add)\b", t):
+    if (
+        picks
+        and (
+            len(t.split()) <= 6
+            or re.search(r"\b(?:option|number|#)\s*\d|\b(?:the )?(?:first|second|third|fourth|fifth|last) (?:one|option|idea)\b", t)
+        )
+        and not re.search(r"\b(?:export|render|make it|change|remove|add)\b", t)
+    ):
         return picks
-    if n == 1 and re.fullmatch(r"\s*(?:yes|yeah|yep|yup|ya|sure|ok(?:ay)?|do it|go ahead|please do|sounds good|why not|haan|han|ji|"
-                               r"go for it|let'?s do it|try it|yes please|ok do it)\b.*", t):
+    if n == 1 and re.fullmatch(
+        r"\s*(?:yes|yeah|yep|yup|ya|sure|ok(?:ay)?|do it|go ahead|please do|sounds good|why not|haan|han|ji|"
+        r"go for it|let'?s do it|try it|yes please|ok do it)\b.*",
+        t,
+    ):
         return [0]
     return None
 
 
-ACK_WORDS = set("""thanks thank you thx ty that's thats it is perfect great nice cool awesome amazing love it looks good so much really
+ACK_WORDS = set(
+    """thanks thank you thx ty that's thats it is perfect great nice cool awesome amazing love it looks good so much really
 the one this what i wanted needed was looking for we're done all set exactly just right spot on and lol haha
 very much better way wow beautiful excellent brilliant fantastic exactly nailed sweet dope fire lit sick bro man dude ok okay
 yes yeah good job work well done appreciate appreciated cheers lovely gorgeous stunning zabardast kamaal bohat acha shukriya
-jazakallah now wonderful superb top notch""".split())
+jazakallah now wonderful superb top notch""".split()
+)
 
 
 def _is_ack(text):
     words = re.findall(r"[a-z']+", str(text).lower())
-    return bool(words) and len(words) <= 9 and all(w in ACK_WORDS for w in words) and \
-        bool(set(words) & {"thanks", "thank", "thx", "ty", "perfect", "great", "love", "awesome", "amazing", "nice", "cool", "good",
-                           "beautiful", "excellent", "wow", "cheers", "lovely", "zabardast", "kamaal", "shukriya", "superb", "wonderful"})
+    return (
+        bool(words)
+        and len(words) <= 9
+        and all(w in ACK_WORDS for w in words)
+        and bool(
+            set(words)
+            & {
+                "thanks",
+                "thank",
+                "thx",
+                "ty",
+                "perfect",
+                "great",
+                "love",
+                "awesome",
+                "amazing",
+                "nice",
+                "cool",
+                "good",
+                "beautiful",
+                "excellent",
+                "wow",
+                "cheers",
+                "lovely",
+                "zabardast",
+                "kamaal",
+                "shukriya",
+                "superb",
+                "wonderful",
+            }
+        )
+    )
 
 
 def _strip_lead(c):
@@ -248,16 +405,41 @@ class Conversation:
     @classmethod
     def start(cls, draft, **kw):
         from ai_pc.video import studio
+
         sess = studio.load(draft)
         word = re.sub(r"[^a-z0-9]", "", draft.split("_")[1] if "_" in draft else draft)[:10] or "edit"
         stamp = time.strftime("%H%M%S")
         design = sess.get("design") or {}
-        state = {"id": f"chat_{word}_{stamp}", "drafts_prefix": f"agent_{word}{stamp}", "base": draft, "request": sess["request"],
-                 "files": sess["files"], "edit_type": sess.get("edit_type"), "reference": sess.get("reference"),
-                 "versions": [{"v": 0, "parent": None, "design": design, "plan": _pin_fonts(sess["plan"], sess["resolved"]), "overrides": [], "said": None,
-                               "done": ["the first edit"], "failed": [], "checks": [], "draft": draft,
-                               "seconds": round(sess["resolved"]["end"], 2), "export": (sess.get("export") or {}).get("path")}],
-                 "cur": 0, "turns": [], "focus": None, "pending": None, "last_ops": []}
+        state = {
+            "id": f"chat_{word}_{stamp}",
+            "drafts_prefix": f"agent_{word}{stamp}",
+            "base": draft,
+            "request": sess["request"],
+            "files": sess["files"],
+            "edit_type": sess.get("edit_type"),
+            "reference": sess.get("reference"),
+            "versions": [
+                {
+                    "v": 0,
+                    "parent": None,
+                    "design": design,
+                    "plan": _pin_fonts(sess["plan"], sess["resolved"]),
+                    "overrides": [],
+                    "said": None,
+                    "done": ["the first edit"],
+                    "failed": [],
+                    "checks": [],
+                    "draft": draft,
+                    "seconds": round(sess["resolved"]["end"], 2),
+                    "export": (sess.get("export") or {}).get("path"),
+                }
+            ],
+            "cur": 0,
+            "turns": [],
+            "focus": None,
+            "pending": None,
+            "last_ops": [],
+        }
         c = cls(state, **kw)
         c._R[0] = sess["resolved"]
         return c
@@ -301,8 +483,14 @@ class Conversation:
 
     def sess(self):
         v = self.version
-        return {"resolved": self.resolved(), "design": v["design"], "plan": v["plan"], "edit_type": self.state.get("edit_type"),
-                "reference": self.state.get("reference"), "request": self.state["request"]}
+        return {
+            "resolved": self.resolved(),
+            "design": v["design"],
+            "plan": v["plan"],
+            "edit_type": self.state.get("edit_type"),
+            "reference": self.state.get("reference"),
+            "request": self.state["request"],
+        }
 
     def _ctx(self):
         v = self.version
@@ -310,9 +498,16 @@ class Conversation:
         secs = {}
         for n, a, b in QE.sections(v["plan"], v["design"]):
             secs[n] = secs.get(n, 0.0) + (b - a)
-        return {"design": v["design"], "plan": v["plan"], "analyses": self.analyses, "focus": self.state.get("focus"),
-                "last_ops": self.state.get("last_ops") or [], "seconds": R["end"], "section_seconds": secs,
-                "bpm": (v["plan"].get("_rhythm") or {}).get("bpm")}
+        return {
+            "design": v["design"],
+            "plan": v["plan"],
+            "analyses": self.analyses,
+            "focus": self.state.get("focus"),
+            "last_ops": self.state.get("last_ops") or [],
+            "seconds": R["end"],
+            "section_seconds": secs,
+            "bpm": (v["plan"].get("_rhythm") or {}).get("bpm"),
+        }
 
     def _lineage(self, v=None):
         """Versions from the current one back to the first: [cur, parent, grandparent, ...]."""
@@ -339,8 +534,15 @@ class Conversation:
             if tr.get("rest"):
                 out.append(self.say_inner(QE.normalize(tr["rest"]), turn, raw=tr["rest"]))
             return self._finish(turn, out, t0)
-        if not pend and self.state.get("last_options") and re.search(r"\b(?:the )?(?:first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th) one\b|"
-                                                                     r"\boption \d\b|\bnumber \d\b", norm):
+        if (
+            not pend
+            and self.state.get("last_options")
+            and re.search(
+                r"\b(?:the )?(?:first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th) one\b|"
+                r"\boption \d\b|\bnumber \d\b",
+                norm,
+            )
+        ):
             pend = self.state["last_options"]
         if pend and pend.get("template") and not pend["options"]:
             r = QE.parse(_strip_lead(norm), self._ctx())
@@ -369,10 +571,16 @@ class Conversation:
                     for m in msgs:
                         out.append(self.say_inner(m, turn))
                 return self._finish(turn, out, t0)
-        if re.fullmatch(r"\s*(?:try|use|pick|take|go with|i(?:'ll| will)? take)? ?(?:the )?(?:first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th) one\s*", norm) \
-                or re.fullmatch(r"\s*(?:option|number) \d\s*", norm):
+        if re.fullmatch(
+            r"\s*(?:try|use|pick|take|go with|i(?:'ll| will)? take)? ?(?:the )?(?:first|second|third|fourth|fifth|last|1st|2nd|3rd|4th|5th) one\s*",
+            norm,
+        ) or re.fullmatch(r"\s*(?:option|number) \d\s*", norm):
             turn["intents"].append("ask")
-            return self._finish(turn, ["I haven't offered options to pick from just now. Tell me what you'd like, or ask e.g. 'what other transitions do you have?'"], t0)
+            return self._finish(
+                turn,
+                ["I haven't offered options to pick from just now. Tell me what you'd like, or ask e.g. 'what other transitions do you have?'"],
+                t0,
+            )
         out.append(self.say_inner(norm, turn, raw=message))
         return self._finish(turn, out, t0)
 
@@ -399,6 +607,7 @@ class Conversation:
                 out.append(self._change(ops, raw or norm, turn))
                 ops = []
                 ctx = self._ctx()
+
         whole = _strip_lead(norm)
         vague = bool(VAGUE.search(whole))  # options only if nothing concrete was asked as well (see below)
         for cl in QE.clauses(norm):
@@ -453,7 +662,10 @@ class Conversation:
         if acks and not out and not asks:
             out.append(acks[0])
         for a in asks[:1]:  # one question back at a time
-            out.append(a["question"] + ("\n" + "\n".join(f"  {i + 1}) {o['label']}" for i, o in enumerate(a.get("options") or [])) if a.get("options") else ""))
+            out.append(
+                a["question"]
+                + ("\n" + "\n".join(f"  {i + 1}) {o['label']}" for i, o in enumerate(a.get("options") or [])) if a.get("options") else "")
+            )
             if a.get("options") or a.get("template"):
                 self.state["pending"] = {"question": a["question"], "options": a.get("options") or [], "template": a.get("template")}
         return "\n".join(x for x in out if x)
@@ -485,12 +697,17 @@ class Conversation:
         if m and head and not QE.match_files(head, self.analyses):
             thing = re.sub(r"\b(?:at|in|on|to)\b.*$", "", m.group(1)).strip(" .?!") or m.group(1)
             return "impossible", f"There is no {thing} in your clips, so I can't add that shot. Send a clip of it and I'll cut it in."
-        if re.fullmatch(r"(?:(?:hmm+|hm+|no+|nope|nah|ok(?:ay)?|yes|yeah|well|so|actually|wait|ah+|oh+|lol|haha+|um+|uh+|right|alright|hey|"
-                        r"listen|look|bro|dude|man)[\s,.!?]*)+", body):
+        if re.fullmatch(
+            r"(?:(?:hmm+|hm+|no+|nope|nah|ok(?:ay)?|yes|yeah|well|so|actually|wait|ah+|oh+|lol|haha+|um+|uh+|right|alright|hey|"
+            r"listen|look|bro|dude|man)[\s,.!?]*)+",
+            body,
+        ):
             return "context", ""
         if re.match(r"^(?:because|since|cause|cuz|coz|so that|as)\b", body) or (
-                re.search(r"\b(?:people|viewers|audience|they|users|my (?:boss|client|followers))\b", body) and
-                re.search(r"\b(?:scroll|skip|leave|lose interest|get bored|bored|swipe|watch|like it|hate it|love it)\b", body) and not QE._subjects(body)):
+            re.search(r"\b(?:people|viewers|audience|they|users|my (?:boss|client|followers))\b", body)
+            and re.search(r"\b(?:scroll|skip|leave|lose interest|get bored|bored|swipe|watch|like it|hate it|love it)\b", body)
+            and not QE._subjects(body)
+        ):
             return "context", ""
         # versions
         if COMPARE.search(body):
@@ -510,10 +727,15 @@ class Conversation:
         if COMPARE.search(body):
             return "compare", lambda: self.compare(body)
         if re.search(r"\b(?:bring back|put back|add back|use (?:it |them )?again|include again|back in)\b", body):
-            hit = QE.match_files(re.sub(r"\b(?:bring|put|add|back|use|again|include|the|shots?|clips?|footage|scenes?|in)\b", " ", body), self.analyses)
+            hit = QE.match_files(
+                re.sub(r"\b(?:bring|put|add|back|use|again|include|the|shots?|clips?|footage|scenes?|in)\b", " ", body), self.analyses
+            )
             avoided = {str(f).lower() for f in self.version["design"].get("avoid_files") or []}
             if hit and hit[0][0].lower() in avoided:
-                return "change", {"ops": [{"op": "unavoid_file", "file": hit[0][0]}, {"op": "more_of", "file": hit[0][0], "n": 2}], "focus": {"kind": "shot"}}
+                return "change", {
+                    "ops": [{"op": "unavoid_file", "file": hit[0][0]}, {"op": "more_of", "file": hit[0][0], "n": 2}],
+                    "focus": {"kind": "shot"},
+                }
         subj = [s for s in QE._subjects(body) if s not in ("shot",)] or QE._subjects(body)
         if not subj and re.search(r"\b(?:put|bring|go|get|switch)\b.*\b(?:one|version|thing)\b.*\bback\b|\bback to the \w+ one\b", body):
             if any(p_.search(body) for p_, _, _ in QE.LOOKS):  # "put the warm one back": the look
@@ -527,18 +749,28 @@ class Conversation:
             cur, par = self._snap(self.state["cur"], subj[0]), self._snap(self.version["parent"], subj[0])
             if cur is not None and par is not None and self._sig(cur, subj[0]) != self._sig(par, subj[0]):
                 return "restore", lambda: self.restore(subj[0], "")
-        if subj and (UNDO.search(body) or (OLD.search(body) and re.search(
-                r"\b(?:back|was (?:better|nicer|cooler|prettier|good|perfect)|were (?:better|nicer|good)|looked better|sounded better|"
-                r"(?:like|as) (?:it was )?before|bring|restore|return|like it was|as it was|liked|prefer(?:red)?|pehle|wapis)\b", body))):
+        if subj and (
+            UNDO.search(body)
+            or (
+                OLD.search(body)
+                and re.search(
+                    r"\b(?:back|was (?:better|nicer|cooler|prettier|good|perfect)|were (?:better|nicer|good)|looked better|sounded better|"
+                    r"(?:like|as) (?:it was )?before|bring|restore|return|like it was|as it was|liked|prefer(?:red)?|pehle|wapis)\b",
+                    body,
+                )
+            )
+        ):
             return "restore", lambda: self.restore(subj[0], body)
         if UNDO.search(body) and not QE.parse(body, ctx)["ops"]:
             nm = re.search(r"\b(two|2|three|3|four|4|five|5)\s+(?:versions?|changes?|steps?|edits?|times|things)\b|\b(twice)\b|\bundo (both)\b", body)
             n = {"two": 2, "2": 2, "three": 3, "3": 3, "four": 4, "4": 4, "five": 5, "5": 5, "twice": 2, "both": 2}.get(
-                next((g for g in nm.groups() if g), "") if nm else "", 1)
+                next((g for g in nm.groups() if g), "") if nm else "", 1
+            )
 
             def undo_n(n=n):
                 out = [self.undo() for _ in range(n)]
                 return out[-1] if n == 1 else f"Undone {n} changes: back to v{self.state['cur']}."
+
             return "undo", undo_n
         # thanks / export
         if (ACK.match(body) or _is_ack(body)) and not QE._subjects(body):
@@ -558,9 +790,11 @@ class Conversation:
             parsed = QE.parse(re.sub(r"^(?:is|are|was|does|do)\s+", "", body).rstrip(" ?"), ctx)
             ans = EX.answer(body, self.sess()) or ""
             if parsed["ops"]:
-                return "question", {"text": (ans + "\n" if ans else "") + f"Want me to change it ({'; '.join(QE.describe(o) for o in parsed['ops'])})?",
-                                    "options": [{"label": "; ".join(QE.describe(o) for o in parsed["ops"]), "ops": parsed["ops"]}],
-                                    "focus": parsed.get("focus")}
+                return "question", {
+                    "text": (ans + "\n" if ans else "") + f"Want me to change it ({'; '.join(QE.describe(o) for o in parsed['ops'])})?",
+                    "options": [{"label": "; ".join(QE.describe(o) for o in parsed["ops"]), "ops": parsed["ops"]}],
+                    "focus": parsed.get("focus"),
+                }
         if is_q or (polite and re.match(r"^(?:tell me|show me|explain|list)\b", body)):
             return self._question(body, ctx)
         # a change
@@ -571,8 +805,10 @@ class Conversation:
         if re.search(r"\b(?:add|put|show|include|with|want|wish)\b.{0,15}\bgreetings?\b", body):
             g = self._greeting()
             if g:
-                return "change", {"ops": [{"op": "text_add", "text": g, "anchor": "start", "role": "title", "position": "lower", "color": None}],
-                                  "focus": {"kind": "text", "who": {"match": g}}}
+                return "change", {
+                    "ops": [{"op": "text_add", "text": g, "anchor": "start", "role": "title", "position": "lower", "color": None}],
+                    "focus": {"kind": "text", "who": {"match": g}},
+                }
             return "ask", {"question": "Which greeting should I add? (e.g. 'Eid Mubarak', 'Happy Birthday')", "options": [], "template": "add {}"}
         r = QE.parse(typed, ctx)
         if r["ops"]:
@@ -592,17 +828,29 @@ class Conversation:
     def _question(self, q, ctx):
         from ai_pc.video import catalog_qa as CQ
         from ai_pc.video import router as RT
+
         if re.search(r"\bwhat can you do\b|\bwhat do you (?:do|support)\b|\bhelp\b", q) and not CQ.parse(q)["kinds"]:
             return "help", RT.help_text()
         ans = EX.answer(q, self.sess())
         spec = CQ.parse(q)
-        item_word = re.search(r"\b(?:effects?|filters?|transitions?|fonts?|animations?|looks?|luts?|presets?|sounds?|sfx|templates?|stickers?|"
-                              r"overlays?|styles?|typefaces?|intros?|outros?)\b", q)
-        about_items = (spec["kinds"] and item_word) or spec["unsupported"] or (item_word and re.search(
-            r"\b(?:do you have|got any|are there|is there|available|options|other|others|similar|alternatives?|else)\b", q))
-        catalogue_q = re.search(r"\b(?:other|others|similar|alternatives?|else|available|do you have|got any|is there|are there|any)\b", q) and \
-            not re.search(r"\b(?:in (?:the|this|my|it)|did you use|you used|are used|is used|in it|so far|right now|currently|now)\b", q) and \
-            not (re.match(r"how many\b", q) and not re.search(r"\b(?:do you have|available|catalogue|catalog|library|exist)\b", q))
+        item_word = re.search(
+            r"\b(?:effects?|filters?|transitions?|fonts?|animations?|looks?|luts?|presets?|sounds?|sfx|templates?|stickers?|"
+            r"overlays?|styles?|typefaces?|intros?|outros?)\b",
+            q,
+        )
+        about_items = (
+            (spec["kinds"] and item_word)
+            or spec["unsupported"]
+            or (
+                item_word
+                and re.search(r"\b(?:do you have|got any|are there|is there|available|options|other|others|similar|alternatives?|else)\b", q)
+            )
+        )
+        catalogue_q = (
+            re.search(r"\b(?:other|others|similar|alternatives?|else|available|do you have|got any|is there|are there|any)\b", q)
+            and not re.search(r"\b(?:in (?:the|this|my|it)|did you use|you used|are used|is used|in it|so far|right now|currently|now)\b", q)
+            and not (re.match(r"how many\b", q) and not re.search(r"\b(?:do you have|available|catalogue|catalog|library|exist)\b", q))
+        )
         if ans and not (about_items and catalogue_q):
             return "question", {"text": ans, "focus": self._focus_from(q)}
         if about_items:
@@ -613,22 +861,44 @@ class Conversation:
             return "question", {"text": ans}
         if self.planner is not None:
             try:
-                r = self.planner._call("fast", [{"role": "system", "content": "You answer a client's question about a video edit, in 1-3 short "
-                                                 "sentences, only from THE EDIT below (times, shots, texts, music, look). If it is not there, say so."},
-                                                {"role": "user", "content": f"THE EDIT:\n{self.brief()}\n\nQUESTION: {q}"}])
+                r = self.planner._call(
+                    "fast",
+                    [
+                        {
+                            "role": "system",
+                            "content": "You answer a client's question about a video edit, in 1-3 short "
+                            "sentences, only from THE EDIT below (times, shots, texts, music, look). If it is not there, say so.",
+                        },
+                        {"role": "user", "content": f"THE EDIT:\n{self.brief()}\n\nQUESTION: {q}"},
+                    ],
+                )
                 self._turn["llm"] = True
                 txt = re.sub(r"<think>.*?</think>", "", r.text or "", flags=re.S).strip()
                 if txt:
                     return "question", {"text": txt[:600]}
             except Exception:  # noqa: BLE001
                 pass
-        return "question", {"text": "I'm not sure what you mean; you can ask about the music, fonts, transitions, effects, colours, "
-                                    "what happens at a moment (e.g. 'what's at 0:12?') or why something is there."}
+        return "question", {
+            "text": "I'm not sure what you mean; you can ask about the music, fonts, transitions, effects, colours, "
+            "what happens at a moment (e.g. 'what's at 0:12?') or why something is there."
+        }
 
     def _focus_from(self, q):
-        for name, kind in (("title", "text"), ("label", "text"), ("font", "text"), ("transition", "transition"), ("music", "music"),
-                           ("song", "music"), ("filter", "look"), ("colou?r", "look"), ("look", "look"), ("effect", "effects"),
-                           ("shake", "shake"), ("zoom", "zoom"), ("flash", "flash")):
+        for name, kind in (
+            ("title", "text"),
+            ("label", "text"),
+            ("font", "text"),
+            ("transition", "transition"),
+            ("music", "music"),
+            ("song", "music"),
+            ("filter", "look"),
+            ("colou?r", "look"),
+            ("look", "look"),
+            ("effect", "effects"),
+            ("shake", "shake"),
+            ("zoom", "zoom"),
+            ("flash", "flash"),
+        ):
             if re.search(r"\b" + name, q):
                 if kind == "text":
                     return {"kind": "text", "who": {"role": "label" if name == "label" else "title"}}
@@ -639,22 +909,35 @@ class Conversation:
         """Items for a question about what exists ("any snow effects?", "other transitions like this?"), with the ones
         that work here offered as options ("use the 2nd")."""
         from ai_pc.video import catalog_qa as CQ
+
         R = self.resolved()
-        like = re.search(r"\b(?:like (?:this|that|these|the current|what you used|the one you used)|similar|other|others|alternatives?|instead|else)\b", q)
+        like = re.search(
+            r"\b(?:like (?:this|that|these|the current|what you used|the one you used)|similar|other|others|alternatives?|instead|else)\b", q
+        )
         spec = CQ.parse(q)
         current = set()
         if like:  # "like this": the words of what the edit uses now, for the kinds asked about
-            kinds = spec["kinds"] or {"transition": ["transition"], "look": ["filter"], "effects": ["scene_effect"]}.get((ctx.get("focus") or {}).get("kind"), [])
+            kinds = spec["kinds"] or {"transition": ["transition"], "look": ["filter"], "effects": ["scene_effect"]}.get(
+                (ctx.get("focus") or {}).get("kind"), []
+            )
             for e in R["edits"]:
                 k = e.get("item") or (e.get("style") or {}).get("font")
                 if k and k.split(":")[0] in kinds:
                     current.add(k)
-            q = re.sub(r"\b(?:any|other|others|similar|alternatives?|else|instead|more|different|ones?|like (?:this|that|these|the current|"
-                       r"what you used|the one you used))\b", " ", q)
-            own = [w for w in CQ.parse(q)["words"] if w not in ("transition", "transitions", "filter", "filters", "effect", "effects", "font", "fonts")]
+            q = re.sub(
+                r"\b(?:any|other|others|similar|alternatives?|else|instead|more|different|ones?|like (?:this|that|these|the current|"
+                r"what you used|the one you used))\b",
+                " ",
+                q,
+            )
+            own = [
+                w for w in CQ.parse(q)["words"] if w not in ("transition", "transitions", "filter", "filters", "effect", "effects", "font", "fonts")
+            ]
             if current and not own:
                 n = self.cat.index.notes
-                words = " ".join(" ".join([str(n.get(k, {}).get("en") or ""), " ".join((n.get(k, {}).get("tags") or [])[:4])]) for k in list(current)[:2])
+                words = " ".join(
+                    " ".join([str(n.get(k, {}).get("en") or ""), " ".join((n.get(k, {}).get("tags") or [])[:4])]) for k in list(current)[:2]
+                )
                 q = f"{q} {words}"
         r = CQ.ask(q, self.planner if spec.get("recommend") else None)
         items = [it for it in r["items"] if it["state"] in ("ready", "untried") and it["key"] not in current][:5]
@@ -671,7 +954,13 @@ class Conversation:
             elif cat_ == "filter":
                 op = {"op": "look", "item": it["key"], "name": it["en"]}
             elif cat_ in ("scene_effect", "character_effect"):
-                op = {"op": "fx_add", "item": it["key"], "anchor": anchor if anchor is not None else "drop", "target": spec.get("target"), "label": it["en"]}
+                op = {
+                    "op": "fx_add",
+                    "item": it["key"],
+                    "anchor": anchor if anchor is not None else "drop",
+                    "target": spec.get("target"),
+                    "label": it["en"],
+                }
             elif cat_ == "font":
                 op = {"op": "text", "who": (ctx.get("focus") or {}).get("who") or {"role": "title"}, "set": {"font": it["name"], "font_asked": True}}
             elif cat_ == "text_intro":
@@ -693,44 +982,94 @@ class Conversation:
     def _vague_one(self, body, parsed):
         """A clause too unclear to act on alone ("make it bigger" with nothing to point at): the likely meanings."""
         if re.fullmatch(r"(?:make )?(?:it|this|that|everything)? ?(?:bigger|larger|huge)", body.strip()):
-            return {"question": "What should be bigger?", "options": [
-                {"label": "the title", "ops": [{"op": "text", "who": {"role": "title"}, "mul": {"size": 1.25}}]},
-                {"label": "all the text", "ops": [{"op": "text", "who": {"role": "all"}, "mul": {"size": 1.2}}]},
-                {"label": "stronger zoom punches", "ops": [{"op": "fx", "kind": "zoom", "mul": {"strength": 1.4}}]}]}
+            return {
+                "question": "What should be bigger?",
+                "options": [
+                    {"label": "the title", "ops": [{"op": "text", "who": {"role": "title"}, "mul": {"size": 1.25}}]},
+                    {"label": "all the text", "ops": [{"op": "text", "who": {"role": "all"}, "mul": {"size": 1.2}}]},
+                    {"label": "stronger zoom punches", "ops": [{"op": "fx", "kind": "zoom", "mul": {"strength": 1.4}}]},
+                ],
+            }
         if re.fullmatch(r"(?:make )?(?:it|this|that|everything)? ?(?:smaller|tiny)", body.strip()):
-            return {"question": "What should be smaller?", "options": [
-                {"label": "the title", "ops": [{"op": "text", "who": {"role": "title"}, "mul": {"size": 0.8}}]},
-                {"label": "all the text", "ops": [{"op": "text", "who": {"role": "all"}, "mul": {"size": 0.85}}]}]}
+            return {
+                "question": "What should be smaller?",
+                "options": [
+                    {"label": "the title", "ops": [{"op": "text", "who": {"role": "title"}, "mul": {"size": 0.8}}]},
+                    {"label": "all the text", "ops": [{"op": "text", "who": {"role": "all"}, "mul": {"size": 0.85}}]},
+                ],
+            }
         if re.fullmatch(r"(?:change|swap|replace) (?:it|this|that|everything)", body.strip()):
             f = (self.state.get("focus") or {}).get("kind")
             if not f:
-                return {"question": "What should I change: the music, the look, the transitions or the title?", "options": [
-                    {"label": "the music", "ops": [{"op": "music", "generate": "_next"}]},
-                    {"label": "the colour look", "ops": [{"op": "look", "words": "", "name": "a different look", "different": True}]},
-                    {"label": "the transitions", "ops": [{"op": "transitions", "family": "_different"}]},
-                    {"label": "the title font", "ops": [{"op": "text", "who": {"role": "title"}, "set": {"font_style": ""}}]}]}
+                return {
+                    "question": "What should I change: the music, the look, the transitions or the title?",
+                    "options": [
+                        {"label": "the music", "ops": [{"op": "music", "generate": "_next"}]},
+                        {"label": "the colour look", "ops": [{"op": "look", "words": "", "name": "a different look", "different": True}]},
+                        {"label": "the transitions", "ops": [{"op": "transitions", "family": "_different"}]},
+                        {"label": "the title font", "ops": [{"op": "text", "who": {"role": "title"}, "set": {"font_style": ""}}]},
+                    ],
+                }
         return None
 
     def _vague(self):
         """'make it better': three concrete directions for this edit (from its style), to pick from."""
         p, d = self.version["plan"], self.version["design"]
         style = str(p.get("style") or d.get("style") or "")
-        calm = style in ("cinematic", "tour", "talking", "documentary") or (self.state.get("edit_type") or {}).get("type") in ("wedding", "real_estate", "documentary")
+        calm = style in ("cinematic", "tour", "talking", "documentary") or (self.state.get("edit_type") or {}).get("type") in (
+            "wedding",
+            "real_estate",
+            "documentary",
+        )
         opts = []
         if calm:
-            opts.append({"label": "slower, more emotional ending (longer last shots, soft fade)",
-                         "ops": [{"op": "section_beats", "section": "outro", "mul": 1.4}, {"op": "audio", "who": "music", "set": {"fade_out": 3.0}}]})
-            opts.append({"label": "richer film look (cinematic grade + subtle grain)",
-                         "ops": [{"op": "look", "words": "cinematic film warm soft contrast", "name": "cinematic"}, {"op": "texture", "what": "grain", "add": True}]})
+            opts.append(
+                {
+                    "label": "slower, more emotional ending (longer last shots, soft fade)",
+                    "ops": [{"op": "section_beats", "section": "outro", "mul": 1.4}, {"op": "audio", "who": "music", "set": {"fade_out": 3.0}}],
+                }
+            )
+            opts.append(
+                {
+                    "label": "richer film look (cinematic grade + subtle grain)",
+                    "ops": [
+                        {"op": "look", "words": "cinematic film warm soft contrast", "name": "cinematic"},
+                        {"op": "texture", "what": "grain", "add": True},
+                    ],
+                }
+            )
             opts.append({"label": "smoother flow (dissolves at every section change)", "ops": [{"op": "transitions", "family": "dissolve"}]})
         else:
             opts.append({"label": "tighter cuts (faster pacing)", "ops": [{"op": "pace", "mul": 0.85}]})
-            opts.append({"label": "punchier drop (zoom punches, a flash and a shake on the hits)",
-                         "ops": [{"op": "recipe", "use": "zoom_punch", "on": "downbeats", "sections": ["drop"], "strength": 1.2},
-                                 {"op": "fx_add", "item": QE._effect_key("white flash", "flash") or "scene_effect:闪白", "anchor": "drop", "label": "white flash", "duration": 0.4},
-                                 {"op": "move_add", "kind": "shake", "anchor": "drop", "strength": 0.6}]})
-            opts.append({"label": "bolder title (bigger, outlined, pops in)",
-                         "ops": [{"op": "text", "who": {"role": "title"}, "set": {"outline": {"color": "#000000", "width": 70}, "shadow": True, "intro_words": "pop in"}, "mul": {"size": 1.15}}]})
+            opts.append(
+                {
+                    "label": "punchier drop (zoom punches, a flash and a shake on the hits)",
+                    "ops": [
+                        {"op": "recipe", "use": "zoom_punch", "on": "downbeats", "sections": ["drop"], "strength": 1.2},
+                        {
+                            "op": "fx_add",
+                            "item": QE._effect_key("white flash", "flash") or "scene_effect:闪白",
+                            "anchor": "drop",
+                            "label": "white flash",
+                            "duration": 0.4,
+                        },
+                        {"op": "move_add", "kind": "shake", "anchor": "drop", "strength": 0.6},
+                    ],
+                }
+            )
+            opts.append(
+                {
+                    "label": "bolder title (bigger, outlined, pops in)",
+                    "ops": [
+                        {
+                            "op": "text",
+                            "who": {"role": "title"},
+                            "set": {"outline": {"color": "#000000", "width": 70}, "shadow": True, "intro_words": "pop in"},
+                            "mul": {"size": 1.15},
+                        }
+                    ],
+                }
+            )
         opts.append({"label": "different music", "ops": [{"op": "music", "generate": "_next"}]})
         self.state["pending"] = {"question": "which direction", "options": opts}
         return "Happy to. Which direction?\n" + "\n".join(f"  {i + 1}) {o['label']}" for i, o in enumerate(opts)) + "\n(or say 'all')"
@@ -746,35 +1085,55 @@ class Conversation:
         d, p = v["design"], v["plan"]
         roles = QE.text_roles(p)
         music = next((e for e in R["edits"] if e["id"] == "music"), None)
-        mu = (f"generated {music['file'].split('_')[1]} {music['file'].split('_')[2]} BPM, volume {music.get('volume')}"
-              if music and str(music.get("file", "")).startswith("music_") else (f"file {music['file']}" if music else "none"))
+        mu = (
+            f"generated {music['file'].split('_')[1]} {music['file'].split('_')[2]} BPM, volume {music.get('volume')}"
+            if music and str(music.get("file", "")).startswith("music_")
+            else (f"file {music['file']}" if music else "none")
+        )
         fx = {}
         for e in p.get("edits") or []:
             for k in QE.fx_kinds(e, p) & {"shake", "zoom", "flash", "glitch", "grain", "vignette", "letterbox", "leak", "effect", "pushin"}:
                 fx[k] = fx.get(k, 0) + 1
         tr = [e for e in R["edits"] if e["type"] == "transition"]
         fl = [e for e in R["edits"] if e["type"] == "filter"]
-        lines = [f"length {R['end']:.1f} s, canvas {d.get('canvas') or p.get('canvas')}, style {p.get('style')}, music: {mu}",
-                 "sections: " + ", ".join(f"{n} {a:.1f}-{b:.1f}" for n, a, b in QE.sections(p, d)),
-                 "shots (design): " + "; ".join(f"{s['id']} [{s.get('section')}] {s.get('file') or ','.join(s.get('files') or [])}"
-                                                + (f" label '{s['label']}'" if s.get("label") else "") + f": {str(s.get('want') or '')[:50]}"
-                                                for s in d.get("shots") or [] if isinstance(s, dict))[:3000],
-                 "texts: " + "; ".join(f"{roles.get(str(e['id']), 'text')} '{e['text'][:30]}' at {e['window'][0]:.1f} s ({e['style']['font'].split(':')[-1] if e['style'].get('font') else 'default'}, "
-                                       f"{e['style']['color']}, size {e['style']['size']})" for e in R["edits"] if e["type"] == "text")[:1500],
-                 "effects: " + (", ".join(f"{k} x{n}" for k, n in fx.items()) or "none"),
-                 "transitions: " + (f"{len(tr)} x " + ", ".join(sorted({EX._name(e['item']) for e in tr})) if tr else "hard cuts only"),
-                 "look: " + (", ".join(EX._name(e["item"]) for e in fl) or "no filter"),
-                 "files: " + "; ".join(f"{a['file']}: {str(a.get('summary') or '')[:70]}" for a in self.analyses.values() if a.get("kind") in ("video", "image"))[:2500]]
+        lines = [
+            f"length {R['end']:.1f} s, canvas {d.get('canvas') or p.get('canvas')}, style {p.get('style')}, music: {mu}",
+            "sections: " + ", ".join(f"{n} {a:.1f}-{b:.1f}" for n, a, b in QE.sections(p, d)),
+            "shots (design): "
+            + "; ".join(
+                f"{s['id']} [{s.get('section')}] {s.get('file') or ','.join(s.get('files') or [])}"
+                + (f" label '{s['label']}'" if s.get("label") else "")
+                + f": {str(s.get('want') or '')[:50]}"
+                for s in d.get("shots") or []
+                if isinstance(s, dict)
+            )[:3000],
+            "texts: "
+            + "; ".join(
+                f"{roles.get(str(e['id']), 'text')} '{e['text'][:30]}' at {e['window'][0]:.1f} s ({e['style']['font'].split(':')[-1] if e['style'].get('font') else 'default'}, "
+                f"{e['style']['color']}, size {e['style']['size']})"
+                for e in R["edits"]
+                if e["type"] == "text"
+            )[:1500],
+            "effects: " + (", ".join(f"{k} x{n}" for k, n in fx.items()) or "none"),
+            "transitions: " + (f"{len(tr)} x " + ", ".join(sorted({EX._name(e["item"]) for e in tr})) if tr else "hard cuts only"),
+            "look: " + (", ".join(EX._name(e["item"]) for e in fl) or "no filter"),
+            "files: "
+            + "; ".join(f"{a['file']}: {str(a.get('summary') or '')[:70]}" for a in self.analyses.values() if a.get("kind") in ("video", "image"))[
+                :2500
+            ],
+        ]
         return "\n".join(lines)
 
     def _llm(self, clauses, message, turn, done=()):
         if self.planner is None:
             return {"reply_text": "I didn't understand: " + "; ".join(f"'{c}'" for c in clauses) + ". Could you say it another way?"}
         recent = "\n".join(f"client: {t['user']}\neditor: {t.get('reply', '')[:200]}" for t in self.state["turns"][-3:])
-        user = (f"THE EDIT (version {self.state['cur']}):\n{self.brief()}\n\nORIGINAL REQUEST: {self.state['request']}\n\n"
-                f"RECENT CHAT:\n{recent or '(none)'}\n\nCLIENT MESSAGE: {message}\n"
-                + (f"ALREADY DONE by the editor (do NOT repeat): {'; '.join(done)}\n" if done else "")
-                + f"PARTS TO HANDLE (only these): {json.dumps(clauses, ensure_ascii=False)}\n\nThe JSON:")
+        user = (
+            f"THE EDIT (version {self.state['cur']}):\n{self.brief()}\n\nORIGINAL REQUEST: {self.state['request']}\n\n"
+            f"RECENT CHAT:\n{recent or '(none)'}\n\nCLIENT MESSAGE: {message}\n"
+            + (f"ALREADY DONE by the editor (do NOT repeat): {'; '.join(done)}\n" if done else "")
+            + f"PARTS TO HANDLE (only these): {json.dumps(clauses, ensure_ascii=False)}\n\nThe JSON:"
+        )
         turn["llm"] = True
         try:
             r = self.planner._call("fast", [{"role": "system", "content": SYSTEM_LLM}, {"role": "user", "content": user}])
@@ -803,7 +1162,10 @@ class Conversation:
         files = {str(a.get("file", "")).lower(): a["file"] for a in self.analyses.values() if a.get("kind") in ("video", "image")}
         if k == "fx_add":
             if op.get("item") not in self.cat.index.items:
-                key = QE._effect_key(str(op.get("words") or op.get("label") or op.get("name") or ""), target=op.get("target") if op.get("target") in ("eyes", "face", "head", "body") else None)
+                key = QE._effect_key(
+                    str(op.get("words") or op.get("label") or op.get("name") or ""),
+                    target=op.get("target") if op.get("target") in ("eyes", "face", "head", "body") else None,
+                )
                 if not key:
                     return None
                 op["item"] = key
@@ -897,6 +1259,7 @@ class Conversation:
                 overrides0 = []  # earlier changes were to the old cut; the template's plan starts clean
         if design_ops and design.get("template"):  # a template edit: its timing stays; footage, music and format can change
             from ai_pc.video import template as TP
+
             design, dd, df = TP.apply_design(design, design_ops, ctx)
             done += dd
             failed += df
@@ -914,6 +1277,7 @@ class Conversation:
                             self.state["files"].append(a["path"])
         elif design_ops:
             from ai_pc.video.recipes import compose
+
             design, dd, df = QE.apply_design(design, design_ops, ctx)
             done += dd
             failed += df
@@ -948,10 +1312,23 @@ class Conversation:
                 ok, what = False, f"check failed: {type(e).__name__}"
             checks.append({"op": QE.describe(op), "ok": bool(ok), "what": what})
         n = len(self.state["versions"])
-        ver = {"v": n, "parent": self.state["cur"], "design": design, "plan": plan, "overrides": overrides0 + plan_ops, "said": said,
-               "done": done, "failed": failed, "checks": checks, "draft": None, "seconds": round(R1["end"], 2), "export": None}
+        ver = {
+            "v": n,
+            "parent": self.state["cur"],
+            "design": design,
+            "plan": plan,
+            "overrides": overrides0 + plan_ops,
+            "said": said,
+            "done": done,
+            "failed": failed,
+            "checks": checks,
+            "draft": None,
+            "seconds": round(R1["end"], 2),
+            "export": None,
+        }
         if self.do_build:
             from ai_pc.video import jybuild as JB
+
             try:
                 M = JB.build(R1, **({"drafts": self.drafts} if self.drafts else {}), name=f"{self.state['drafts_prefix']}_v{n}")
                 ver["draft"] = M["draft"]
@@ -966,8 +1343,15 @@ class Conversation:
         msg = f"v{n}: " + "; ".join(done) + "."
         if failed:
             msg += " Couldn't: " + "; ".join(failed) + "."
-        msg += (f" Checked on the timeline: {len(checks) - len(bad)}/{len(checks)} OK" +
-                (" (" + "; ".join(f"{c['op']}: {c['what']}" for c in bad) + ")" if bad else "") + ".") if checks else ""
+        msg += (
+            (
+                f" Checked on the timeline: {len(checks) - len(bad)}/{len(checks)} OK"
+                + (" (" + "; ".join(f"{c['op']}: {c['what']}" for c in bad) + ")" if bad else "")
+                + "."
+            )
+            if checks
+            else ""
+        )
         if R1["notes"] and len(R1["notes"]) > len(R0.get("notes") or []):
             new = [x for x in R1["notes"] if x not in (R0.get("notes") or [])][:2]
             if new:
@@ -982,25 +1366,33 @@ class Conversation:
         question with a link gets what the template is, with the recut on offer). None when the message is not that."""
         from ai_pc.video import template as TP
         from ai_pc.video import template_meta as TM
+
         raw = " ".join(str(message or "").split())
         link = TEMPLATE_LINK.search(raw)
         if link:
             src = link.group(0).rstrip(").,!?;:'\"")
-            rest = (raw[:link.start()] + " " + raw[link.end():]).strip()
+            rest = (raw[: link.start()] + " " + raw[link.end() :]).strip()
             try:
                 tpl = TP.resolve(src, self.planner, log=lambda *a: None)
             except TM.NotAllowed as e:
                 turn["intents"].append("impossible")
-                return {"reply": f"I can't read that link: {e}. Paste the template's own page (capcut.com/template-detail/...), a screenshot of it, "
-                                 "or a video of the template."}
+                return {
+                    "reply": f"I can't read that link: {e}. Paste the template's own page (capcut.com/template-detail/...), a screenshot of it, "
+                    "or a video of the template."
+                }
             except Exception as e:  # noqa: BLE001  (offline, a changed page...)
                 turn["intents"].append("impossible")
-                return {"reply": f"I couldn't read that template ({type(e).__name__}: {str(e)[:100]}). A screenshot of its page or a video of it works too."}
+                return {
+                    "reply": f"I couldn't read that template ({type(e).__name__}: {str(e)[:100]}). A screenshot of its page or a video of it works too."
+                }
             nr = QE.normalize(rest)
             if rest.rstrip().endswith("?") or (QUESTION.search(nr) and not POLITE.match(nr)):
                 turn["intents"].append("question")
                 text = self._template_text(tpl) + "\nWant me to recut your edit on it?"
-                self.state["pending"] = self.state["last_options"] = {"question": text, "options": [{"label": f"use {tpl['name']}", "ops": [self._use_op(tpl)]}]}
+                self.state["pending"] = self.state["last_options"] = {
+                    "question": text,
+                    "options": [{"label": f"use {tpl['name']}", "ops": [self._use_op(tpl)]}],
+                }
                 return {"reply": text}
             turn["intents"].append("change")
             rest = TEMPLATE_WORDS.sub(" ", rest).strip(" ,.;:")
@@ -1009,19 +1401,23 @@ class Conversation:
         if not m or QUESTION.match(raw.lower()) and not POLITE.match(raw.lower()):
             return None
         words = (m.group(1) or m.group(2) or "").strip()
-        rest = (raw[:m.start()] + " " + raw[m.end():]).strip(" ,.;:")
+        rest = (raw[: m.start()] + " " + raw[m.end() :]).strip(" ,.;:")
         rest = rest if re.search(r"[a-z]{3,}", FILLER.sub(" ", rest.lower())) else None
         tpl = self._find_template(words)
         k = ORDINAL.get(words.lower())
-        offered = [o for o in (self.state.get("last_options") or {}).get("options") or [] if any(x.get("op") == "use_template" for x in o.get("ops") or [])]
+        offered = [
+            o for o in (self.state.get("last_options") or {}).get("options") or [] if any(x.get("op") == "use_template" for x in o.get("ops") or [])
+        ]
         if tpl is None and k is not None and offered and -len(offered) <= k < len(offered):  # "use the second template" after a list
             tpl = TP.load(next(x["name"] for x in offered[k]["ops"] if x.get("op") == "use_template"))
         if tpl is None:
             turn["intents"].append("ask")
             lib = TP.library()
             if not lib:
-                return {"reply": "There are no templates saved yet. Paste a CapCut template's link (capcut.com/template-detail/...), a screenshot of its "
-                                 "page, or a video of it, and I'll recut the edit on it."}
+                return {
+                    "reply": "There are no templates saved yet. Paste a CapCut template's link (capcut.com/template-detail/...), a screenshot of its "
+                    "page, or a video of it, and I'll recut the edit on it."
+                }
             kind, payload = self._templates(" ".join([self.state["request"], words]))
             head = "Which template?" if words.lower() in GENERIC_NAME or not words else f"I have no template called '{words}'."
             if payload.get("options"):
@@ -1044,12 +1440,14 @@ class Conversation:
     def _find_template(self, words):
         """The library's template a client names: by its name or its page title, typos and 'slowmo'/'slow motion' alike."""
         from ai_pc.video import template as TP
+
         w = " ".join(str(words or "").lower().replace("_", " ").split())
         if not w or w in GENERIC_NAME:
             return None
 
         def toks(x):
             return set(re.findall(r"[a-z0-9]+", QE.normalize(str(x or "").replace("_", " ")))) - {"the", "a", "template", "edit"}
+
         q = toks(w)
         best, bs = None, 0.0
         for nm in TP.library():
@@ -1066,23 +1464,39 @@ class Conversation:
         return best if bs >= 0.5 else None
 
     def _use_op(self, tpl):
-        return {"op": "use_template", "name": tpl["name"], "label": ((tpl.get("meta") or {}).get("title") or tpl["name"]).strip(),
-                "slots": len(tpl.get("slots") or []), "seconds": tpl.get("seconds")}
+        return {
+            "op": "use_template",
+            "name": tpl["name"],
+            "label": ((tpl.get("meta") or {}).get("title") or tpl["name"]).strip(),
+            "slots": len(tpl.get("slots") or []),
+            "seconds": tpl.get("seconds"),
+        }
 
     def _template_text(self, tpl):
         """What a template is, in two or three sentences."""
         from ai_pc.video import trends as TR
+
         m = tpl.get("meta") or {}
-        head = f"'{(m.get('title') or tpl['name']).strip()}'" + (f" by {m['author'].strip()}" if m.get("author") else "") + \
-            f": {len(tpl.get('slots') or [])} clips, {float(tpl['seconds']):.1f} s" + (f", {m['aspect']}" if m.get("aspect") else "") + \
-            (f", {int(m['uses']):,} uses" if m.get("uses") else "") + "."
+        head = (
+            f"'{(m.get('title') or tpl['name']).strip()}'"
+            + (f" by {m['author'].strip()}" if m.get("author") else "")
+            + f": {len(tpl.get('slots') or [])} clips, {float(tpl['seconds']):.1f} s"
+            + (f", {m['aspect']}" if m.get("aspect") else "")
+            + (f", {int(m['uses']):,} uses" if m.get("uses") else "")
+            + "."
+        )
         bits = [head]
         style = TR.short(tpl.get("techniques") or {})
         if style:
             bits.append(f"Style: {style}.")
-        bits.append("An exact copy (learned from its video)." if tpl.get("exact", True) else
-                    "Made from its page: the clip count and length are exact, the cuts are even beats (send a video of it for its exact frames).")
-        vids = [a for a in self.analyses.values() if a.get("kind") in ("video", "image") and not str(a.get("file", "")).startswith(("music_", "sfx_"))]
+        bits.append(
+            "An exact copy (learned from its video)."
+            if tpl.get("exact", True)
+            else "Made from its page: the clip count and length are exact, the cuts are even beats (send a video of it for its exact frames)."
+        )
+        vids = [
+            a for a in self.analyses.values() if a.get("kind") in ("video", "image") and not str(a.get("file", "")).startswith(("music_", "sfx_"))
+        ]
         moments = sum(1 if a.get("kind") == "image" else max(1, int(float(a.get("seconds") or 0) // 1.5)) for a in vids)
         if vids and len(tpl.get("slots") or []) > moments:
             bits.append(f"It needs {len(tpl['slots'])} moments and your footage has about {moments}: some would repeat.")
@@ -1091,24 +1505,36 @@ class Conversation:
     def _templates(self, q):
         """Which saved templates fit this edit's footage and the words asked, as options to recut on."""
         from ai_pc.video import template as TP
+
         if not TP.library():
-            return "question", {"text": "No templates saved yet. Paste a CapCut template's link (capcut.com/template-detail/...), a screenshot of its "
-                                        "page, or a video of it, and I'll add it and recut the edit on it."}
+            return "question", {
+                "text": "No templates saved yet. Paste a CapCut template's link (capcut.com/template-detail/...), a screenshot of its "
+                "page, or a video of it, and I'll add it and recut the edit on it."
+            }
         cur = self.version["design"].get("template")
         lines, opts = [], []
         for x in TP.suggest(q, self.analyses, k=4):
             t = TP.load(x["name"]) or {}
-            lines.append(f"{len(opts) + 1}) {x['name']}" + (f" ('{x['title'].strip()}')" if x.get("title") else "") +
-                         f": {x['clips']} clips, {float(x['seconds']):.0f} s, {'exact' if x['exact'] else 'from its page'}" +
-                         (f"; {x['why']}" if x["why"] != "no strong match" else "") + (" (in use now)" if x["name"] == cur else ""))
+            lines.append(
+                f"{len(opts) + 1}) {x['name']}"
+                + (f" ('{x['title'].strip()}')" if x.get("title") else "")
+                + f": {x['clips']} clips, {float(x['seconds']):.0f} s, {'exact' if x['exact'] else 'from its page'}"
+                + (f"; {x['why']}" if x["why"] != "no strong match" else "")
+                + (" (in use now)" if x["name"] == cur else "")
+            )
             opts.append({"label": x["name"], "ops": [self._use_op(t)]})
-        return "catalog", {"text": "Templates that fit, best first:\n" + "\n".join(lines) +
-                                   "\nSay e.g. 'use the 1st' to recut this edit on one, or paste a CapCut template link to add another.", "options": opts}
+        return "catalog", {
+            "text": "Templates that fit, best first:\n"
+            + "\n".join(lines)
+            + "\nSay e.g. 'use the 1st' to recut this edit on one, or paste a CapCut template link to add another.",
+            "options": opts,
+        }
 
     def _switch_template(self, op):
         """(design, plan, what was done) for recutting this edit on a template, or why it could not be."""
         from ai_pc.video import template as TP
         from ai_pc.video import trends as TR
+
         tpl = TP.load(op["name"])
         if tpl is None:
             try:
@@ -1118,13 +1544,23 @@ class Conversation:
         cur = self.version["design"]
         if cur.get("template") == tpl["name"]:
             return f"the edit already follows '{tpl['name']}'"
-        texts = sorted((e for e in self.version["plan"].get("edits") or [] if e.get("type") == "text" and e.get("text")),
-                       key=lambda e: float(e.get("start") or 0))
+        texts = sorted(
+            (e for e in self.version["plan"].get("edits") or [] if e.get("type") == "text" and e.get("text")),
+            key=lambda e: float(e.get("start") or 0),
+        )
         main = QE.main_title(texts)
         own = [main[0]["text"]] if main else (cur.get("texts") or None)
         req = " ".join([self.state["request"]] + [t["user"] for t in self.state["turns"]])
-        d = {"template": tpl["name"], "template_source": tpl.get("source"), "pins": {}, "avoid_files": list(cur.get("avoid_files") or []),
-             "music": None, "canvas": None, "texts": own, "speed": None}
+        d = {
+            "template": tpl["name"],
+            "template_source": tpl.get("source"),
+            "pins": {},
+            "avoid_files": list(cur.get("avoid_files") or []),
+            "music": None,
+            "canvas": None,
+            "texts": own,
+            "speed": None,
+        }
         try:
             plan, info = TP.refill(d, self.analyses, req, log=lambda *a: None, chat=True, with_info=True)
         except Exception as e:  # noqa: BLE001
@@ -1133,9 +1569,14 @@ class Conversation:
             if a.get("path") and a["path"] not in self.state["files"] and str(a.get("file", "")).startswith("music_"):
                 self.state["files"].append(a["path"])
         op["slots"], op["seconds"] = len(plan["clips"]), tpl["seconds"]
-        done = [f"recut on the template '{tpl['name']}' ({len(plan['clips'])} slots, {float(tpl['seconds']):.1f} s, " +
-                ("its exact cut frames" if tpl.get("exact", True) else "made from its page: even slots on the beat") + ")"]
-        style = "; ".join(p for p in TR.short(tpl.get("techniques") or {}).split("; ") if p and "greeting" not in p)  # the greeting: its own tip below
+        done = [
+            f"recut on the template '{tpl['name']}' ({len(plan['clips'])} slots, {float(tpl['seconds']):.1f} s, "
+            + ("its exact cut frames" if tpl.get("exact", True) else "made from its page: even slots on the beat")
+            + ")"
+        ]
+        style = "; ".join(
+            p for p in TR.short(tpl.get("techniques") or {}).split("; ") if p and "greeting" not in p
+        )  # the greeting: its own tip below
         if style:
             done.append(f"style: {style}")
         if own:
@@ -1148,12 +1589,16 @@ class Conversation:
     def _tpl_speed(self, b):
         """Slow motion / speed ramps / normal speed on every slot of a template edit, or None."""
         from ai_pc.video import template as TP
+
         if not re.search(r"slow ?-?mo|slow motion|\bspeed\b|velocity|\bramps?\b|real ?-?time|\bfaster\b|\bslower\b", b):
             return None
         if re.search(r"\b(?:cuts?|cutting|pace|pacing|music|song|beat|tempo|bpm|transitions?|text|title)\b", b):
             return None
-        if re.search(r"\b(?:no|remove|without|drop|kill|stop|get rid of|take (?:out|off)|turn off|don'?t (?:want|need|like))\b.{0,20}"
-                     r"\b(?:slow ?-?mo|slow motion|speed ramps?|ramps?|velocity)\b|\b(?:normal|regular|original|real ?-?time|natural) speed\b|\bin real ?-?time\b", b):
+        if re.search(
+            r"\b(?:no|remove|without|drop|kill|stop|get rid of|take (?:out|off)|turn off|don'?t (?:want|need|like))\b.{0,20}"
+            r"\b(?:slow ?-?mo|slow motion|speed ramps?|ramps?|velocity)\b|\b(?:normal|regular|original|real ?-?time|natural) speed\b|\bin real ?-?time\b",
+            b,
+        ):
             return {"op": "tpl_speed", "value": "normal"}
         if re.search(r"\b(?:speed ramps?|velocity|ramps?)\b", b):
             return {"op": "tpl_speed", "value": "ramp"}
@@ -1174,6 +1619,7 @@ class Conversation:
         """The greeting this edit's occasion suggests: its template's tags, else the request ('eid video' -> Eid Mubarak)."""
         from ai_pc.video import template as TP
         from ai_pc.video import trends as TR
+
         d = self.version["design"]
         if d.get("template"):
             g = TP.settings(TP.load(d["template"]) or {}, "").get("greeting")
@@ -1183,6 +1629,7 @@ class Conversation:
 
     def _new_media(self, files, turn):
         from pathlib import Path
+
         new = [str(Path(f)) for f in files if str(Path(f)) not in self.state["files"]]
         if not new:
             return ""
@@ -1219,9 +1666,13 @@ class Conversation:
         if v["parent"] is None:
             return "This is the first version: nothing changed yet."
         bad = [c for c in v.get("checks") or [] if not c["ok"]]
-        return (f"v{v['v']} (from v{v['parent']}, you said: '{v['said']}'): " + "; ".join(v["done"]) +
-                (". Not done: " + "; ".join(v["failed"]) if v.get("failed") else "") +
-                (". Not confirmed on the timeline: " + "; ".join(c["op"] for c in bad) if bad else "") + ".")
+        return (
+            f"v{v['v']} (from v{v['parent']}, you said: '{v['said']}'): "
+            + "; ".join(v["done"])
+            + (". Not done: " + "; ".join(v["failed"]) if v.get("failed") else "")
+            + (". Not confirmed on the timeline: " + "; ".join(c["op"] for c in bad) if bad else "")
+            + "."
+        )
 
     def versions_text(self):
         lines = []
@@ -1242,12 +1693,17 @@ class Conversation:
 
         def summ(R):
             m = next((e for e in R["edits"] if e["id"] == "music"), {})
-            return {"length": f"{R['end']:.1f} s", "shots": len(R["clips"]), "format": f"{R['canvas'][0]}x{R['canvas'][1]}",
-                    "music": f"{str(m.get('file', 'none')).split('_')[1] if str(m.get('file', '')).startswith('music_') else m.get('file', 'none')} vol {m.get('volume')}",
-                    "texts": ", ".join(f"'{e['text'][:16]}'" for e in R["edits"] if e["type"] == "text")[:120],
-                    "transitions": ", ".join(sorted({EX._name(e['item']) for e in R["edits"] if e["type"] == "transition"})) or "none",
-                    "look": ", ".join(EX._name(e["item"]) for e in R["edits"] if e["type"] == "filter") or "none",
-                    "effects": sum(1 for e in R["edits"] if e["type"] in ("effect", "shake", "zoom"))}
+            return {
+                "length": f"{R['end']:.1f} s",
+                "shots": len(R["clips"]),
+                "format": f"{R['canvas'][0]}x{R['canvas'][1]}",
+                "music": f"{str(m.get('file', 'none')).split('_')[1] if str(m.get('file', '')).startswith('music_') else m.get('file', 'none')} vol {m.get('volume')}",
+                "texts": ", ".join(f"'{e['text'][:16]}'" for e in R["edits"] if e["type"] == "text")[:120],
+                "transitions": ", ".join(sorted({EX._name(e["item"]) for e in R["edits"] if e["type"] == "transition"})) or "none",
+                "look": ", ".join(EX._name(e["item"]) for e in R["edits"] if e["type"] == "filter") or "none",
+                "effects": sum(1 for e in R["edits"] if e["type"] in ("effect", "shake", "zoom")),
+            }
+
         sa, sb = summ(Ra), summ(Rb)
         diff = [f"{k}: {sa[k]} -> {sb[k]}" for k in sa if sa[k] != sb[k]]
         return f"v{a} vs v{b}: " + ("; ".join(diff) if diff else "no visible difference") + "."
@@ -1260,15 +1716,21 @@ class Conversation:
             return {"design": d.get("music"), "volume": m.get("volume"), "file": m.get("file")}
         if what in ("title", "label", "cta", "caption", "text"):
             roles = QE.text_roles(p)
-            return [copy.deepcopy(e) for e in p.get("edits") or [] if e.get("type") in ("text", "captions")
-                    and (what == "text" or roles.get(str(e.get("id"))) == what)]
+            return [
+                copy.deepcopy(e)
+                for e in p.get("edits") or []
+                if e.get("type") in ("text", "captions") and (what == "text" or roles.get(str(e.get("id"))) == what)
+            ]
         if what in ("transition", "look", "sfx"):
             t = {"look": "filter"}.get(what, what)
             return [copy.deepcopy(e) for e in p.get("edits") or [] if e.get("type") == t]
         if what in ("shake", "zoom", "flash", "glitch", "effects", "texture"):
             kind = {"effects": "effect"}.get(what, what)
-            return [copy.deepcopy(e) for e in p.get("edits") or [] if e.get("type") not in ("text", "captions", "audio", "sfx", "transition", "filter", "animation")
-                    and kind in QE.fx_kinds(e, p)]
+            return [
+                copy.deepcopy(e)
+                for e in p.get("edits") or []
+                if e.get("type") not in ("text", "captions", "audio", "sfx", "transition", "filter", "animation") and kind in QE.fx_kinds(e, p)
+            ]
         if what == "length":
             return x.get("seconds")
         if what == "pace":
@@ -1282,12 +1744,34 @@ class Conversation:
     @staticmethod
     def _sig(snap, what):
         if isinstance(snap, list):
-            keys = ("text", "color", "size", "font", "position", "name", "after", "duration", "strength", "to", "on", "start", "sound", "at", "params")
+            keys = (
+                "text",
+                "color",
+                "size",
+                "font",
+                "position",
+                "name",
+                "after",
+                "duration",
+                "strength",
+                "to",
+                "on",
+                "start",
+                "sound",
+                "at",
+                "params",
+            )
             return json.dumps(sorted(json.dumps({k: e.get(k) for k in keys}, sort_keys=True, ensure_ascii=False) for e in snap), ensure_ascii=False)
         return json.dumps(snap, sort_keys=True, ensure_ascii=False, default=str)
 
-    ASPECTS = {"font": ("font",), "colour": ("color",), "size": ("size",), "position": ("position",), "words": ("text",),
-               "animation": ("intro", "outro", "loop")}
+    ASPECTS = {
+        "font": ("font",),
+        "colour": ("color",),
+        "size": ("size",),
+        "position": ("position",),
+        "words": ("text",),
+        "animation": ("intro", "outro", "loop"),
+    }
 
     def restore(self, what, text=""):
         """One element (music, title, labels, look, transitions, shakes, length...) back to how it was in an earlier version:
@@ -1296,9 +1780,21 @@ class Conversation:
         what = {"effects": "effects", "speed": "shot", "clip_audio": "shot", "voice": "music"}.get(what, what)
         aspect = None
         if what in ("title", "label", "cta", "caption", "text"):
-            aspect = next((a for a, pat in (("font", r"\bfonts?|typeface"), ("colour", r"\bcolou?rs?\b"), ("size", r"\bsize|bigger|smaller"),
-                                            ("position", r"\bposition|place|where it was"), ("words", r"\bwords|wording|text was|it said|name"),
-                                            ("animation", r"\banimation|intro|how it came in")) if re.search(pat, text)), None)
+            aspect = next(
+                (
+                    a
+                    for a, pat in (
+                        ("font", r"\bfonts?|typeface"),
+                        ("colour", r"\bcolou?rs?\b"),
+                        ("size", r"\bsize|bigger|smaller"),
+                        ("position", r"\bposition|place|where it was"),
+                        ("words", r"\bwords|wording|text was|it said|name"),
+                        ("animation", r"\banimation|intro|how it came in"),
+                    )
+                    if re.search(pat, text)
+                ),
+                None,
+            )
             if what == "text" and aspect:
                 what = "title" if re.search(r"\btitle", text) else "label" if re.search(r"\blabel", text) else "text"
         fields = self.ASPECTS.get(aspect)
@@ -1308,15 +1804,90 @@ class Conversation:
 
         def sig_of(sn):
             if fields and isinstance(sn, list):
-                return json.dumps(sorted(json.dumps({"id": e.get("id"), **{f: e.get(f) for f in fields}}, sort_keys=True, ensure_ascii=False) for e in sn))
+                return json.dumps(
+                    sorted(json.dumps({"id": e.get("id"), **{f: e.get(f) for f in fields}}, sort_keys=True, ensure_ascii=False) for e in sn)
+                )
             return self._sig(sn, what)
+
         sig = sig_of(cur)
-        generic = {"old", "previou", "earlier", "back", "bring", "put", "befor", "better", "restor", "return", "like", "liked", "was", "were",
-                   "music", "song", "title", "label", "text", "transition", "look", "colour", "color", "filter", "go", "want", "one",
-                   "version", "undo", "revert", "nicer", "cooler", "prettier", "good", "perfect", "prefer", "preferr", "first", "original",
-                   "font", "size", "position", "word", "animation", "it", "them", "keep", "though", "tho", "shake", "zoom", "flash",
-                   "glitch", "effect", "transit", "sound", "track", "beat", "grade", "colours", "length", "pace", "speed", "shot",
-                   "clip", "versions", "sounded", "looked", "lik", "realli", "actual", "thought", "felt", "much", "way", "kind"}
+        generic = {
+            "old",
+            "previou",
+            "earlier",
+            "back",
+            "bring",
+            "put",
+            "befor",
+            "better",
+            "restor",
+            "return",
+            "like",
+            "liked",
+            "was",
+            "were",
+            "music",
+            "song",
+            "title",
+            "label",
+            "text",
+            "transition",
+            "look",
+            "colour",
+            "color",
+            "filter",
+            "go",
+            "want",
+            "one",
+            "version",
+            "undo",
+            "revert",
+            "nicer",
+            "cooler",
+            "prettier",
+            "good",
+            "perfect",
+            "prefer",
+            "preferr",
+            "first",
+            "original",
+            "font",
+            "size",
+            "position",
+            "word",
+            "animation",
+            "it",
+            "them",
+            "keep",
+            "though",
+            "tho",
+            "shake",
+            "zoom",
+            "flash",
+            "glitch",
+            "effect",
+            "transit",
+            "sound",
+            "track",
+            "beat",
+            "grade",
+            "colours",
+            "length",
+            "pace",
+            "speed",
+            "shot",
+            "clip",
+            "versions",
+            "sounded",
+            "looked",
+            "lik",
+            "realli",
+            "actual",
+            "thought",
+            "felt",
+            "much",
+            "way",
+            "kind",
+        }
         words = [w for w in QE.content_words(text) if w not in generic and not w.startswith(("previou", "prefer", "restor", "revert"))]
         chain = self._lineage()[1:] + [i for i in range(len(self.state["versions"]) - 1, -1, -1) if i not in self._lineage()]
         if re.search(r"\b(?:first|original|very first)\b", text):
@@ -1332,9 +1903,14 @@ class Conversation:
             if s is None or sig_of(s) == sig:
                 continue
             if words:
-                blob = (json.dumps(s, ensure_ascii=False, default=str) + " " + " ".join(self.state["versions"][i]["done"]) + " " +
-                        str(self.state["versions"][i]["said"] or "")).lower()
-                hexes = {QE.COLOURS[w] .lower() for w in QE.COLOURS if w in words}
+                blob = (
+                    json.dumps(s, ensure_ascii=False, default=str)
+                    + " "
+                    + " ".join(self.state["versions"][i]["done"])
+                    + " "
+                    + str(self.state["versions"][i]["said"] or "")
+                ).lower()
+                hexes = {QE.COLOURS[w].lower() for w in QE.COLOURS if w in words}
                 if not all(w in blob for w in words if w not in QE.COLOURS) or (hexes and not any(h in blob for h in hexes)):
                     continue
             pick = i
@@ -1343,7 +1919,9 @@ class Conversation:
             return f"The {what} hasn't changed in earlier versions" + (" in that way" if words else "") + "; tell me how it should be instead."
         snap = self._snap(pick, what)
         if what == "music":
-            ops = [{"op": "music", "set": snap["design"]}] + ([{"op": "audio", "who": "music", "set": {"volume": snap["volume"]}}] if snap.get("volume") is not None else [])
+            ops = [{"op": "music", "set": snap["design"]}] + (
+                [{"op": "audio", "who": "music", "set": {"volume": snap["volume"]}}] if snap.get("volume") is not None else []
+            )
         elif what in ("title", "label", "cta", "caption", "text"):
             ops = [{"op": "restore", "kind": "text", "role": what, "edits": snap, **({"fields": list(fields)} if fields else {})}]
         elif what in ("transition", "sfx"):
@@ -1374,15 +1952,18 @@ class Conversation:
             return f"v{v['v']} is already exported: {v['export']}"
         from ai_pc.video import verify as V
         from ai_pc.video.studio import Studio
+
         R = self.resolved()
         if not v.get("draft"):
             from ai_pc.video import jybuild as JB
+
             M = JB.build(R, name=f"{self.state['drafts_prefix']}_v{v['v']}")
             v["draft"] = M["draft"]
         else:
             M = getattr(self, "_M", None)
             if not M or M.get("draft") != v["draft"]:
                 from ai_pc.video import jybuild as JB
+
                 M = JB.build(R, name=v["draft"])
         st = Studio(self.planner, log=self.log, export=True)
         sess = {"map": M, "plan": v["plan"], "resolved": R}

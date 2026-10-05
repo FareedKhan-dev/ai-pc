@@ -9,6 +9,7 @@ Set AI_PC_HOME to use another folder.
   OUT      everything the programs make        STATE    learned state, caches and the encrypted key vault
   RUNS     desktop-agent run logs              KB       the video knowledge base (built on this PC)
 """
+
 import os
 from pathlib import Path
 

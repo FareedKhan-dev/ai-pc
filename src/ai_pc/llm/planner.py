@@ -4,6 +4,7 @@ ChatPlanner     real model calls through the OpenAI-compatible API (Nebius): fas
 ScriptedPlanner deterministic test double (used by the test-suite to exercise the loop without a network)
 FilePlanner     requests are written to files and answered by a person or an assistant (demonstration / debugging)
 """
+
 import base64
 import json
 import threading
@@ -47,11 +48,21 @@ def to_plan(d, raw="", model="", ms=0.0, usage=None):
     except (TypeError, ValueError):
         conf = None
     u = usage or {}
-    return Plan(thought=str(d.get("thought", ""))[:300], risk=str(d.get("risk", "low")).lower(), confidence=conf,
-                actions=acts[:6], done=bool(d.get("done")), success=d.get("success"), answer=d.get("answer"),
-                skill=d.get("skill") if isinstance(d.get("skill"), dict) else None, evidence=d.get("evidence"),
-                raw=raw, model=model, ms=ms,
-                tokens=(u.get("prompt_tokens", 0), u.get("completion_tokens", 0)))
+    return Plan(
+        thought=str(d.get("thought", ""))[:300],
+        risk=str(d.get("risk", "low")).lower(),
+        confidence=conf,
+        actions=acts[:6],
+        done=bool(d.get("done")),
+        success=d.get("success"),
+        answer=d.get("answer"),
+        skill=d.get("skill") if isinstance(d.get("skill"), dict) else None,
+        evidence=d.get("evidence"),
+        raw=raw,
+        model=model,
+        ms=ms,
+        tokens=(u.get("prompt_tokens", 0), u.get("completion_tokens", 0)),
+    )
 
 
 class ChatPlanner:
@@ -90,6 +101,7 @@ class ChatPlanner:
 
         def go():
             return self.chat.complete_with_fallback(cfg["model"], messages, [cfg["extra"] or {}, {}], max_tokens=cfg["max_tokens"])
+
         futs = [self._pool.submit(go)]
         if cfg.get("hedge_s"):
             done, _ = wait(futs, timeout=cfg["hedge_s"])
@@ -114,26 +126,31 @@ class ChatPlanner:
         text = prompts.user_message(goal, observation, history, subgoal, note)
         if image_jpeg:
             tier = "vision"
-            content = [{"type": "text", "text": text},
-                       {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(image_jpeg).decode()}}]
+            content = [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + base64.b64encode(image_jpeg).decode()}},
+            ]
         else:
             content = text
         messages = [{"role": "system", "content": prompts.PLANNER_SYSTEM}, {"role": "user", "content": content}]
         r = self._call(tier, messages)
         d = parse_json(r.text)
         if d is None:  # one repair attempt
-            messages += [{"role": "assistant", "content": r.text[:1500]},
-                         {"role": "user", "content": "That was not valid JSON. Reply with the single JSON object only."}]
+            messages += [
+                {"role": "assistant", "content": r.text[:1500]},
+                {"role": "user", "content": "That was not valid JSON. Reply with the single JSON object only."},
+            ]
             r2 = self._call(tier, messages)
             d, r = parse_json(r2.text), r2
         if d is None:
             raise PlannerError("planner returned no valid JSON")
-        return to_plan(d, r.text, MODELS[tier]["model"] + (" (hedged)" if getattr(r, "hedged", False) else ""),
-                       r.total_ms, r.usage)
+        return to_plan(d, r.text, MODELS[tier]["model"] + (" (hedged)" if getattr(r, "hedged", False) else ""), r.total_ms, r.usage)
 
     def deep_plan(self, goal, context):
-        messages = [{"role": "system", "content": prompts.DEEP_SYSTEM},
-                    {"role": "user", "content": f"GOAL: {goal}\n\nCONTEXT:\n{context}\n\nProduce the plan JSON."}]
+        messages = [
+            {"role": "system", "content": prompts.DEEP_SYSTEM},
+            {"role": "user", "content": f"GOAL: {goal}\n\nCONTEXT:\n{context}\n\nProduce the plan JSON."},
+        ]
         r = self._call("deep", messages)
         d = parse_json(r.text)
         if d is None:
@@ -183,8 +200,7 @@ class FilePlanner:
         raise PlannerError(f"no answer for request {self.n} within {self.timeout}s")
 
     def next(self, goal, observation, history=None, image_jpeg=None, subgoal=None, note=None, tier="fast"):
-        d, ms = self._ask("next", {"goal": goal, "subgoal": subgoal, "note": note, "history": history or [],
-                                   "observation": observation}, image_jpeg)
+        d, ms = self._ask("next", {"goal": goal, "subgoal": subgoal, "note": note, "history": history or [], "observation": observation}, image_jpeg)
         return to_plan(d, json.dumps(d), "file", ms)
 
     def deep_plan(self, goal, context):

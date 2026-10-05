@@ -7,6 +7,7 @@
 
 Every step is timed; every action passes the safety layer; a kill switch (Ctrl+Alt+Q) aborts the run.
 """
+
 import json
 import re
 import threading
@@ -33,8 +34,33 @@ class ReplayFail(Exception):
 
 _NUM = dict(zip("0123456789", ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")))
 _SYM = {"+": "plus", "-": "minus", "*": "multiply", "/": "divide", "=": "equals"}
-_STOP = {"the", "a", "an", "button", "icon", "item", "in", "on", "at", "of", "to", "left", "right", "top", "bottom",
-         "sidebar", "menu", "tab", "panel", "click", "and", "with", "num", "btn", "control"}
+_STOP = {
+    "the",
+    "a",
+    "an",
+    "button",
+    "icon",
+    "item",
+    "in",
+    "on",
+    "at",
+    "of",
+    "to",
+    "left",
+    "right",
+    "top",
+    "bottom",
+    "sidebar",
+    "menu",
+    "tab",
+    "panel",
+    "click",
+    "and",
+    "with",
+    "num",
+    "btn",
+    "control",
+}
 _UNJUDGEABLE = {"Pane", "Group", "Custom", "Window", "Document", "Image"}
 
 
@@ -57,6 +83,7 @@ def _target_matches(target, under):
     if not t or not u:
         return True
     import difflib
+
     return bool(t & u) or any(difflib.SequenceMatcher(None, x, y).ratio() > 0.8 for x in t for y in u)
 
 
@@ -75,8 +102,7 @@ class RunResult:
 
 
 class Agent:
-    def __init__(self, planner=None, grounder=None, confirm=None, dry_run=True, allow_apps=(), verbose=True,
-                 limits=None, store=None):
+    def __init__(self, planner=None, grounder=None, confirm=None, dry_run=True, allow_apps=(), verbose=True, limits=None, store=None):
         self.planner, self.grounder = planner, grounder
         self.confirm = confirm or safety.Confirmer("deny")
         self.dry_run = dry_run
@@ -113,7 +139,7 @@ class Agent:
         self.rec = []
         self.messy = []
         self.pre_struct = None
-        self.plan_snap = None   # the snapshot the planner's ids refer to (frozen per plan; see _target)
+        self.plan_snap = None  # the snapshot the planner's ids refer to (frozen per plan; see _target)
         self._last_el = None
         self.run_dir = RUNS / f"{time.strftime('%Y%m%d-%H%M%S')}_{slug(goal, 30)}"
         self.run_dir.mkdir(parents=True, exist_ok=True)
@@ -166,8 +192,7 @@ class Agent:
                 real = bool(info["title"].strip()) or info["cls"] in ("#32770", "#32768")  # dialog / menu
                 if same_app and real:
                     self.hwnd = fg
-            if self.hwnd != self.main_hwnd and self.main_hwnd and win32gui.IsWindow(self.main_hwnd) \
-                    and inputs.foreground() == self.main_hwnd:
+            if self.hwnd != self.main_hwnd and self.main_hwnd and win32gui.IsWindow(self.main_hwnd) and inputs.foreground() == self.main_hwnd:
                 self.hwnd = self.main_hwnd  # the dialog closed and the main window is in front again
         return self.hwnd
 
@@ -246,6 +271,7 @@ class Agent:
         def cb(h, _):
             if win32gui.IsWindowVisible(h) and win32process.GetWindowThreadProcessId(h)[1] == self.pid:
                 out.append(h)
+
         win32gui.EnumWindows(cb, None)
         return frozenset(out)
 
@@ -267,8 +293,7 @@ class Agent:
         """What the window looks like right now: text labels (cheap, catch digit changes), a pixel thumbnail
         (catches panes, dialogs and mode switches that change no text) and the app's set of windows (a dialog or
         popup menu opening is progress even where it barely changes the main window's pixels)."""
-        names = tuple((uia.live_name(e), uia.get_value(e) if (e.role in ("Edit", "ComboBox") and not e.password) else None)
-                      for e in self._watch)
+        names = tuple((uia.live_name(e), uia.get_value(e) if (e.role in ("Edit", "ComboBox") and not e.password) else None) for e in self._watch)
         return ("hybrid", names, screen.signature(screen.grab(self.snap.rect)), self._app_windows())
 
     @staticmethod
@@ -521,8 +546,7 @@ class Agent:
             except Exception:  # noqa: BLE001  (fall back to grounding on demand)
                 pass
         pts = [(str(a.get("target", "")).lower(), a.get("_pt")) for a in run if a.get("_pt")]
-        collapsed = any(ta != tb and abs(pa[0] - pb[0]) <= 6 and abs(pa[1] - pb[1]) <= 6
-                        for i, (ta, pa) in enumerate(pts) for tb, pb in pts[i + 1:])
+        collapsed = any(ta != tb and abs(pa[0] - pb[0]) <= 6 and abs(pa[1] - pb[1]) <= 6 for i, (ta, pa) in enumerate(pts) for tb, pb in pts[i + 1 :])
         if collapsed:  # different targets on the same spot = the grounder did not really see them
             for a in run:
                 a.pop("_pt", None)
@@ -622,8 +646,11 @@ class Agent:
                 return {"ok": False, "detail": f"refused vision click: ({x},{y}) is outside the app window", "ms": t.ms()}
             under = uia.element_at(x, y)
             # sanity checks on what is REALLY under the predicted point: is it risky? is it plausibly what was asked for?
-            v = (safety.classify({"op": "ground_click", "target": f"{under['name']} {under['aid']}"}, None, self.goal,
-                                 self.snap.proc, self.allow_apps) if under else safety.Verdict("low"))
+            v = (
+                safety.classify({"op": "ground_click", "target": f"{under['name']} {under['aid']}"}, None, self.goal, self.snap.proc, self.allow_apps)
+                if under
+                else safety.Verdict("low")
+            )
             if v.level == "low" and not _target_matches(str(a.get("target", "")), under):
                 v = safety.Verdict("block", f"the point is on {under.get('name')!r}, not on {a.get('target')!r}")
             if v.level == "low":
@@ -656,11 +683,18 @@ class Agent:
         x, y = int(ox + float(a.get("x", 0)) * scale), int(oy + float(a.get("y", 0)) * scale)
         if not self._inside(x, y):
             l, tp, r, b = self.snap.rect
-            return {"ok": False, "detail": f"refused click_xy: ({a.get('x')},{a.get('y')}) is outside the screenshot "
-                                           f"({round((r - l) / scale)}x{round((b - tp) / scale)} px)", "ms": t.ms()}
+            return {
+                "ok": False,
+                "detail": f"refused click_xy: ({a.get('x')},{a.get('y')}) is outside the screenshot "
+                f"({round((r - l) / scale)}x{round((b - tp) / scale)} px)",
+                "ms": t.ms(),
+            }
         under = uia.element_at(x, y)
-        v = (safety.classify({"op": "ground_click", "target": f"{under['name']} {under['aid']}"}, None, self.goal,
-                             self.snap.proc, self.allow_apps) if under else safety.Verdict("low"))
+        v = (
+            safety.classify({"op": "ground_click", "target": f"{under['name']} {under['aid']}"}, None, self.goal, self.snap.proc, self.allow_apps)
+            if under
+            else safety.Verdict("low")
+        )
         if v.level == "low" and a.get("target") and not _target_matches(str(a["target"]), under):
             return {"ok": False, "detail": f"refused click_xy: the point is on {under.get('name')!r}", "ms": t.ms()}
         if v.level != "low":
@@ -704,7 +738,8 @@ class Agent:
                 st[k] = a[k]
         nm = f"{el.name} {el.aid}" if el else ""
         if re.search(r"\b(clear|backspace|delete|undo|erase|reset)\b", nm, re.I) or (
-                a.get("op") == "key" and [str(k).lower() for k in a.get("keys", [])] in (["backspace"], ["delete"], ["ctrl", "z"])):
+            a.get("op") == "key" and [str(k).lower() for k in a.get("keys", [])] in (["backspace"], ["delete"], ["ctrl", "z"])
+        ):
             self.messy.append("corrective action: " + (nm.strip() or str(a.get("keys"))))
         if a.get("op") == "ground_click":
             u = a.get("_under") or {}
@@ -845,10 +880,9 @@ class Agent:
         toks = [w.strip(".,:;!?()[]'\"").lower() for w in str(answer).split()]
         toks = [w for w in toks if w and w not in stop]
         base = getattr(self, "_texts0", {})
-        changed = [e for i, e in enumerate(x for x in self.snap.els if x.role in TEXT_ROLES)
-                   if base.get(e.aid or f"t{i}") != e.name]
+        changed = [e for i, e in enumerate(x for x in self.snap.els if x.role in TEXT_ROLES) if base.get(e.aid or f"t{i}") != e.name]
         best, score = None, 0.0
-        for e in (changed or texts):
+        for e in changed or texts:
             s = sum(1 for w in toks if w in e.name.lower()) + (0.5 if re.search(r"result|display|output|answer|value", e.aid or "", re.I) else 0)
             if s > score:
                 best, score = e, s
@@ -884,6 +918,7 @@ class Agent:
                 except Exception as e:  # noqa: BLE001
                     holder["error"] = f"{type(e).__name__}: {str(e)[:120]}"
                 holder["ms"] = tt.ms()
+
             deep_bg = (threading.Thread(target=think, daemon=True), holder)
             deep_bg[0].start()
             deep_bg[0].join(0.3)  # a scripted/instant planner answers at once; a real one keeps thinking in the background
@@ -898,8 +933,13 @@ class Agent:
                 self.llm_calls += 1
                 if "d" in h:
                     plan_text = self._plan_text(h["d"])
-                    self._log("deep_plan", ms=round(h["ms"]), background=True, approach=str(h["d"].get("approach", ""))[:200],
-                              subgoals=len(h["d"].get("subgoals", [])))
+                    self._log(
+                        "deep_plan",
+                        ms=round(h["ms"]),
+                        background=True,
+                        approach=str(h["d"].get("approach", ""))[:200],
+                        subgoals=len(h["d"].get("subgoals", [])),
+                    )
                 else:
                     self._log("deep_plan_failed", why=h.get("error"))
             image = None
@@ -910,24 +950,54 @@ class Agent:
             self.llm_calls += 1
             self.t["plan"] += t.ms()
             note = None
-            self._log("plan", model=plan.model, ms=round(t.ms()), conf=plan.confidence, risk=plan.risk, thought=plan.thought,
-                      n=len(plan.actions), done=plan.done, tokens=plan.tokens, actions=plan.actions)
+            self._log(
+                "plan",
+                model=plan.model,
+                ms=round(t.ms()),
+                conf=plan.confidence,
+                risk=plan.risk,
+                thought=plan.thought,
+                n=len(plan.actions),
+                done=plan.done,
+                tokens=plan.tokens,
+                actions=plan.actions,
+            )
             if plan.done:
-                if (plan.success is not False and plan.answer and not grounded_retry and self.snap
-                        and self.snap.richness >= 6 and not self._grounded(plan, obs)):
+                if (
+                    plan.success is not False
+                    and plan.answer
+                    and not grounded_retry
+                    and self.snap
+                    and self.snap.richness >= 6
+                    and not self._grounded(plan, obs)
+                ):
                     # the answer must come from the screen, not from the model's memory: ask once to point at it
                     grounded_retry = True
-                    note = ("Your answer must be read from the screen. Quote, as 'evidence', the exact text of an element "
-                            "in the OBSERVATION that shows it; if the result is not visible yet, act to make it visible.")
+                    note = (
+                        "Your answer must be read from the screen. Quote, as 'evidence', the exact text of an element "
+                        "in the OBSERVATION that shows it; if the result is not visible yet, act to make it visible."
+                    )
                     self._log("unverified_answer", answer=str(plan.answer)[:80], evidence=plan.evidence)
                     continue
                 return plan
-            if (plan.confidence is not None and plan.confidence < 0.6 and not deep_used and hasattr(self.planner, "deep_plan") and not self.dry_run
-                    and self.llm_calls <= 2):
+            if (
+                plan.confidence is not None
+                and plan.confidence < 0.6
+                and not deep_used
+                and hasattr(self.planner, "deep_plan")
+                and not self.dry_run
+                and self.llm_calls <= 2
+            ):
                 # the quick planner is unsure about a new situation: think harder once, then plan again with that guidance
                 t = Timer()
-                d = self.planner.deep_plan(goal, obs + self._app_context() + "\n\nHISTORY:\n" + "\n".join(history[-6:])
-                                           + f"\n\nQuick planner said (low confidence): {plan.thought}")
+                d = self.planner.deep_plan(
+                    goal,
+                    obs
+                    + self._app_context()
+                    + "\n\nHISTORY:\n"
+                    + "\n".join(history[-6:])
+                    + f"\n\nQuick planner said (low confidence): {plan.thought}",
+                )
                 self.llm_calls += 1
                 self.t["plan"] += t.ms()
                 deep_used = True  # (not 'messy': the unsure plan was never executed, so the recording stays clean)
@@ -952,19 +1022,33 @@ class Agent:
                 self._last_el = None
                 r = self._exec(a)
                 el = self._last_el
-                label = f"{a.get('op')} {a.get('id', '')}".strip() + (f" '{el.name[:30]}'" if el else "") + (f" {str(a.get('text') or a.get('target') or a.get('keys') or '')[:40]}" if not el else "")
+                label = (
+                    f"{a.get('op')} {a.get('id', '')}".strip()
+                    + (f" '{el.name[:30]}'" if el else "")
+                    + (f" {str(a.get('text') or a.get('target') or a.get('keys') or '')[:40]}" if not el else "")
+                )
                 self.t["act"] += r["ms"]
-                self._log("act", op=a.get("op"), ok=r["ok"], ms=round(r["ms"], 1), detail=r["detail"],
-                          id=a.get("id"), name=el.name if el else a.get("name"), aid=el.aid if el else None)
+                self._log(
+                    "act",
+                    op=a.get("op"),
+                    ok=r["ok"],
+                    ms=round(r["ms"], 1),
+                    detail=r["detail"],
+                    id=a.get("id"),
+                    name=el.name if el else a.get("name"),
+                    aid=el.aid if el else None,
+                )
                 if not r["ok"]:
                     self.messy.append("failed action")
                 lines.append(f"{len(history) + len(lines) + 1}. {label} -> {'ok' if r['ok'] else 'FAILED'}: {r['detail']}")
                 xy = a.get("_xy")
                 if xy:
                     if any(abs(xy[0] - p[0]) <= 12 and abs(xy[1] - p[1]) <= 12 for p in clicked):
-                        lines.append("   NOTE: this landed on the same spot as an earlier click. If that did not work, do not "
-                                     "repeat it: add \"zoom\": true and a \"near\" hint, describe the target differently, or "
-                                     "use a shortcut.")
+                        lines.append(
+                            "   NOTE: this landed on the same spot as an earlier click. If that did not work, do not "
+                            'repeat it: add "zoom": true and a "near" hint, describe the target differently, or '
+                            "use a shortcut."
+                        )
                         if a.get("target"):
                             self._missed.add(self._norm_target(a["target"]))
                     clicked.append(xy)
@@ -997,8 +1081,9 @@ class Agent:
                     lines.append("   TEXT CHANGES: " + "; ".join(ch))
             if batch_ok and not changed:
                 lines.append("   (no visible change after these actions)")
-                self._missed.update(self._norm_target(a.get("target")) for a in plan.actions
-                                    if a.get("op") in ("ground_click", "hover") and a.get("target"))
+                self._missed.update(
+                    self._norm_target(a.get("target")) for a in plan.actions if a.get("op") in ("ground_click", "hover") and a.get("target")
+                )
             if not exp_ok:
                 lines.append("   " + exp_msg)
             history.extend(lines)
@@ -1013,13 +1098,16 @@ class Agent:
                 if deep_used or not hasattr(self.planner, "deep_plan"):
                     if stuck >= self.limits["stuck_after"] + 2:
                         raise TimeoutError("stuck: no visible progress")
-                    note = ("No visible progress in the last batches. Change approach instead of repeating: use a shortcut "
-                            "from APP SHORTCUTS, describe the target differently, use click_xy on the screenshot, or wait "
-                            "if a slow operation (loading, importing, exporting) is running.")
+                    note = (
+                        "No visible progress in the last batches. Change approach instead of repeating: use a shortcut "
+                        "from APP SHORTCUTS, describe the target differently, use click_xy on the screenshot, or wait "
+                        "if a slow operation (loading, importing, exporting) is running."
+                    )
                     continue
                 t = Timer()
-                d = self.planner.deep_plan(goal, obs + self._app_context() + "\n\nHISTORY:\n" + "\n".join(history[-10:])
-                                           + "\n\nThe quick planner is stuck; re-plan.")
+                d = self.planner.deep_plan(
+                    goal, obs + self._app_context() + "\n\nHISTORY:\n" + "\n".join(history[-10:]) + "\n\nThe quick planner is stuck; re-plan."
+                )
                 self.llm_calls += 1
                 self.t["plan"] += t.ms()
                 deep_used, stuck = True, 0
@@ -1030,8 +1118,10 @@ class Agent:
 
     @staticmethod
     def _plan_text(d):
-        return ("PLAN from the deep thinker (follow it; some steps may already be done, so check HISTORY and the screen): "
-                + json.dumps({k: d.get(k) for k in ("approach", "subgoals")}, ensure_ascii=False)[:1600])
+        return (
+            "PLAN from the deep thinker (follow it; some steps may already be done, so check HISTORY and the screen): "
+            + json.dumps({k: d.get(k) for k in ("approach", "subgoals")}, ensure_ascii=False)[:1600]
+        )
 
     # ------------------------------------------------------------------ public API
     def run(self, goal, app=None, params=None, use_skill=True, learn=True, deep=False):
@@ -1086,8 +1176,18 @@ class Agent:
             error = f"{type(e).__name__}: {str(e)[:200]}"
             self._log("error", why=error)
         finally:
-            res = RunResult(ok=ok, answer=answer, lane=lane, steps=self.steps, ms=round(total.ms()), llm_calls=self.llm_calls,
-                            skill=skill_name, timings={k: round(v) for k, v in self.t.items()}, run_dir=str(self.run_dir), error=error)
+            res = RunResult(
+                ok=ok,
+                answer=answer,
+                lane=lane,
+                steps=self.steps,
+                ms=round(total.ms()),
+                llm_calls=self.llm_calls,
+                skill=skill_name,
+                timings={k: round(v) for k, v in self.t.items()},
+                run_dir=str(self.run_dir),
+                error=error,
+            )
             (self.run_dir / "summary.json").write_text(json.dumps(res.__dict__, indent=1, default=str), encoding="utf-8")
             self.trace_f.close()
         return res

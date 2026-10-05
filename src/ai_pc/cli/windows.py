@@ -17,6 +17,7 @@ documents', 'rename the photos from august by the date taken', 'make the second 
 Safety: nothing is ever deleted for good (the Recycle Bin, and it is never emptied), Windows / Program Files / AppData and
 this project are never touched, big or removing changes wait for 'yes', and 'undo' puts anything back.
 """
+
 import argparse
 import sys
 from pathlib import Path
@@ -38,13 +39,16 @@ def main(argv=None):
 
     from ai_pc.windows.settings import Fake, Settings
     from ai_pc.windows.winchat import CHATS, WinChat
+
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     kw = {"planner": planner, "read_only": a.look}
     if a.sandbox:
         from ai_pc.windows import sandbox as win_sandbox
+
         base = ROOT / "out" / "win" / "sandbox"
         chats = ROOT / "out" / "win" / "sandbox_chats"
         kw["settings"] = Settings(Fake(folder=base / "startup"))
@@ -52,8 +56,12 @@ def main(argv=None):
             chat = WinChat.load(a.resume or None, chats_dir=chats, **kw)
         else:
             sb = win_sandbox.build(base / "folders")
-            chat = WinChat.start(places={"downloads": sb["downloads"], "documents": sb["documents"], "pictures": sb["pictures"]}, roots=[base / "folders"],
-                                 chats_dir=chats, **kw)
+            chat = WinChat.start(
+                places={"downloads": sb["downloads"], "documents": sb["documents"], "pictures": sb["pictures"]},
+                roots=[base / "folders"],
+                chats_dir=chats,
+                **kw,
+            )
         print(f"Sandbox: made-up folders in {base / 'folders'}; settings go to a test branch of the registry.")
     else:
         if a.resume is not None:

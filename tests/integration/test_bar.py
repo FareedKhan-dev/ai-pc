@@ -10,6 +10,7 @@ pictures of the bar (out/_tests/bar/ui/*.png) to look at.
 
   .venv\\Scripts\\python.exe tests\\integration\\test_bar.py
 """
+
 import ctypes
 import json
 import shutil
@@ -46,9 +47,12 @@ def fresh(name):
 def t_pieces():
     from ai_pc.assistant import mic
     from ai_pc.assistant.bar import palette, shown_text
+
     check("combo: 'ctrl+alt+space' is Ctrl+Alt with the space bar", S.parse_hotkey("ctrl+alt+space") == (0x3, 0x20, "Ctrl+Alt+Space"))
-    check("combo: 'Win + Shift + A' and F-keys are understood", S.parse_hotkey("Win + Shift + A")[1:] == (ord("A"), "Shift+Win+A")
-          and S.parse_hotkey(COMBO)[1] == 0x87)
+    check(
+        "combo: 'Win + Shift + A' and F-keys are understood",
+        S.parse_hotkey("Win + Shift + A")[1:] == (ord("A"), "Shift+Win+A") and S.parse_hotkey(COMBO)[1] == 0x87,
+    )
     bad = []
     for t in ("space", "ctrl+alt", "ctrl+a+b", "ctrl+banana"):
         try:
@@ -60,22 +64,33 @@ def t_pieces():
     b = S.dropfiles([r"C:\a b\x.mp4", r"C:\y.png"])
     head = struct.unpack("<IiiII", b[:20])
     names = b[20:].decode("utf-16-le")
-    check("copy: the clipboard bytes for files are Windows' file-list format", head == (20, 0, 0, 0, 1) and names.startswith("C:\\a b\\x.mp4\0C:\\y.png\0\0"),
-          (head, names))
+    check(
+        "copy: the clipboard bytes for files are Windows' file-list format",
+        head == (20, 0, 0, 0, 1) and names.startswith("C:\\a b\\x.mp4\0C:\\y.png\0\0"),
+        (head, names),
+    )
     parts = split_reply("[Photos] Brighter: v2.png\n[Slack, Teams] Ready to post v2.png to #team. Say 'yes'")
-    check("reply: each program's part is shown under its own name", [p[0] for p in parts] == ["Photos", "Slack, Teams"] and parts[1][1].startswith("Ready"),
-          parts)
-    check("reply: a long path is shown as just the file name", shown_text(r"Edited: C:\Users\me\out\video\agent_x.mp4 (6 of 9 checks)") ==
-          "Edited: agent_x.mp4 (6 of 9 checks)")
+    check(
+        "reply: each program's part is shown under its own name",
+        [p[0] for p in parts] == ["Photos", "Slack, Teams"] and parts[1][1].startswith("Ready"),
+        parts,
+    )
+    check(
+        "reply: a long path is shown as just the file name",
+        shown_text(r"Edited: C:\Users\me\out\video\agent_x.mp4 (6 of 9 checks)") == "Edited: agent_x.mp4 (6 of 9 checks)",
+    )
     dark, light = palette(True, "#0050a0"), palette(False, "#99ddff")
     from ai_pc.assistant.bar import lum
+
     check("look: the accent stays readable on a dark and on a light bar", lum(dark["accent"]) >= 0.42 and lum(light["accent"]) <= 0.45, (dark, light))
     import math
+
     tone = struct.pack("<1600h", *[int(9000 * math.sin(i / 8)) for i in range(1600)])
     check("microphone: silence reads 0, speech-like sound reads clearly", mic.level(b"\0" * 3200) == 0.0 and mic.level(tone) > 0.5, mic.level(tone))
     d = fresh("pieces")
     w = mic.write_wav(d / "t.wav", [tone, tone], 16000, 1)
     import wave
+
     with wave.open(str(w)) as f:
         ok = (f.getframerate(), f.getnchannels(), f.getnframes()) == (16000, 1, 3200)
     check("microphone: what is heard is saved as a 16 kHz WAV", ok)
@@ -91,17 +106,24 @@ def t_shell():
         got.append((kind, d))
         if kind == "hotkey_up" or kind == "show":
             ev.set()
+
     fake_fg = {"hwnd": 0, "class": "CabinetWClass", "title": "Pictures", "pid": 0}
     sh = S.Shell(on, {"bar": COMBO}, name="AIPC_Shell_unit", tray=False, key_state=lambda vk: False, front=lambda: fake_fg)
     sh.start()
     sh.ready.wait(5)
-    check("combo: Windows takes the combo for the bar (RegisterHotKey, no keyboard hook)", sh.registered.get("bar") == "Ctrl+Alt+Shift+F24",
-          (sh.registered, sh.failed))
+    check(
+        "combo: Windows takes the combo for the bar (RegisterHotKey, no keyboard hook)",
+        sh.registered.get("bar") == "Ctrl+Alt+Shift+F24",
+        (sh.registered, sh.failed),
+    )
     S.user32.PostMessageW(sh.hwnd, S.WM_HOTKEY, 1, 0)
     ev.wait(5)
     kinds = [k for k, _ in got]
-    check("combo: a press is reported with the window in front, then its release", kinds[:2] == ["hotkey", "hotkey_up"]
-          and got[0][1]["fg"]["class"] == "CabinetWClass", got)
+    check(
+        "combo: a press is reported with the window in front, then its release",
+        kinds[:2] == ["hotkey", "hotkey_up"] and got[0][1]["fg"]["class"] == "CabinetWClass",
+        got,
+    )
     name = f"Local\\AIPC_Bar_test_{int(time.time())}"
     first = S.single_instance(name)
     second = S.single_instance(name)
@@ -109,7 +131,9 @@ def t_shell():
     S.kernel32.CloseHandle(first)
     ev.clear()
     got.clear()
-    check("one copy: a second start asks the running bar to show itself", S.poke_running("AIPC_Shell_unit") and ev.wait(5) and got[0][0] == "show", got)
+    check(
+        "one copy: a second start asks the running bar to show itself", S.poke_running("AIPC_Shell_unit") and ev.wait(5) and got[0][0] == "show", got
+    )
     sh.stop()
     sh.join(5)
     check("combo: given back to Windows when the bar quits", not sh.is_alive())
@@ -117,6 +141,7 @@ def t_shell():
 
 def t_agent():
     from test_aipc import slack_with_uploads  # noqa: F401 - the same fakes the chat tests use
+
     d = fresh("agent")
     photo, photo2 = d / "car.jpg", d / "bike.jpg"
     shutil.copy(PHOTO_SRC, photo)
@@ -127,6 +152,7 @@ def t_agent():
         events.append((kind, data))
         if kind in ("reply", "newchat"):
             done.set()
+
     ag = Agent(on, chats_dir=d / "chats", planner=None, options={"chats_root": d / "lanes"}, resume_hours=0, warm=False)
     ag.ready.wait(30)
     calls = []
@@ -137,12 +163,23 @@ def t_agent():
     done.wait(120)
     r = next((x for k, x in events if k == "reply"), {})
     kinds = [k for k, _ in events]
-    check("agent: a selected photo is 'it': 'make it brighter' edits it", r.get("text", "").startswith("[Photos]") and "Brighter" in r.get("text", "")
-          and len(r.get("files", [])) == 1, r)
-    check("agent: the selected photo is learned, not forced on the request", calls and calls[-1][1] == [] and
-          any(a["path"].lower() == str(photo).lower() and "File Explorer" in a.get("note", "") for a in ag.chat.arts.items), (calls, ag.chat.arts.items))
-    check("agent: the bar hears which program works (live) before the reply", "lane" in kinds and kinds.index("lane") < kinds.index("reply")
-          and next(x for k, x in events if k == "lane")["label"] == "Photos", kinds)
+    check(
+        "agent: a selected photo is 'it': 'make it brighter' edits it",
+        r.get("text", "").startswith("[Photos]") and "Brighter" in r.get("text", "") and len(r.get("files", [])) == 1,
+        r,
+    )
+    check(
+        "agent: the selected photo is learned, not forced on the request",
+        calls
+        and calls[-1][1] == []
+        and any(a["path"].lower() == str(photo).lower() and "File Explorer" in a.get("note", "") for a in ag.chat.arts.items),
+        (calls, ag.chat.arts.items),
+    )
+    check(
+        "agent: the bar hears which program works (live) before the reply",
+        "lane" in kinds and kinds.index("lane") < kinds.index("reply") and next(x for k, x in events if k == "lane")["label"] == "Photos",
+        kinds,
+    )
     events.clear()
     done.clear()
     ag.send("make these black and white", context=[str(photo), str(photo2)], where="File Explorer")
@@ -153,10 +190,14 @@ def t_agent():
     events.clear()
     ag.new_chat()
     done.wait(30)
-    check("agent: New chat starts a new conversation (the old one stays saved)", ag.chat.state["id"] != old
-          and (d / "chats" / old / "chat.json").is_file(), events)
+    check(
+        "agent: New chat starts a new conversation (the old one stays saved)",
+        ag.chat.state["id"] != old and (d / "chats" / old / "chat.json").is_file(),
+        events,
+    )
     ag.stop()
     import os
+
     ag2 = Agent(lambda k, x: None, chats_dir=d / "chats", planner=None, options={"chats_root": d / "lanes"}, resume_hours=6, warm=False)
     ag2.ready.wait(30)
     same = ag2.chat.state["id"] == ag.chat.state["id"]
@@ -167,7 +208,10 @@ def t_agent():
         os.utime(c, (t, t))
     ag3 = Agent(lambda k, x: None, chats_dir=d / "chats", planner=None, options={"chats_root": d / "lanes"}, resume_hours=6, warm=False)
     ag3.ready.wait(30)
-    check("agent: the bar carries on today's chat, and starts afresh after 6 hours", same and ag3.chat.state["id"] != ag.chat.state["id"] and f.is_file())
+    check(
+        "agent: the bar carries on today's chat, and starts afresh after 6 hours",
+        same and ag3.chat.state["id"] != ag.chat.state["id"] and f.is_file(),
+    )
     ag3.stop()
 
 
@@ -177,6 +221,7 @@ def snap(hwnd, path):
     import win32gui
     import win32ui
     from PIL import Image
+
     left, top, right, bottom = win32gui.GetWindowRect(hwnd)
     w, h = right - left, bottom - top
     hdc = win32gui.GetWindowDC(hwnd)
@@ -224,6 +269,7 @@ def ui_child(out, wav, photo):
     from test_aipc import TH, slack_with_uploads
 
     from ai_pc.assistant import bar as B
+
     S.dpi_aware()
     res = {"checks": [], "errors": [], "log": [], "timings": {}}
     tr, got = slack_with_uploads()
@@ -246,15 +292,23 @@ def ui_child(out, wav, photo):
 
         def cancel(self):
             pass
+
     front = {"fg": {"hwnd": 1, "class": "CabinetWClass", "title": "Pictures", "pid": 0}}
     import os
-    bar = B.Bar(cfg={"hotkey": COMBO, "fallbacks": [], "resume_hours": 0, "theme": os.environ.get("AIPC_TEST_THEME", "auto")},
-                agent_kw={"chats_dir": out / "chats", "planner": None,
-                          "options": {"chats_root": out / "lanes", "hub": {"transports": tr, "creds": TH.CREDS}}},
-                shell_kw={"name": "AIPC_Shell_uitest", "tray": False, "key_state": lambda vk: time.monotonic() < held["until"],
-                          "front": lambda: front["fg"]},
-                recorder=FakeRec, context=lambda fg: [str(photo)] if fg.get("class") == "CabinetWClass" else [], clipboard=lambda d: [],
-                log=lambda *a: res["log"].append(" ".join(map(str, a))))
+
+    bar = B.Bar(
+        cfg={"hotkey": COMBO, "fallbacks": [], "resume_hours": 0, "theme": os.environ.get("AIPC_TEST_THEME", "auto")},
+        agent_kw={
+            "chats_dir": out / "chats",
+            "planner": None,
+            "options": {"chats_root": out / "lanes", "hub": {"transports": tr, "creds": TH.CREDS}},
+        },
+        shell_kw={"name": "AIPC_Shell_uitest", "tray": False, "key_state": lambda vk: time.monotonic() < held["until"], "front": lambda: front["fg"]},
+        recorder=FakeRec,
+        context=lambda fg: [str(photo)] if fg.get("class") == "CabinetWClass" else [],
+        clipboard=lambda d: [],
+        log=lambda *a: res["log"].append(" ".join(map(str, a))),
+    )
 
     def ck(name, ok, detail=""):
         res["checks"].append([name, bool(ok), str(detail)[:400]])
@@ -277,7 +331,11 @@ def ui_child(out, wav, photo):
         res["timings"].update(bar.timings)
         ck("bar: pressing the combo shows the bar", ok)
         ok = yield (lambda: bar.context == [str(photo)] and bar.chips.winfo_manager(), 5)
-        ck("bar: the photo selected in File Explorer comes along (a chip 'From File Explorer')", ok and bar.where == "File Explorer", (bar.context, bar.where))
+        ck(
+            "bar: the photo selected in File Explorer comes along (a chip 'From File Explorer')",
+            ok and bar.where == "File Explorer",
+            (bar.context, bar.where),
+        )
         ck("bar: suggestions for a photo are offered", bar.sugg.winfo_manager() and getattr(bar, "_sugg_key", None) == "image")
         order = bar.card.pack_slaves()
         ck("bar: the files coming along are shown above the suggestions", order.index(bar.chips) < order.index(bar.sugg), order)
@@ -340,8 +398,11 @@ def ui_child(out, wav, photo):
         ck("bar: Ctrl+N starts a new chat", ok)
         press()
         yield 0.5
-        ck("bar: pressing the combo while the bar is in front hides it (a tap)", not bar.visible or bar.focused() is False,
-           (bar.visible, bar.focused()))
+        ck(
+            "bar: pressing the combo while the bar is in front hides it (a tap)",
+            not bar.visible or bar.focused() is False,
+            (bar.visible, bar.focused()),
+        )
 
     gen = script()
 
@@ -353,6 +414,7 @@ def ui_child(out, wav, photo):
             return
         except Exception:  # noqa: BLE001
             import traceback
+
             res["errors"].append(traceback.format_exc())
             finish()
             return
@@ -374,12 +436,14 @@ def ui_child(out, wav, photo):
                 step(False)
             else:
                 bar.root.after(40, poll)
+
         bar.root.after(10, poll)
 
     def finish():
         res["errors"] += [line for line in res["log"] if "Traceback" in line or "Error" in line]  # the bar's log also says what it did
         (out / "results.json").write_text(json.dumps(res, indent=1), encoding="utf-8")
         bar.quit()
+
     bar.root.after(200, step)
     bar.run()
 
@@ -387,13 +451,15 @@ def ui_child(out, wav, photo):
 def t_ui():
     from ai_pc.core import hidden_desktop
     from ai_pc.sound.tts import speak
+
     d = fresh("ui")
     photo = d / "car.jpg"
     shutil.copy(PHOTO_SRC, photo)
     wav = d / "voice.wav"
     speak("Make it black and white.", str(wav))
-    rc, out, err, timed_out = hidden_desktop.run([sys.executable, str(Path(__file__).resolve()), "--ui-child", str(d), str(wav), str(photo)],
-                                                 timeout=400, cwd=ROOT)
+    rc, out, err, timed_out = hidden_desktop.run(
+        [sys.executable, str(Path(__file__).resolve()), "--ui-child", str(d), str(wav), str(photo)], timeout=400, cwd=ROOT
+    )
     rf = d / "results.json"
     if not rf.is_file():
         check("ui: the bar ran on the hidden desktop", False, f"rc={rc} timed_out={timed_out}\n{out[-1500:]}\n{err[-2500:]}")
@@ -431,9 +497,12 @@ def t_launch():
     import os
 
     from ai_pc.core import hidden_desktop
+
     home = fresh("launch")
-    (home / "bar.json").write_text(json.dumps({"hotkey": "ctrl+alt+shift+f23", "fallbacks": [], "tray": False, "notify": False,
-                                               "name": "AIPCTEST", "resume_hours": 0}), encoding="utf-8")
+    (home / "bar.json").write_text(
+        json.dumps({"hotkey": "ctrl+alt+shift+f23", "fallbacks": [], "tray": False, "notify": False, "name": "AIPCTEST", "resume_hours": 0}),
+        encoding="utf-8",
+    )
     env = dict(os.environ, AIPC_BAR_HOME=str(home))
     pyw = str(Path(sys.executable).with_name("pythonw.exe"))
     log = home / "bar.log"
@@ -441,13 +510,19 @@ def t_launch():
     try:
         ok = _wait(lambda: "combo Ctrl+Alt+Shift+F23" in _read(log), 90)
         text = _read(log)
-        check("start: started like the shortcut (pythonw), the bar runs from python.exe with a console that has no window",
-              "python.exe, console with no window" in text, text[-800:])
+        check(
+            "start: started like the shortcut (pythonw), the bar runs from python.exe with a console that has no window",
+            "python.exe, console with no window" in text,
+            text[-800:],
+        )
         check("start: it takes its combo and waits in the background", ok, text[-800:])
         hidden_desktop.run([pyw, "-m", "ai_pc", "bar", "--offline"], cwd=ROOT, env=env, timeout=60)
         ok = _wait(lambda: "asked by a second start" in _read(log), 30)
-        check("start: a second start shows the running bar instead of starting another copy",
-              ok and _read(log).count("start (offline") == 1, _read(log)[-800:])
+        check(
+            "start: a second start shows the running bar instead of starting another copy",
+            ok and _read(log).count("start (offline") == 1,
+            _read(log)[-800:],
+        )
     finally:
         first.stop()
 
@@ -458,6 +533,7 @@ def t_shortcut():
     from win32com.shell import shell
 
     from ai_pc.assistant.bar import make_icon
+
     d = fresh("shortcut")
     icon = make_icon()
     with Image.open(icon) as im:
@@ -468,8 +544,11 @@ def t_shortcut():
     link = pythoncom.CoCreateInstance(shell.CLSID_ShellLink, None, pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IShellLink)
     link.QueryInterface(pythoncom.IID_IPersistFile).Load(str(lnk))
     target, args = link.GetPath(shell.SLGP_RAWPATH)[0], link.GetArguments()
-    check("shortcut: 'AI PC.lnk' starts the bar with pythonw (to pin to Start or the taskbar)", made and target.lower().endswith("pythonw.exe")
-          and args.endswith("-m ai_pc bar"), (target, args))
+    check(
+        "shortcut: 'AI PC.lnk' starts the bar with pythonw (to pin to Start or the taskbar)",
+        made and target.lower().endswith("pythonw.exe") and args.endswith("-m ai_pc bar"),
+        (target, args),
+    )
     check("start with Windows: the sign-in command starts the bar quietly", S.launch_command(ROOT, startup=True).endswith("bar --startup"))
 
 
@@ -483,6 +562,7 @@ def main():
             t()
         except Exception:  # noqa: BLE001 - one part failing does not hide the others
             import traceback
+
             check(f"{t.__name__}: ran without an error", False, traceback.format_exc()[-1500:])
     bad = [n for n, ok in RESULTS if not ok]
     print(f"\n{'ALL PASS' if not bad else f'{len(bad)} FAILED'}  ({len(RESULTS) - len(bad)}/{len(RESULTS)}, {time.time() - t0:.0f} s)")

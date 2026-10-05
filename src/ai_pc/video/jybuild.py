@@ -5,6 +5,7 @@ Track stack, bottom to top: main video, overlay layers, filter tracks, effect tr
 over_text, then audio. Items that overlap in time get their own track. Every feature is applied in its own guard, so
 one failure becomes a note in the edit map instead of a failed build. ~0.1-0.5 s per draft.
 """
+
 import os
 import re
 import time
@@ -16,8 +17,17 @@ from pyJianYingDraft import SEC, trange
 from ai_pc.video.editplan import Catalog, motion_keyframes
 
 DRAFTS = Path(os.environ["LOCALAPPDATA"]) / "JianyingPro" / "User Data" / "Projects" / "com.lveditor.draft"
-KFP = {"scale": "uniform_scale", "x": "position_x", "y": "position_y", "rotation": "rotation", "alpha": "alpha",
-       "brightness": "brightness", "contrast": "contrast", "saturation": "saturation", "volume": "volume"}
+KFP = {
+    "scale": "uniform_scale",
+    "x": "position_x",
+    "y": "position_y",
+    "rotation": "rotation",
+    "alpha": "alpha",
+    "brightness": "brightness",
+    "contrast": "contrast",
+    "saturation": "saturation",
+    "volume": "volume",
+}
 
 
 def us(x):
@@ -26,7 +36,7 @@ def us(x):
 
 def _rgb(h):
     h = h.lstrip("#")
-    return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return tuple(int(h[i : i + 2], 16) / 255 for i in (0, 2, 4))
 
 
 _DUR = {}
@@ -72,8 +82,8 @@ class Builder:
         self.name = name or draft_name(R.get("name"))
         self.drafts = Path(drafts)
         self.stats = {}
-        self.segs = {}       # clip id -> [VideoSegment per piece]
-        self.tsegs = {}      # text id -> TextSegment
+        self.segs = {}  # clip id -> [VideoSegment per piece]
+        self.tsegs = {}  # text id -> TextSegment
         self.edit_out = []
 
     def _ok(self, what, fn, *a, **k):
@@ -89,20 +99,45 @@ class Builder:
     def _video_piece(self, clip, pc, start_us, first, last, main):
         st = clip["settings"]
         sx, sy = clip.get("stretch") or (1.0, 1.0)
-        cs = jy.ClipSettings(alpha=st["alpha"], flip_horizontal=st["flip_h"], flip_vertical=st["flip_v"], rotation=st["rotation"],
-                             scale_x=st["scale"] * sx, scale_y=st["scale"] * sy, transform_x=st["x"], transform_y=st["y"])
+        cs = jy.ClipSettings(
+            alpha=st["alpha"],
+            flip_horizontal=st["flip_h"],
+            flip_vertical=st["flip_v"],
+            rotation=st["rotation"],
+            scale_x=st["scale"] * sx,
+            scale_y=st["scale"] * sy,
+            transform_x=st["x"],
+            transform_y=st["y"],
+        )
         mat = pc["path"]
         if clip.get("crop"):
             c = clip["crop"]
-            mat = jy.VideoMaterial(pc["path"], crop_settings=jy.CropSettings(
-                upper_left_x=c["left"], upper_left_y=c["top"], upper_right_x=1 - c["right"], upper_right_y=c["top"],
-                lower_left_x=c["left"], lower_left_y=1 - c["bottom"], lower_right_x=1 - c["right"], lower_right_y=1 - c["bottom"]))
+            mat = jy.VideoMaterial(
+                pc["path"],
+                crop_settings=jy.CropSettings(
+                    upper_left_x=c["left"],
+                    upper_left_y=c["top"],
+                    upper_right_x=1 - c["right"],
+                    upper_right_y=c["top"],
+                    lower_left_x=c["left"],
+                    lower_left_y=1 - c["bottom"],
+                    lower_right_x=1 - c["right"],
+                    lower_right_y=1 - c["bottom"],
+                ),
+            )
         if pc["kind"] == "image":
             seg = jy.VideoSegment(mat, trange(start_us, us(pc["dur"])), clip_settings=cs)
         else:
             span = min(pc["src_span"], material_seconds(pc["path"]) - pc["src_from"] - 0.001)
-            seg = jy.VideoSegment(mat, trange(start_us, us(span / pc["speed"])), source_timerange=trange(us(pc["src_from"]), us(span)),
-                                  speed=pc["speed"], volume=clip["volume"], change_pitch=clip.get("pitch_with_speed", False), clip_settings=cs)
+            seg = jy.VideoSegment(
+                mat,
+                trange(start_us, us(span / pc["speed"])),
+                source_timerange=trange(us(pc["src_from"]), us(span)),
+                speed=pc["speed"],
+                volume=clip["volume"],
+                change_pitch=clip.get("pitch_with_speed", False),
+                clip_settings=cs,
+            )
         if clip.get("chroma"):
             ch = clip["chroma"]
             self._ok("chroma", seg.add_chroma, ch["color"] + "FF", ch["intensity"], ch["shadow"], ch["edge_smooth"], ch["spill"])
@@ -110,8 +145,14 @@ class Builder:
             m = clip["mask"]
             mt = jy.MaskType[m["type"]]
             mw, mh = seg.material_size
-            kw = dict(center_x=(m["x"] - 0.5) * mw, center_y=(0.5 - m["y"]) * mh, size=m["size"], rotation=m["rotation"],
-                      feather=m["feather"], invert=m["invert"])
+            kw = dict(
+                center_x=(m["x"] - 0.5) * mw,
+                center_y=(0.5 - m["y"]) * mh,
+                size=m["size"],
+                rotation=m["rotation"],
+                feather=m["feather"],
+                invert=m["invert"],
+            )
             if m["type"] == "矩形":
                 kw.update(rect_width=m["width"] or m["size"], round_corner=m["round"] or 0)
             self._ok("mask", seg.add_mask, mt, **kw)
@@ -194,20 +235,51 @@ class Builder:
         return script
 
     def _text_seg(self, text, start, dur, st, pos):
-        style = jy.TextStyle(size=st["size"], bold=st["bold"], italic=st["italic"], underline=st["underline"], color=_rgb(st["color"]),
-                             alpha=st["alpha"], align=st["align"], letter_spacing=st["letter_spacing"], line_spacing=st["line_spacing"],
-                             vertical=st.get("vertical", False), auto_wrapping=True, max_line_width=st.get("max_width", 0.82))
+        style = jy.TextStyle(
+            size=st["size"],
+            bold=st["bold"],
+            italic=st["italic"],
+            underline=st["underline"],
+            color=_rgb(st["color"]),
+            alpha=st["alpha"],
+            align=st["align"],
+            letter_spacing=st["letter_spacing"],
+            line_spacing=st["line_spacing"],
+            vertical=st.get("vertical", False),
+            auto_wrapping=True,
+            max_line_width=st.get("max_width", 0.82),
+        )
         cs = jy.ClipSettings(transform_x=pos[0], transform_y=pos[1], scale_x=st["scale"], scale_y=st["scale"], rotation=st["rotation"])
-        border = jy.TextBorder(alpha=st["outline"]["alpha"], color=_rgb(st["outline"]["color"]), width=st["outline"]["width"]) if st.get("outline") else None
+        border = (
+            jy.TextBorder(alpha=st["outline"]["alpha"], color=_rgb(st["outline"]["color"]), width=st["outline"]["width"])
+            if st.get("outline")
+            else None
+        )
         bg = st.get("background")
-        background = jy.TextBackground(color=bg["color"], style=bg["style"], alpha=bg["alpha"], round_radius=bg["round"],
-                                       height=bg.get("height", 0.14), width=bg.get("width", 0.14),
-                                       horizontal_offset=bg.get("x_offset", 0.5), vertical_offset=bg.get("y_offset", 0.5)) if bg else None
+        background = (
+            jy.TextBackground(
+                color=bg["color"],
+                style=bg["style"],
+                alpha=bg["alpha"],
+                round_radius=bg["round"],
+                height=bg.get("height", 0.14),
+                width=bg.get("width", 0.14),
+                horizontal_offset=bg.get("x_offset", 0.5),
+                vertical_offset=bg.get("y_offset", 0.5),
+            )
+            if bg
+            else None
+        )
         sh = st.get("shadow")
-        shadow = jy.TextShadow(alpha=sh["alpha"], color=_rgb(sh["color"]), diffuse=sh["diffuse"], distance=sh["distance"], angle=sh["angle"]) if sh else None
+        shadow = (
+            jy.TextShadow(alpha=sh["alpha"], color=_rgb(sh["color"]), diffuse=sh["diffuse"], distance=sh["distance"], angle=sh["angle"])
+            if sh
+            else None
+        )
         font = self.cat.enum(st["font"]) if st.get("font") else None
-        return jy.TextSegment(text, trange(us(start), us(dur)), font=font, style=style, clip_settings=cs, border=border,
-                              background=background, shadow=shadow)
+        return jy.TextSegment(
+            text, trange(us(start), us(dur)), font=font, style=style, clip_settings=cs, border=border, background=background, shadow=shadow
+        )
 
     # ------------------------------------------------------------------ build
     def build(self):
@@ -239,8 +311,18 @@ class Builder:
                 self._ok(f"text {e['kind']}", seg.add_animation, self.cat.enum(e["item"]), us(e["duration"]))
         for e in [e for e in edits if e["type"] == "keyframes" and e["on"] in self.tsegs]:
             tx = next(t for t in texts if t["id"] == e["on"])
-            pseudo = {"id": tx["id"], "start": tx["start"], "volume": 1.0,
-                      "settings": {"scale": tx["style"]["scale"], "x": tx["position"][0], "y": tx["position"][1], "rotation": tx["style"]["rotation"], "alpha": tx["style"]["alpha"]}}
+            pseudo = {
+                "id": tx["id"],
+                "start": tx["start"],
+                "volume": 1.0,
+                "settings": {
+                    "scale": tx["style"]["scale"],
+                    "x": tx["position"][0],
+                    "y": tx["position"][1],
+                    "rotation": tx["style"]["rotation"],
+                    "alpha": tx["style"]["alpha"],
+                },
+            }
             for prop, pts in motion_keyframes(pseudo, [e], {"start": tx["start"], "dur": tx["duration"]}).items():
                 if prop in ("volume", "brightness", "contrast", "saturation"):
                     continue
@@ -280,6 +362,7 @@ class Builder:
                     a, b = e["window"]
                     if self._ok("effect (track)", script.add_effect, self.cat.enum(e["item"]), trange(us(a), us(b - a)), tn, params=e.get("params")):
                         e["track"] = tn
+
         fx_tracks([e for e in edits if e["type"] == "effect" and e["mode"] == "track" and not e["over_text"]], "fx")
         for i, lane in enumerate(_lanes(texts)):
             tn = f"title{i + 1}"
@@ -307,9 +390,16 @@ class Builder:
             tracks.append(tn)
             for e in lane:
                 span = min(e["duration"] * e["speed"], material_seconds(e["path"], audio=True) - e["src_from"] - 0.001)
-                seg = self._ok("audio", jy.AudioSegment, e["path"], trange(us(e["at"]), us(span / e["speed"])),
-                               source_timerange=trange(us(e["src_from"]), us(span)), speed=e["speed"], volume=e["volume"],
-                               change_pitch=e.get("pitch_with_speed", False))
+                seg = self._ok(
+                    "audio",
+                    jy.AudioSegment,
+                    e["path"],
+                    trange(us(e["at"]), us(span / e["speed"])),
+                    source_timerange=trange(us(e["src_from"]), us(span)),
+                    speed=e["speed"],
+                    volume=e["volume"],
+                    change_pitch=e.get("pitch_with_speed", False),
+                )
                 if not seg:
                     continue
                 if e["fade_in"] or e["fade_out"]:
@@ -327,9 +417,30 @@ class Builder:
         R = self.R
         clips = []
         for c in R["clips"] + R["layers"]:
-            clips.append({k: c.get(k) for k in ("id", "file", "path", "kind", "overlay", "start", "end", "dur", "pieces", "settings", "visible",
-                                                "src_size", "focus", "window", "track", "reversed")} | {"chroma": bool(c.get("chroma")),
-                                                                                                         "blend": c.get("blend"), "mask": c.get("mask")})
+            clips.append(
+                {
+                    k: c.get(k)
+                    for k in (
+                        "id",
+                        "file",
+                        "path",
+                        "kind",
+                        "overlay",
+                        "start",
+                        "end",
+                        "dur",
+                        "pieces",
+                        "settings",
+                        "visible",
+                        "src_size",
+                        "focus",
+                        "window",
+                        "track",
+                        "reversed",
+                    )
+                }
+                | {"chroma": bool(c.get("chroma")), "blend": c.get("blend"), "mask": c.get("mask")}
+            )
         edits = []
         for e in R["edits"]:
             x = {k: v for k, v in e.items() if not k.startswith("_")}
@@ -340,9 +451,22 @@ class Builder:
                     if f in card:
                         x[f] = card[f]
             edits.append(x)
-        return {"draft": self.name, "path": str(self.drafts / self.name), "canvas": R["canvas"], "aspect": R["aspect"], "fps": R.get("fps", 30),
-                "platform": R.get("platform"), "safe": R.get("safe"), "seconds": round(script.duration / SEC, 3), "tracks": tracks,
-                "clips": clips, "edits": edits, "stats": self.stats, "notes": self.notes, "build_ms": round(secs * 1000)}
+        return {
+            "draft": self.name,
+            "path": str(self.drafts / self.name),
+            "canvas": R["canvas"],
+            "aspect": R["aspect"],
+            "fps": R.get("fps", 30),
+            "platform": R.get("platform"),
+            "safe": R.get("safe"),
+            "seconds": round(script.duration / SEC, 3),
+            "tracks": tracks,
+            "clips": clips,
+            "edits": edits,
+            "stats": self.stats,
+            "notes": self.notes,
+            "build_ms": round(secs * 1000),
+        }
 
 
 def build(R, drafts=DRAFTS, name=None):

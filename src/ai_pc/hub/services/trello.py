@@ -1,5 +1,6 @@
 """Trello through its REST API (key and token in an OAuth header, never in the address): boards, lists, cards; create,
 move, comment, set a due date, archive. Every card made or changed is read back."""
+
 from ai_pc.hub.http import Api, HubError
 from ai_pc.hub.services import Base, pick
 
@@ -17,13 +18,19 @@ class Trello(Base):
         return {"who": me.get("fullName") or me.get("username"), "where": "Trello"}
 
     def boards(self):
-        return [{"id": b["id"], "name": b["name"], "url": b.get("url")} for b in self.api().get("members/me/boards", params={"fields": "name,url,closed"})
-                if not b.get("closed")]
+        return [
+            {"id": b["id"], "name": b["name"], "url": b.get("url")}
+            for b in self.api().get("members/me/boards", params={"fields": "name,url,closed"})
+            if not b.get("closed")
+        ]
 
     def lists(self, board):
         b = board if isinstance(board, dict) else self.board(board)
-        return [{"id": x["id"], "name": x["name"], "board": b["id"]} for x in self.api().get(f"boards/{b['id']}/lists", params={"fields": "name,closed"})
-                if not x.get("closed")]
+        return [
+            {"id": x["id"], "name": x["name"], "board": b["id"]}
+            for x in self.api().get(f"boards/{b['id']}/lists", params={"fields": "name,closed"})
+            if not x.get("closed")
+        ]
 
     def board(self, name=None):
         bs = self.boards()
@@ -46,8 +53,17 @@ class Trello(Base):
         b = self.board(board)
         cards = self.api().get(f"boards/{b['id']}/cards", params={"fields": "name,due,dueComplete,idList,url,desc"})
         names = {x["id"]: x["name"] for x in self.lists(b)}
-        out = [{"id": c["id"], "name": c["name"], "list": names.get(c["idList"], "?"), "due": c.get("due"), "done": c.get("dueComplete"), "url": c.get("url")}
-               for c in cards]
+        out = [
+            {
+                "id": c["id"],
+                "name": c["name"],
+                "list": names.get(c["idList"], "?"),
+                "due": c.get("due"),
+                "done": c.get("dueComplete"),
+                "url": c.get("url"),
+            }
+            for c in cards
+        ]
         return [c for c in out if not list_name or pick([{"name": c["list"]}], list_name)]
 
     def card(self, name, board=None):
@@ -58,10 +74,18 @@ class Trello(Base):
 
     def create(self, name, list_name=None, board=None, desc=None, due=None):
         lst = self.list_(list_name, board)
-        c = self.api().post("cards", json={"idList": lst["id"], "name": name, "pos": "top", **({"desc": desc} if desc else {}), **({"due": due} if due else {})})
+        c = self.api().post(
+            "cards", json={"idList": lst["id"], "name": name, "pos": "top", **({"desc": desc} if desc else {}), **({"due": due} if due else {})}
+        )
         back = self.api().get(f"cards/{c['id']}", params={"fields": "name,idList"})
-        return {"id": c["id"], "url": c.get("url") or c.get("shortUrl"), "where": f"{lst['board_name']} / {lst['name']}", "name": name,
-                "verified": back.get("name") == name and back.get("idList") == lst["id"], "undo": {"service": "trello", "op": "delete", "id": c["id"]}}
+        return {
+            "id": c["id"],
+            "url": c.get("url") or c.get("shortUrl"),
+            "where": f"{lst['board_name']} / {lst['name']}",
+            "name": name,
+            "verified": back.get("name") == name and back.get("idList") == lst["id"],
+            "undo": {"service": "trello", "op": "delete", "id": c["id"]},
+        }
 
     def move(self, card_name, to_list, board=None):
         c = self.card(card_name, board)
@@ -70,8 +94,14 @@ class Trello(Base):
         self.api().put(f"cards/{c['id']}", json={"idList": lst["id"]})
         back = self.api().get(f"cards/{c['id']}", params={"fields": "idList"})
         prev = self.list_(before, board)
-        return {"id": c["id"], "url": c["url"], "where": f"{before} -> {lst['name']}", "name": c["name"], "verified": back.get("idList") == lst["id"],
-                "undo": {"service": "trello", "op": "move_id", "id": c["id"], "list_id": prev["id"]}}
+        return {
+            "id": c["id"],
+            "url": c["url"],
+            "where": f"{before} -> {lst['name']}",
+            "name": c["name"],
+            "verified": back.get("idList") == lst["id"],
+            "undo": {"service": "trello", "op": "move_id", "id": c["id"], "list_id": prev["id"]},
+        }
 
     def move_id(self, id, list_id):  # noqa: A002
         self.api().put(f"cards/{id}", json={"idList": list_id})
@@ -80,8 +110,13 @@ class Trello(Base):
     def comment(self, card_name, text, board=None):
         c = self.card(card_name, board)
         a = self.api().post(f"cards/{c['id']}/actions/comments", json={"text": text})
-        return {"id": a["id"], "where": c["name"], "url": c["url"], "verified": (a.get("data") or {}).get("text") == text,
-                "undo": {"service": "trello", "op": "delete_comment", "card": c["id"], "id": a["id"]}}
+        return {
+            "id": a["id"],
+            "where": c["name"],
+            "url": c["url"],
+            "verified": (a.get("data") or {}).get("text") == text,
+            "undo": {"service": "trello", "op": "delete_comment", "card": c["id"], "id": a["id"]},
+        }
 
     def delete_comment(self, card, id):  # noqa: A002
         self.api().delete(f"cards/{card}/actions/{id}/comments")

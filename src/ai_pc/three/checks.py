@@ -1,10 +1,11 @@
 """What a 3D render shows, measured from the files (numpy + Pillow; FFmpeg for videos):
-  silhouette(mask)  the subject's flat silhouette (Workbench, clear background, the ground hidden): how much of the
-                    frame it covers and whether it touches an edge (cut off)
-  picture(png)      the render itself: not blank, not too dark, not washed out
-  video(mp4, ...)   length and frame rate as asked, it moves, no black frames
-  view_checks(...)  all of these for one rendered view, as checks {"what", "ok", "level", "detail"}
+silhouette(mask)  the subject's flat silhouette (Workbench, clear background, the ground hidden): how much of the
+                  frame it covers and whether it touches an edge (cut off)
+picture(png)      the render itself: not blank, not too dark, not washed out
+video(mp4, ...)   length and frame rate as asked, it moves, no black frames
+view_checks(...)  all of these for one rendered view, as checks {"what", "ok", "level", "detail"}
 """
+
 import subprocess
 from pathlib import Path
 
@@ -53,19 +54,32 @@ def view_checks(name, entry, path, mask, cut_ok=()):
         out.append(_check(f"{name}: whole subject framed", inside, f"x {fr['x0']:.2f}-{fr['x1']:.2f}, y {fr['y0']:.2f}-{fr['y1']:.2f}", "warn"))
     pc = picture(p)
     out.append(_check(f"{name}: a real picture", pc["std"] > 0.03, f"contrast {pc['std']:.3f}"))
-    out.append(_check(f"{name}: exposure", 0.2 <= pc["mean"] <= 0.88 and pc["clip_hi"] < 0.12, f"brightness {pc['mean']:.2f}, "
-                      f"{pc['clip_hi']:.0%} washed out", "warn"))
+    out.append(
+        _check(
+            f"{name}: exposure",
+            0.2 <= pc["mean"] <= 0.88 and pc["clip_hi"] < 0.12,
+            f"brightness {pc['mean']:.2f}, {pc['clip_hi']:.0%} washed out",
+            "warn",
+        )
+    )
     return out
 
 
 def encode(frames_dir, out, fps=30, gpu=True):
     """PNG frames -> an MP4 (H.264, the Intel GPU when it works, else x264)."""
     pattern = str(Path(frames_dir) / "frame_%04d.png")
-    for enc in ((["-c:v", "h264_qsv", "-global_quality", "21", "-pix_fmt", "nv12"] if gpu else []), ["-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p"]):
+    for enc in (
+        (["-c:v", "h264_qsv", "-global_quality", "21", "-pix_fmt", "nv12"] if gpu else []),
+        ["-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p"],
+    ):
         if not enc:
             continue
-        r = subprocess.run(["ffmpeg", "-hide_banner", "-y", "-v", "error", "-framerate", str(fps), "-i", pattern] + enc + ["-movflags", "+faststart", str(out)],
-                           capture_output=True, creationflags=NO_WINDOW, timeout=900)
+        r = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-y", "-v", "error", "-framerate", str(fps), "-i", pattern] + enc + ["-movflags", "+faststart", str(out)],
+            capture_output=True,
+            creationflags=NO_WINDOW,
+            timeout=900,
+        )
         if r.returncode == 0 and Path(out).exists():
             return enc[1]
     raise RuntimeError("the frames could not be made into a video")
@@ -84,8 +98,29 @@ def video(path, frames, fps, dark_ok=False):
     out.append(_check("video: plays through", not errs, "; ".join(errs[:2])))
     shots = []
     for t in (0.0, want * 0.33, want * 0.66, max(0.0, want - 0.1)):
-        r = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{t:.3f}", "-i", str(path), "-frames:v", "1", "-vf", "scale=160:90", "-f", "rawvideo", "-pix_fmt", "gray", "-"],
-                           capture_output=True, creationflags=NO_WINDOW, timeout=60)
+        r = subprocess.run(
+            [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-ss",
+                f"{t:.3f}",
+                "-i",
+                str(path),
+                "-frames:v",
+                "1",
+                "-vf",
+                "scale=160:90",
+                "-f",
+                "rawvideo",
+                "-pix_fmt",
+                "gray",
+                "-",
+            ],
+            capture_output=True,
+            creationflags=NO_WINDOW,
+            timeout=60,
+        )
         if len(r.stdout) == 160 * 90:
             shots.append(np.frombuffer(r.stdout, np.uint8).astype(np.float32) / 255)
     spread = max((float(s.std()) for s in shots), default=0.0)

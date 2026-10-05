@@ -9,6 +9,7 @@ reliable each catalogue item is here (proven in exports / downloaded / never tri
 The planner gets this as its "what is possible" sheet, the critic checks against it, and the final report explains
 every substitution with it. Pure computation: ~10-50 ms.
 """
+
 from ai_pc.media import sfx
 
 LIMITS = [
@@ -21,13 +22,28 @@ LIMITS = [
     "CapCut-only catalogue items cannot render in JianYing",
 ]
 TECHNIQUES = {
-    "shake": "camera shake (position keyframes, any strength)", "zoom": "zoom punch or slow push (scale keyframes)",
-    "slow": "slow motion / speed ramp (split clip)", "ramp": "speed ramp", "freeze": "freeze frame", "reverse": "reverse playback",
-    "reframe": "reframing on the subject (face tracking)", "chroma": "green/blue screen removal", "green screen": "green screen removal",
-    "mask": "shape masks", "blend": "blend modes", "beat": "cuts snapped to music beats (needs a music file)",
-    "duck": "music ducking under speech", "sound": "synthesised sound effects", "sfx": "synthesised sound effects",
-    "whoosh": "synthesised whoosh", "impact": "synthesised impact", "riser": "synthesised riser", "flash": "white flash (transition 闪白 or effect)",
-    "text": "titles with fonts and animations", "title": "titles", "caption": "captions from given text",
+    "shake": "camera shake (position keyframes, any strength)",
+    "zoom": "zoom punch or slow push (scale keyframes)",
+    "slow": "slow motion / speed ramp (split clip)",
+    "ramp": "speed ramp",
+    "freeze": "freeze frame",
+    "reverse": "reverse playback",
+    "reframe": "reframing on the subject (face tracking)",
+    "chroma": "green/blue screen removal",
+    "green screen": "green screen removal",
+    "mask": "shape masks",
+    "blend": "blend modes",
+    "beat": "cuts snapped to music beats (needs a music file)",
+    "duck": "music ducking under speech",
+    "sound": "synthesised sound effects",
+    "sfx": "synthesised sound effects",
+    "whoosh": "synthesised whoosh",
+    "impact": "synthesised impact",
+    "riser": "synthesised riser",
+    "flash": "white flash (transition 闪白 or effect)",
+    "text": "titles with fonts and animations",
+    "title": "titles",
+    "caption": "captions from given text",
 }
 PARTS = ("eyes", "face", "head", "body", "hands")
 
@@ -56,9 +72,17 @@ def footage(analyses):
         has_speech |= snd.get("kind") == "speech"
         if a.get("screen"):
             screens.append(a["file"])
-        files.append({"file": a["file"], "kind": k, "seconds": a.get("seconds"), "face_max": round(top, 4),
-                      "clear_face": [[round(x, 1), round(y + 0.25, 1)] for x, y in clear][:6], "sound": snd.get("kind"),
-                      "screen": (a.get("screen") or {}).get("kind")})
+        files.append(
+            {
+                "file": a["file"],
+                "kind": k,
+                "seconds": a.get("seconds"),
+                "face_max": round(top, 4),
+                "clear_face": [[round(x, 1), round(y + 0.25, 1)] for x, y in clear][:6],
+                "sound": snd.get("kind"),
+                "screen": (a.get("screen") or {}).get("kind"),
+            }
+        )
     return {"files": files, "best_face": round(best_face, 4), "has_music": has_music, "has_speech": has_speech, "screens": screens}
 
 
@@ -93,9 +117,12 @@ def feasibility(brief, groups, cat, foot):
                 best = cards[0]
                 key = f"{best['category']}:{best['name']}"
                 matches_part = part not in PARTS or best.get("target") == part
-                v.update(status="direct" if matches_part else "approximate", how=f"{best.get('en')} ({best['name']})",
-                         reliability=_state(cat, key), options=[f"{c.get('en')} ({c['name']}, {_state(cat, c['category'] + ':' + c['name'])})"
-                                                                 for c in cards[:4]])
+                v.update(
+                    status="direct" if matches_part else "approximate",
+                    how=f"{best.get('en')} ({best['name']})",
+                    reliability=_state(cat, key),
+                    options=[f"{c.get('en')} ({c['name']}, {_state(cat, c['category'] + ':' + c['name'])})" for c in cards[:4]],
+                )
                 # is the exact look only available as VIP?
                 q = f"{n.get('query') or ''} {what}"
                 pro = [h for h in ix.search(q, categories=kinds, free_only=False, k=3) if h.get("pro")]
@@ -113,8 +140,24 @@ def feasibility(brief, groups, cat, foot):
     return out
 
 
-COLOURS = ("red", "white", "black", "blue", "green", "yellow", "orange", "silver", "grey", "gray", "pink", "purple", "gold",
-           "golden", "brown", "beige")
+COLOURS = (
+    "red",
+    "white",
+    "black",
+    "blue",
+    "green",
+    "yellow",
+    "orange",
+    "silver",
+    "grey",
+    "gray",
+    "pink",
+    "purple",
+    "gold",
+    "golden",
+    "brown",
+    "beige",
+)
 _STOP = {"a", "an", "the", "and", "with", "in", "on", "of", "for", "to", "at", "my", "our", "your", "its"}
 
 
@@ -122,6 +165,7 @@ def off_brief(request, analyses):
     """Files that show a different version of the thing the request is about: "an ad for the red sports car" and a
     file captioned "a luxury white sports car". {file: why}. Only colour + thing, which captions state reliably."""
     import re
+
     req = str(request or "").lower()
     out = {}
     for m in re.finditer(r"\b(" + "|".join(COLOURS) + r")\s+([a-z][a-z\s-]{2,40})", req):
@@ -133,8 +177,10 @@ def off_brief(request, analyses):
         for a in analyses.values():
             if a.get("kind") not in ("video", "image"):
                 continue
-            text = " ".join([a.get("file", "").replace("-", " ").replace("_", " "), str(a.get("summary") or "")] +
-                            [str(x.get("subject") or "") for x in a.get("moments", [])]).lower()
+            text = " ".join(
+                [a.get("file", "").replace("-", " ").replace("_", " "), str(a.get("summary") or "")]
+                + [str(x.get("subject") or "") for x in a.get("moments", [])]
+            ).lower()
             if not re.search(rf"\b{thing}s?\b", text) or re.search(rf"\b{colour}\b(\s+[a-z-]+){{0,3}}\s+{thing}", text):
                 continue
             other = next((c for c in COLOURS if c != colour and re.search(rf"\b{c}\b(\s+[a-z-]+){{0,3}}\s+{thing}", text)), None)
@@ -156,11 +202,16 @@ def snapshot(brief, analyses, groups, cat, lessons_text="", request=""):
         if f["kind"] == "audio":
             lines.append(f"  {f['file']}: audio ({f.get('sound')}{', ' + str(f['bpm']) + ' BPM' if f.get('bpm') else ''})")
             continue
-        face = (f"clear face at {', '.join(f'{a}-{b} s' for a, b in f['clear_face'])} (up to {f['face_max'] * 100:.1f}% of the frame)"
-                if f["clear_face"] else f"no clear face (largest {f['face_max'] * 100:.2f}% of the frame)")
+        face = (
+            f"clear face at {', '.join(f'{a}-{b} s' for a, b in f['clear_face'])} (up to {f['face_max'] * 100:.1f}% of the frame)"
+            if f["clear_face"]
+            else f"no clear face (largest {f['face_max'] * 100:.2f}% of the frame)"
+        )
         lines.append(f"  {f['file']}: {face}; sound: {f.get('sound') or 'none'}" + (f"; {f['screen']} screen" if f.get("screen") else ""))
-    lines.append(f"  music file: {'yes' if foot['has_music'] else 'NO (use synthesised sound effects for impact and rhythm)'}"
-                 f"; speech in the clips: {'yes' if foot['has_speech'] else 'no'}")
+    lines.append(
+        f"  music file: {'yes' if foot['has_music'] else 'NO (use synthesised sound effects for impact and rhythm)'}"
+        f"; speech in the clips: {'yes' if foot['has_speech'] else 'no'}"
+    )
     lines.append("needs:")
     for v in feas:
         s = f"  {v['need']} {v['what']} -> {v['status'].upper()}: {v.get('how', '')}"

@@ -16,6 +16,7 @@ Things to say: 'modern / classic / bold style', 'in navy / green / maroon / blac
 'use photo.jpg', 'add my logo logo.png', 'make it a story / a square post / a thumbnail / A4', 'export the pdf for printing',
 'save the png for whatsapp', 'undo', 'go back to v2', 'history'.
 """
+
 import argparse
 import sys
 
@@ -38,9 +39,11 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     from ai_pc.design.designchat import DesignChat
+
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     if a.cmd == "make":
         c = DesignChat.start(planner=planner, files=a.extra)

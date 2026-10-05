@@ -5,6 +5,7 @@ template has text, and follow-ups change footage / music / format but not the te
   .venv\\Scripts\\python.exe tests\\integration\\test_templates.py
 Needs the 'gym_hype' template (learned from out/video/agent_no_180359.mp4; it is learned on the fly if missing).
 """
+
 import sys
 from pathlib import Path
 
@@ -50,8 +51,11 @@ def main():
     check("the same file rarely twice in a row", adj <= max(2, len(R["clips"]) // 10), f"{adj} times")
     m = next((e for e in plan["edits"] if e.get("id") == "music"), None)
     beat = 60.0 / round(tpl["bpm"]) if tpl.get("bpm") else None
-    check("music at the template's tempo, offset under a beat", m is not None and beat and 0 <= m["from"] < beat + 1e-6,
-          f"music {m and m.get('file')} from {m and m.get('from')}")
+    check(
+        "music at the template's tempo, offset under a beat",
+        m is not None and beat and 0 <= m["from"] < beat + 1e-6,
+        f"music {m and m.get('file')} from {m and m.get('from')}",
+    )
     texts = [e for e in R["edits"] if e["type"] == "text"]
     check("the client's words where the template has text", any(t["text"] == "ROAD TRIP" for t in texts), str([t["text"] for t in texts][:3]))
     kinds = {e["type"] for e in R["edits"]}
@@ -59,10 +63,19 @@ def main():
     # follow-ups
     d = {"template": tpl["name"], "pins": {}, "avoid_files": [], "music": None, "canvas": plan["canvas"], "texts": None}
     beach = next(f for f in (Path(x).name for x in files) if "beach" in f)
-    d2, done, failed = TP.apply_design(d, [{"op": "shot_move", "to": "first", "file": beach}, {"op": "pace", "mul": 0.8},
-                                           {"op": "avoid_file", "file": next(Path(x).name for x in files if "motorcycle" in x)}])
-    check("follow-ups: footage pinned and avoided, pacing refused (the template sets it)",
-          len(done) == 2 and len(failed) == 1 and "template" in failed[0], f"done {done}, failed {failed}")
+    d2, done, failed = TP.apply_design(
+        d,
+        [
+            {"op": "shot_move", "to": "first", "file": beach},
+            {"op": "pace", "mul": 0.8},
+            {"op": "avoid_file", "file": next(Path(x).name for x in files if "motorcycle" in x)},
+        ],
+    )
+    check(
+        "follow-ups: footage pinned and avoided, pacing refused (the template sets it)",
+        len(done) == 2 and len(failed) == 1 and "template" in failed[0],
+        f"done {done}, failed {failed}",
+    )
     p2 = TP.refill(d2, an, "", log=lambda *a: None)
     check("a pinned file opens the edit", p2["clips"][0]["file"] == beach, p2["clips"][0]["file"])
     check("an avoided file is gone", not any("motorcycle" in c["file"] for c in p2["clips"]))

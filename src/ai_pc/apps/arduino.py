@@ -6,6 +6,7 @@ Checked: it compiles, fits the board's flash and memory, the .hex is made, and n
 
   'arduino traffic light on a nano, green 5 seconds'   'arduino ultrasonic alarm closer than 20 cm'   'upload it to the arduino'
 """
+
 import json
 import re
 import shutil
@@ -15,8 +16,12 @@ from pathlib import Path
 from ai_pc.core.config import ROOT
 
 NAME, LABEL = "arduino", "Arduino: sketches from words, compiled for Uno/Nano/Mega, upload after a yes"
-EXAMPLES = ["arduino blink pin 7 every 200 ms", "arduino traffic light on a nano, green 5 seconds", "arduino ultrasonic alarm closer than 20 cm",
-            "upload it to the arduino"]
+EXAMPLES = [
+    "arduino blink pin 7 every 200 ms",
+    "arduino traffic light on a nano, green 5 seconds",
+    "arduino ultrasonic alarm closer than 20 cm",
+    "upload it to the arduino",
+]
 CLI = ROOT / "tools" / "arduino" / "arduino-cli.exe"
 CONFIG = ROOT / "tools" / "arduino" / "arduino-cli.yaml"
 BOARDS = {"uno": "arduino:avr:uno", "nano": "arduino:avr:nano:cpu=atmega328", "mega": "arduino:avr:mega:cpu=atmega2560"}
@@ -24,7 +29,10 @@ PWM = {"uno": {3, 5, 6, 9, 10, 11}, "nano": {3, 5, 6, 9, 10, 11}, "mega": set(ra
 OUTWARD = {"upload"}
 
 SKETCHES = {
-    "blink": ("Blink", {"LED": 13}, """// Blink an LED (made by AI PC)
+    "blink": (
+        "Blink",
+        {"LED": 13},
+        """// Blink an LED (made by AI PC)
 const int LED = {LED};
 const unsigned long WAIT_MS = {ms};
 
@@ -38,8 +46,13 @@ void loop() {
   digitalWrite(LED, LOW);
   delay(WAIT_MS);
 }
-""", 500),
-    "traffic": ("TrafficLight", {"RED": 10, "YELLOW": 9, "GREEN": 8}, """// Traffic light (made by AI PC)
+""",
+        500,
+    ),
+    "traffic": (
+        "TrafficLight",
+        {"RED": 10, "YELLOW": 9, "GREEN": 8},
+        """// Traffic light (made by AI PC)
 const int RED = {RED}, YELLOW = {YELLOW}, GREEN = {GREEN};
 const unsigned long GREEN_MS = {ms}, YELLOW_MS = 2000, RED_MS = {ms};
 
@@ -62,8 +75,13 @@ void loop() {
   show(LOW, LOW, HIGH, GREEN_MS);
   show(LOW, HIGH, LOW, YELLOW_MS);
 }
-""", 5000),
-    "button": ("ButtonLed", {"BUTTON": 2, "LED": 13}, """// A button turns the LED on and off (made by AI PC)
+""",
+        5000,
+    ),
+    "button": (
+        "ButtonLed",
+        {"BUTTON": 2, "LED": 13},
+        """// A button turns the LED on and off (made by AI PC)
 const int BUTTON = {BUTTON}, LED = {LED};
 bool on = false;
 int last = HIGH;
@@ -82,8 +100,13 @@ void loop() {
   }
   last = now;
 }
-""", 0),
-    "knob": ("KnobToLed", {"SENSOR": "A0", "LED": 9}, """// A knob or sensor sets the LED brightness and is printed to Serial (made by AI PC)
+""",
+        0,
+    ),
+    "knob": (
+        "KnobToLed",
+        {"SENSOR": "A0", "LED": 9},
+        """// A knob or sensor sets the LED brightness and is printed to Serial (made by AI PC)
 const int SENSOR = {SENSOR}, LED = {LED};
 
 void setup() {
@@ -97,8 +120,13 @@ void loop() {
   Serial.println(value);
   delay({ms});
 }
-""", 100),
-    "ultrasonic": ("DistanceAlarm", {"TRIG": 9, "ECHO": 10, "ALERT": 13}, """// HC-SR04 distance with an alarm when something is close (made by AI PC)
+""",
+        100,
+    ),
+    "ultrasonic": (
+        "DistanceAlarm",
+        {"TRIG": 9, "ECHO": 10, "ALERT": 13},
+        """// HC-SR04 distance with an alarm when something is close (made by AI PC)
 const int TRIG = {TRIG}, ECHO = {ECHO}, ALERT = {ALERT};
 const float NEAR_CM = {near};
 
@@ -123,8 +151,13 @@ void loop() {
   digitalWrite(ALERT, (us > 0 && cm < NEAR_CM) ? HIGH : LOW);
   delay({ms});
 }
-""", 200),
-    "temperature": ("TemperatureFan", {"SENSOR": "A0", "FAN": 8}, """// LM35 temperature, a fan (through a relay or transistor) on when hot (made by AI PC)
+""",
+        200,
+    ),
+    "temperature": (
+        "TemperatureFan",
+        {"SENSOR": "A0", "FAN": 8},
+        """// LM35 temperature, a fan (through a relay or transistor) on when hot (made by AI PC)
 const int SENSOR = {SENSOR}, FAN = {FAN};
 const float HOT_C = {hot};
 
@@ -141,8 +174,13 @@ void loop() {
   digitalWrite(FAN, c > HOT_C ? HIGH : LOW);
   delay({ms});
 }
-""", 1000),
-    "motion": ("MotionAlarm", {"PIR": 2, "ALARM": 13}, """// PIR motion alarm (made by AI PC)
+""",
+        1000,
+    ),
+    "motion": (
+        "MotionAlarm",
+        {"PIR": 2, "ALARM": 13},
+        """// PIR motion alarm (made by AI PC)
 const int PIR = {PIR}, ALARM = {ALARM};
 
 void setup() {
@@ -157,20 +195,44 @@ void loop() {
   if (moving) Serial.println("Motion!");
   delay({ms});
 }
-""", 100),
+""",
+        100,
+    ),
 }
-KINDS = {"traffic": r"traffic", "ultrasonic": r"ultrasonic|distance|hc-?sr04|parking", "temperature": r"temperature|lm35|\bfan\b",
-         "motion": r"motion|\bpir\b", "button": r"button|switch|push", "knob": r"knob|potentiometer|\bpot\b|analog|light sensor|ldr|dimm", "blink": r"blink|flash|led"}
-WIRING = {"LED": "LED (+) through a 220 ohm resistor; LED (-) to GND", "RED": "red LED through 220 ohm to GND", "YELLOW": "yellow LED through 220 ohm to GND",
-          "GREEN": "green LED through 220 ohm to GND", "BUTTON": "push button to GND", "SENSOR": "sensor/knob middle pin (outer pins to 5V and GND)",
-          "TRIG": "HC-SR04 Trig (Vcc to 5V, GND to GND)", "ECHO": "HC-SR04 Echo", "ALERT": "buzzer or LED (+), (-) to GND", "FAN": "relay/transistor input for the fan",
-          "PIR": "PIR OUT (VCC to 5V, GND to GND)", "ALARM": "buzzer or LED (+), (-) to GND"}
+KINDS = {
+    "traffic": r"traffic",
+    "ultrasonic": r"ultrasonic|distance|hc-?sr04|parking",
+    "temperature": r"temperature|lm35|\bfan\b",
+    "motion": r"motion|\bpir\b",
+    "button": r"button|switch|push",
+    "knob": r"knob|potentiometer|\bpot\b|analog|light sensor|ldr|dimm",
+    "blink": r"blink|flash|led",
+}
+WIRING = {
+    "LED": "LED (+) through a 220 ohm resistor; LED (-) to GND",
+    "RED": "red LED through 220 ohm to GND",
+    "YELLOW": "yellow LED through 220 ohm to GND",
+    "GREEN": "green LED through 220 ohm to GND",
+    "BUTTON": "push button to GND",
+    "SENSOR": "sensor/knob middle pin (outer pins to 5V and GND)",
+    "TRIG": "HC-SR04 Trig (Vcc to 5V, GND to GND)",
+    "ECHO": "HC-SR04 Echo",
+    "ALERT": "buzzer or LED (+), (-) to GND",
+    "FAN": "relay/transistor input for the fan",
+    "PIR": "PIR OUT (VCC to 5V, GND to GND)",
+    "ALARM": "buzzer or LED (+), (-) to GND",
+}
 PWM_ROLES = {"knob": {"LED"}}
 
 
 def cli(*args, timeout=600):
-    return subprocess.run([str(CLI), "--config-file", str(CONFIG), *args], capture_output=True, text=True, timeout=timeout,
-                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    return subprocess.run(
+        [str(CLI), "--config-file", str(CONFIG), *args],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
 
 
 def read(text):
@@ -178,8 +240,20 @@ def read(text):
     kind = next((k for k, p in KINDS.items() if re.search(p, c)), "blink")
     title, pins, _, ms = SKETCHES[kind]
     pins = dict(pins)
-    roles = {"LED": r"led|light", "BUTTON": r"button|switch", "SENSOR": r"sensor|knob|potentiometer|pot|lm35", "TRIG": r"trig", "ECHO": r"echo",
-             "ALERT": r"buzzer|alert|alarm", "ALARM": r"buzzer|alarm|alert", "FAN": r"fan|relay", "PIR": r"pir|motion", "RED": r"red", "YELLOW": r"yellow", "GREEN": r"green"}
+    roles = {
+        "LED": r"led|light",
+        "BUTTON": r"button|switch",
+        "SENSOR": r"sensor|knob|potentiometer|pot|lm35",
+        "TRIG": r"trig",
+        "ECHO": r"echo",
+        "ALERT": r"buzzer|alert|alarm",
+        "ALARM": r"buzzer|alarm|alert",
+        "FAN": r"fan|relay",
+        "PIR": r"pir|motion",
+        "RED": r"red",
+        "YELLOW": r"yellow",
+        "GREEN": r"green",
+    }
     for role in pins:
         m = re.search(r"\b(?:" + roles[role] + r")\w*\s+(?:on\s+|at\s+|to\s+)?pin\s+(A?\d{1,2})\b", c, re.I)
         if m:
@@ -193,8 +267,15 @@ def read(text):
     near = re.search(r"\b(\d+)\s*cm\b", c)
     hot = re.search(r"\b(?:above|over|hotter than|more than)\s+(\d+)|\b(\d+)\s*(?:°\s*)?c\b(?!m)", c)
     board = next((b for b in BOARDS if re.search(rf"\b{b}\b", c)), "uno")
-    return {"kind": kind, "title": title, "pins": pins, "ms": ms, "near": int(near.group(1)) if near else 20,
-            "hot": int(hot.group(1) or hot.group(2)) if hot else 30, "board": board}
+    return {
+        "kind": kind,
+        "title": title,
+        "pins": pins,
+        "ms": ms,
+        "near": int(near.group(1)) if near else 20,
+        "hot": int(hot.group(1) or hot.group(2)) if hot else 30,
+        "board": board,
+    }
 
 
 def sketch(spec):
@@ -220,9 +301,11 @@ def compile_sketch(folder, board):
 
 def check(j, build, name, spec):
     sizes = {s["name"]: s for s in (j.get("builder_result") or {}).get("executable_sections_size") or []}
-    out = [("it compiles", bool(j.get("success"))),
-           ("it fits the board's flash and memory", bool(sizes) and all(s["size"] <= s["max_size"] for s in sizes.values())),
-           ("the .hex for the board is made", (build / f"{name}.ino.hex").exists())]
+    out = [
+        ("it compiles", bool(j.get("success"))),
+        ("it fits the board's flash and memory", bool(sizes) and all(s["size"] <= s["max_size"] for s in sizes.values())),
+        ("the .hex for the board is made", (build / f"{name}.ino.hex").exists()),
+    ]
     if spec:
         pins = list(spec["pins"].values())
         pwm_ok = all(spec["pins"][r] in PWM[spec["board"]] for r in PWM_ROLES.get(spec["kind"], ()))
@@ -232,6 +315,7 @@ def check(j, build, name, spec):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     memo = (ctx.get("memo") or {}).get("arduino")
     if re.search(r"\bupload\b", c) and (re.search(r"\barduino\b", c) or memo):
@@ -281,13 +365,26 @@ def run(op, ctx):
     memo = ctx.setdefault("memo", {})
     if op["op"] == "boards":
         found = boards()
-        return ("Boards on USB: " + "; ".join(f"{a}: {n or 'unknown board (a clone: pick uno/nano/mega)'}" for a, n in found) + ".") if found else \
-            "No board on a USB port right now (plug it in; clones need the CH340 driver)."
+        return (
+            ("Boards on USB: " + "; ".join(f"{a}: {n or 'unknown board (a clone: pick uno/nano/mega)'}" for a, n in found) + ".")
+            if found
+            else "No board on a USB port right now (plug it in; clones need the CH340 driver)."
+        )
     if op["op"] == "upload":
         last = memo.get("arduino")
         if not last or not op.get("port"):
             return preview(op, ctx)
-        r = cli("upload", "-p", op["port"], "--fqbn", BOARDS[last["board"]], "--input-dir", str(Path(last["folder"]) / "build"), last["folder"], timeout=180)
+        r = cli(
+            "upload",
+            "-p",
+            op["port"],
+            "--fqbn",
+            BOARDS[last["board"]],
+            "--input-dir",
+            str(Path(last["folder"]) / "build"),
+            last["folder"],
+            timeout=180,
+        )
         ok = r.returncode == 0
         return f"Uploaded {last['name']} to {op['port']}." if ok else f"Upload failed: {(r.stderr or r.stdout).strip()[-300:]}"
     out = Path(ctx["out"]) / "arduino"
@@ -310,7 +407,14 @@ def run(op, ctx):
     bad = [w for w, ok in checks if not ok]
     memo["arduino"] = {"folder": str(folder), "name": name, "board": board}
     use = f" Uses {sizes['text']['size']:,} of {sizes['text']['max_size']:,} bytes of flash." if "text" in sizes else ""
-    return (f"Arduino sketch {name} for the {board.title()}: {folder / (name + '.ino')}." + use +
-            (" Wiring: " + "; ".join(notes) + "." if notes else "") +
-            (" Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else " NOT right: " + "; ".join(bad) + ". " + (j.get("compiler_err") or "")[-400:]) +
-            " Say 'upload it to the arduino' with the board plugged in; it opens in the Arduino IDE too.")
+    return (
+        f"Arduino sketch {name} for the {board.title()}: {folder / (name + '.ino')}."
+        + use
+        + (" Wiring: " + "; ".join(notes) + "." if notes else "")
+        + (
+            " Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else " NOT right: " + "; ".join(bad) + ". " + (j.get("compiler_err") or "")[-400:]
+        )
+        + " Say 'upload it to the arduino' with the board plugged in; it opens in the Arduino IDE too."
+    )

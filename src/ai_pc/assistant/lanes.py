@@ -4,6 +4,7 @@ passes a message, says whether it waits for a yes, and lists the files it made (
 
   LANES["photo"].open([photo])    lane.say(session, "make it brighter", files)    lane.pending(session)    lane.results(session)
 """
+
 import re
 import shutil
 from pathlib import Path
@@ -14,9 +15,12 @@ from ai_pc.core.config import ROOT
 DELIVER = set(EXT)
 _EXTS = "|".join(sorted({e[1:] for e in DELIVER}, key=len, reverse=True))
 PATHS = re.compile(r"(?:[A-Za-z]:\\|(?<![\w\\/])(?:out|media)[\\/])[^\r\n\"'<>|*?]*?\.(?:" + _EXTS + r")(?![\w])", re.I)
-NEW_DOC = re.compile(r"\b(?:write|make|create|draft|prepare|generate|build|design|type)\b.*\b(?:report|letter|application|assignment|cv|resume|essay|"
-                     r"notice|memo|proposal|quotation|presentation|slides?|deck|spreadsheet|workbook|excel|sheet|document|doc|agenda|minutes|"
-                     r"timetable|marks? ?sheet|budget|brochure|handout)\b", re.I)
+NEW_DOC = re.compile(
+    r"\b(?:write|make|create|draft|prepare|generate|build|design|type)\b.*\b(?:report|letter|application|assignment|cv|resume|essay|"
+    r"notice|memo|proposal|quotation|presentation|slides?|deck|spreadsheet|workbook|excel|sheet|document|doc|agenda|minutes|"
+    r"timetable|marks? ?sheet|budget|brochure|handout)\b",
+    re.I,
+)
 
 
 def files_in(value, base=None, depth=0):
@@ -61,7 +65,7 @@ def dedupe(paths):
 class Lane:
     key = label = blurb = ""
     examples = ()
-    works_on = ()   # kinds the program's work is about: a new file of these kinds starts a new conversation about it
+    works_on = ()  # kinds the program's work is about: a new file of these kinds starts a new conversation about it
     needs_file = False
 
     def __init__(self, chat):
@@ -118,6 +122,7 @@ class Lane:
     def reopen(self, info):
         """The conversation saved under info["id"], when the program can load one (else a new one starts when needed)."""
         import importlib
+
         mod, name = getattr(self, "module", ""), getattr(self, "cls_name", "")
         if not (mod and name and info and info.get("id")):
             return None
@@ -195,6 +200,7 @@ class VideoLane(Lane):
             if not any(kind_of(f) == "video" for f in media) and not any(kind_of(f) == "image" for f in media):
                 return "Which video? Send it (or name it) and say what to do."
             from ai_pc.video.studio import Studio
+
             sess = Studio(planner=self.planner, log=self.progress, export=True).new(message, to_media(media))
             s.draft = (sess.get("map") or {}).get("draft")
             exp = sess.get("export") or {}
@@ -202,12 +208,17 @@ class VideoLane(Lane):
             rep = sess.get("report") or {}
             res = rep.get("results") or []
             ok = sum(1 for r in res if r.get("status") == "pass")
-            return (f"Edited: {s.export}" if s.export else "The edit is planned but the video could not be exported") + \
-                (f" ({ok} of {len(res)} checks passed)" if res else "") + ". Ask for changes, or 'undo'."
+            return (
+                (f"Edited: {s.export}" if s.export else "The edit is planned but the video could not be exported")
+                + (f" ({ok} of {len(res)} checks passed)" if res else "")
+                + ". Ask for changes, or 'undo'."
+            )
         if s.conv is None:
             from ai_pc.video.conversation import Conversation
-            s.conv = Conversation.latest(s.draft, planner=self.planner, log=self.progress, export=True) or \
-                Conversation.start(s.draft, planner=self.planner, log=self.progress, export=True)
+
+            s.conv = Conversation.latest(s.draft, planner=self.planner, log=self.progress, export=True) or Conversation.start(
+                s.draft, planner=self.planner, log=self.progress, export=True
+            )
             s.state = s.conv.state
         extra = [f for f in files if kind_of(f) in ("image", "audio", "video")]
         reply = s.conv.say(message, files=to_media(extra)) if extra else s.conv.say(message)
@@ -235,8 +246,10 @@ class OfficeSession:
 
 class OfficeLane(Lane):
     key, label = "office", "Word, PowerPoint, Excel and PDF"
-    blurb = ("writes Word documents (reports, letters, applications, assignments, CVs), PowerPoint decks and Excel workbooks from words; "
-             "edits an existing .docx/.pptx/.xlsx by conversation; several files together; PDFs packed, compressed, split, watermarked")
+    blurb = (
+        "writes Word documents (reports, letters, applications, assignments, CVs), PowerPoint decks and Excel workbooks from words; "
+        "edits an existing .docx/.pptx/.xlsx by conversation; several files together; PDFs packed, compressed, split, watermarked"
+    )
     examples = ("write a 3 page report on solar energy in Lahore", "make a 10 slide presentation on our sales", "make the title blue")
     works_on = ("document", "slides", "sheet", "pdf")
 
@@ -250,6 +263,7 @@ class OfficeLane(Lane):
         from ai_pc.office.bookchat import BookChat
         from ai_pc.office.deckchat import DeckChat
         from ai_pc.office.docchat import DocChat
+
         cls = {".docx": DocChat, ".pptx": DeckChat, ".xlsx": BookChat, ".xlsm": BookChat}[Path(path).suffix.lower()]
         kw = {"chats_dir": self.chats_dir()} if self.chats_dir() else {}
         return cls.start(path, planner=self.planner, **kw)
@@ -261,7 +275,10 @@ class OfficeLane(Lane):
             return self._new(s, message, files)
         if pdfs or len(office) >= 2:
             from ai_pc.office.projectchat import ProjectChat
-            s.chat = ProjectChat.start(office + pdfs, planner=self.planner, log=self.progress, **({"projects_dir": self.chats_dir()} if self.chats_dir() else {}))
+
+            s.chat = ProjectChat.start(
+                office + pdfs, planner=self.planner, log=self.progress, **({"projects_dir": self.chats_dir()} if self.chats_dir() else {})
+            )
             return s.chat.say(message)
         if office:
             s.chat = self._edit_chat(office[0])
@@ -271,6 +288,7 @@ class OfficeLane(Lane):
     def _new(self, s, message, files):
         """A new Word document, deck or workbook from words (files sent are its material: data, pictures, a report to build from)."""
         from ai_pc.office.studio import DocStudio
+
         sess = DocStudio(planner=self.planner, log=self.progress).new(message, list(files))
         main = sess.get("pptx") or sess.get("xlsx") or sess.get("docx")
         s.made = dedupe([sess.get(k) for k in ("pptx", "xlsx", "docx", "pdf") if sess.get(k) and Path(sess[k]).exists()])
@@ -286,11 +304,13 @@ class OfficeLane(Lane):
 # ---------------------------------------------------------------- the conversations that start the same way
 class SimpleLane(Lane):
     """A program whose conversation starts with (planner, files) and has no single subject file."""
+
     module = cls_name = ""
     takes_files, has_log = True, True
 
     def open(self, files):
         import importlib
+
         cls = getattr(importlib.import_module(self.module, "ai_pc"), self.cls_name)
         kw = {"planner": self.planner}
         if self.chats_dir():
@@ -311,12 +331,14 @@ class SimpleLane(Lane):
 
 class SubjectLane(Lane):
     """A program whose conversation is about one file (a photo, a sound, a video to convert)."""
+
     module = cls_name = ""
     src_kw = "src"
     extra_kw = "files"
 
     def open(self, files):
         import importlib
+
         cls = getattr(importlib.import_module(self.module, "ai_pc"), self.cls_name)
         subject = self.subject(files)
         kw = {"planner": self.planner, self.src_kw: subject[0] if subject else None}
@@ -330,8 +352,10 @@ class SubjectLane(Lane):
 
 class PhotoLane(SubjectLane):
     key, label = "photo", "Photos"
-    blurb = ("edits a photo: fix, brighten, crop, straighten, remove or change the background, passport photos, blur faces, text, watermark, "
-             "filters, sizes for Instagram/WhatsApp; versions and undo")
+    blurb = (
+        "edits a photo: fix, brighten, crop, straighten, remove or change the background, passport photos, blur faces, text, watermark, "
+        "filters, sizes for Instagram/WhatsApp; versions and undo"
+    )
     examples = ("make my photo brighter", "remove the background", "make a passport photo")
     works_on = ("image",)
     needs_file = True
@@ -345,8 +369,10 @@ class PhotoLane(SubjectLane):
 
 class SoundLane(SubjectLane):
     key, label = "sound", "Sound"
-    blurb = ("cleans voice recordings (noise, hum, pauses, ums), loudness for YouTube/podcasts, word-by-word captions on talking videos, "
-             "music under a voice, voice-overs read by Windows voices, transcripts")
+    blurb = (
+        "cleans voice recordings (noise, hum, pauses, ums), loudness for YouTube/podcasts, word-by-word captions on talking videos, "
+        "music under a voice, voice-overs read by Windows voices, transcripts"
+    )
     examples = ("clean up this recording", "add word by word captions", "voice-over: Welcome to Khan Electronics")
     works_on = ("audio", "video")
     module, cls_name = ".sound.soundchat", "SoundChat"
@@ -354,8 +380,10 @@ class SoundLane(SubjectLane):
 
 class ConvertLane(SubjectLane):
     key, label = "convert", "Converter"
-    blurb = ("converts, compresses and fixes videos and sound: smaller files (under N MB), formats, WhatsApp/email ready, trims, GIFs, "
-             "extract the audio, rotate, records the screen")
+    blurb = (
+        "converts, compresses and fixes videos and sound: smaller files (under N MB), formats, WhatsApp/email ready, trims, GIFs, "
+        "extract the audio, rotate, records the screen"
+    )
     examples = ("make it under 10 MB", "will it play on WhatsApp?", "make a gif of 0:05 to 0:08")
     works_on = ("video", "audio")
     module, cls_name = ".convert.convchat", "ConvertChat"
@@ -363,8 +391,10 @@ class ConvertLane(SubjectLane):
 
 class WindowsLane(SimpleLane):
     key, label = "windows", "Windows files and settings"
-    blurb = ("your folders (Downloads, Documents, Desktop, Pictures): find, clean up, sort, move, rename, duplicates, big files; "
-             "wallpaper, dark mode, night light, power, start-up apps; everything undoable")
+    blurb = (
+        "your folders (Downloads, Documents, Desktop, Pictures): find, clean up, sort, move, rename, duplicates, big files; "
+        "wallpaper, dark mode, night light, power, start-up apps; everything undoable"
+    )
     examples = ("clean up my downloads", "find my CV and move it to documents", "turn on dark mode")
     module, cls_name, takes_files = ".windows.winchat", "WinChat", False
 
@@ -385,8 +415,10 @@ class DesignLane(SimpleLane):
 
 class HubLane(SimpleLane):
     key, label = "hub", "Work apps"
-    blurb = ("Slack, Microsoft Teams, Outlook mail and calendar, OneDrive, Gmail, Google Calendar and Drive, Trello, Asana, Notion, Jira, "
-             "HubSpot, Zoom, Telegram, WhatsApp, Figma, Canva: post, send files, read, email, meetings, tasks; anything others see waits for a yes")
+    blurb = (
+        "Slack, Microsoft Teams, Outlook mail and calendar, OneDrive, Gmail, Google Calendar and Drive, Trello, Asana, Notion, Jira, "
+        "HubSpot, Zoom, Telegram, WhatsApp, Figma, Canva: post, send files, read, email, meetings, tasks; anything others see waits for a yes"
+    )
     examples = ("send it to slack #general", "what's new in #general?", "email it to ali@khan.pk", "brief me")
     module, cls_name = ".hub.hubchat", "HubChat"
     has_log = False
@@ -427,7 +459,9 @@ class ThreeLane(SimpleLane):
 
 class AccountsLane(SimpleLane):
     key, label = "accounts", "Accounts and invoices"
-    blurb = "invoices, payments, who owes money, profit, sales tax; PDF invoices; sync to QuickBooks, TallyPrime, Xero, Zoho Books; FBR Digital Invoicing"
+    blurb = (
+        "invoices, payments, who owes money, profit, sales tax; PDF invoices; sync to QuickBooks, TallyPrime, Xero, Zoho Books; FBR Digital Invoicing"
+    )
     examples = ("invoice for Ali Traders: 2 LED TV at 85,000 each, 18% tax", "who owes me money?", "send everything to tally")
     module, cls_name, takes_files = ".accounts.accountschat", "AccountsChat", False
     has_log = False
@@ -441,16 +475,19 @@ class AccountsLane(SimpleLane):
 
 class AppsLane(Lane):
     key, label = "apps", "Programs"
-    blurb = ("88 more programs by name: Photoshop, Illustrator, After Effects, Premiere, Lightroom, GIMP, Krita, RawTherapee, Shotcut, HandBrake, "
-             "Audacity, MuseScore, LMMS, OBS, Blender-free 3D (FreeCAD, OpenSCAD, PrusaSlicer), KiCad, Arduino, MATLAB, R, LaTeX, draw.io, Visio, "
-             "LibreOffice, Calibre, Anki, QGIS, MS Project, Revit, Unity, Godot, Docker, Postman, Jupyter, VS Code, Python, Node, PHP, C++, Go, "
-             "Rust, .NET, Java, Android, Flutter, PostgreSQL, MySQL, MongoDB, Power BI, 7-Zip, Obsidian, AutoHotkey, KeePassXC, Google Docs/Forms, "
-             "GitHub, Spotify, Salesforce, Shopify, WooCommerce, Daraz, WordPress, Odoo, Mailchimp, Brevo, Dropbox, Discord, OCR, PC care, "
-             "diagrams, citations, quizzes, ebooks, printing, maps, notes, backups, contacts, QR codes, music, calendar invites")
+    blurb = (
+        "88 more programs by name: Photoshop, Illustrator, After Effects, Premiere, Lightroom, GIMP, Krita, RawTherapee, Shotcut, HandBrake, "
+        "Audacity, MuseScore, LMMS, OBS, Blender-free 3D (FreeCAD, OpenSCAD, PrusaSlicer), KiCad, Arduino, MATLAB, R, LaTeX, draw.io, Visio, "
+        "LibreOffice, Calibre, Anki, QGIS, MS Project, Revit, Unity, Godot, Docker, Postman, Jupyter, VS Code, Python, Node, PHP, C++, Go, "
+        "Rust, .NET, Java, Android, Flutter, PostgreSQL, MySQL, MongoDB, Power BI, 7-Zip, Obsidian, AutoHotkey, KeePassXC, Google Docs/Forms, "
+        "GitHub, Spotify, Salesforce, Shopify, WooCommerce, Daraz, WordPress, Odoo, Mailchimp, Brevo, Dropbox, Discord, OCR, PC care, "
+        "diagrams, citations, quizzes, ebooks, printing, maps, notes, backups, contacts, QR codes, music, calendar invites"
+    )
     examples = ("gimp make photo.jpg black and white", "7zip pack my reports with password X", "print it")
 
     def open(self, files):
         from ai_pc.apps.appschat import AppsChat
+
         kw = {"files": list(files)}
         if self.chats_dir():
             kw["chats_dir"] = self.chats_dir()
@@ -465,5 +502,19 @@ class AppsLane(Lane):
         return []  # its replies name what it made
 
 
-LANE_CLASSES = [VideoLane, OfficeLane, WindowsLane, PhotoLane, CadLane, SoundLane, DesignLane, HubLane, SocialLane, CodeLane, ConvertLane,
-                ThreeLane, AccountsLane, AppsLane]
+LANE_CLASSES = [
+    VideoLane,
+    OfficeLane,
+    WindowsLane,
+    PhotoLane,
+    CadLane,
+    SoundLane,
+    DesignLane,
+    HubLane,
+    SocialLane,
+    CodeLane,
+    ConvertLane,
+    ThreeLane,
+    AccountsLane,
+    AppsLane,
+]

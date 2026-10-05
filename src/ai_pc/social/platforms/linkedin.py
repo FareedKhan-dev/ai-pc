@@ -8,6 +8,7 @@ What a personal app cannot do on LinkedIn (its rules, not ours): read posts back
 (those need the Community Management API, for registered businesses). So a post whose answer was lost is never sent
 again blindly: it is marked for you to look at your profile, and statistics say so instead of guessing.
 """
+
 import urllib.parse
 from pathlib import Path
 
@@ -25,6 +26,7 @@ class LinkedIn(Platform):
     def token(self):
         self.need("access_token")
         from ai_pc.social import auth
+
         return auth.fresh_token(self) if not self.transport else self.creds["access_token"]
 
     def lapi(self, versioned=True, timeout=60):
@@ -37,6 +39,7 @@ class LinkedIn(Platform):
         u = self.call(self.lapi(False).get, "v2/userinfo")
         if u.get("sub") and self.creds.get("person") != u["sub"] and not self.transport:
             from ai_pc.core import vault
+
             vault.put("linkedin", {"person": u["sub"]})
         self.creds["person"] = u.get("sub")
         return {"who": u.get("name"), "where": f"LinkedIn ({u.get('email')})" if u.get("email") else "LinkedIn", "id": u.get("sub")}
@@ -51,11 +54,14 @@ class LinkedIn(Platform):
 
     # ---------------------------------------------------------------- media
     def _image(self, path):
-        js = self.call(self.lapi().post, "rest/images", params={"action": "initializeUpload"},
-                       json={"initializeUploadRequest": {"owner": self.urn()}})
+        js = self.call(
+            self.lapi().post, "rest/images", params={"action": "initializeUpload"}, json={"initializeUploadRequest": {"owner": self.urn()}}
+        )
         v = js.get("value") or {}
         up = self.api(API, {"Authorization": f"Bearer {self.token()}"}, 300)
-        st, _, content = up.request("PUT", v["uploadUrl"], data=Path(path).read_bytes(), raw=True, headers={"Content-Type": "application/octet-stream"})
+        st, _, content = up.request(
+            "PUT", v["uploadUrl"], data=Path(path).read_bytes(), raw=True, headers={"Content-Type": "application/octet-stream"}
+        )
         if st not in (200, 201):
             raise SocialError("retry" if st >= 500 else "invalid", f"LinkedIn refused the picture upload ({st})")
         return v["image"]
@@ -64,8 +70,12 @@ class LinkedIn(Platform):
         r = job.get("remote") or {}
         size = Path(path).stat().st_size
         if not r.get("video"):
-            js = self.call(self.lapi().post, "rest/videos", params={"action": "initializeUpload"},
-                           json={"initializeUploadRequest": {"owner": self.urn(), "fileSizeBytes": size, "uploadCaptions": False, "uploadThumbnail": False}})
+            js = self.call(
+                self.lapi().post,
+                "rest/videos",
+                params={"action": "initializeUpload"},
+                json={"initializeUploadRequest": {"owner": self.urn(), "fileSizeBytes": size, "uploadCaptions": False, "uploadThumbnail": False}},
+            )
             v = js.get("value") or {}
             parts = [{"url": i["uploadUrl"], "a": int(i["firstByte"]), "b": int(i["lastByte"])} for i in v.get("uploadInstructions") or []]
             self.checkpoint(job, video=v["video"], upload_token=v.get("uploadToken", ""), parts=parts, etags=[])
@@ -85,8 +95,12 @@ class LinkedIn(Platform):
                     etags.append((h or {}).get("ETag") or (h or {}).get("etag"))
                     self.checkpoint(job, etags=etags)
         if not r.get("finalized"):
-            self.call(self.lapi().post, "rest/videos", params={"action": "finalizeUpload"},
-                      json={"finalizeUploadRequest": {"video": r["video"], "uploadToken": r.get("upload_token", ""), "uploadedPartIds": r["etags"]}})
+            self.call(
+                self.lapi().post,
+                "rest/videos",
+                params={"action": "finalizeUpload"},
+                json={"finalizeUploadRequest": {"video": r["video"], "uploadToken": r.get("upload_token", ""), "uploadedPartIds": r["etags"]}},
+            )
             self.checkpoint(job, finalized=True)
         return r["video"]
 
@@ -103,12 +117,16 @@ class LinkedIn(Platform):
     # ---------------------------------------------------------------- publishing
     def publish(self, job, post, prepared, budget=120):
         import time
+
         r = job.get("remote") or {}
         if r.get("post_urn"):
             return {"status": "published", "id": r["post_urn"], "permalink": self._link(r["post_urn"]), "verified": True}
         if r.get("posting"):  # the post was sent but its answer never came: LinkedIn cannot be asked, so it is not sent again
-            raise SocialError("policy", "the LinkedIn post was sent but LinkedIn's answer was lost; look at your profile before posting it again "
-                                        "(personal apps cannot read posts back)")
+            raise SocialError(
+                "policy",
+                "the LinkedIn post was sent but LinkedIn's answer was lost; look at your profile before posting it again "
+                "(personal apps cannot read posts back)",
+            )
         media = prepared.get("media") or []
         kinds = prepared.get("kinds") or []
         content = None
@@ -132,9 +150,14 @@ class LinkedIn(Platform):
                 content = {"media": {"id": imgs[0], "altText": (alts[0] if alts else "")[:4086]}}
             else:
                 content = {"multiImage": {"images": [{"id": u, "altText": (alts[i] if i < len(alts) else "")[:4086]} for i, u in enumerate(imgs)]}}
-        body = {"author": self.urn(), "commentary": prepared.get("text") or "", "visibility": "PUBLIC",
-                "distribution": {"feedDistribution": "MAIN_FEED", "targetEntities": [], "thirdPartyDistributionChannels": []},
-                "lifecycleState": "PUBLISHED", "isReshareDisabledByAuthor": False}
+        body = {
+            "author": self.urn(),
+            "commentary": prepared.get("text") or "",
+            "visibility": "PUBLIC",
+            "distribution": {"feedDistribution": "MAIN_FEED", "targetEntities": [], "thirdPartyDistributionChannels": []},
+            "lifecycleState": "PUBLISHED",
+            "isReshareDisabledByAuthor": False,
+        }
         if content:
             body["content"] = content
         self.checkpoint(job, posting=True)
@@ -145,12 +168,18 @@ class LinkedIn(Platform):
         if st == 201:
             urn = (h or {}).get("x-restli-id") or (h or {}).get("X-RestLi-Id") or (h or {}).get("x-linkedin-id")
             self.checkpoint(job, post_urn=urn, posting=False)
-            return {"status": "published", "id": urn, "permalink": self._link(urn), "verified": bool(urn),
-                    "notes": ["LinkedIn confirmed it (personal apps cannot read posts back)"]}
+            return {
+                "status": "published",
+                "id": urn,
+                "permalink": self._link(urn),
+                "verified": bool(urn),
+                "notes": ["LinkedIn confirmed it (personal apps cannot read posts back)"],
+            }
         self.checkpoint(job, posting=False)  # refused: nothing was posted, so it may be tried again
         import json as _json
 
         from ai_pc.hub.http import HubError
+
         try:
             body_js = _json.loads(out.decode("utf-8"))
         except (ValueError, UnicodeDecodeError, AttributeError):

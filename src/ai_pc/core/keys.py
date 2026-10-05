@@ -6,6 +6,7 @@ A key is looked up in this order:
   3. this PC's encrypted vault             ai-pc keys set NEBIUS_API_KEY   (Windows DPAPI, this Windows user only)
   4. a legacy key file in the project      my_nebius.txt        (git-ignored; prefer 2 or 3)
 """
+
 import os
 
 from ai_pc.core.paths import ROOT
@@ -38,6 +39,7 @@ def dotenv(path=None):
 def from_vault(env_name):
     try:
         from ai_pc.core import vault
+
         return ((vault.get(VAULT_ENTRY) or {}).get(env_name) or "").strip()
     except Exception:  # noqa: BLE001 - no vault on this PC (or not readable by this user): look elsewhere
         return ""

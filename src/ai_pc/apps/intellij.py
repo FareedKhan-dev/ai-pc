@@ -6,6 +6,7 @@ Eclipse and VS Code. Maven's local repository and settings stay in tools/maven/h
 
   "intellij java project called 'Shop'"   'java maven app called Stock'   'intellij build and test C:\\code\\app\\pom.xml'
 """
+
 import os
 import re
 import shutil
@@ -172,12 +173,18 @@ class InventoryTest {{
 def env():
     home = (ROOT / "tools" / "maven" / "home").resolve()
     home.mkdir(parents=True, exist_ok=True)
-    return dict(os.environ, JAVA_HOME=str(JDK.resolve()), PATH=str(JDK.resolve() / "bin") + os.pathsep + os.environ["PATH"],
-                MAVEN_OPTS=f"-Duser.home={home} -Dmaven.repo.local={home / 'repository'}", MAVEN_ARGS="-B")
+    return dict(
+        os.environ,
+        JAVA_HOME=str(JDK.resolve()),
+        PATH=str(JDK.resolve() / "bin") + os.pathsep + os.environ["PATH"],
+        MAVEN_OPTS=f"-Duser.home={home} -Dmaven.repo.local={home / 'repository'}",
+        MAVEN_ARGS="-B",
+    )
 
 
 def mvn(*args, cwd, timeout=1200):
     from ai_pc.core import hidden_desktop
+
     rc, out, err, timed_out = hidden_desktop.run(["cmd", "/c", str(MVN), *map(str, args)], timeout=timeout, cwd=str(cwd), env=env())
     return rc == 0 and not timed_out, out + err
 
@@ -195,7 +202,9 @@ def surefire(folder):
     """(tests, failures + errors, skipped) from Surefire's reports."""
     run = bad = skip = 0
     for f in Path(folder).rglob("surefire-reports/*.txt"):
-        m = re.search(r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+),\s*Skipped:\s*(\d+)", f.read_text(encoding="utf-8", errors="replace"))
+        m = re.search(
+            r"Tests run:\s*(\d+),\s*Failures:\s*(\d+),\s*Errors:\s*(\d+),\s*Skipped:\s*(\d+)", f.read_text(encoding="utf-8", errors="replace")
+        )
         if m:
             run += int(m.group(1))
             bad += int(m.group(2)) + int(m.group(3))
@@ -205,6 +214,7 @@ def surefire(folder):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bintellij\b|\beclipse\b|\bjava\b|\bmaven\b|\bpom\.xml\b", c):
         return None
@@ -219,16 +229,27 @@ def run(op, ctx):
     if not (JDK and MVN):
         return "The JDK and Maven are not in tools/jdk and tools/maven."
     from ai_pc.core import hidden_desktop
+
     if op["op"] == "build":
         folder = Path(op["file"]).resolve().parent
         ok, txt = mvn("-q", "package", cwd=folder)
         errs = compile_errors(txt)
         tests, bad, skip = surefire(folder)
         if not ok:
-            return (f"Maven build of {folder.name} FAILED" + (f" with {len(errs)} compile error(s): " + "; ".join(errs[:8]) if errs else
-                    (f": {bad} of {tests} tests failed" if bad else ": " + txt.strip()[-300:])) + ".")
-        return f"{folder.name} builds with Maven: {tests} tests, {bad} failed, {skip} skipped; jar(s): " + \
-            ", ".join(p.name for p in (folder / "target").glob("*.jar")) + "."
+            return (
+                f"Maven build of {folder.name} FAILED"
+                + (
+                    f" with {len(errs)} compile error(s): " + "; ".join(errs[:8])
+                    if errs
+                    else (f": {bad} of {tests} tests failed" if bad else ": " + txt.strip()[-300:])
+                )
+                + "."
+            )
+        return (
+            f"{folder.name} builds with Maven: {tests} tests, {bad} failed, {skip} skipped; jar(s): "
+            + ", ".join(p.name for p in (folder / "target").glob("*.jar"))
+            + "."
+        )
     name = op["name"]
     pkg = re.sub(r"[^a-z0-9]", "", name.lower()) or "app"
     artifact = re.sub(r"[^a-z0-9-]", "-", name.lower())
@@ -248,8 +269,11 @@ def run(op, ctx):
     errs = compile_errors(txt)
     tests, bad, skip = surefire(out)
     jar = out / "target" / f"{artifact}.jar"
-    checks = [("Maven compiled it with Java 25, no errors", ok and not errs), (f"JUnit 5: {tests - bad} of {tests} tests passed", tests >= 5 and bad == 0),
-              ("the jar was packaged", jar.exists())]
+    checks = [
+        ("Maven compiled it with Java 25, no errors", ok and not errs),
+        (f"JUnit 5: {tests - bad} of {tests} tests passed", tests >= 5 and bad == 0),
+        ("the jar was packaged", jar.exists()),
+    ]
     ran = ""
     if jar.exists():
         rc, o, e, _ = hidden_desktop.run([str(JDK / "bin" / "java.exe"), "-jar", str(jar)], timeout=60, env=env())
@@ -257,6 +281,12 @@ def run(op, ctx):
         checks.append(("java -jar runs it and prints the stock's value (Rs 22,000)", "Total value: Rs 22,000" in o))
     ctx.setdefault("memo", {})["project"] = str(out)  # for VS Code and the other tools
     bad_checks = [w for w, good in checks if not good]
-    return (f"Java project {out} (Maven: pom.xml, com.{pkg}.Inventory, App, JUnit tests; open the folder in IntelliJ IDEA, Eclipse or VS Code). " +
-            (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else "") +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad_checks else "NOT right: " + "; ".join(bad_checks) + ". " + "; ".join(errs[:5])))
+    return (
+        f"Java project {out} (Maven: pom.xml, com.{pkg}.Inventory, App, JUnit tests; open the folder in IntelliJ IDEA, Eclipse or VS Code). "
+        + (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else "")
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad_checks
+            else "NOT right: " + "; ".join(bad_checks) + ". " + "; ".join(errs[:5])
+        )
+    )

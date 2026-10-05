@@ -7,6 +7,7 @@ still the same after compression.
            watermark="DRAFT", server=render.Server())       -> {"path", "pages", "outline", "checks": [...]}
   compress(src, out)   select(src, out, pages)   delete(src, out, pages)   rotate(src, out, pages, 90)   split(src, folder)
 """
+
 import datetime as _dt
 import re
 from pathlib import Path
@@ -35,6 +36,7 @@ def info(path):
                     out.append({"title": str(it.title), "page": r.get_destination_page_number(it) + 1, "depth": depth})
                 except Exception:  # noqa: BLE001
                     out.append({"title": str(getattr(it, "title", "")), "page": None, "depth": depth})
+
     try:
         walk(r.outline)
     except Exception:  # noqa: BLE001
@@ -50,6 +52,7 @@ def texts(path):
 def visible_texts(path):
     """Each page's text that lies inside the page (a mark placed off the page is in the file but nobody sees it)."""
     import pypdfium2 as pdfium
+
     doc = pdfium.PdfDocument(str(path))
     out = []
     for i in range(len(doc)):
@@ -71,6 +74,7 @@ def cover_pdf(folder, title, subtitle=None, lines=(), accent="1F3864", server=No
     from docx.shared import Cm, Pt, RGBColor
 
     from ai_pc.office import docx_build as DB
+
     d = Document()
     sec = d.sections[0]
     sec.page_width, sec.page_height = Cm(21.0), Cm(29.7)
@@ -112,6 +116,7 @@ def _overlay_deck(folder, name, size_pt, pages, server=None):
     from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
     from pptx.oxml.ns import qn
     from pptx.util import Emu, Pt
+
     prs = Presentation()
     prs.slide_width, prs.slide_height = Emu(int(size_pt[0] * 12700)), Emu(int(size_pt[1] * 12700))
     blank = prs.slide_layouts[6]
@@ -154,6 +159,7 @@ def free_zone(pdf_path, k):
     """Where a page number can go on page k (0-based) without touching what is printed there: bottom centre, else bottom
     right, else bottom left, else top right. (zone, x0, x1, y_bottom, y_top) in points from the page's bottom-left."""
     import pypdfium2 as pdfium
+
     doc = pdfium.PdfDocument(str(pdf_path))
     page = doc[k]
     pw, ph = page.get_size()
@@ -163,6 +169,7 @@ def free_zone(pdf_path, k):
 
     def clear(x0, x1, y0, y1):
         return not any(b[0] < x1 and b[2] > x0 and b[1] < y1 and b[3] > y0 for b in boxes)
+
     for name, a, b in ZONES:
         if clear(a * pw, b * pw, band[0][0], band[0][1]):
             return name, a * pw, b * pw, band[0][0], band[0][1], pw, ph
@@ -173,6 +180,7 @@ def free_zone(pdf_path, k):
 
 def _render_small(path, scale=0.12):
     import pypdfium2 as pdfium
+
     doc = pdfium.PdfDocument(str(path))
     return [doc[i].render(scale=scale).to_pil().convert("L") for i in range(len(doc))]
 
@@ -187,7 +195,9 @@ def pack(parts, out, cover=None, numbers=False, watermark=None, server=None, com
     w = PdfWriter()
     bookmarks = []
     if cover:
-        cp = cover_pdf(folder, cover.get("title") or "Report", cover.get("subtitle"), cover.get("lines") or (), cover.get("accent") or "1F3864", server)
+        cp = cover_pdf(
+            folder, cover.get("title") or "Report", cover.get("subtitle"), cover.get("lines") or (), cover.get("accent") or "1F3864", server
+        )
         w.append(str(cp), outline_item=cover.get("title") or "Cover")
         bookmarks.append(cover.get("title") or "Cover")
     first = len(w.pages)
@@ -235,6 +245,7 @@ def pack(parts, out, cover=None, numbers=False, watermark=None, server=None, com
     rep = check_pack(out, bookmarks, first, n_body, numbers, watermark, plain)
     if zones:
         from collections import Counter
+
         rep["number_places"] = dict(Counter(zones))
     return {"path": str(out), **rep}
 
@@ -244,12 +255,19 @@ def check_pack(path, bookmarks, first, n_body, numbers, watermark, plain=None):
     pages = visible_texts(path)
     checks = [{"op": "pages", "ok": inf["pages"] == first + n_body, "what": f"{inf['pages']} pages ({first} cover + {n_body})"}]
     titles = [o["title"] for o in inf["outline"] if o["depth"] == 0]
-    checks.append({"op": "bookmarks", "ok": titles[:len(bookmarks)] == bookmarks, "what": " | ".join(titles[:8])})
+    checks.append({"op": "bookmarks", "ok": titles[: len(bookmarks)] == bookmarks, "what": " | ".join(titles[:8])})
     if numbers:
         miss = [i + 1 for i in range(n_body) if f"Page {i + 1} of {n_body}" not in " ".join((pages[first + i] or "").split())]
-        checks.append({"op": "page numbers", "ok": not miss, "what": f"'Page i of {n_body}' on {n_body - len(miss)}/{n_body} pages" + (f"; missing on {miss[:5]}" if miss else "")})
+        checks.append(
+            {
+                "op": "page numbers",
+                "ok": not miss,
+                "what": f"'Page i of {n_body}' on {n_body - len(miss)}/{n_body} pages" + (f"; missing on {miss[:5]}" if miss else ""),
+            }
+        )
     if watermark and plain is not None:  # a drawn mark has no text to find: the page must look different in its middle
         from PIL import ImageChops, ImageStat
+
         a, b = _render_small(plain), _render_small(path)
         miss = []
         for i, (x, y) in enumerate(zip(a, b)):
@@ -257,7 +275,13 @@ def check_pack(path, bookmarks, first, n_body, numbers, watermark, plain=None):
             box = (int(wd * 0.25), int(ht * 0.3), int(wd * 0.75), int(ht * 0.7))
             if ImageStat.Stat(ImageChops.difference(x.crop(box), y.crop(box))).mean[0] < 0.4:
                 miss.append(i + 1)
-        checks.append({"op": "watermark", "ok": not miss, "what": f"'{watermark}' drawn across {len(b) - len(miss)}/{len(b)} pages" + (f"; not on {miss[:5]}" if miss else "")})
+        checks.append(
+            {
+                "op": "watermark",
+                "ok": not miss,
+                "what": f"'{watermark}' drawn across {len(b) - len(miss)}/{len(b)} pages" + (f"; not on {miss[:5]}" if miss else ""),
+            }
+        )
     return {"pages": inf["pages"], "outline": titles, "kb": inf["kb"], "checks": checks}
 
 
@@ -265,6 +289,7 @@ def compress(src, out, quality=60, max_px=1800):
     """Smaller: images re-encoded (JPEG at `quality`, at most `max_px` on the long side), content streams compressed,
     identical objects shared. Checked: the same pages with the same text."""
     from PIL import Image
+
     before = texts(src)
     w = PdfWriter(clone_from=str(src))
     imgs = 0
@@ -290,9 +315,16 @@ def compress(src, out, quality=60, max_px=1800):
     after = texts(out)
     kb0, kb1 = round(Path(src).stat().st_size / 1024, 1), round(out.stat().st_size / 1024, 1)
     same = len(before) == len(after) and all(" ".join((a or "").split()) == " ".join((b or "").split()) for a, b in zip(before, after))
-    return {"path": str(out), "kb_before": kb0, "kb_after": kb1, "images": imgs,
-            "checks": [{"op": "smaller", "ok": kb1 < kb0, "what": f"{kb0} KB -> {kb1} KB ({imgs} image(s) re-encoded)"},
-                       {"op": "same pages and text", "ok": same, "what": f"{len(after)} pages, text {'unchanged' if same else 'CHANGED'}"}]}
+    return {
+        "path": str(out),
+        "kb_before": kb0,
+        "kb_after": kb1,
+        "images": imgs,
+        "checks": [
+            {"op": "smaller", "ok": kb1 < kb0, "what": f"{kb0} KB -> {kb1} KB ({imgs} image(s) re-encoded)"},
+            {"op": "same pages and text", "ok": same, "what": f"{len(after)} pages, text {'unchanged' if same else 'CHANGED'}"},
+        ],
+    }
 
 
 def parse_pages(spec, n):

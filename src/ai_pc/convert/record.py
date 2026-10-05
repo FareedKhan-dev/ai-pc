@@ -7,6 +7,7 @@ cut off) and turned into an MP4 at the end, then checked.
   path = stop(r)                                        -> the finished MP4
   mics()                                                -> microphone names (DirectShow)
 """
+
 import os
 import re
 import signal
@@ -43,8 +44,11 @@ def start(folder, seconds=None, mic=False, screen=1, fps=30, gpu=True):
             args += ["-f", "dshow", "-i", f"audio={mic_name}"]
     vf = f"{grab},hwmap=derive_device=qsv,format=qsv" if gpu else f"{grab},hwdownload,format=bgra"
     args += ["-filter_complex", f"{vf}[v]", "-map", "[v]"] + (["-map", "0:a"] if mic_name else [])
-    args += (["-c:v", "h264_qsv", "-global_quality", "25", "-look_ahead", "0"] if gpu else ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                                                                                              "-pix_fmt", "yuv420p"])
+    args += (
+        ["-c:v", "h264_qsv", "-global_quality", "25", "-look_ahead", "0"]
+        if gpu
+        else ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p"]
+    )
     args += (["-c:a", "aac", "-b:a", "128k"] if mic_name else []) + ["-t", str(int(seconds) if seconds else 4 * 3600), str(mkv)]
     p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=NO_WINDOW)
     time.sleep(1.5)
@@ -94,8 +98,9 @@ def stop(rec, wait=True):
     if not mkv.exists() or mkv.stat().st_size < 1000:
         raise RecordError("nothing was recorded")
     mp4 = mkv.with_suffix(".mp4")
-    code, _, err = MD.run(["ffmpeg", "-hide_banner", "-y", "-v", "error", "-i", str(mkv), "-map", "0", "-c", "copy", "-movflags", "+faststart", str(mp4)],
-                          timeout=600)
+    code, _, err = MD.run(
+        ["ffmpeg", "-hide_banner", "-y", "-v", "error", "-i", str(mkv), "-map", "0", "-c", "copy", "-movflags", "+faststart", str(mp4)], timeout=600
+    )
     if code or not mp4.exists():
         raise RecordError(f"the recording could not be finished: {err.strip()[-200:]}")
     p = MD.probe(mp4)

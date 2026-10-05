@@ -17,6 +17,7 @@ Things to say: 'fix it', 'brighter', 'warmer', 'more contrast', 'black and white
 'watermark "© Me"', 'sepia instead', 'undo', 'go back to v2', 'compare with the original', 'save it as png'.
 Saved copies leave out the GPS location unless you ask otherwise.
 """
+
 import argparse
 import os
 import sys
@@ -51,9 +52,11 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     from ai_pc.photo.photochat import PhotoChat
+
     planner = None
     if not getattr(a, "offline", True) and a.cmd != "look":
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     if a.cmd == "look":
         c = PhotoChat.start(a.file, chats_dir=ROOT / "out" / "photo" / "looks")
@@ -113,7 +116,12 @@ def main(argv=None):
                 k += 1
             dst.write_bytes(saved.read_bytes())
         ok += good
-        print(f"{'ok ' if good else 'BAD'} {f.name}: " + " | ".join(x.splitlines()[0][:90] for x in replies) + f" -> {dst.name if saved else 'not saved'}", flush=True)
+        print(
+            f"{'ok ' if good else 'BAD'} {f.name}: "
+            + " | ".join(x.splitlines()[0][:90] for x in replies)
+            + f" -> {dst.name if saved else 'not saved'}",
+            flush=True,
+        )
     print(f"\n{ok}/{len(files)} photos done in {time.perf_counter() - t0:.0f} s; copies in {out}")
 
 

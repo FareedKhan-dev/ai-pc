@@ -10,25 +10,58 @@ Text: 'a 3D intro for Khan Electronics in gold', 'make it silver', 'add the tagl
 Mockups: 'a box mockup with box.png', 'put card.png on a business card', 'show site.png on a laptop', 'a mug with logo.png'.
 Models: 'show me chair.glb', 'convert it to stl', 'is it ready for 3D printing?', 'how big is it?'.
 """
+
 import re
 
 from ai_pc.convert.convparse import secs
 
 IMG = r"png|jpg|jpeg|webp"
 MODEL_EXT = r"glb|gltf|obj|fbx|stl|ply|usd|usdz|usda|usdc|blend|3mf"
-VIEWS = [(r"\b(?:3d (?:floor )?plan|floor ?plan in 3d|doll ?house|inside|interior|furnished plan|layout in 3d|cut ?away)\b", "plan3d"),
-         (r"\b(?:top view|from (?:straight )?above|from the top|bird'?s[- ]eye|plan view|overhead)\b", "top"),
-         (r"\b(?:front(?: view| elevation)?|elevation|facade|façade|from the (?:road|street)|outside view|exterior)\b", "front"),
-         (r"\b(?:aerial|drone|from up high|corner view|3/4 view|three[- ]quarter)\b", "aerial"),
-         (r"\b(?:video|walk ?through|turn ?around|turntable|360|fly ?(?:around|over)|go(?:ing)? (?:a)?round|orbit|animation|animated)\b", "orbit")]
-COLOURS = {"white": "plaster_white", "cream": "plaster_cream", "beige": "plaster_cream", "off ?white": "plaster_cream", "grey": "plaster_grey",
-           "gray": "plaster_grey"}
+VIEWS = [
+    (r"\b(?:3d (?:floor )?plan|floor ?plan in 3d|doll ?house|inside|interior|furnished plan|layout in 3d|cut ?away)\b", "plan3d"),
+    (r"\b(?:top view|from (?:straight )?above|from the top|bird'?s[- ]eye|plan view|overhead)\b", "top"),
+    (r"\b(?:front(?: view| elevation)?|elevation|facade|façade|from the (?:road|street)|outside view|exterior)\b", "front"),
+    (r"\b(?:aerial|drone|from up high|corner view|3/4 view|three[- ]quarter)\b", "aerial"),
+    (r"\b(?:video|walk ?through|turn ?around|turntable|360|fly ?(?:around|over)|go(?:ing)? (?:a)?round|orbit|animation|animated)\b", "orbit"),
+]
+COLOURS = {
+    "white": "plaster_white",
+    "cream": "plaster_cream",
+    "beige": "plaster_cream",
+    "off ?white": "plaster_cream",
+    "grey": "plaster_grey",
+    "gray": "plaster_grey",
+}
 ACCENTS = {"brick": "brick_red", "stone": "stone_grey", "wood(?:en)?": "wood_light", "marble": "marble"}
-MATERIALS = ["gold", "silver", "chrome", "copper", "bronze", "glass", "neon", "plastic", "marble", "wood", "rose gold", "black", "white", "red", "blue",
-             "green", "orange", "purple", "pink"]
-MOCKS = [(r"\bbox(?:es)?\b|\bpackag", "box"), (r"\bbusiness cards?\b|\bvisiting cards?\b|\bcards?\b", "card"), (r"\blaptop\b|\bmacbook\b|\bcomputer screen\b", "laptop"),
-         (r"\b(?:phone|mobile|iphone|android|smartphone|app)\b", "phone"), (r"\bmugs?\b|\bcups?\b", "mug"),
-         (r"\bposter\b|\bframe(?:d)?\b|\bon (?:a|the) wall\b|\bcanvas\b|\bpainting\b", "poster")]
+MATERIALS = [
+    "gold",
+    "silver",
+    "chrome",
+    "copper",
+    "bronze",
+    "glass",
+    "neon",
+    "plastic",
+    "marble",
+    "wood",
+    "rose gold",
+    "black",
+    "white",
+    "red",
+    "blue",
+    "green",
+    "orange",
+    "purple",
+    "pink",
+]
+MOCKS = [
+    (r"\bbox(?:es)?\b|\bpackag", "box"),
+    (r"\bbusiness cards?\b|\bvisiting cards?\b|\bcards?\b", "card"),
+    (r"\blaptop\b|\bmacbook\b|\bcomputer screen\b", "laptop"),
+    (r"\b(?:phone|mobile|iphone|android|smartphone|app)\b", "phone"),
+    (r"\bmugs?\b|\bcups?\b", "mug"),
+    (r"\bposter\b|\bframe(?:d)?\b|\bon (?:a|the) wall\b|\bcanvas\b|\bpainting\b", "poster"),
+]
 
 
 def _kind(words):
@@ -36,7 +69,13 @@ def _kind(words):
     found = []
     for rx, k in MOCKS:
         for m in re.finditer(rx, words):
-            found.append((m.start(), k, bool(re.search(r"\b(?:on|onto|as|into|in)\s+(?:a|an|the|my|some|his|her|their)?\s*(?:\w+\s+){0,2}$", words[:m.start()]))))
+            found.append(
+                (
+                    m.start(),
+                    k,
+                    bool(re.search(r"\b(?:on|onto|as|into|in)\s+(?:a|an|the|my|some|his|her|their)?\s*(?:\w+\s+){0,2}$", words[: m.start()])),
+                )
+            )
     if not found:
         return None
     after_on = [f for f in found if f[2]]
@@ -64,18 +103,27 @@ def parse(clause, ctx=None):
 
     def done(ask=None):
         return {"ops": ops, "ask": ask}
+
     # ---------------------------------------------------------------- questions, saving
-    if re.search(r"^\s*(?:how (?:big|large|tall|heavy|many)|what(?:'s| is) (?:its|the) (?:size|height|dimensions)|dimensions\b|"
-                 r"(?:is it|is this|can (?:it|this|i)) (?:be )?(?:ready|ok|fine|printable|print it|go) (?:for|to) (?:3d )?print)", c):
+    if re.search(
+        r"^\s*(?:how (?:big|large|tall|heavy|many)|what(?:'s| is) (?:its|the) (?:size|height|dimensions)|dimensions\b|"
+        r"(?:is it|is this|can (?:it|this|i)) (?:be )?(?:ready|ok|fine|printable|print it|go) (?:for|to) (?:3d )?print)",
+        c,
+    ):
         op("ask", what="print" if "print" in c else "info")
         return done()
     if re.search(r"^\s*(?:what (?:did you|have you) (?:make|made|do)|show (?:me )?the files|where (?:is|are) (?:it|they|the files))\b", c):
         op("ask", what="where")
         return done()
-    m = re.search(r"\b(?:save|export|download)\b(?: (?:it|them|this|the (?:pictures|images|renders|video|files)))?(?: (?:to|on|in|into) "
-                  r"(?:my |the )?(desktop|downloads?|documents?|videos?|pictures?|photos?))?", c) or \
-        re.search(r"\b(?:put|copy|move)\b (?:it|them|this|the (?:pictures|images|renders|video|files)) (?:to|on|in|into) (?:my |the )?"
-                  r"(desktop|downloads?|documents?|videos?|pictures?|photos?)\b", c)
+    m = re.search(
+        r"\b(?:save|export|download)\b(?: (?:it|them|this|the (?:pictures|images|renders|video|files)))?(?: (?:to|on|in|into) "
+        r"(?:my |the )?(desktop|downloads?|documents?|videos?|pictures?|photos?))?",
+        c,
+    ) or re.search(
+        r"\b(?:put|copy|move)\b (?:it|them|this|the (?:pictures|images|renders|video|files)) (?:to|on|in|into) (?:my |the )?"
+        r"(desktop|downloads?|documents?|videos?|pictures?|photos?)\b",
+        c,
+    )
     if m and not re.search(r"\b(?:as|to|into) (?:an? )?\.?(?:" + MODEL_EXT + r")\b", c):
         op("save", where=m.group(1))
         return done()
@@ -90,15 +138,25 @@ def parse(clause, ctx=None):
         op("ask", what="print")
     # ---------------------------------------------------------------- houses
     house_word = re.search(r"\b(?:house|home|plan|bungalow|villa|marla|kanal|elevation|floor ?plan|building)\b", c)
-    if re.search(r"\b(?:my|the|this|that) (?:house )?(?:plan|drawing|design)\b.*\b3d\b|\b3d\b.*\b(?:my|the|this|that) (?:house )?(?:plan|drawing|design)\b", c) and \
-            not re.search(r"\b\d+(?:\.\d+)? (?:marla|kanal)\b|\bx\s*\d", c):
+    if re.search(
+        r"\b(?:my|the|this|that) (?:house )?(?:plan|drawing|design)\b.*\b3d\b|\b3d\b.*\b(?:my|the|this|that) (?:house )?(?:plan|drawing|design)\b", c
+    ) and not re.search(r"\b\d+(?:\.\d+)? (?:marla|kanal)\b|\bx\s*\d", c):
         op("house_from_cad")
-    elif house_word and re.search(r"\b(?:3d|three d|model|render|elevation|view|visual|walkthrough)\b", c) and \
-            re.search(r"\b(?:\d+(?:\.\d+)?\s*(?:marla|kanal)|\d+\s*(?:x|by)\s*\d+|bed ?rooms?|story|storey|double|single|floors?)\b", c):
+    elif (
+        house_word
+        and re.search(r"\b(?:3d|three d|model|render|elevation|view|visual|walkthrough)\b", c)
+        and re.search(r"\b(?:\d+(?:\.\d+)?\s*(?:marla|kanal)|\d+\s*(?:x|by)\s*\d+|bed ?rooms?|story|storey|double|single|floors?)\b", c)
+    ):
         op("house_new", brief=raw)
-    elif subj == "house" and re.search(r"\b(?:bigger|smaller|larger|wider|longer|shorter|add|remove|another|extra|one more|double|single|story|storey|"
-                                       r"bed ?rooms?|kitchen|lounge|drawing|dining|store|stairs?|porch|bath|marla|kanal|plot)\b", c) and \
-            not re.search(r"\b(?:furniture|names?|labels?|walls?|colou?r|cladding|panels?|front|video|view|quality|camera|light)\b", c):
+    elif (
+        subj == "house"
+        and re.search(
+            r"\b(?:bigger|smaller|larger|wider|longer|shorter|add|remove|another|extra|one more|double|single|story|storey|"
+            r"bed ?rooms?|kitchen|lounge|drawing|dining|store|stairs?|porch|bath|marla|kanal|plot)\b",
+            c,
+        )
+        and not re.search(r"\b(?:furniture|names?|labels?|walls?|colou?r|cladding|panels?|front|video|view|quality|camera|light)\b", c)
+    ):
         op("cad", text=raw)
     for rx, v in VIEWS:
         if re.search(rx, c) and (subj == "house" or house_word or any(o["op"].startswith("house") for o in ops)):
@@ -108,7 +166,9 @@ def parse(clause, ctx=None):
     elif re.search(r"\bground floor\b|\bdownstairs\b|\blower floor\b", c):
         op("storey", which="ground")
     for word, key in COLOURS.items():
-        if re.search(rf"\b{word} (?:walls?|paint|plaster|colou?r|house|building|front)\b|\b(?:walls?|paint|house) (?:in |to )?{word}\b|\bmake it {word}\b", c):
+        if re.search(
+            rf"\b{word} (?:walls?|paint|plaster|colou?r|house|building|front)\b|\b(?:walls?|paint|house) (?:in |to )?{word}\b|\bmake it {word}\b", c
+        ):
             op("colors", wall=key, parapet=key)
     for word, key in ACCENTS.items():
         if re.search(rf"\b{word} (?:cladding|panels?|tiles|front|facade|work|finish|accents?)\b", c):
@@ -134,18 +194,26 @@ def parse(clause, ctx=None):
         op("quality", level="high")
     elif re.search(r"\b(?:quick|fast|draft|preview) (?:render|quality|version)?\b", c) and not re.search(r"\bvideo\b", c):
         op("quality", level="normal")
-    if re.search(r"\b(?:4k|bigger|larger|high[- ]?res(?:olution)?|print size|big) (?:image|picture|render|pictures|images)?\b", c) and \
-            not re.search(r"\b(?:room|kitchen|house|plot|text|box)\b", c):
+    if re.search(r"\b(?:4k|bigger|larger|high[- ]?res(?:olution)?|print size|big) (?:image|picture|render|pictures|images)?\b", c) and not re.search(
+        r"\b(?:room|kitchen|house|plot|text|box)\b", c
+    ):
         op("big", on=True)
     m = re.search(r"\b(\d+(?:\.\d+)?)\s*(?:s|sec|secs|seconds?)\b", c)
     if m and re.search(r"\b(?:video|long|intro|animation|clip|turn)\b", c):
         op("seconds", value=float(m.group(1)))
     # ---------------------------------------------------------------- 3D text and logo intros
-    if re.search(r"\b(?:3d |three d )?(?:intro|logo reveal|title|text|logo animation|opener|3d name|3d logo)\b", c) and \
-            re.search(r"\b(?:3d|intro|reveal|animation|opener|animated)\b", c) and not house_word:
+    if (
+        re.search(r"\b(?:3d |three d )?(?:intro|logo reveal|title|text|logo animation|opener|3d name|3d logo)\b", c)
+        and re.search(r"\b(?:3d|intro|reveal|animation|opener|animated)\b", c)
+        and not house_word
+    ):
         tail = r"(?:\s+(?:in|with|on|using|as|that|which|looking|made of)\b.*)?\s*$"
-        mt = re.search(r"[\"“]([^\"”]+)[\"”]", raw) or re.search(r"(?<![\w])'([^']+)'(?![\w])", raw) or \
-            re.search(r"\bfor\s+(.+?)" + tail, raw, re.I) or re.search(r"\b(?:saying|that says|text|name)\s*[:\-]?\s*(.+?)\s*$", raw, re.I)
+        mt = (
+            re.search(r"[\"“]([^\"”]+)[\"”]", raw)
+            or re.search(r"(?<![\w])'([^']+)'(?![\w])", raw)
+            or re.search(r"\bfor\s+(.+?)" + tail, raw, re.I)
+            or re.search(r"\b(?:saying|that says|text|name)\s*[:\-]?\s*(.+?)\s*$", raw, re.I)
+        )
         if mt and mt.group(1).strip():
             op("text_new", text=mt.group(1).strip().strip("\"'"))
     if subj == "text" or any(o["op"] == "text_new" for o in ops):
@@ -155,12 +223,23 @@ def parse(clause, ctx=None):
         mt = re.search(r"\b(?:tagline|subtitle|slogan|second line|under it|below it)\b\s*[:\-]?\s*[\"']?(.+?)[\"']?\s*$", raw, re.I)
         if mt:
             op("text_style", sub=mt.group(1).strip())
-        for word, anim in (("spin", "spin"), ("rotate", "spin"), ("zoom", "dolly"), ("fly", "dolly"), ("rise", "rise"), ("drop", "drop"), ("slide", "rise")):
+        for word, anim in (
+            ("spin", "spin"),
+            ("rotate", "spin"),
+            ("zoom", "dolly"),
+            ("fly", "dolly"),
+            ("rise", "rise"),
+            ("drop", "drop"),
+            ("slide", "rise"),
+        ):
             if re.search(rf"\b{word}", c):
                 op("text_style", anim=anim)
                 break
-        mb = re.search(r"\b(dark|black|white|studio|blue|navy|red|green|purple|gradient)\b (?:background|backdrop|bg)\b|\bon (?:a )?(dark|black|white|blue|navy|red|green|purple) "
-                       r"(?:background|backdrop)?\b", c)
+        mb = re.search(
+            r"\b(dark|black|white|studio|blue|navy|red|green|purple|gradient)\b (?:background|backdrop|bg)\b|\bon (?:a )?(dark|black|white|blue|navy|red|green|purple) "
+            r"(?:background|backdrop)?\b",
+            c,
+        )
         if mb:
             op("text_style", background=mb.group(1) or mb.group(2))
         mt = re.search(r"\b(?:change|make) the (?:text|words|name) (?:to|say|into)\s+[\"']?(.+?)[\"']?\s*$", raw, re.I)
@@ -182,7 +261,9 @@ def parse(clause, ctx=None):
     if m and (subj == "mockup" or any(o["op"] == "mockup" for o in ops)):
         k = {"mm": 0.1, "in": 2.54, "inch": 2.54, "inches": 2.54}.get(m.group(4) or "cm", 1.0)
         op("mockup_size", w=float(m.group(1)) * k, h=float(m.group(2)) * k, d=float(m.group(3)) * k)
-    if re.search(r"\b(?:other|another|different) (?:angle|side|view)\b|\bfrom the (?:side|back|left|right)\b|\brotate (?:it|the camera)\b", c) and subj in ("mockup", "model", "text"):
+    if re.search(
+        r"\b(?:other|another|different) (?:angle|side|view)\b|\bfrom the (?:side|back|left|right)\b|\brotate (?:it|the camera)\b", c
+    ) and subj in ("mockup", "model", "text"):
         op("angle", turn=40 if re.search(r"\bright\b", c) else -40 if re.search(r"\bleft\b", c) else 60)
     if not ops and re.search(r"\b\d{1,2}:\d{2}\b|\bsecs?\b", c):
         return {"ops": [], "ask": None}

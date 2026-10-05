@@ -4,6 +4,7 @@ again on request (a webhook may delete its own messages).
 
   'post to discord: New stock arrived! LED TV 55 now Rs 84,000'   'post photo.jpg to discord saying New arrivals'   'delete the last discord post'
 """
+
 import json
 import re
 from pathlib import Path
@@ -14,9 +15,14 @@ from ai_pc.hub.http import Api, HubError, multipart
 NAME, LABEL = "discord", "Discord: post messages and pictures to a channel (webhook), delete"
 EXAMPLES = ["post to discord: New stock arrived!", "post photo.jpg to discord saying New arrivals", "delete the last discord post"]
 OUTWARD = {"post", "delete"}
-APP = {"label": "Discord", "fields": [("webhook", "The channel's webhook URL", True)],
-       "steps": ["In your Discord server: Server Settings > Integrations > Webhooks > New Webhook; pick the channel; Copy Webhook URL.",
-                 "Run 'ai-pc apps connect discord' and paste it (kept encrypted: anyone with it can post to that channel)."]}
+APP = {
+    "label": "Discord",
+    "fields": [("webhook", "The channel's webhook URL", True)],
+    "steps": [
+        "In your Discord server: Server Settings > Integrations > Webhooks > New Webhook; pick the channel; Copy Webhook URL.",
+        "Run 'ai-pc apps connect discord' and paste it (kept encrypted: anyone with it can post to that channel).",
+    ],
+}
 
 
 class Client:
@@ -28,8 +34,10 @@ class Client:
     def post(self, text, image=None):
         try:
             if image:
-                body, ctype = multipart({"payload_json": json.dumps({"content": text})}, {"files[0]": (Path(image).name, Path(image).read_bytes(), "image/png" if
-                                                                                                       image.lower().endswith(".png") else "image/jpeg")})
+                body, ctype = multipart(
+                    {"payload_json": json.dumps({"content": text})},
+                    {"files[0]": (Path(image).name, Path(image).read_bytes(), "image/png" if image.lower().endswith(".png") else "image/jpeg")},
+                )
                 return self.api.request("POST", self.c["webhook"], params={"wait": "true"}, data=body, headers={"Content-Type": ctype}, retries=0)
             return self.api.request("POST", self.c["webhook"], params={"wait": "true"}, json_body={"content": text}, retries=0)
         except HubError as e:
@@ -60,6 +68,7 @@ def connect(values, transport=None, store=None):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bdiscord\b", c):
         return None
@@ -96,5 +105,8 @@ def run(op, ctx):
     if ctx.get("clients") is None:
         vault.put("discord_last", {"id": m["id"]})
     ok = (m.get("content") or "") == op["text"] and (not op.get("image") or m.get("attachments"))
-    return f"Posted on Discord (message {m['id']}; {'read back: the same text' if ok else 'NOT the same when read back'}" + \
-        (", with the picture" if m.get("attachments") else "") + "). Say 'delete the last discord post' to take it back."
+    return (
+        f"Posted on Discord (message {m['id']}; {'read back: the same text' if ok else 'NOT the same when read back'}"
+        + (", with the picture" if m.get("attachments") else "")
+        + "). Say 'delete the last discord post' to take it back."
+    )

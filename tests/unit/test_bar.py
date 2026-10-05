@@ -1,4 +1,5 @@
 """The command bar's pieces that need no window: the key combo, the clipboard format, replies, colours, the microphone."""
+
 import math
 import struct
 import wave

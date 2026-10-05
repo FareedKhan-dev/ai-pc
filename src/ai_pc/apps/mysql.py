@@ -8,6 +8,7 @@ sums equal the same sums done in Python. MySQL Workbench, DBeaver and HeidiSQL o
 
   'mysql database for a shop with products, customers and orders'   'mysql import sales.xlsx'   'mysql run report.sql'
 """
+
 import os
 import re
 import socket
@@ -78,7 +79,11 @@ def sql_text(v):
 def tsv_rows(text):
     """mysql --batch output as rows (tab-separated, its escapes undone)."""
     un = {"\\t": "\t", "\\n": "\n", "\\\\": "\\", "\\0": "\0"}
-    return [[re.sub(r"\\[tn0\\]", lambda m: un[m.group(0)], c) for c in ln.split("\t")] for ln in text.strip("\r\n").splitlines()] if text.strip() else []
+    return (
+        [[re.sub(r"\\[tn0\\]", lambda m: un[m.group(0)], c) for c in ln.split("\t")] for ln in text.strip("\r\n").splitlines()]
+        if text.strip()
+        else []
+    )
 
 
 class Server:
@@ -86,6 +91,7 @@ class Server:
 
     def __init__(self):
         from ai_pc.core import hidden_desktop
+
         b = bin_dir()
         self.b = b
         h = home()
@@ -100,9 +106,20 @@ class Server:
         s.bind(("127.0.0.1", 0))
         self.port = s.getsockname()[1]
         s.close()
-        self.proc = hidden_desktop.start([str(b / "mysqld.exe"), *common, f"--port={self.port}", "--bind-address=127.0.0.1", "--mysqlx=OFF",
-                                          "--skip-log-bin", "--performance-schema=OFF", f"--tmpdir={h / 'tmp'}", f"--secure-file-priv={h / 'files'}"],
-                                         env=env())
+        self.proc = hidden_desktop.start(
+            [
+                str(b / "mysqld.exe"),
+                *common,
+                f"--port={self.port}",
+                "--bind-address=127.0.0.1",
+                "--mysqlx=OFF",
+                "--skip-log-bin",
+                "--performance-schema=OFF",
+                f"--tmpdir={h / 'tmp'}",
+                f"--secure-file-priv={h / 'files'}",
+            ],
+            env=env(),
+        )
         end = time.monotonic() + 90
         while time.monotonic() < end:
             ok, _ = self.sql("SELECT 1")
@@ -121,6 +138,7 @@ class Server:
         """(ok, output or the error) for SQL text or a .sql file. A file is given on the client's input, where its own commands
         (source, system) stay off as MySQL 9 has them by default: a .sql file can only send SQL to the server."""
         from ai_pc.core import hidden_desktop
+
         args = [str(self.b / "mysql.exe"), *self.client(), "--batch", "--default-character-set=utf8mb4"]
         if db:
             args += ["-D", db]
@@ -131,12 +149,17 @@ class Server:
 
     def dump(self, db, dest):
         from ai_pc.core import hidden_desktop
-        rc, o, e, _ = hidden_desktop.run([str(self.b / "mysqldump.exe"), *self.client(), "--single-transaction", "--routines", f"--result-file={dest}",
-                                          "--databases", db], timeout=300, env=env())
+
+        rc, o, e, _ = hidden_desktop.run(
+            [str(self.b / "mysqldump.exe"), *self.client(), "--single-transaction", "--routines", f"--result-file={dest}", "--databases", db],
+            timeout=300,
+            env=env(),
+        )
         return rc == 0
 
     def close(self):
         from ai_pc.core import hidden_desktop
+
         hidden_desktop.run([str(self.b / "mysqladmin.exe"), *self.client(), "shutdown"], timeout=120, env=env())
         self.proc.wait(60)
         self.proc.stop()
@@ -156,6 +179,7 @@ def column_type(kind, values):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bmy\s?sql\b|\bmysql workbench\b", c):
         return None
@@ -183,59 +207,85 @@ def run(op, ctx):
             ok, res = srv.sql(db="work", file=src)
             rows = tsv_rows(res) if ok else []
             import csv
+
             with (out / (src.stem + "_result.csv")).open("w", encoding="utf-8", newline="") as f:
                 csv.writer(f).writerows(rows)
-            return (f"MySQL ran {src.name}: " + (f"done; result in {src.stem}_result.csv: " + " | ".join(", ".join(r) for r in rows[:4])
-                                                 if ok else "FAILED: " + res.strip()[-400:]))
+            return f"MySQL ran {src.name}: " + (
+                f"done; result in {src.stem}_result.csv: " + " | ".join(", ".join(r) for r in rows[:4]) if ok else "FAILED: " + res.strip()[-400:]
+            )
         if op["op"] == "import":
             from ai_pc.apps import stats
+
             data = stats.sheet(op["file"])
             table = ident(Path(op["file"]).stem)
             cols = {}
             for k, vals in data.items():
                 kind = infer([None if v is None else str(v) for v in vals])
-                cols[ident(k)] = (k, kind, column_type(kind, [None if v is None else str(v).replace(",", "") if kind in ("bigint", "numeric") else v
-                                                             for v in vals]))
+                cols[ident(k)] = (
+                    k,
+                    kind,
+                    column_type(kind, [None if v is None else str(v).replace(",", "") if kind in ("bigint", "numeric") else v for v in vals]),
+                )
             n = len(next(iter(data.values()), []))
 
             def value(k, kind, i):
                 v = data[k][i]
                 return sql_text(None if v is None else str(v).replace(",", "") if kind in ("bigint", "numeric") else v)
 
-            ddl = (f"CREATE DATABASE IF NOT EXISTS imports;\nUSE imports;\nDROP TABLE IF EXISTS `{table}`;\nCREATE TABLE `{table}` (id INT AUTO_INCREMENT PRIMARY KEY, "
-                   + ", ".join(f"`{c}` {t}" for c, (_, _, t) in cols.items()) + ");")
+            ddl = (
+                f"CREATE DATABASE IF NOT EXISTS imports;\nUSE imports;\nDROP TABLE IF EXISTS `{table}`;\nCREATE TABLE `{table}` (id INT AUTO_INCREMENT PRIMARY KEY, "
+                + ", ".join(f"`{c}` {t}" for c, (_, _, t) in cols.items())
+                + ");"
+            )
             values = ",\n".join("(" + ", ".join(value(k, kind, i) for k, kind, _ in cols.values()) + ")" for i in range(n))
             script = out / f"import_{table}.sql"
-            script.write_text(ddl + "\n" + (f"INSERT INTO `{table}` ({', '.join(f'`{c}`' for c in cols)}) VALUES\n{values};\n" if n else ""), encoding="utf-8")
+            script.write_text(
+                ddl + "\n" + (f"INSERT INTO `{table}` ({', '.join(f'`{c}`' for c in cols)}) VALUES\n{values};\n" if n else ""), encoding="utf-8"
+            )
             ok, err = srv.sql(file=script)
             okc, cnt = srv.sql(f"SELECT count(*) FROM `{table}`", db="imports")
             got = int(tsv_rows(cnt)[1][0]) if okc and len(tsv_rows(cnt)) > 1 else -1
-            okt, types = srv.sql("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'imports' "
-                                 f"AND table_name = '{table}' ORDER BY ordinal_position")
+            okt, types = srv.sql(
+                "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'imports' "
+                f"AND table_name = '{table}' ORDER BY ordinal_position"
+            )
             srv.dump("imports", out / "imports_backup.sql")
             kinds = ", ".join(f"{r[0]} {r[1]}" for r in tsv_rows(types)[1:])
-            return (f"MySQL table {table} made from {Path(op['file']).name} ({kinds}); script {script.name}, backup imports_backup.sql. " +
-                    (f"Checked: all {n} rows are in it (the database counts {got})." if ok and got == n else f"NOT right: {got} of {n} rows. {err.strip()[-300:]}"))
+            return f"MySQL table {table} made from {Path(op['file']).name} ({kinds}); script {script.name}, backup imports_backup.sql. " + (
+                f"Checked: all {n} rows are in it (the database counts {got})."
+                if ok and got == n
+                else f"NOT right: {got} of {n} rows. {err.strip()[-300:]}"
+            )
         srv.sql("DROP DATABASE IF EXISTS shop; CREATE DATABASE shop")
         schema = out / "shop_schema.sql"
         schema.write_text(SHOP.strip() + "\n", encoding="utf-8")
         ok_s, err_s = srv.sql(db="shop", file=schema)
-        data = ["INSERT INTO customers (name, phone, city) VALUES " + ", ".join(f"({sql_text(n)}, {sql_text(p)}, {sql_text(c)})" for n, p, c in SAMPLE_CUSTOMERS) + ";",
-                "INSERT INTO products (name, price, stock) VALUES " + ", ".join(f"({sql_text(n)}, {p}, {s})" for n, p, s in SAMPLE_PRODUCTS) + ";"]
+        data = [
+            "INSERT INTO customers (name, phone, city) VALUES "
+            + ", ".join(f"({sql_text(n)}, {sql_text(p)}, {sql_text(c)})" for n, p, c in SAMPLE_CUSTOMERS)
+            + ";",
+            "INSERT INTO products (name, price, stock) VALUES " + ", ".join(f"({sql_text(n)}, {p}, {s})" for n, p, s in SAMPLE_PRODUCTS) + ";",
+        ]
         for k, (cust, status, items) in enumerate(SAMPLE_ORDERS, 1):
             data.append(f"INSERT INTO orders (customer_id, status) VALUES ({cust}, '{status}');")
-            data += [f"INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ({k}, {pid}, {q}, {SAMPLE_PRODUCTS[pid - 1][1]});" for pid, q in items]
+            data += [
+                f"INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ({k}, {pid}, {q}, {SAMPLE_PRODUCTS[pid - 1][1]});"
+                for pid, q in items
+            ]
         sample = out / "shop_sample_data.sql"
         sample.write_text("\n".join(data) + "\n", encoding="utf-8")
         ok_d, err_d = srv.sql(db="shop", file=sample)
         ok_t, tabs = srv.sql("SELECT table_name FROM information_schema.tables WHERE table_schema = 'shop' ORDER BY 1")
-        ok_f, fks = srv.sql("SELECT count(*) FROM information_schema.table_constraints WHERE constraint_schema = 'shop' AND constraint_type = 'FOREIGN KEY'")
+        ok_f, fks = srv.sql(
+            "SELECT count(*) FROM information_schema.table_constraints WHERE constraint_schema = 'shop' AND constraint_type = 'FOREIGN KEY'"
+        )
         bad_fk, why_fk = srv.sql("INSERT INTO orders (customer_id) VALUES (999)", db="shop")
         bad_price, why_price = srv.sql("INSERT INTO products (name, price) VALUES ('Broken', -5)", db="shop")
         bad_status, why_status = srv.sql("INSERT INTO orders (customer_id, status) VALUES (1, 'lost')", db="shop")
         ok_r, rep = srv.sql(REPORT, db="shop")
         rep_rows = tsv_rows(rep) if ok_r else []
         import csv
+
         with (out / "shop_report.csv").open("w", encoding="utf-8", newline="") as f:
             csv.writer(f).writerows(rep_rows)
         srv.dump("shop", out / "shop_backup.sql")
@@ -248,16 +298,25 @@ def run(op, ctx):
         names = [r[0] for r in tsv_rows(tabs)[1:]]
         fk_count = int(tsv_rows(fks)[1][0]) if ok_f and len(tsv_rows(fks)) > 1 else -1
         backup = out / "shop_backup.sql"
-        checks = [("the four tables were made with their keys", ok_s and ok_d and names == ["customers", "order_items", "orders", "products"] and fk_count == 3),
-                  ("the database refuses an order for a customer that does not exist (foreign key)", not bad_fk and "foreign key" in why_fk.lower()),
-                  ("the database refuses a negative price (check)", not bad_price and "check constraint" in why_price.lower()),
-                  ("the database refuses an order status that is not one of new/paid/shipped/cancelled", not bad_status),
-                  ("the sales report's totals equal the same sums done in Python (" + ", ".join(f"{k} Rs {v:,.0f}" for k, v in want.items()) + ")",
-                   ok_r and got == {k: float(v) for k, v in want.items()}),
-                  ("a mysqldump backup was made", backup.exists() and "CREATE TABLE `orders`" in backup.read_text(encoding="utf-8"))]
+        checks = [
+            (
+                "the four tables were made with their keys",
+                ok_s and ok_d and names == ["customers", "order_items", "orders", "products"] and fk_count == 3,
+            ),
+            ("the database refuses an order for a customer that does not exist (foreign key)", not bad_fk and "foreign key" in why_fk.lower()),
+            ("the database refuses a negative price (check)", not bad_price and "check constraint" in why_price.lower()),
+            ("the database refuses an order status that is not one of new/paid/shipped/cancelled", not bad_status),
+            (
+                "the sales report's totals equal the same sums done in Python (" + ", ".join(f"{k} Rs {v:,.0f}" for k, v in want.items()) + ")",
+                ok_r and got == {k: float(v) for k, v in want.items()},
+            ),
+            ("a mysqldump backup was made", backup.exists() and "CREATE TABLE `orders`" in backup.read_text(encoding="utf-8")),
+        ]
         bad = [w for w, good in checks if not good]
-        return (f"MySQL 9.7 database 'shop' (customers, products, orders, order_items) on a local server: schema {schema.name}, sample data {sample.name}, "
-                "report shop_report.csv, backup shop_backup.sql (restore with mysql or MySQL Workbench's Data Import). " +
-                ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + (err_s or err_d)[-300:]))
+        return (
+            f"MySQL 9.7 database 'shop' (customers, products, orders, order_items) on a local server: schema {schema.name}, sample data {sample.name}, "
+            "report shop_report.csv, backup shop_backup.sql (restore with mysql or MySQL Workbench's Data Import). "
+            + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + (err_s or err_d)[-300:])
+        )
     finally:
         srv.close()

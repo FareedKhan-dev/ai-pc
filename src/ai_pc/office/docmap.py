@@ -16,6 +16,7 @@ Target descriptors (the parser and the model both write these):
   {"kind": "paragraphs", "contains": "text"}     {"kind": "table", "n": 1 | "which": "last" | "all"}
   {"kind": "list", "n": 1 | "which": "last"}     {"kind": "items", "k": [indexes]}
 """
+
 import copy
 import re
 
@@ -60,7 +61,7 @@ def paragraph_md(p):
         if not core or not (b or i):
             out.append(t)
             continue
-        lead, trail = t[:len(t) - len(t.lstrip())], t[len(t.rstrip()):]
+        lead, trail = t[: len(t) - len(t.lstrip())], t[len(t.rstrip()) :]
         mark = "**" if b and not i else "*" if i and not b else "***"
         out.append(f"{lead}{mark}{core}{mark}{trail}")
     s = "".join(out)
@@ -71,6 +72,7 @@ def set_paragraph_md(p, md, keep_base=True):
     """Replace the paragraph's text with `md` (marks become bold / italic runs). The paragraph's style, its properties
     and the first text run's look (font, size, colour) stay; fields, bookmarks and drawings in it are removed."""
     from ai_pc.office.docplan import runs as md_runs
+
     base = None
     for r in p.runs:
         if r.text.strip():
@@ -122,10 +124,21 @@ def docx_map(src):
         if isinstance(el, Paragraph):
             lvl = heading_level(el)
             name = el.style.name if el.style is not None else ""
-            items.append({"k": k, "kind": "p", "style": name, "level": lvl, "text": el.text, "md": paragraph_md(el), "list": is_list(el),
-                          "drawing": bool(el._p.findall(".//" + qn("w:drawing"))), "chart": "drawingml/2006/chart" in el._p.xml if el._p.findall(".//" + qn("w:drawing")) else False,
-                          "page_break": any(br.get(qn("w:type")) == "page" for br in el._p.iter(qn("w:br"))) or el.paragraph_format.page_break_before,
-                          "toc": "TOC" in _fields(el._p) or name.startswith("TOC ") or name.lower().startswith("toc ")})
+            items.append(
+                {
+                    "k": k,
+                    "kind": "p",
+                    "style": name,
+                    "level": lvl,
+                    "text": el.text,
+                    "md": paragraph_md(el),
+                    "list": is_list(el),
+                    "drawing": bool(el._p.findall(".//" + qn("w:drawing"))),
+                    "chart": "drawingml/2006/chart" in el._p.xml if el._p.findall(".//" + qn("w:drawing")) else False,
+                    "page_break": any(br.get(qn("w:type")) == "page" for br in el._p.iter(qn("w:br"))) or el.paragraph_format.page_break_before,
+                    "toc": "TOC" in _fields(el._p) or name.startswith("TOC ") or name.lower().startswith("toc "),
+                }
+            )
         else:
             rows = [[c.text.strip() for c in r.cells] for r in el.rows]
             texts = [x for r in rows for x in r]
@@ -135,8 +148,9 @@ def docx_map(src):
                 continue
             t_n += 1
             tables.append({"k": k, "t": t_n, "rows": len(rows), "cols": ncols, "header": rows[0] if rows else [], "data": rows[:60]})
-            items.append({"k": k, "kind": "table", "t": t_n, "text": " | ".join(texts)[:400], "rows": len(rows), "cols": ncols,
-                          "header": tables[-1]["header"]})
+            items.append(
+                {"k": k, "kind": "table", "t": t_n, "text": " | ".join(texts)[:400], "rows": len(rows), "cols": ncols, "header": tables[-1]["header"]}
+            )
     _visual_headings(doc, items, els)
     heads = [it for it in items if it["kind"] == "p" and it.get("level")]
     sections = []
@@ -150,19 +164,36 @@ def docx_map(src):
     foot_fields = " ".join(_fields(p._p) for p in sec.footer.paragraphs) + " " + " ".join(_fields(p._p) for p in sec.header.paragraphs)
     normal = doc.styles["Normal"]
     words = sum(len(it["text"].split()) for it in items if it["kind"] == "p") + sum(len(t_["texts"]) if "texts" in t_ else 0 for t_ in tables)
-    return {"items": items, "headings": heads, "sections": sections, "tables": tables,
-            "title": title["text"].strip() if title else (heads[0]["text"].strip() if heads else next((it["text"].strip() for it in items if it["kind"] == "p" and it["text"].strip()), "")),
-            "title_k": title["k"] if title else None,
-            "page": {"width_cm": round(sec.page_width.cm, 2) if sec.page_width else None, "height_cm": round(sec.page_height.cm, 2) if sec.page_height else None,
-                     "orientation": "landscape" if sec.page_width and sec.page_height and sec.page_width > sec.page_height else "portrait",
-                     "margins_cm": [round(x.cm, 2) if x is not None else None for x in (sec.top_margin, sec.right_margin, sec.bottom_margin, sec.left_margin)],
-                     "columns": _columns(sec)},
-            "header": head_txt, "footer": foot_txt, "page_numbers": "PAGE" in foot_fields.upper(),
-            "toc": any(it.get("toc") for it in items),
-            "fonts": {"body": _style_font(normal), "body_size": normal.font.size.pt if normal.font.size else None},
-            "stats": {"paragraphs": sum(1 for it in items if it["kind"] == "p" and it["text"].strip()), "words": words, "tables": len(tables),
-                      "headings": len(heads), "images": sum(1 for it in items if it.get("drawing") and not it.get("chart")),
-                      "charts": sum(1 for it in items if it.get("chart"))}}
+    return {
+        "items": items,
+        "headings": heads,
+        "sections": sections,
+        "tables": tables,
+        "title": title["text"].strip()
+        if title
+        else (heads[0]["text"].strip() if heads else next((it["text"].strip() for it in items if it["kind"] == "p" and it["text"].strip()), "")),
+        "title_k": title["k"] if title else None,
+        "page": {
+            "width_cm": round(sec.page_width.cm, 2) if sec.page_width else None,
+            "height_cm": round(sec.page_height.cm, 2) if sec.page_height else None,
+            "orientation": "landscape" if sec.page_width and sec.page_height and sec.page_width > sec.page_height else "portrait",
+            "margins_cm": [round(x.cm, 2) if x is not None else None for x in (sec.top_margin, sec.right_margin, sec.bottom_margin, sec.left_margin)],
+            "columns": _columns(sec),
+        },
+        "header": head_txt,
+        "footer": foot_txt,
+        "page_numbers": "PAGE" in foot_fields.upper(),
+        "toc": any(it.get("toc") for it in items),
+        "fonts": {"body": _style_font(normal), "body_size": normal.font.size.pt if normal.font.size else None},
+        "stats": {
+            "paragraphs": sum(1 for it in items if it["kind"] == "p" and it["text"].strip()),
+            "words": words,
+            "tables": len(tables),
+            "headings": len(heads),
+            "images": sum(1 for it in items if it.get("drawing") and not it.get("chart")),
+            "charts": sum(1 for it in items if it.get("chart")),
+        },
+    }
 
 
 def _visual_headings(doc, items, els):
@@ -187,7 +218,7 @@ def _visual_headings(doc, items, els):
         if bold or size >= base + 1.5:
             cands.append((it, size))
     for k, (it, size) in enumerate(cands):
-        nxt = next((x for x in items[it["k"] + 1:] if x["kind"] != "p" or x["text"].strip()), None)
+        nxt = next((x for x in items[it["k"] + 1 :] if x["kind"] != "p" or x["text"].strip()), None)
         if nxt is None or (nxt["kind"] == "p" and nxt["k"] in {c[0]["k"] for c in cands}) and len(cands) > 1 and k == len(cands) - 1:
             continue
         it["level"] = 1 if size >= max(s for _, s in cands) - 0.5 else 2
@@ -206,9 +237,11 @@ def _theme_font(style, which):
     """A theme font ('minorHAnsi' -> the theme's body font) from the document's theme part."""
     try:
         from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
         doc_part = style.part.package.main_document_part
         theme = doc_part.part_related_by(RT.THEME)
         from lxml import etree
+
         root = etree.fromstring(theme.blob)
         ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
         kind = "a:majorFont" if str(which).startswith("major") else "a:minorFont"
@@ -290,8 +323,15 @@ def find(m, t):
     t = t or {"kind": "all"}
     kind = t.get("kind", "all")
     items = m["items"]
-    body = [it["k"] for it in items if it["kind"] == "p" and not it.get("level") and it["style"] not in ("Title", "Subtitle", "Caption")
-            and it["text"].strip() and not it.get("toc")]
+    body = [
+        it["k"]
+        for it in items
+        if it["kind"] == "p"
+        and not it.get("level")
+        and it["style"] not in ("Title", "Subtitle", "Caption")
+        and it["text"].strip()
+        and not it.get("toc")
+    ]
     if kind == "all":
         return [it["k"] for it in items]
     if kind == "body":
@@ -388,8 +428,14 @@ def describe_target(m, t):
         return "every table" if t.get("which") == "all" else f"table {t.get('n') or t.get('which') or 1}"
     if kind == "headings":
         return f"the level-{t['level']} headings" if t.get("level") else "the headings"
-    return {"all": "the whole document", "body": "the body text", "title": "the title", "paragraphs": f"paragraphs with '{t.get('contains')}'",
-            "list": "the list", "items": "those parts"}.get(kind, kind)
+    return {
+        "all": "the whole document",
+        "body": "the body text",
+        "title": "the title",
+        "paragraphs": f"paragraphs with '{t.get('contains')}'",
+        "list": "the list",
+        "items": "those parts",
+    }.get(kind, kind)
 
 
 def _ordinal(n):
@@ -402,14 +448,20 @@ def _ordinal(n):
 
 def outline_text(m, limit=60):
     """The document in a few lines, for the model: title, sections with their paragraph counts, tables."""
-    lines = [f"TITLE: {m['title'][:100]}", f"PAGE: {m['page']['orientation']}, margins {m['page']['margins_cm']} cm, columns {m['page']['columns']}",
-             f"BODY FONT: {m['fonts']['body']} {m['fonts']['body_size']} pt; page numbers: {m['page_numbers']}; contents page: {m['toc']}; "
-             f"header: '{m['header'][:60]}'; footer: '{m['footer'][:60]}'",
-             f"STATS: {m['stats']}", "SECTIONS:"]
+    lines = [
+        f"TITLE: {m['title'][:100]}",
+        f"PAGE: {m['page']['orientation']}, margins {m['page']['margins_cm']} cm, columns {m['page']['columns']}",
+        f"BODY FONT: {m['fonts']['body']} {m['fonts']['body_size']} pt; page numbers: {m['page_numbers']}; contents page: {m['toc']}; "
+        f"header: '{m['header'][:60]}'; footer: '{m['footer'][:60]}'",
+        f"STATS: {m['stats']}",
+        "SECTIONS:",
+    ]
     for s in m["sections"][:limit]:
-        n_par = sum(1 for it in m["items"][s["h"] + 1:s["end"]] if it["kind"] == "p" and it["text"].strip() and not it.get("level"))
-        n_tab = sum(1 for it in m["items"][s["h"] + 1:s["end"]] if it["kind"] == "table")
-        lines.append(f"  {'  ' * (s['level'] - 1)}- [{s['level']}] {s['title'][:80]} ({n_par} paragraphs" + (f", {n_tab} table(s)" if n_tab else "") + ")")
+        n_par = sum(1 for it in m["items"][s["h"] + 1 : s["end"]] if it["kind"] == "p" and it["text"].strip() and not it.get("level"))
+        n_tab = sum(1 for it in m["items"][s["h"] + 1 : s["end"]] if it["kind"] == "table")
+        lines.append(
+            f"  {'  ' * (s['level'] - 1)}- [{s['level']}] {s['title'][:80]} ({n_par} paragraphs" + (f", {n_tab} table(s)" if n_tab else "") + ")"
+        )
     for tb in m["tables"][:10]:
         lines.append(f"TABLE {tb['t']}: {tb['rows']} rows x {tb['cols']} cols; header {tb['header'][:8]}")
     return "\n".join(lines)

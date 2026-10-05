@@ -1,4 +1,5 @@
 """Every module of the package imports (a smoke test for missing dependencies and broken imports)."""
+
 import importlib
 import pkgutil
 

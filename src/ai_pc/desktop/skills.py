@@ -3,6 +3,7 @@
 Steps use semantic locators (automation id / role / name), not pixel positions, so they survive window moves and
 re-layouts. Replay needs no language-model calls.
 """
+
 import copy
 import hashlib
 import json
@@ -139,10 +140,20 @@ def compile_skill(goal, steps, meta=None, answer_loc=None, app=None, answer=None
     else:
         final_steps, final_intent, params = copy.deepcopy(steps), goal, []
     suffix = "-" + hashlib.md5("|".join(pre_struct).encode()).hexdigest()[:6] if pre_struct else ""
-    return {"name": slug(final_intent) + suffix, "intent": final_intent, "params": params, "app": app or {}, "steps": final_steps,
-            "pre_struct": pre_struct or [], "param_kinds": {k: _kind(declared[k]) for k in params},
-            "final": {"read": answer_loc} if answer_loc else {}, "example_answer": answer, "version": 1,
-            "created": time.strftime("%Y-%m-%d %H:%M:%S"), "stats": {"runs": 0, "ok": 0, "fails_in_row": 0, "ms": []}}
+    return {
+        "name": slug(final_intent) + suffix,
+        "intent": final_intent,
+        "params": params,
+        "app": app or {},
+        "steps": final_steps,
+        "pre_struct": pre_struct or [],
+        "param_kinds": {k: _kind(declared[k]) for k in params},
+        "final": {"read": answer_loc} if answer_loc else {},
+        "example_answer": answer,
+        "version": 1,
+        "created": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "stats": {"runs": 0, "ok": 0, "fails_in_row": 0, "ms": []},
+    }
 
 
 def fill(step, params):

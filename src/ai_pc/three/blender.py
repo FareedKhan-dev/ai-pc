@@ -4,6 +4,7 @@ A scene script gets a JSON spec and writes a JSON result; its PROGRESS lines are
 
   r = run("house_scene.py", spec, folder, log=print)     -> the script's result (raises BlenderError with the reason)
 """
+
 import json
 import re
 import subprocess

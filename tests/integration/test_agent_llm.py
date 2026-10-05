@@ -1,7 +1,8 @@
 """Real-model end-to-end test (Nebius): the agent learns tasks on Calculator by itself, then replays them as reflexes.
 
-  python tests/integration/test_agent_llm.py [easy] [unknown] [replay] [keep]
+python tests/integration/test_agent_llm.py [easy] [unknown] [replay] [keep]
 """
+
 import shutil
 import sys
 import time
@@ -35,18 +36,20 @@ def close_calc():
 
 
 def agent(verbose=True):
-    return Agent(planner=ChatPlanner(), grounder=Grounder(autostart=False), confirm=Confirmer("deny"), dry_run=False,
-                 store=STORE, verbose=verbose)
+    return Agent(planner=ChatPlanner(), grounder=Grounder(autostart=False), confirm=Confirmer("deny"), dry_run=False, store=STORE, verbose=verbose)
 
 
 def show(label, r):
-    print(f"{NL}>>> {label}: ok={r.ok} lane={r.lane} answer={r.answer!r}{NL}    total {r.ms} ms | llm_calls {r.llm_calls} | steps {r.steps} | {r.timings}"
-          + (f"{NL}    error: {r.error}" if r.error else ""))
+    print(
+        f"{NL}>>> {label}: ok={r.ok} lane={r.lane} answer={r.answer!r}{NL}    total {r.ms} ms | llm_calls {r.llm_calls} | steps {r.steps} | {r.timings}"
+        + (f"{NL}    error: {r.error}" if r.error else "")
+    )
 
 
 def calc_in_mode(mode):
     """Open Calculator (if needed) and put it in Standard (Alt+1) or Scientific (Alt+2) mode, so every run starts from a known state."""
     from ai_pc.desktop import uia
+
     h = apps.find_window(title_substr="Calculator", exclude=("code.exe",))
     if not h:
         h, _ = apps.launch("calculator")
@@ -111,12 +114,18 @@ def t_trials(n=3):
             calc_in_mode("standard")
             rep = agent(verbose=False).run(UNKNOWN, app="Calculator")
         rows.append((r, learned, rep))
-        print(f"  trial {i + 1}: learn ok={r.ok} answer={str(r.answer)[:40]!r} {r.ms} ms, {r.llm_calls} model calls, {r.steps} steps"
-              f" | skill learned={learned}" + (f" | replay: lane={rep.lane} ok={rep.ok} answer={rep.answer!r} {rep.ms} ms" if rep else "")
-              + (f" | error={r.error}" if r.error else ""), flush=True)
+        print(
+            f"  trial {i + 1}: learn ok={r.ok} answer={str(r.answer)[:40]!r} {r.ms} ms, {r.llm_calls} model calls, {r.steps} steps"
+            f" | skill learned={learned}"
+            + (f" | replay: lane={rep.lane} ok={rep.ok} answer={rep.answer!r} {rep.ms} ms" if rep else "")
+            + (f" | error={r.error}" if r.error else ""),
+            flush=True,
+        )
     ok = sum(1 for r, _, _ in rows if r.ok and "12" in str(r.answer))
-    print(f"{NL}  SUMMARY: learned correctly {ok}/{n}; skills saved {sum(1 for _, l, _ in rows if l)}/{n}; "
-          f"replays correct {sum(1 for _, _, p in rows if p and p.ok and p.lane == 'skill' and '12' in str(p.answer))}/{n}")
+    print(
+        f"{NL}  SUMMARY: learned correctly {ok}/{n}; skills saved {sum(1 for _, l, _ in rows if l)}/{n}; "
+        f"replays correct {sum(1 for _, _, p in rows if p and p.ok and p.lane == 'skill' and '12' in str(p.answer))}/{n}"
+    )
     close_calc()
 
 

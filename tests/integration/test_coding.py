@@ -6,6 +6,7 @@ headless Chrome (a page with a script error fails, a clean one passes).
   .venv\\Scripts\\python.exe tests\\integration\\test_coding.py
 About half a minute (it makes real virtual environments and runs real tests).
 """
+
 import json
 import shutil
 import sys
@@ -41,6 +42,7 @@ class Script:
 
         class R:
             pass
+
         r = R()
         r.text = self.answers.pop(0) if self.answers else ""
         return r
@@ -155,15 +157,26 @@ def chat_flow():
     proj = c.project()
     check("new project: the test failure went back to the model and was repaired", "repaired in 1 round" in r and "tests: 2/2 pass" in r.lower(), r)
     check("new project: it ran and printed the right answer", "100.0 C = 212.0 F" in r, r)
-    check("new project: the model saw the failing test's output", "CHECK FAILED: tests" in pl.asked[1] and "AssertionError" in pl.asked[1], pl.asked[1][:300])
-    check("new project: one version in git, its own .venv, code fences forgiven", len(proj.log()) == 1 and (proj.folder / ".venv" / "Scripts" / "python.exe").exists()
-          and proj.read("main.py").startswith("import argparse"))
+    check(
+        "new project: the model saw the failing test's output",
+        "CHECK FAILED: tests" in pl.asked[1] and "AssertionError" in pl.asked[1],
+        pl.asked[1][:300],
+    )
+    check(
+        "new project: one version in git, its own .venv, code fences forgiven",
+        len(proj.log()) == 1 and (proj.folder / ".venv" / "Scripts" / "python.exe").exists() and proj.read("main.py").startswith("import argparse"),
+    )
     vs = json.loads((proj.folder / ".vscode" / "tasks.json").read_text(encoding="utf-8"))
-    check("VS Code: Run and Test tasks and the project's interpreter are set up", [t["label"] for t in vs["tasks"]] == ["Run", "Test"] and
-          ".venv" in (proj.folder / ".vscode" / "settings.json").read_text(encoding="utf-8"))
+    check(
+        "VS Code: Run and Test tasks and the project's interpreter are set up",
+        [t["label"] for t in vs["tasks"]] == ["Run", "Test"] and ".venv" in (proj.folder / ".vscode" / "settings.json").read_text(encoding="utf-8"),
+    )
     r = c.say("add fahrenheit to celsius as well")
-    check("edit: search/replace blocks applied, tests 3/3, a second version", "Changed main.py, test_main.py" in r and "tests: 3/3 pass" in r.lower()
-          and len(proj.log()) == 2, r)
+    check(
+        "edit: search/replace blocks applied, tests 3/3, a second version",
+        "Changed main.py, test_main.py" in r and "tests: 3/3 pass" in r.lower() and len(proj.log()) == 2,
+        r,
+    )
     check("edit: the model was given the files and their functions", "def c_to_f(c)" in pl.asked[2] and "=== FILE: main.py ===" in pl.asked[2])
     r = c.say("rename everything")
     check("edit: a change that does not fit the files is reported, nothing committed", "did not fit" in r and len(proj.log()) == 2, r)
@@ -181,7 +194,9 @@ def risky():
     pl = Script([RISKY])
     c = CodeChat.start(planner=pl, chats_dir=OUT / "chats", projects_dir=OUT / "projects")
     r = c.say("make a python script that cleans my temp folder")
-    check("risky code is saved but not run, and the line is shown", "not run" in r and "deletes files" in r and "rmtree" in r and c.state["pending"], r)
+    check(
+        "risky code is saved but not run, and the line is shown", "not run" in r and "deletes files" in r and "rmtree" in r and c.state["pending"], r
+    )
     r = c.say("no")
     check("'no' leaves it unrun", "Not run" in r and not c.state["pending"], r)
 
@@ -198,28 +213,56 @@ def project_rules():
     check("search/replace changes exactly the matched text", ch == ["a.py"] and p.read("a.py").strip() == "x = 2")
     ch, probs = p.apply_edits("FILE: new/b.py\n<<<<<<< SEARCH\n=======\ny = 3\n>>>>>>> REPLACE")
     check("an empty search makes a new file", ch == ["new/b.py"] and p.read("new/b.py").strip() == "y = 3")
-    hits = V.risks(type("P", (), {"files": lambda self: ["m.py"], "read": lambda self, f: "import subprocess\nsubprocess.run(['format','C:'])\n# os.remove('x')\n"})())
-    check("risk scan: running other programs is flagged, commented lines are not", {h["what"] for h in hits} == {"runs other programs"}
-          and all(h["line"] != 3 for h in hits), str(hits))
+    hits = V.risks(
+        type(
+            "P",
+            (),
+            {"files": lambda self: ["m.py"], "read": lambda self, f: "import subprocess\nsubprocess.run(['format','C:'])\n# os.remove('x')\n"},
+        )()
+    )
+    check(
+        "risk scan: running other programs is flagged, commented lines are not",
+        {h["what"] for h in hits} == {"runs other programs"} and all(h["line"] != 3 for h in hits),
+        str(hits),
+    )
     meta, files = parse_files("```\n=== META ===\nname: x\n=== END ===\n=== FILE: main.py ===\nprint('hi')\n=== END ===\n```")
     check("model answers: META and FILE blocks read through code fences", meta == {"name": "x"} and files == {"main.py": "print('hi')"})
 
 
 def web():
     good = Project.create(OUT / "projects" / "web_good", "web")
-    good.write({"index.html": "<!doctype html><html><head><link rel='stylesheet' href='style.css'></head><body><h1>Khan Electronics</h1>"
-                              "<p>Quality appliances in Lahore since 1998.</p><script src='script.js'></script></body></html>",
-                "style.css": "body{font-family:Segoe UI}", "script.js": "document.querySelector('h1').textContent += '!';"})
+    good.write(
+        {
+            "index.html": "<!doctype html><html><head><link rel='stylesheet' href='style.css'></head><body><h1>Khan Electronics</h1>"
+            "<p>Quality appliances in Lahore since 1998.</p><script src='script.js'></script></body></html>",
+            "style.css": "body{font-family:Segoe UI}",
+            "script.js": "document.querySelector('h1').textContent += '!';",
+        }
+    )
     res = V.web(good, "index.html")
-    check("web: a clean page loads with content and no console errors", all(c["ok"] for c in res), str([(c["what"], c["detail"][:100]) for c in res if not c["ok"]]))
+    check(
+        "web: a clean page loads with content and no console errors",
+        all(c["ok"] for c in res),
+        str([(c["what"], c["detail"][:100]) for c in res if not c["ok"]]),
+    )
     bad = Project.create(OUT / "projects" / "web_bad", "web")
-    bad.write({"index.html": "<!doctype html><html><body><h1>Broken page here</h1><p>some words for the check</p><script>notAFunction();</script></body></html>"})
+    bad.write(
+        {
+            "index.html": "<!doctype html><html><body><h1>Broken page here</h1><p>some words for the check</p><script>notAFunction();</script></body></html>"
+        }
+    )
     res = V.web(bad, "index.html")
     check("web: a page with a script error fails the console check", any(not c["ok"] and "console" in c["what"] for c in res), str(res)[:300])
     missing = Project.create(OUT / "projects" / "web_missing", "web")
-    missing.write({"index.html": "<!doctype html><html><body><h1>Shop</h1><p>Words enough to count here</p><script src='nope.js'></script></body></html>"})
+    missing.write(
+        {"index.html": "<!doctype html><html><body><h1>Shop</h1><p>Words enough to count here</p><script src='nope.js'></script></body></html>"}
+    )
     res = V.web(missing, "index.html")
-    check("web: a missing script file fails the 'every file it links to' check", any(not c["ok"] and "links to" in c["what"] for c in res), str(res)[:300])
+    check(
+        "web: a missing script file fails the 'every file it links to' check",
+        any(not c["ok"] and "links to" in c["what"] for c in res),
+        str(res)[:300],
+    )
 
 
 if __name__ == "__main__":

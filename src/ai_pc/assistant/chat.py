@@ -13,6 +13,7 @@ program in use).
   c.say("yes")                                                    -> posted, checked
   c.say(voice="note.ogg")                                         -> what it heard, then the same as typing it
 """
+
 import datetime as dt
 import json
 import re
@@ -26,7 +27,9 @@ from ai_pc.assistant.lanes import LANE_CLASSES, dedupe, files_said
 from ai_pc.core.config import ROOT
 
 CHATS = ROOT / "out" / "aipc" / "chats"
-YES = re.compile(r"^\s*(?:yes|yeah|yep|yup|y|ok|okay|sure|go ahead|do it|send(?: it)?|post(?: it)?|confirm(?:ed)?|approved?|please do|haan|ji)\b[\s.!]*$", re.I)
+YES = re.compile(
+    r"^\s*(?:yes|yeah|yep|yup|y|ok|okay|sure|go ahead|do it|send(?: it)?|post(?: it)?|confirm(?:ed)?|approved?|please do|haan|ji)\b[\s.!]*$", re.I
+)
 NO = re.compile(r"^\s*(?:no|nope|n|cancel|stop|don'?t|drop it|never ?mind|forget it|leave it)\b", re.I)
 HELP = re.compile(r"^\s*(?:help|menu|commands|what can you do|what all can you do|what do you do|what can i ask)\b|\bwhat can you do\b", re.I)
 MADE_Q = re.compile(r"\bwhat (?:have you|did you) (?:make|made|do|done)\b|\b(?:list|show)(?: me)? (?:the |my |all )?files\b|\bwhat files\b", re.I)
@@ -37,9 +40,12 @@ PICK = re.compile(r"^\s*(?:(?:number|no\.?|#)\s*)?(\d{1,2})\b|^\s*(?:the\s+)?(fi
 ORDINAL = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5}
 NAME_LANES = {"hub", "social", "apps"}  # programs whose rules look files up by name in the message
 DELIVER = {"hub", "social", "apps"}  # programs that send, post or pack what others made: edit follow-ups stay with the maker
-REF = re.compile(r"\b(?:the (?:edited |new |final |latest |same |original |last )?(?:video|clip|reel|photo|picture|pic|image|file|pdf|document|doc|"
-                 r"report|sheet|spreadsheet|deck|presentation|slides|audio|song|recording|plan|drawing|model|result|output|one|invoice|card|post|"
-                 r"thumbnail|design|archive|zip)s?|it|this|that|them)\b", re.I)
+REF = re.compile(
+    r"\b(?:the (?:edited |new |final |latest |same |original |last )?(?:video|clip|reel|photo|picture|pic|image|file|pdf|document|doc|"
+    r"report|sheet|spreadsheet|deck|presentation|slides|audio|song|recording|plan|drawing|model|result|output|one|invoice|card|post|"
+    r"thumbnail|design|archive|zip)s?|it|this|that|them)\b",
+    re.I,
+)
 PLACES = ["Desktop", "Downloads", "Videos", "Pictures", "Music", "Documents"]
 
 
@@ -55,6 +61,7 @@ def spoken_channels(text):
 
 class Reply(str):
     """The reply text, with .files (made this turn) and .heard (what a voice note said)."""
+
     files: list
     heard: str
 
@@ -76,14 +83,23 @@ class AIPCChat:
 
     @classmethod
     def start(cls, chats_dir=None, planner=None, options=None, log=print):
-        stamp = time.strftime('%Y%m%d_%H%M%S')
+        stamp = time.strftime("%Y%m%d_%H%M%S")
         cid, n = f"aipc_{stamp}", 2
         while (Path(chats_dir or CHATS) / cid).exists():  # two chats in the same second (New chat, New chat) stay two
             cid, n = f"aipc_{stamp}_{n}", n + 1
         folder = Path(chats_dir or CHATS) / cid
         folder.mkdir(parents=True, exist_ok=True)
-        st = {"id": cid, "folder": str(folder), "turns": [], "artifacts": [], "active": None, "pending": None, "queue": [], "choice": None,
-              "sessions": {}}
+        st = {
+            "id": cid,
+            "folder": str(folder),
+            "turns": [],
+            "artifacts": [],
+            "active": None,
+            "pending": None,
+            "queue": [],
+            "choice": None,
+            "sessions": {},
+        }
         c = cls(st, planner, options, log)
         c.save()
         return c
@@ -103,6 +119,7 @@ class AIPCChat:
 
     def save(self):
         from ai_pc.apps.appschat import redact
+
         (self.folder / "chat.json").write_text(json.dumps(redact(self.state), ensure_ascii=False, indent=1, default=str), encoding="utf-8")
 
     # ---------------------------------------------------------------- helpers
@@ -113,6 +130,7 @@ class AIPCChat:
         """The program module that would take this message by its own rules (as the programs chat routes)."""
         if self._mods is None:
             from ai_pc.apps import all_modules
+
             self._mods = all_modules()
         known = {} if files else {Path(a["path"]).name.lower(): a["path"] for a in self.arts.alive()}  # 'it' -> just that file
         known.update({Path(f).name.lower(): str(f) for f in files})
@@ -137,8 +155,27 @@ class AIPCChat:
     def find_on_pc(self, kinds, text):
         """The person's newest files of these kinds in their usual folders, best name match first (for 'my video' with no file sent)."""
         exts = set().union(*(KINDS[k] for k in kinds if k in KINDS))
-        words = {w for w in re.findall(r"[a-z0-9]{3,}", text.lower())} - {"the", "and", "add", "make", "with", "video", "photo", "picture", "my",
-                                                                            "this", "that", "for", "effect", "please", "can", "you", "image", "song", "audio"}
+        words = {w for w in re.findall(r"[a-z0-9]{3,}", text.lower())} - {
+            "the",
+            "and",
+            "add",
+            "make",
+            "with",
+            "video",
+            "photo",
+            "picture",
+            "my",
+            "this",
+            "that",
+            "for",
+            "effect",
+            "please",
+            "can",
+            "you",
+            "image",
+            "song",
+            "audio",
+        }
         found = []
         home = Path(self.options.get("home") or Path.home())  # tests give a made-up home
         for place in PLACES:
@@ -155,7 +192,9 @@ class AIPCChat:
         lines = ["I can do all of this from this one chat (type, or send a voice note; send files with your message):"]
         for l in self.lanes.values():
             lines.append(f"- {l.label}: {l.blurb.split(';')[0]}. e.g. '{l.examples[0]}'")
-        lines.append("Say 'undo' to go back a step in what we were doing; 'what have you made?' lists the files; anything others will see waits for your 'yes'.")
+        lines.append(
+            "Say 'undo' to go back a step in what we were doing; 'what have you made?' lists the files; anything others will see waits for your 'yes'."
+        )
         return "\n".join(lines)
 
     # ---------------------------------------------------------------- a message
@@ -165,6 +204,7 @@ class AIPCChat:
         heard = None
         if voice:
             from ai_pc.assistant.voice import transcribe
+
             heard = transcribe(voice)
             message = f"{message} {heard}".strip() if heard else message
             if not heard and not message:
@@ -182,16 +222,27 @@ class AIPCChat:
             reply, made = self._handle(message, sent, turn_no)
         except Exception as e:  # noqa: BLE001 - a program's failure is said, not raised
             if type(e).__name__ == "PlannerError":
-                reply = ("The AI model is not answering right now (the provider is slow or down), and this request needs it. "
-                         "Nothing was changed; try again in a few minutes.")
+                reply = (
+                    "The AI model is not answering right now (the provider is slow or down), and this request needs it. "
+                    "Nothing was changed; try again in a few minutes."
+                )
             else:
                 reply = f"Couldn't: {type(e).__name__}: {e}"
             made = []
         return self._done(turn_no, t0, message, reply, made, heard)
 
     def _done(self, turn_no, t0, message, reply, made, heard):
-        self.state["turns"].append({"n": turn_no, "user": message, "heard": heard, "reply": reply, "made": made, "lane": self.state.get("active"),
-                                    "seconds": round(time.perf_counter() - t0, 2)})
+        self.state["turns"].append(
+            {
+                "n": turn_no,
+                "user": message,
+                "heard": heard,
+                "reply": reply,
+                "made": made,
+                "lane": self.state.get("active"),
+                "seconds": round(time.perf_counter() - t0, 2),
+            }
+        )
         self.save()
         return _reply(reply, made, heard)
 
@@ -226,7 +277,11 @@ class AIPCChat:
         if HELP.search(message):
             return self.help_text(), []
         if GREET.search(message):
-            return "Hi! Send a file, a voice note, or tell me what to do: e.g. 'add a glow effect to my video', 'make my photo brighter', "                    "'send it to slack #team', 'write a 2 page report on ...'. Say 'what can you do?' for everything.", []
+            return (
+                "Hi! Send a file, a voice note, or tell me what to do: e.g. 'add a glow effect to my video', 'make my photo brighter', "
+                "'send it to slack #team', 'write a 2 page report on ...'. Say 'what can you do?' for everything.",
+                [],
+            )
         if THANKS.search(message):
             return "Glad to help. Anything else?", []
         if MADE_Q.search(message):
@@ -239,15 +294,24 @@ class AIPCChat:
             parts.append(o)
             made_all += m
             if self.state.get("pending") or self.state.get("choice"):
-                self.state["queue"] = steps[i + 1:]
+                self.state["queue"] = steps[i + 1 :]
                 break
         return "\n".join(parts), made_all
 
     def _route_and_run(self, text, files, turn_no):
         refs = [a["path"] for a in self.arts.resolve(text)] if not files else []
-        lane, why, ask = router.pick(text, files, self.state.get("active"), self.apps_claim, self.planner, self.catalogue(),
-                                     "; ".join(self.arts.describe()), refs=refs, editing=self.state.get("editing"),
-                                     known={a["kind"] for a in self.arts.alive()})
+        lane, why, ask = router.pick(
+            text,
+            files,
+            self.state.get("active"),
+            self.apps_claim,
+            self.planner,
+            self.catalogue(),
+            "; ".join(self.arts.describe()),
+            refs=refs,
+            editing=self.state.get("editing"),
+            known={a["kind"] for a in self.arts.alive()},
+        )
         if not lane or lane not in self.lanes:
             if self.planner is not None and QUESTION.search(text):
                 return self._answer(text), []
@@ -257,8 +321,16 @@ class AIPCChat:
     def _answer(self, text):
         """A question no program is for: a short answer from the model (it sees the question only, never files or keys)."""
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": "Answer in 1-4 short sentences, plainly. If it is something this PC's "
-                                                                          "programs could do, say so in one line."}, {"role": "user", "content": text}])
+            r = self.planner._call(
+                "fast",
+                [
+                    {
+                        "role": "system",
+                        "content": "Answer in 1-4 short sentences, plainly. If it is something this PC's programs could do, say so in one line.",
+                    },
+                    {"role": "user", "content": text},
+                ],
+            )
             return r.text.strip() or "I don't know."
         except Exception:  # noqa: BLE001
             return "The AI model is not answering right now; try again in a few minutes."

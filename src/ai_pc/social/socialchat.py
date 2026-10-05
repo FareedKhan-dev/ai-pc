@@ -8,6 +8,7 @@ results gathered, comments read and answered (each answer shown first), posts ca
   sc.say("yes")  ->  scheduled: Instagram and TikTok by this PC, YouTube by YouTube itself
   sc.say("what's scheduled?") / sc.say("how did my posts do this week?") / sc.say("any new comments?") / sc.say("reply to 2: thank you!")
 """
+
 import datetime as dt
 import json
 import re
@@ -24,8 +25,11 @@ from ai_pc.social.socialparse import parse
 from ai_pc.social.store import Store, iso, now
 
 CHATS = ROOT / "out" / "social" / "chats"
-YES = re.compile(r"^\s*(?:yes|yeah|yep|y|ok|okay|sure|go(?: ahead)?|post it|publish(?: it)?|do it|confirm(?:ed)?|send it|schedule it|reply|hide it|"
-                 r"delete it|cancel it)\b", re.I)
+YES = re.compile(
+    r"^\s*(?:yes|yeah|yep|y|ok|okay|sure|go(?: ahead)?|post it|publish(?: it)?|do it|confirm(?:ed)?|send it|schedule it|reply|hide it|"
+    r"delete it|cancel it)\b",
+    re.I,
+)
 NO = re.compile(r"^\s*(?:no|nope|n|stop|don'?t|drop it|never mind|forget it|discard)\b", re.I)
 SOCIAL_SYSTEM = """You turn a request about social media into actions for a program. Reply with ONE JSON object: {"ops": [...]} or {"ask": "<short question>"}.
 Actions:
@@ -63,6 +67,7 @@ def _info(path):
     k = kind_of(path)
     if k == "video":
         from ai_pc.convert import media as MD
+
         try:
             p = MD.probe(path)
             v = p.get("video") or {}
@@ -71,6 +76,7 @@ def _info(path):
             return {}
     if k == "image":
         from PIL import Image
+
         try:
             w, h = Image.open(path).size
             return {"w": w, "h": h}
@@ -99,8 +105,16 @@ class SocialChat:
         cid = f"social_{time.strftime('%Y%m%d_%H%M%S')}"
         folder = Path(chats_dir or CHATS) / cid
         folder.mkdir(parents=True, exist_ok=True)
-        st = {"id": cid, "folder": str(folder), "turns": [], "pending": None, "last_post": None, "db": str(db) if db else None,
-              "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in (files or [])}, "comments": []}
+        st = {
+            "id": cid,
+            "folder": str(folder),
+            "turns": [],
+            "pending": None,
+            "last_post": None,
+            "db": str(db) if db else None,
+            "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in (files or [])},
+            "comments": [],
+        }
         if files:
             st["last_file"] = str(Path(files[-1]).resolve())
         return cls(st, planner, platforms, store, prep, budget)
@@ -112,6 +126,7 @@ class SocialChat:
         if self._platforms is not None:
             return self._platforms
         from ai_pc.social.platforms import connected
+
         return connected(self.db)
 
     # ---------------------------------------------------------------- a message
@@ -139,15 +154,23 @@ class SocialChat:
             else:
                 if p:
                     self.state["pending"] = None
-                ctx = {"connected": sorted(self.platforms()), "files": self.state["files"], "now": dt.datetime.now(), "last": self.state.get("last_post"),
-                       "last_file": self.state.get("last_file")}
+                ctx = {
+                    "connected": sorted(self.platforms()),
+                    "files": self.state["files"],
+                    "now": dt.datetime.now(),
+                    "last": self.state.get("last_post"),
+                    "last_file": self.state.get("last_file"),
+                }
                 r = parse(message, ctx)
                 if not r["ops"] and not r.get("ask"):
                     r = self._llm(message, ctx)
                 if r.get("ask") and not r["ops"]:
                     reply = r["ask"]
                 else:
-                    reply = "\n".join(self.run(op) for op in r["ops"]) or "Tell me what to post and where, e.g. 'post eid.mp4 to instagram and tiktok saying ...'."
+                    reply = (
+                        "\n".join(self.run(op) for op in r["ops"])
+                        or "Tell me what to post and where, e.g. 'post eid.mp4 to instagram and tiktok saying ...'."
+                    )
         except SocialError as e:
             reply = f"Couldn't: {e}"
         turn.update(reply=reply, seconds=round(time.perf_counter() - t0, 2))
@@ -158,26 +181,46 @@ class SocialChat:
 
     def _llm(self, message, ctx):
         if self.planner is None:
-            return {"ops": [], "ask": "Say what to post and where, e.g. 'post eid.mp4 to instagram reels and youtube shorts tomorrow at 7 pm saying ...'."}
+            return {
+                "ops": [],
+                "ask": "Say what to post and where, e.g. 'post eid.mp4 to instagram reels and youtube shorts tomorrow at 7 pm saying ...'.",
+            }
         self._turn["llm"] = True
         sys_ = SOCIAL_SYSTEM.replace("{today}", dt.datetime.now().strftime("%A %d %B %Y, %H:%M"))
         try:
             listed = ""
             if self.state.get("comments"):
                 cs = {(c["platform"], c["id"]): c for c in self.db.comments(limit=100)}
-                listed = "LISTED COMMENTS (the person refers to them by number):\n" + "\n".join(
-                    f"{i}. {specs.LABEL.get(p, p)}, {(cs.get((p, cid)) or {}).get('author', '')}: {(cs.get((p, cid)) or {}).get('text', '')[:120]}"
-                    for i, (p, cid, _) in enumerate(self.state["comments"], 1)) + "\n"
-            r = self.planner._call("fast", [{"role": "system", "content": sys_},
-                                            {"role": "user", "content": f"CONNECTED: {', '.join(ctx['connected']) or 'none'}\nFILES: {', '.join(self.state['files']) or 'none'}\n"
-                                                                        f"{listed}REQUEST: {message}"}])
+                listed = (
+                    "LISTED COMMENTS (the person refers to them by number):\n"
+                    + "\n".join(
+                        f"{i}. {specs.LABEL.get(p, p)}, {(cs.get((p, cid)) or {}).get('author', '')}: {(cs.get((p, cid)) or {}).get('text', '')[:120]}"
+                        for i, (p, cid, _) in enumerate(self.state["comments"], 1)
+                    )
+                    + "\n"
+                )
+            r = self.planner._call(
+                "fast",
+                [
+                    {"role": "system", "content": sys_},
+                    {
+                        "role": "user",
+                        "content": f"CONNECTED: {', '.join(ctx['connected']) or 'none'}\nFILES: {', '.join(self.state['files']) or 'none'}\n"
+                        f"{listed}REQUEST: {message}",
+                    },
+                ],
+            )
             d = parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return {"ops": [], "ask": f"I could not work that out ({type(e).__name__})."}
         ops = [o for o in d.get("ops") or [] if isinstance(o, dict) and o.get("op")]
         for o in ops:  # the model names files; only files the chat knows are used
             if o.get("op") == "compose":
-                o["media"] = [self.state["files"].get(str(m).lower(), m) for m in o.get("media") or [] if str(m).lower() in self.state["files"] or Path(str(m)).exists()]
+                o["media"] = [
+                    self.state["files"].get(str(m).lower(), m)
+                    for m in o.get("media") or []
+                    if str(m).lower() in self.state["files"] or Path(str(m)).exists()
+                ]
                 o.setdefault("formats", {})
         return {"ops": ops, "ask": d.get("ask") if not ops else None}
 
@@ -196,8 +239,16 @@ class SocialChat:
             if t < now() - dt.timedelta(minutes=1):
                 return f"{_when_words(iso(t))} has already passed; give a later time."
             when = iso(t)
-        post = {"text": op.get("text") or "", "title": op.get("title"), "media": media, "when": when, "privacy": op.get("privacy"),
-                "fill": op.get("fill"), "trim": op.get("trim"), "utm": op.get("utm")}
+        post = {
+            "text": op.get("text") or "",
+            "title": op.get("title"),
+            "media": media,
+            "when": when,
+            "privacy": op.get("privacy"),
+            "fill": op.get("fill"),
+            "trim": op.get("trim"),
+            "utm": op.get("utm"),
+        }
         kinds = [kind_of(m) for m in media]
         info = [_info(m) for m in media]
         targets, skipped = [], []
@@ -231,11 +282,13 @@ class SocialChat:
             for n in (prep.get("notes") or [])[:3]:
                 bits.append(n)
             words = prep.get("parts") and f"a thread of {len(prep['parts'])}" or f"{len(prep.get('text') or '')} characters"
-            bits.append(words + (f", title \"{prep['title']}\"" if prep.get("title") else ""))
+            bits.append(words + (f', title "{prep["title"]}"' if prep.get("title") else ""))
             native = bool(post.get("when") and plat.native_schedule)
             t["native"] = native
             if post.get("when"):
-                bits.append(f"{_when_words(post['when'])} ({'the platform publishes it, this PC may be off' if native else 'this PC publishes it: keep it on'})")
+                bits.append(
+                    f"{_when_words(post['when'])} ({'the platform publishes it, this PC may be off' if native else 'this PC publishes it: keep it on'})"
+                )
             for w in getattr(plat, "warnings", lambda *a: [])(post, t) or []:
                 bits.append("NOTE " + w)
             lines.append(f"- {label}: " + "; ".join(bits))
@@ -243,8 +296,12 @@ class SocialChat:
         if not ok:
             self.state["pending"] = None
             return "Nothing can be posted as it is:\n" + "\n".join(lines) + ("\n" + "\n".join(pend["skipped"]) if pend["skipped"] else "")
-        head = "Ready to " + ("schedule" if post.get("when") else "post") + (f": \"{post['text'][:120]}\"" if post.get("text") else "") + "\n"
-        tail = "\nSay 'yes' to " + ("schedule it" if post.get("when") else "post it") + " (or 'yes but not on tiktok'), 'no' to drop it, or give a new caption."
+        head = "Ready to " + ("schedule" if post.get("when") else "post") + (f': "{post["text"][:120]}"' if post.get("text") else "") + "\n"
+        tail = (
+            "\nSay 'yes' to "
+            + ("schedule it" if post.get("when") else "post it")
+            + " (or 'yes but not on tiktok'), 'no' to drop it, or give a new caption."
+        )
         return head + "\n".join(lines) + ("\n" + "\n".join(pend["skipped"]) if pend["skipped"] else "") + tail
 
     def confirm(self, pend, skip=()):
@@ -256,14 +313,29 @@ class SocialChat:
         for t in pend["targets"]:
             if t["platform"] in skip or t["prepared"].get("problems"):
                 continue
-            made.append(self.db.add_job({"post_id": post["id"], "platform": t["platform"], "format": t["format"], "prepared": t["prepared"],
-                                         "native": bool(t.get("native")), "status": "ready"}))
+            made.append(
+                self.db.add_job(
+                    {
+                        "post_id": post["id"],
+                        "platform": t["platform"],
+                        "format": t["format"],
+                        "prepared": t["prepared"],
+                        "native": bool(t.get("native")),
+                        "status": "ready",
+                    }
+                )
+            )
         if not made:
             return "Nothing was left to post."
         self.state["last_post"] = post["id"]
         if post.get("when") and not any(j["native"] for j in made):
             note = self._auto_note()
-            return f"Scheduled for {_when_words(post['when'])}: " + ", ".join(specs.LABEL[j["platform"]] for j in made) + ". This PC posts them then." + note
+            return (
+                f"Scheduled for {_when_words(post['when'])}: "
+                + ", ".join(specs.LABEL[j["platform"]] for j in made)
+                + ". This PC posts them then."
+                + note
+            )
         return self._drive(post["id"])
 
     def _drive(self, pid):
@@ -289,10 +361,14 @@ class SocialChat:
             r = j.get("remote") or {}
             s = j["status"]
             if s == "published":
-                lines.append(f"- {label}: published{' (checked)' if r.get('verified') else ''} {r.get('permalink') or r.get('id') or ''}".rstrip()
-                             + ("; " + "; ".join(j.get("notes") or []) if j.get("notes") else ""))
+                lines.append(
+                    f"- {label}: published{' (checked)' if r.get('verified') else ''} {r.get('permalink') or r.get('id') or ''}".rstrip()
+                    + ("; " + "; ".join(j.get("notes") or []) if j.get("notes") else "")
+                )
             elif s == "scheduled":
-                lines.append(f"- {label}: scheduled on {specs.LABEL[j['platform']]} for {_when_words(r.get('publish_at') or post['when'])} (it publishes it, even if this PC is off)")
+                lines.append(
+                    f"- {label}: scheduled on {specs.LABEL[j['platform']]} for {_when_words(r.get('publish_at') or post['when'])} (it publishes it, even if this PC is off)"
+                )
             elif s in ("processing", "uploading", "ready", "retry"):
                 lines.append(f"- {label}: still going ({s}{': ' + j['error'] if j.get('error') else ''}); the background runner finishes it")
             elif s == "needs_signin":
@@ -311,7 +387,11 @@ class SocialChat:
             on = RN.task_installed()
         except Exception:  # noqa: BLE001
             on = False
-        return "" if on else "\nAutomatic posting is off, so scheduled posts go out only while a chat runs. Say 'turn on automatic posting' (Windows runs the poster every 5 minutes, hidden)."
+        return (
+            ""
+            if on
+            else "\nAutomatic posting is off, so scheduled posts go out only while a chat runs. Say 'turn on automatic posting' (Windows runs the poster every 5 minutes, hidden)."
+        )
 
     # ---------------------------------------------------------------- the queue
     def op_queue(self, op):
@@ -321,8 +401,10 @@ class SocialChat:
         lines = []
         for p in sorted(ps, key=lambda p: p.get("when") or ""):
             js = self.db.jobs(post_id=p["id"])
-            lines.append(f"- {_when_words(p['when']) if p.get('when') else 'now'}: \"{(p.get('text') or '')[:60]}\" -> " +
-                         ", ".join(f"{specs.LABEL.get(j['platform'], j['platform'])} ({j['status']})" for j in js))
+            lines.append(
+                f'- {_when_words(p["when"]) if p.get("when") else "now"}: "{(p.get("text") or "")[:60]}" -> '
+                + ", ".join(f"{specs.LABEL.get(j['platform'], j['platform'])} ({j['status']})" for j in js)
+            )
         return "Scheduled and going:\n" + "\n".join(lines)
 
     def _target_jobs(self, op, states):
@@ -338,8 +420,12 @@ class SocialChat:
             return "Nothing of the last post is waiting to be cancelled."
         native = [j for j in js if j["status"] == "scheduled"]
         self.state["pending"] = {"op": "cancel", "jobs": [j["id"] for j in js]}
-        return "Ready to cancel: " + ", ".join(specs.LABEL[j["platform"]] for j in js) + \
-            (" (already uploaded and scheduled there: it is deleted from the platform)" if native else "") + ". Say 'yes' to cancel it."
+        return (
+            "Ready to cancel: "
+            + ", ".join(specs.LABEL[j["platform"]] for j in js)
+            + (" (already uploaded and scheduled there: it is deleted from the platform)" if native else "")
+            + ". Say 'yes' to cancel it."
+        )
 
     def do_cancel(self, pend):
         out = []
@@ -362,8 +448,11 @@ class SocialChat:
         if not js:
             return "No published post to delete (I can delete the last post this chat published)."
         self.state["pending"] = {"op": "delete", "jobs": [j["id"] for j in js]}
-        return "Ready to DELETE from " + ", ".join(f"{specs.LABEL[j['platform']]} ({(j.get('remote') or {}).get('permalink') or ''})" for j in js) + \
-            ". This cannot be undone. Say 'yes' to delete."
+        return (
+            "Ready to DELETE from "
+            + ", ".join(f"{specs.LABEL[j['platform']]} ({(j.get('remote') or {}).get('permalink') or ''})" for j in js)
+            + ". This cannot be undone. Say 'yes' to delete."
+        )
 
     def do_delete(self, pend):
         out = []
@@ -411,7 +500,11 @@ class SocialChat:
     def op_results(self, op):
         days = op.get("days") or 7
         since = iso(now() - dt.timedelta(days=days))
-        js = [j for j in self.db.jobs(status=["published"]) if (j.get("published_at") or "") >= since and (not op.get("platforms") or j["platform"] in op["platforms"])]
+        js = [
+            j
+            for j in self.db.jobs(status=["published"])
+            if (j.get("published_at") or "") >= since and (not op.get("platforms") or j["platform"] in op["platforms"])
+        ]
         if not js:
             return f"No posts published in the last {days} days."
         plats = self.platforms()
@@ -432,12 +525,18 @@ class SocialChat:
             p = self.db.post(j["post_id"])
             for k in ("views", "likes", "comments", "shares", "saves"):
                 tot[k] = tot.get(k, 0) + (m.get(k) or 0)
-            lines.append(f"- {specs.LABEL[j['platform']]} {specs.FORMAT_WORDS.get(j.get('format'), '')}, \"{(p.get('text') or '')[:40]}\": " +
-                         (", ".join(f"{m[k]} {k}" for k in ("views", "likes", "comments", "shares", "saves") if m.get(k) is not None) or m.get("error", "no numbers yet")))
+            lines.append(
+                f'- {specs.LABEL[j["platform"]]} {specs.FORMAT_WORDS.get(j.get("format"), "")}, "{(p.get("text") or "")[:40]}": '
+                + (
+                    ", ".join(f"{m[k]} {k}" for k in ("views", "likes", "comments", "shares", "saves") if m.get(k) is not None)
+                    or m.get("error", "no numbers yet")
+                )
+            )
         head = f"Last {days} days, {len(rows)} posts: " + ", ".join(f"{v} {k}" for k, v in tot.items() if v) + "."
         out = head + "\n" + "\n".join(lines[:15])
         if op.get("report"):
             from ai_pc.social.report import excel
+
             path = excel(rows, self.db, self.folder / f"social_results_{dt.date.today():%Y%m%d}.xlsx")
             out += f"\nReport: {path}"
         return out
@@ -451,15 +550,20 @@ class SocialChat:
                 continue
             try:
                 for cm in plats[j["platform"]].comments(j) or []:
-                    new += self.db.comment(j["platform"], cm["id"], j["id"], cm.get("created") or "", cm.get("author") or "", cm.get("text") or "", cm)
+                    new += self.db.comment(
+                        j["platform"], cm["id"], j["id"], cm.get("created") or "", cm.get("author") or "", cm.get("text") or "", cm
+                    )
             except SocialError as e:
                 self.db.log(j["id"], "comments", str(e))
         cs = self.db.comments(state="new", limit=20)
         self.state["comments"] = [(c["platform"], c["id"], c["job_id"]) for c in cs]
         if not cs:
             return "No new comments."
-        return f"New comments ({len(cs)}):\n" + "\n".join(f"{i}. {specs.LABEL[c['platform']]}, {c['author']}: {c['text'][:200]}" for i, c in enumerate(cs, 1)) + \
-            "\nSay 'reply to 2: thank you!' or 'hide 3'."
+        return (
+            f"New comments ({len(cs)}):\n"
+            + "\n".join(f"{i}. {specs.LABEL[c['platform']]}, {c['author']}: {c['text'][:200]}" for i, c in enumerate(cs, 1))
+            + "\nSay 'reply to 2: thank you!' or 'hide 3'."
+        )
 
     def _comment(self, ref):
         cs = self.state.get("comments") or []
@@ -509,13 +613,20 @@ class SocialChat:
             except SocialError as e:
                 have.append(f"{specs.LABEL[n]}: NOT working ({e})")
         missing = [specs.LABEL[n] for n in specs.NAMES if n not in plats]
-        return "Connected: " + ("; ".join(have) or "nothing yet") + "." + (f" Not yet: {', '.join(missing)} ('ai-pc social steps <name>')." if missing else "")
+        return (
+            "Connected: "
+            + ("; ".join(have) or "nothing yet")
+            + "."
+            + (f" Not yet: {', '.join(missing)} ('ai-pc social steps <name>')." if missing else "")
+        )
 
     def op_auto(self, op):
         if op["on"]:
             self.state["pending"] = {"op": "auto_on"}
-            return ("Ready to turn on automatic posting: Windows Task Scheduler runs this PC's poster every 5 minutes, hidden, while you are signed in, "
-                    "so scheduled posts go out on time. Say 'yes' to turn it on.")
+            return (
+                "Ready to turn on automatic posting: Windows Task Scheduler runs this PC's poster every 5 minutes, hidden, while you are signed in, "
+                "so scheduled posts go out on time. Say 'yes' to turn it on."
+            )
         ok = RN.remove_task()
         return "Automatic posting is off." if ok else "Automatic posting was not on."
 
@@ -528,5 +639,6 @@ class SocialChat:
 
     def op_best_time(self, op):
         from ai_pc.social.report import best_times
+
         r = best_times(self.db, op.get("platforms"))
         return r

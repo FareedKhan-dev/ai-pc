@@ -17,6 +17,7 @@ Things to say: 'a 5 marla house with 2 bedrooms' (also 10 marla, 1 kanal, 30x60,
 'a flange OD 150 ID 60, 4 holes of 14 on a 110 PCD, 12 thick', 'make the holes 16', 'round the corners 10',
 'give me the laser cut file', 'undo', 'redo', 'go back to v1', 'history'.
 """
+
 import argparse
 import sys
 
@@ -37,9 +38,11 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     from ai_pc.cad.cadchat import CadChat
+
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     if a.cmd == "draw":
         c = CadChat.start(planner=planner)

@@ -1,4 +1,5 @@
 """Paths and API keys."""
+
 import pytest
 
 from ai_pc.core import keys, paths
@@ -19,7 +20,7 @@ def test_ai_pc_home_moves_everything(monkeypatch, tmp_path):
 
 def test_dotenv_reads_keys_comments_quotes_and_export(tmp_path):
     env = tmp_path / ".env"
-    env.write_text('# comment\n\nNEBIUS_API_KEY="abc"\nexport OTHER=\'x y\'\nBROKEN LINE\nEMPTY=\n', encoding="utf-8")
+    env.write_text("# comment\n\nNEBIUS_API_KEY=\"abc\"\nexport OTHER='x y'\nBROKEN LINE\nEMPTY=\n", encoding="utf-8")
     assert keys.dotenv(env) == {"NEBIUS_API_KEY": "abc", "OTHER": "x y", "EMPTY": ""}
 
 

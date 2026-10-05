@@ -5,6 +5,7 @@
 Every file is checked with ffprobe (a real video stream, at least 4 s) before it is kept; a manifest records where each
 clip came from (media/stock/manifest.json). Nothing is executed; only .mp4 files are written, inside the project.
 """
+
 import json
 import re
 import subprocess
@@ -17,15 +18,36 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "media" / "stock"
 UA = {"User-Agent": "Mozilla/5.0"}
 GENRES = {
-    "travel": (["travel", "city", "beach", "landscape"], ["city", "beach", "travel", "street", "sunset", "mountain", "aerial", "tourist", "market", "ocean", "boat", "temple"]),
-    "gym": (["gym", "fitness", "workout"], ["gym", "workout", "weight", "boxing", "training", "exercis", "running", "push", "rope", "athlete", "muscular"]),
-    "cooking": (["cooking", "food", "kitchen"], ["cook", "chopping", "cutting", "frying", "pan", "kitchen", "salad", "pizza", "pasta", "chef", "vegetable", "dough", "plate", "sauce"]),
-    "realestate": (["house", "interior", "home"], ["house", "living", "kitchen", "bedroom", "pool", "interior", "apartment", "home", "room", "villa", "modern"]),
+    "travel": (
+        ["travel", "city", "beach", "landscape"],
+        ["city", "beach", "travel", "street", "sunset", "mountain", "aerial", "tourist", "market", "ocean", "boat", "temple"],
+    ),
+    "gym": (
+        ["gym", "fitness", "workout"],
+        ["gym", "workout", "weight", "boxing", "training", "exercis", "running", "push", "rope", "athlete", "muscular"],
+    ),
+    "cooking": (
+        ["cooking", "food", "kitchen"],
+        ["cook", "chopping", "cutting", "frying", "pan", "kitchen", "salad", "pizza", "pasta", "chef", "vegetable", "dough", "plate", "sauce"],
+    ),
+    "realestate": (
+        ["house", "interior", "home"],
+        ["house", "living", "kitchen", "bedroom", "pool", "interior", "apartment", "home", "room", "villa", "modern"],
+    ),
     "car": (["car", "driving", "road"], ["car", "driving", "road", "wheel", "highway", "drive", "vehicle", "sports-car", "night"]),
     "wedding": (["wedding", "couple", "love"], ["wedding", "bride", "groom", "ring", "couple", "bouquet", "kiss", "dance", "love"]),
-    "tech": (["technology", "smartphone", "laptop"], ["smartphone", "phone", "laptop", "tablet", "typing", "device", "screen", "computer", "headphones", "watch"]),
-    "sports": (["sports", "soccer", "basketball", "skateboard"], ["soccer", "football", "basketball", "skate", "surf", "tennis", "ball", "player", "goal", "dunk", "kick"]),
-    "nature": (["nature", "animals", "forest", "waterfall"], ["forest", "waterfall", "mountain", "animal", "bird", "deer", "ocean", "river", "lake", "wild", "fox", "eagle", "flowers"]),
+    "tech": (
+        ["technology", "smartphone", "laptop"],
+        ["smartphone", "phone", "laptop", "tablet", "typing", "device", "screen", "computer", "headphones", "watch"],
+    ),
+    "sports": (
+        ["sports", "soccer", "basketball", "skateboard"],
+        ["soccer", "football", "basketball", "skate", "surf", "tennis", "ball", "player", "goal", "dunk", "kick"],
+    ),
+    "nature": (
+        ["nature", "animals", "forest", "waterfall"],
+        ["forest", "waterfall", "mountain", "animal", "bird", "deer", "ocean", "river", "lake", "wild", "fox", "eagle", "flowers"],
+    ),
     "party": (["party", "dance", "concert"], ["party", "dance", "dancing", "club", "concert", "lights", "crowd", "dj", "celebrat", "confetti"]),
 }
 
@@ -49,8 +71,11 @@ def listing(cat, page=1):
 
 
 def probe(p):
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type,width,height", "-of", "json", str(p)],
-                       capture_output=True, text=True)
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type,width,height", "-of", "json", str(p)],
+        capture_output=True,
+        text=True,
+    )
     try:
         d = json.loads(r.stdout or "{}")
     except json.JSONDecodeError:
@@ -93,8 +118,16 @@ def fetch(genre, n=7):
             info = probe(dest)
             if info:
                 got.append(dest)
-                log.append({"genre": genre, "file": str(dest.relative_to(ROOT)), "source": f"https://mixkit.co/free-stock-video/{slug}-{vid}/",
-                            "quality": q, "licence": "Mixkit Stock Video Free License", **info})
+                log.append(
+                    {
+                        "genre": genre,
+                        "file": str(dest.relative_to(ROOT)),
+                        "source": f"https://mixkit.co/free-stock-video/{slug}-{vid}/",
+                        "quality": q,
+                        "licence": "Mixkit Stock Video Free License",
+                        **info,
+                    }
+                )
                 break
             dest.unlink(missing_ok=True)
     return log, got

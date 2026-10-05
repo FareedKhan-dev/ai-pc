@@ -5,6 +5,7 @@ top tracks. Playlists are made private.
   "spotify playlist 'Road trip': Blinding Lights by The Weeknd; Shape of You by Ed Sheeran; Tum Hi Ho by Arijit Singh"
   "what's playing on spotify"   'my top spotify songs'
 """
+
 import base64
 import hashlib
 import http.server
@@ -22,16 +23,22 @@ NAME, LABEL = "spotify", "Spotify: playlists from song names, now playing, top t
 EXAMPLES = ["spotify playlist 'Road trip': Blinding Lights by The Weeknd; Shape of You by Ed Sheeran", "what's playing on spotify"]
 REDIRECT = "http://127.0.0.1:8888/callback"
 SCOPES = "playlist-modify-private playlist-modify-public playlist-read-private user-read-currently-playing user-top-read"
-APP = {"label": "Spotify", "fields": [("client_id", "Client ID of your Spotify app", False)],
-       "steps": ["developer.spotify.com/dashboard > Create app: any name, Redirect URI http://127.0.0.1:8888/callback, tick Web API; Save.",
-                 "Copy the Client ID (no secret is needed), run 'ai-pc apps connect spotify' and allow the app in the browser."],
-       "notes": "A Spotify app in development mode works for you (and up to 25 people you add); Spotify accepts 127.0.0.1, not 'localhost', as the address."}
+APP = {
+    "label": "Spotify",
+    "fields": [("client_id", "Client ID of your Spotify app", False)],
+    "steps": [
+        "developer.spotify.com/dashboard > Create app: any name, Redirect URI http://127.0.0.1:8888/callback, tick Web API; Save.",
+        "Copy the Client ID (no secret is needed), run 'ai-pc apps connect spotify' and allow the app in the browser.",
+    ],
+    "notes": "A Spotify app in development mode works for you (and up to 25 people you add); Spotify accepts 127.0.0.1, not 'localhost', as the address.",
+}
 
 
 def _token(form, transport=None):
     try:
         return Api("https://accounts.spotify.com", service="spotify sign-in", transport=transport).request(
-            "POST", "api/token", data=urllib.parse.urlencode(form).encode(), headers={"Content-Type": "application/x-www-form-urlencoded"}, retries=1)
+            "POST", "api/token", data=urllib.parse.urlencode(form).encode(), headers={"Content-Type": "application/x-www-form-urlencoded"}, retries=1
+        )
     except HubError as e:
         raise RuntimeError(f"Spotify refused the sign-in ({e}); run 'ai-pc apps connect spotify' again") from e
 
@@ -45,15 +52,20 @@ class Client:
         if c.get("access_token") and c.get("expires_at", 0) > time.time() + 60:
             return c["access_token"]
         tok = _token({"grant_type": "refresh_token", "refresh_token": c["refresh_token"], "client_id": c["client_id"]}, self.transport)
-        c.update(access_token=tok["access_token"], refresh_token=tok.get("refresh_token") or c["refresh_token"], expires_at=time.time() + int(tok.get("expires_in", 3600)))
+        c.update(
+            access_token=tok["access_token"],
+            refresh_token=tok.get("refresh_token") or c["refresh_token"],
+            expires_at=time.time() + int(tok.get("expires_in", 3600)),
+        )
         if self.transport is None:
             vault.put(NAME, {k: c[k] for k in ("access_token", "refresh_token", "expires_at")})
         return c["access_token"]
 
     def call(self, method, path, body=None, params=None):
         try:
-            return Api("https://api.spotify.com/v1", headers={"Authorization": f"Bearer {self.token()}"}, service="spotify", transport=self.transport).request(
-                method, path, json_body=body, params=params, retries=0 if method == "POST" else 3)
+            return Api(
+                "https://api.spotify.com/v1", headers={"Authorization": f"Bearer {self.token()}"}, service="spotify", transport=self.transport
+            ).request(method, path, json_body=body, params=params, retries=0 if method == "POST" else 3)
         except HubError as e:
             raise RuntimeError(f"Spotify: {e}") from e
 
@@ -105,11 +117,20 @@ def connect(values, transport=None, store=None, open_url=webbrowser.open, show=p
 
         def log_message(self, *a):
             pass
+
     srv = http.server.HTTPServer(("127.0.0.1", 8888), H)
     srv.timeout = 0.5
-    url = "https://accounts.spotify.com/authorize?" + urllib.parse.urlencode({"client_id": values["client_id"], "response_type": "code", "redirect_uri": REDIRECT,
-                                                                             "scope": SCOPES, "state": state, "code_challenge_method": "S256",
-                                                                             "code_challenge": challenge})
+    url = "https://accounts.spotify.com/authorize?" + urllib.parse.urlencode(
+        {
+            "client_id": values["client_id"],
+            "response_type": "code",
+            "redirect_uri": REDIRECT,
+            "scope": SCOPES,
+            "state": state,
+            "code_challenge_method": "S256",
+            "code_challenge": challenge,
+        }
+    )
     show(f"Allow the app in Spotify (opening it; or paste this link):\n{url}")
     threading.Thread(target=lambda: open_url(url), daemon=True).start()
     t0 = time.time()
@@ -118,10 +139,22 @@ def connect(values, transport=None, store=None, open_url=webbrowser.open, show=p
     srv.server_close()
     if got.get("state") != state or "code" not in got:
         raise RuntimeError(f"Spotify sign-in did not finish ({got.get('error', 'timed out')})")
-    tok = _token({"grant_type": "authorization_code", "code": got["code"], "redirect_uri": REDIRECT, "client_id": values["client_id"], "code_verifier": verifier},
-                 transport)
-    creds = {"client_id": values["client_id"], "access_token": tok["access_token"], "refresh_token": tok["refresh_token"],
-             "expires_at": time.time() + int(tok.get("expires_in", 3600))}
+    tok = _token(
+        {
+            "grant_type": "authorization_code",
+            "code": got["code"],
+            "redirect_uri": REDIRECT,
+            "client_id": values["client_id"],
+            "code_verifier": verifier,
+        },
+        transport,
+    )
+    creds = {
+        "client_id": values["client_id"],
+        "access_token": tok["access_token"],
+        "refresh_token": tok["refresh_token"],
+        "expires_at": time.time() + int(tok.get("expires_in", 3600)),
+    }
     (store or (lambda v: vault.put(NAME, v)))(creds)
     return {"who": Client(creds, transport).call("GET", "me").get("display_name"), "where": "Spotify"}
 
@@ -144,13 +177,22 @@ def run(op, ctx):
     c = client(ctx)
     if op["op"] == "now":
         t = c.now()
-        return f"Playing on Spotify: {t['name']} by {', '.join(a['name'] for a in t['artists'])}." if t else "Nothing is playing on Spotify right now."
+        return (
+            f"Playing on Spotify: {t['name']} by {', '.join(a['name'] for a in t['artists'])}." if t else "Nothing is playing on Spotify right now."
+        )
     if op["op"] == "top":
         ts = c.top()
-        return "Your top songs lately:\n" + "\n".join(f"{i}. {t['name']} by {', '.join(a['name'] for a in t['artists'])}" for i, t in enumerate(ts, 1)) if ts else "No top songs yet."
+        return (
+            "Your top songs lately:\n" + "\n".join(f"{i}. {t['name']} by {', '.join(a['name'] for a in t['artists'])}" for i, t in enumerate(ts, 1))
+            if ts
+            else "No top songs yet."
+        )
     p, found, total = c.playlist(op["name"], op["songs"])
     missing = [s for s, t in found if not t]
     ok = total == len(found) - len(missing)
-    return (f"Spotify playlist '{op['name']}' (private): {len(found) - len(missing)} of {len(found)} songs added" +
-            (f"; not found: {', '.join(missing)}" if missing else "") + f" ({'read back: ' + str(total) + ' songs' if ok else 'NOT as asked when read back'}). "
-            f"{(p.get('external_urls') or {}).get('spotify', '')}")
+    return (
+        f"Spotify playlist '{op['name']}' (private): {len(found) - len(missing)} of {len(found)} songs added"
+        + (f"; not found: {', '.join(missing)}" if missing else "")
+        + f" ({'read back: ' + str(total) + ' songs' if ok else 'NOT as asked when read back'}). "
+        f"{(p.get('external_urls') or {}).get('spotify', '')}"
+    )

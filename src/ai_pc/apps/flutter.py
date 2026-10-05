@@ -7,6 +7,7 @@ read back. A Flutter project given (pubspec.yaml) is analysed and tested, each p
 
   "flutter app called 'Shop'"   'flutter test C:\\code\\myapp\\pubspec.yaml'
 """
+
 import os
 import re
 import shutil
@@ -178,13 +179,21 @@ def home():
 def env():
     h = home()
     e = {k: v for k, v in os.environ.items() if not k.upper().startswith(("FLUTTER", "PUB_", "DART"))}
-    e.update(FLUTTER_ROOT=str(SDK.resolve()), PUB_CACHE=str(h / "pub-cache"), APPDATA=str(h / "appdata"), LOCALAPPDATA=str(h / "localappdata"),
-             FLUTTER_SUPPRESS_ANALYTICS="true", NO_COLOR="1", PATH=str(SDK.resolve() / "bin") + os.pathsep + os.environ["PATH"])
+    e.update(
+        FLUTTER_ROOT=str(SDK.resolve()),
+        PUB_CACHE=str(h / "pub-cache"),
+        APPDATA=str(h / "appdata"),
+        LOCALAPPDATA=str(h / "localappdata"),
+        FLUTTER_SUPPRESS_ANALYTICS="true",
+        NO_COLOR="1",
+        PATH=str(SDK.resolve() / "bin") + os.pathsep + os.environ["PATH"],
+    )
     return e
 
 
 def flutter(*args, cwd, timeout=1800):
     from ai_pc.core import hidden_desktop
+
     rc, out, err, timed_out = hidden_desktop.run(["cmd", "/c", str(FLUTTER), *map(str, args)], timeout=timeout, cwd=str(cwd), env=env())
     return rc == 0 and not timed_out, out + err
 
@@ -220,6 +229,7 @@ def serve_and_fetch(folder):
     class Quiet(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *args):
             pass
+
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(folder)))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
@@ -234,6 +244,7 @@ def serve_and_fetch(folder):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bflutter\b|\bdart\b|\bpubspec\.yaml\b", c):
         return None
@@ -278,12 +289,25 @@ def run(op, ctx):
     ok_w, log_w = flutter("build", "web", "--release", "--no-web-resources-cdn", cwd=out)
     web = out / "build" / "web"
     page, js = serve_and_fetch(web) if (web / "index.html").exists() else ("", 0)
-    checks = [("flutter analyze finds no issues", ok_a and "No issues found" in an),
-              (f"flutter test: {passed} of 6 tests passed (5 unit tests + a widget test that finds 'Total value: Rs 22,000' on the screen)", ok_t and passed == 6 and not failed),
-              (f"flutter build web made the web app; served on 127.0.0.1 it answers with its page and main.dart.js ({js / 1024 / 1024:.1f} MB)",
-               ok_w and "<html" in page.lower() and js > 100_000)]
+    checks = [
+        ("flutter analyze finds no issues", ok_a and "No issues found" in an),
+        (
+            f"flutter test: {passed} of 6 tests passed (5 unit tests + a widget test that finds 'Total value: Rs 22,000' on the screen)",
+            ok_t and passed == 6 and not failed,
+        ),
+        (
+            f"flutter build web made the web app; served on 127.0.0.1 it answers with its page and main.dart.js ({js / 1024 / 1024:.1f} MB)",
+            ok_w and "<html" in page.lower() and js > 100_000,
+        ),
+    ]
     bad = [w for w, good in checks if not good]
     ctx.setdefault("memo", {})["project"] = str(out)
-    return (f"Flutter app {out} (lib/inventory.dart, lib/main.dart, test/; android/ and web/ ready; open it in Android Studio or VS Code). "
-            f"Web build: {web}. " + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else
-                                     "NOT right: " + "; ".join(bad) + ". " + "; ".join(problems(an + te)[:5]) + " " + (log_w.strip()[-300:] if not ok_w else "")))
+    return (
+        f"Flutter app {out} (lib/inventory.dart, lib/main.dart, test/; android/ and web/ ready; open it in Android Studio or VS Code). "
+        f"Web build: {web}. "
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + ". " + "; ".join(problems(an + te)[:5]) + " " + (log_w.strip()[-300:] if not ok_w else "")
+        )
+    )

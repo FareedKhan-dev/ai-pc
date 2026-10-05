@@ -1,11 +1,12 @@
 """Signing in to the services that use OAuth, and keeping the access token fresh (all tokens live in the vault):
 
-  google_signin(client_id, client_secret)    the person signs in once in their browser; a loopback page on 127.0.0.1 takes
-                                             the answer (PKCE, so the code is useless to anyone else); keeps a refresh token
-  microsoft_signin(client_id, show)          a device code: the person opens microsoft.com/devicelogin and types the code shown
-  canva_signin(client_id, client_secret)     like Google, on the fixed address the Canva integration lists (127.0.0.1:3001/oauth/redirect)
-  access_token(service)                      a valid token for google / microsoft / zoom / canva, refreshed when it is about to expire
+google_signin(client_id, client_secret)    the person signs in once in their browser; a loopback page on 127.0.0.1 takes
+                                           the answer (PKCE, so the code is useless to anyone else); keeps a refresh token
+microsoft_signin(client_id, show)          a device code: the person opens microsoft.com/devicelogin and types the code shown
+canva_signin(client_id, client_secret)     like Google, on the fixed address the Canva integration lists (127.0.0.1:3001/oauth/redirect)
+access_token(service)                      a valid token for google / microsoft / zoom / canva, refreshed when it is about to expire
 """
+
 import base64
 import hashlib
 import http.server
@@ -20,12 +21,28 @@ from ai_pc.hub.http import Api, HubError
 
 GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN = "https://oauth2.googleapis.com/token"
-GOOGLE_SCOPES = ["openid", "email", "https://www.googleapis.com/auth/gmail.modify", "https://www.googleapis.com/auth/calendar.events",
-                 "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/spreadsheets",
-                 "https://www.googleapis.com/auth/documents", "https://www.googleapis.com/auth/presentations",
-                 "https://www.googleapis.com/auth/forms.body"]  # Docs, Slides and Forms (apps lane)
+GOOGLE_SCOPES = [
+    "openid",
+    "email",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/documents",
+    "https://www.googleapis.com/auth/presentations",
+    "https://www.googleapis.com/auth/forms.body",
+]  # Docs, Slides and Forms (apps lane)
 MS_BASE = "https://login.microsoftonline.com/common/oauth2/v2.0"
-MS_SCOPES = ["User.Read", "Mail.ReadWrite", "Mail.Send", "Calendars.ReadWrite", "Files.ReadWrite", "Tasks.ReadWrite", "Notes.ReadWrite", "offline_access"]
+MS_SCOPES = [
+    "User.Read",
+    "Mail.ReadWrite",
+    "Mail.Send",
+    "Calendars.ReadWrite",
+    "Files.ReadWrite",
+    "Tasks.ReadWrite",
+    "Notes.ReadWrite",
+    "offline_access",
+]
 MS_TEAMS_SCOPES = ["Chat.ReadWrite", "ChannelMessage.Send", "Team.ReadBasic.All", "Channel.ReadBasic.All"]
 ZOOM_TOKEN = "https://zoom.us/oauth/token"
 CANVA_AUTH = "https://www.canva.com/api/oauth/authorize"
@@ -58,16 +75,36 @@ def google_signin(client_id, client_secret, scopes=None, open_url=webbrowser.ope
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             ok = "code" in got and got.get("state") == state
-            self.wfile.write(("<h2>Signed in. You can close this tab and go back to the AI PC.</h2>" if ok else
-                              "<h2>Sign-in did not finish. Go back to the AI PC and try again.</h2>").encode())
+            self.wfile.write(
+                (
+                    "<h2>Signed in. You can close this tab and go back to the AI PC.</h2>"
+                    if ok
+                    else "<h2>Sign-in did not finish. Go back to the AI PC and try again.</h2>"
+                ).encode()
+            )
 
         def log_message(self, *a):
             pass
+
     srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)  # only this PC can reach it
     redirect = f"http://127.0.0.1:{srv.server_port}"
-    url = GOOGLE_AUTH + "?" + urllib.parse.urlencode({
-        "client_id": client_id, "redirect_uri": redirect, "response_type": "code", "scope": " ".join(scopes or GOOGLE_SCOPES),
-        "code_challenge": challenge, "code_challenge_method": "S256", "access_type": "offline", "prompt": "consent", "state": state})
+    url = (
+        GOOGLE_AUTH
+        + "?"
+        + urllib.parse.urlencode(
+            {
+                "client_id": client_id,
+                "redirect_uri": redirect,
+                "response_type": "code",
+                "scope": " ".join(scopes or GOOGLE_SCOPES),
+                "code_challenge": challenge,
+                "code_challenge_method": "S256",
+                "access_type": "offline",
+                "prompt": "consent",
+                "state": state,
+            }
+        )
+    )
     show(f"Sign in to Google in your browser (opening it now). If it does not open, paste this link into it:\n{url}")
     threading.Thread(target=lambda: open_url(url), daemon=True).start()
     srv.timeout = 1
@@ -79,10 +116,28 @@ def google_signin(client_id, client_secret, scopes=None, open_url=webbrowser.ope
         raise HubError(f"Google sign-in did not finish ({got.get('error', 'timed out')})")
     if got.get("state") != state:
         raise HubError("Google sign-in answered with the wrong state; try again")
-    tok = _token_call(GOOGLE_TOKEN, {"code": got["code"], "client_id": client_id, "client_secret": client_secret, "redirect_uri": redirect,
-                                      "grant_type": "authorization_code", "code_verifier": verifier}, transport)
-    vault.put("google", {"client_id": client_id, "client_secret": client_secret, "refresh_token": tok.get("refresh_token", ""),
-                         "access_token": tok["access_token"], "expires_at": time.time() + int(tok.get("expires_in", 3600)) - 60})
+    tok = _token_call(
+        GOOGLE_TOKEN,
+        {
+            "code": got["code"],
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": redirect,
+            "grant_type": "authorization_code",
+            "code_verifier": verifier,
+        },
+        transport,
+    )
+    vault.put(
+        "google",
+        {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": tok.get("refresh_token", ""),
+            "access_token": tok["access_token"],
+            "expires_at": time.time() + int(tok.get("expires_in", 3600)) - 60,
+        },
+    )
     return tok
 
 
@@ -104,11 +159,17 @@ def _loopback(build_url, host="127.0.0.1", port=0, path="/", show=print, open_ur
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             ok = "code" in got and got.get("state") == state
-            self.wfile.write(("<h2>Signed in. You can close this tab and go back to the AI PC.</h2>" if ok else
-                              "<h2>Sign-in did not finish. Go back to the AI PC and try again.</h2>").encode())
+            self.wfile.write(
+                (
+                    "<h2>Signed in. You can close this tab and go back to the AI PC.</h2>"
+                    if ok
+                    else "<h2>Sign-in did not finish. Go back to the AI PC and try again.</h2>"
+                ).encode()
+            )
 
         def log_message(self, *a):
             pass
+
     srv = http.server.HTTPServer((host, port), Handler)  # only this PC can reach it
     redirect = f"http://{host}:{srv.server_port}{path}"
     url = build_url(redirect, state)
@@ -132,21 +193,48 @@ def canva_signin(client_id, client_secret, scopes=None, open_url=webbrowser.open
     host, port, path = CANVA_REDIRECT
 
     def build(redirect, state):
-        return CANVA_AUTH + "?" + urllib.parse.urlencode({"client_id": client_id, "response_type": "code", "scope": " ".join(scopes or CANVA_SCOPES),
-                                                          "code_challenge": challenge, "code_challenge_method": "s256", "state": state,
-                                                          "redirect_uri": redirect})
+        return (
+            CANVA_AUTH
+            + "?"
+            + urllib.parse.urlencode(
+                {
+                    "client_id": client_id,
+                    "response_type": "code",
+                    "scope": " ".join(scopes or CANVA_SCOPES),
+                    "code_challenge": challenge,
+                    "code_challenge_method": "s256",
+                    "state": state,
+                    "redirect_uri": redirect,
+                }
+            )
+        )
+
     got, redirect = _loopback(build, host, port, path, show=show, open_url=open_url, timeout=timeout, who="Canva")
-    tok = _canva_token({"grant_type": "authorization_code", "code": got["code"], "code_verifier": verifier, "redirect_uri": redirect},
-                       client_id, client_secret, transport)
-    vault.put("canva", {"client_id": client_id, "client_secret": client_secret, "refresh_token": tok.get("refresh_token", ""),
-                        "access_token": tok["access_token"], "expires_at": time.time() + int(tok.get("expires_in", 14400)) - 120})
+    tok = _canva_token(
+        {"grant_type": "authorization_code", "code": got["code"], "code_verifier": verifier, "redirect_uri": redirect},
+        client_id,
+        client_secret,
+        transport,
+    )
+    vault.put(
+        "canva",
+        {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": tok.get("refresh_token", ""),
+            "access_token": tok["access_token"],
+            "expires_at": time.time() + int(tok.get("expires_in", 14400)) - 120,
+        },
+    )
     return tok
 
 
 def _canva_token(form, client_id, client_secret, transport=None):
     basic = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     api = Api(CANVA_TOKEN, service="sign-in", transport=transport)
-    return api.request("POST", CANVA_TOKEN, data=_form(form), headers={"Content-Type": "application/x-www-form-urlencoded", "Authorization": f"Basic {basic}"})
+    return api.request(
+        "POST", CANVA_TOKEN, data=_form(form), headers={"Content-Type": "application/x-www-form-urlencoded", "Authorization": f"Basic {basic}"}
+    )
 
 
 # ---------------------------------------------------------------- Microsoft: device code
@@ -158,8 +246,11 @@ def microsoft_signin(client_id, teams=False, show=print, timeout=900, transport=
     while time.time() - t0 < min(timeout, int(dc.get("expires_in", 900))):
         time.sleep(every)
         try:
-            tok = _token_call(f"{MS_BASE}/token", {"grant_type": "urn:ietf:params:oauth:grant-type:device_code", "client_id": client_id,
-                                                   "device_code": dc["device_code"]}, transport)
+            tok = _token_call(
+                f"{MS_BASE}/token",
+                {"grant_type": "urn:ietf:params:oauth:grant-type:device_code", "client_id": client_id, "device_code": dc["device_code"]},
+                transport,
+            )
         except HubError as e:
             err = (e.body or {}).get("error")
             if err == "authorization_pending":
@@ -168,8 +259,16 @@ def microsoft_signin(client_id, teams=False, show=print, timeout=900, transport=
                 every += 5
                 continue
             raise HubError(f"Microsoft sign-in stopped: {err or e}")
-        vault.put("microsoft", {"client_id": client_id, "refresh_token": tok.get("refresh_token", ""), "access_token": tok["access_token"],
-                                "expires_at": time.time() + int(tok.get("expires_in", 3600)) - 60, "scopes": " ".join(scopes)})
+        vault.put(
+            "microsoft",
+            {
+                "client_id": client_id,
+                "refresh_token": tok.get("refresh_token", ""),
+                "access_token": tok["access_token"],
+                "expires_at": time.time() + int(tok.get("expires_in", 3600)) - 60,
+                "scopes": " ".join(scopes),
+            },
+        )
         return tok
     raise HubError("Microsoft sign-in timed out")
 
@@ -184,8 +283,11 @@ def access_token(service, transport=None):
             raise HubError("Zoom is not connected: run ai-pc hub connect zoom")
         basic = base64.b64encode(f"{c['client_id']}:{c['client_secret']}".encode()).decode()
         api = Api(ZOOM_TOKEN, service="zoom", transport=transport)
-        tok = api.request("POST", f"{ZOOM_TOKEN}?grant_type=account_credentials&account_id={urllib.parse.quote(c['account_id'])}",
-                          headers={"Authorization": f"Basic {basic}"})
+        tok = api.request(
+            "POST",
+            f"{ZOOM_TOKEN}?grant_type=account_credentials&account_id={urllib.parse.quote(c['account_id'])}",
+            headers={"Authorization": f"Basic {basic}"},
+        )
         vault.put("zoom", {"access_token": tok["access_token"], "expires_at": time.time() + int(tok.get("expires_in", 3600)) - 60})
         return tok["access_token"]
     if c.get("access_token") and c.get("expires_at", 0) > time.time():
@@ -193,11 +295,22 @@ def access_token(service, transport=None):
     if not c.get("refresh_token"):
         raise HubError(f"{service.title()} is not signed in: run ai-pc hub connect {service}")
     if service == "google":
-        tok = _token_call(GOOGLE_TOKEN, {"client_id": c["client_id"], "client_secret": c["client_secret"], "refresh_token": c["refresh_token"],
-                                         "grant_type": "refresh_token"}, transport)
+        tok = _token_call(
+            GOOGLE_TOKEN,
+            {"client_id": c["client_id"], "client_secret": c["client_secret"], "refresh_token": c["refresh_token"], "grant_type": "refresh_token"},
+            transport,
+        )
     elif service == "microsoft":
-        tok = _token_call(f"{MS_BASE}/token", {"client_id": c["client_id"], "refresh_token": c["refresh_token"], "grant_type": "refresh_token",
-                                               "scope": c.get("scopes") or " ".join(MS_SCOPES)}, transport)
+        tok = _token_call(
+            f"{MS_BASE}/token",
+            {
+                "client_id": c["client_id"],
+                "refresh_token": c["refresh_token"],
+                "grant_type": "refresh_token",
+                "scope": c.get("scopes") or " ".join(MS_SCOPES),
+            },
+            transport,
+        )
     elif service == "canva":  # Canva's refresh tokens are used once: the new one is kept
         tok = _canva_token({"grant_type": "refresh_token", "refresh_token": c["refresh_token"]}, c["client_id"], c["client_secret"], transport)
     else:

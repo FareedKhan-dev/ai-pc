@@ -2,6 +2,7 @@
 GraphQL 2026-10 (client-credentials token, throttling once), WooCommerce REST v3 (a host that strips the Authorization
 header), Daraz Open Platform (every call's signature checked), WordPress REST (media + posts) and Odoo JSON-RPC.
 Each answers send(method, url, headers, data, timeout) -> (status, headers, bytes) like the hub's transports."""
+
 import base64
 import hashlib
 import hmac  # noqa: F401 - Daraz signatures
@@ -25,8 +26,15 @@ class FakeShopify:
     def __init__(self):
         self.sent, self.token, self.throttle_once, self.n = [], None, True, 10
         self.variants = {}  # sku -> variant
-        self.orders = [{"id": "gid://shopify/Order/1", "name": "#1001", "createdAt": "2026-10-03T10:00:00Z", "totalPriceSet": {"shopMoney": {"amount": "5000.00"}},
-                        "fulfillmentOrders": {"nodes": [{"id": "gid://shopify/FulfillmentOrder/1", "status": "OPEN"}]}}]
+        self.orders = [
+            {
+                "id": "gid://shopify/Order/1",
+                "name": "#1001",
+                "createdAt": "2026-10-03T10:00:00Z",
+                "totalPriceSet": {"shopMoney": {"amount": "5000.00"}},
+                "fulfillmentOrders": {"nodes": [{"id": "gid://shopify/FulfillmentOrder/1", "status": "OPEN"}]},
+            }
+        ]
         self.fulfilled = []
 
     def send(self, method, url, headers, data, timeout):
@@ -57,9 +65,14 @@ class FakeShopify:
             if var["sku"] in self.variants:
                 return js(200, {"data": {"productSet": {"product": None, "userErrors": [{"field": "sku", "message": "SKU taken"}]}}})
             self.n += 1
-            self.variants[var["sku"]] = {"id": f"gid://shopify/ProductVariant/{self.n}", "sku": var["sku"], "price": var["price"],
-                                         "inventoryQuantity": var["inventoryQuantities"][0]["quantity"], "inventoryItem": {"id": f"gid://shopify/InventoryItem/{self.n}"},
-                                         "product": {"id": f"gid://shopify/Product/{self.n}", "title": i["title"]}}
+            self.variants[var["sku"]] = {
+                "id": f"gid://shopify/ProductVariant/{self.n}",
+                "sku": var["sku"],
+                "price": var["price"],
+                "inventoryQuantity": var["inventoryQuantities"][0]["quantity"],
+                "inventoryItem": {"id": f"gid://shopify/InventoryItem/{self.n}"},
+                "product": {"id": f"gid://shopify/Product/{self.n}", "title": i["title"]},
+            }
             return js(200, {"data": {"productSet": {"product": {"id": f"gid://shopify/Product/{self.n}"}, "userErrors": []}}})
         if "productVariantsBulkUpdate(" in q:
             for x in v["v"]:
@@ -79,7 +92,9 @@ class FakeShopify:
             f = v["f"]
             self.fulfilled.append("gid://shopify/Order/1")
             self.last_tracking = f.get("trackingInfo")
-            return js(200, {"data": {"fulfillmentCreate": {"fulfillment": {"id": "gid://shopify/Fulfillment/1", "status": "SUCCESS"}, "userErrors": []}}})
+            return js(
+                200, {"data": {"fulfillmentCreate": {"fulfillment": {"id": "gid://shopify/Fulfillment/1", "status": "SUCCESS"}, "userErrors": []}}}
+            )
         return js(200, {"errors": [{"message": f"unknown query {q[:60]}"}]})
 
 
@@ -94,8 +109,9 @@ class FakeWoo:
         self.sent.append({"method": method, "url": url, "headers": headers})
         u = urllib.parse.urlparse(url)
         q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
-        authed = (not self.strip_auth and headers.get("Authorization") == "Basic " + base64.b64encode(b"ck_1:cs_1").decode()) or \
-            (q.get("consumer_key") == "ck_1" and q.get("consumer_secret") == "cs_1")
+        authed = (not self.strip_auth and headers.get("Authorization") == "Basic " + base64.b64encode(b"ck_1:cs_1").decode()) or (
+            q.get("consumer_key") == "ck_1" and q.get("consumer_secret") == "cs_1"
+        )
         if not authed:
             return js(401, {"code": "woocommerce_rest_authentication_error", "message": "Consumer key is missing.", "data": {"status": 401}})
         path = url.split(self.BASE, 1)[1].split("?")[0]
@@ -132,7 +148,15 @@ class FakeDaraz:
     def __init__(self):
         self.sent, self.bad_signs = [], 0
         self.items = {"LS-01": {"item_id": 9001, "SkuId": 777, "price": 2500, "quantity": 10, "name": "Lawn Suit"}}
-        self.orders = [{"order_id": 123456789, "order_number": 123456789, "price": "2,500.00", "created_at": "2026-10-03 11:00:00 +0500", "statuses": ["pending"]}]
+        self.orders = [
+            {
+                "order_id": 123456789,
+                "order_number": 123456789,
+                "price": "2,500.00",
+                "created_at": "2026-10-03 11:00:00 +0500",
+                "statuses": ["pending"],
+            }
+        ]
 
     def send(self, method, url, headers, data, timeout):
         u = urllib.parse.urlparse(url)
@@ -148,12 +172,35 @@ class FakeDaraz:
             it = self.items.get(p["seller_sku"])
             if not it:
                 return js(200, {"type": "ISV", "code": "208", "message": "Product not found"})
-            return js(200, {"code": "0", "data": {"item_id": it["item_id"], "attributes": {"name": it["name"]},
-                                                 "skus": [{"SellerSku": p["seller_sku"], "SkuId": it["SkuId"], "price": it["price"], "quantity": it["quantity"]}]}})
+            return js(
+                200,
+                {
+                    "code": "0",
+                    "data": {
+                        "item_id": it["item_id"],
+                        "attributes": {"name": it["name"]},
+                        "skus": [{"SellerSku": p["seller_sku"], "SkuId": it["SkuId"], "price": it["price"], "quantity": it["quantity"]}],
+                    },
+                },
+            )
         if path == "/products/get":
-            return js(200, {"code": "0", "data": {"total_products": str(len(self.items)), "products": [
-                {"item_id": it["item_id"], "attributes": {"name": it["name"]}, "skus": [{"SellerSku": s, "SkuId": it["SkuId"], "price": it["price"], "quantity": it["quantity"]}]}
-                for s, it in self.items.items()]}})
+            return js(
+                200,
+                {
+                    "code": "0",
+                    "data": {
+                        "total_products": str(len(self.items)),
+                        "products": [
+                            {
+                                "item_id": it["item_id"],
+                                "attributes": {"name": it["name"]},
+                                "skus": [{"SellerSku": s, "SkuId": it["SkuId"], "price": it["price"], "quantity": it["quantity"]}],
+                            }
+                            for s, it in self.items.items()
+                        ],
+                    },
+                },
+            )
         if path == "/product/price_quantity/update":
             sku = ET.fromstring(p["payload"]).find(".//Sku")
             it = self.items[sku.findtext("SellerSku")]
@@ -170,13 +217,46 @@ class FakeDaraz:
             return js(200, {"code": "0", "data": [{"order_item_id": 456, "sku": "LS-01", "status": "pending"}]})
         if path == "/order/fulfill/pack":
             req = json.loads(p["packReq"])
-            return js(200, {"code": "0", "result": {"success": True, "data": {"pack_order_list": [
-                {"order_id": o["order_id"], "order_item_list": [{"order_item_id": i, "item_err_code": "0", "tracking_number": "DRZ123456", "shipment_provider": "Daraz Express",
-                                                                "package_id": "FP001"} for i in o["order_item_list"]]} for o in req["pack_order_list"]]}}})
+            return js(
+                200,
+                {
+                    "code": "0",
+                    "result": {
+                        "success": True,
+                        "data": {
+                            "pack_order_list": [
+                                {
+                                    "order_id": o["order_id"],
+                                    "order_item_list": [
+                                        {
+                                            "order_item_id": i,
+                                            "item_err_code": "0",
+                                            "tracking_number": "DRZ123456",
+                                            "shipment_provider": "Daraz Express",
+                                            "package_id": "FP001",
+                                        }
+                                        for i in o["order_item_list"]
+                                    ],
+                                }
+                                for o in req["pack_order_list"]
+                            ]
+                        },
+                    },
+                },
+            )
         if path == "/order/package/rts":
             req = json.loads(p["readyToShipReq"])
             self.orders = []
-            return js(200, {"code": "0", "result": {"success": True, "data": {"packages": [{"package_id": x["package_id"], "item_err_code": "0"} for x in req["packages"]]}}})
+            return js(
+                200,
+                {
+                    "code": "0",
+                    "result": {
+                        "success": True,
+                        "data": {"packages": [{"package_id": x["package_id"], "item_err_code": "0"} for x in req["packages"]]},
+                    },
+                },
+            )
         return js(200, {"type": "ISV", "code": "InvalidApi", "message": "no such api"})
 
 
@@ -189,7 +269,9 @@ class FakeWordPress:
     def send(self, method, url, headers, data, timeout):
         self.sent.append({"method": method, "url": url, "headers": headers})
         if headers.get("Authorization") != "Basic " + base64.b64encode(b"ayesha:abcdabcdabcdabcdabcdabcd").decode():
-            return js(401, {"code": "incorrect_password", "message": "The provided password is an invalid application password.", "data": {"status": 401}})
+            return js(
+                401, {"code": "incorrect_password", "message": "The provided password is an invalid application password.", "data": {"status": 401}}
+            )
         path = url.split(self.BASE, 1)[1].split("?")[0]
         if path == "users/me":
             return js(200, {"id": 1, "name": "Ayesha"})
@@ -202,8 +284,14 @@ class FakeWordPress:
         if path == "posts" and method == "POST":
             b = json.loads(data)
             self.n += 1
-            self.posts[self.n] = {"id": self.n, "title": {"raw": b["title"], "rendered": b["title"]}, "content": {"raw": b["content"]}, "status": b["status"],
-                                  "featured_media": b.get("featured_media", 0), "link": f"https://blog.pk/?p={self.n}"}
+            self.posts[self.n] = {
+                "id": self.n,
+                "title": {"raw": b["title"], "rendered": b["title"]},
+                "content": {"raw": b["content"]},
+                "status": b["status"],
+                "featured_media": b.get("featured_media", 0),
+                "link": f"https://blog.pk/?p={self.n}",
+            }
             return js(201, self.posts[self.n])
         m = re.fullmatch(r"posts/(\d+)", path)
         if m and method == "GET":
@@ -221,10 +309,24 @@ class FakeOdoo:
 
     def __init__(self):
         self.sent = []
-        self.t = {"product.product": {7: {"id": 7, "name": "Lawn Suit", "default_code": "LS-01", "lst_price": 2500.0, "qty_available": 10.0, "sale_ok": True}},
-                  "res.partner": {3: {"id": 3, "name": "Ali Traders"}}, "account.move": {},
-                  "sale.order": {20: {"id": 20, "name": "S00020", "partner_id": [3, "Ali Traders"], "amount_total": 5000.0, "date_order": "2026-10-03",
-                                      "state": "sale", "invoice_status": "to invoice"}}}
+        self.t = {
+            "product.product": {
+                7: {"id": 7, "name": "Lawn Suit", "default_code": "LS-01", "lst_price": 2500.0, "qty_available": 10.0, "sale_ok": True}
+            },
+            "res.partner": {3: {"id": 3, "name": "Ali Traders"}},
+            "account.move": {},
+            "sale.order": {
+                20: {
+                    "id": 20,
+                    "name": "S00020",
+                    "partner_id": [3, "Ali Traders"],
+                    "amount_total": 5000.0,
+                    "date_order": "2026-10-03",
+                    "state": "sale",
+                    "invoice_status": "to invoice",
+                }
+            },
+        }
 
     def _match(self, row, dom):
         for f, op, v in dom:
@@ -246,11 +348,21 @@ class FakeOdoo:
             return js(200, {"jsonrpc": "2.0", "id": b["id"], "result": 2 if (db, login, key) == ("khan", "ayesha@khan.pk", "odoo-key") else False})
         db, uid, key, model, meth, args, kw = p["args"]
         if uid != 2 or key != "odoo-key":
-            return js(200, {"jsonrpc": "2.0", "id": b["id"], "error": {"code": 200, "message": "Odoo Server Error",
-                                                                      "data": {"name": "odoo.exceptions.AccessDenied", "message": "Access Denied"}}})
+            return js(
+                200,
+                {
+                    "jsonrpc": "2.0",
+                    "id": b["id"],
+                    "error": {
+                        "code": 200,
+                        "message": "Odoo Server Error",
+                        "data": {"name": "odoo.exceptions.AccessDenied", "message": "Access Denied"},
+                    },
+                },
+            )
         rows = self.t[model]
         if meth == "search_read":
-            hit = [r for r in rows.values() if self._match(r, args[0])][:kw.get("limit", 80)]
+            hit = [r for r in rows.values() if self._match(r, args[0])][: kw.get("limit", 80)]
             return js(200, {"jsonrpc": "2.0", "id": b["id"], "result": [{k: r.get(k) for k in kw.get("fields") or r} | {"id": r["id"]} for r in hit]})
         if meth == "create":
             vals = args[0]
@@ -331,7 +443,7 @@ class FakeBrevo:
             self.contacts[b["email"]] = b
             for i in b["listIds"]:
                 self.lists[i]["totalSubscribers"] += 1 if new else 0
-            return (js(201, {"id": len(self.contacts)}) if new else (204, {}, b""))
+            return js(201, {"id": len(self.contacts)}) if new else (204, {}, b"")
         if path == "emailCampaigns" and method == "POST":
             if not b["sender"].get("email"):
                 return js(400, {"code": "invalid_parameter", "message": "sender email is missing"})
@@ -364,14 +476,23 @@ class FakeDropbox:
                 path = path.replace(".", " (1).", 1)
             h = hashlib.sha256()
             for i in range(0, len(data), 4 * 1024 * 1024):
-                h.update(hashlib.sha256(data[i:i + 4 * 1024 * 1024]).digest())
+                h.update(hashlib.sha256(data[i : i + 4 * 1024 * 1024]).digest())
             self.files[path] = data
             return js(200, {"name": path.rsplit("/", 1)[-1], "path_display": path, "size": len(data), "content_hash": h.hexdigest()})
         b = json.loads(data)
         if url.endswith("/files/list_folder"):
             folder = b["path"]
-            return js(200, {"entries": [{".tag": "file", "name": p.rsplit("/", 1)[-1], "path_display": p, "size": len(d)} for p, d in self.files.items()
-                                        if p.rsplit("/", 1)[0] == folder], "has_more": False})
+            return js(
+                200,
+                {
+                    "entries": [
+                        {".tag": "file", "name": p.rsplit("/", 1)[-1], "path_display": p, "size": len(d)}
+                        for p, d in self.files.items()
+                        if p.rsplit("/", 1)[0] == folder
+                    ],
+                    "has_more": False,
+                },
+            )
         if url.endswith("/sharing/create_shared_link_with_settings"):
             if b["path"] not in self.files:
                 return js(409, {"error_summary": "path/not_found/"})

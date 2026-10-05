@@ -10,6 +10,7 @@ carry tracking parameters (from_page, from_page_click) are not for automated acc
 /template-detail/<id> first and checked against the robots rules before the one fetch. No login, no crawling of
 listings, no media downloads: only the page the client points at, cached for a day.
 """
+
 import html as _html
 import json
 import re
@@ -34,8 +35,10 @@ def clean_url(url):
     url = str(url).strip()
     m = DETAIL.match(url)
     if not m:
-        raise NotAllowed("only a CapCut template's own page (capcut.com/template-detail/...) can be read; "
-                         "listing pages (/templates/, /explore/...) are not crawled")
+        raise NotAllowed(
+            "only a CapCut template's own page (capcut.com/template-detail/...) can be read; "
+            "listing pages (/templates/, /explore/...) are not crawled"
+        )
     tid = m.group(1)
     return tid, f"https://www.capcut.com/template-detail/{tid}"
 
@@ -111,8 +114,8 @@ def parse_page(page, tid):
     for k, (pos, idv) in enumerate(marks):
         if idv != tid:
             continue
-        after = page[pos:marks[k + 1][0]] if k + 1 < len(marks) else page[pos:pos + 4000]
-        before = page[marks[k - 1][0]:pos] if k else page[max(0, pos - 4000):pos]
+        after = page[pos : marks[k + 1][0]] if k + 1 < len(marks) else page[pos : pos + 4000]
+        before = page[marks[k - 1][0] : pos] if k else page[max(0, pos - 4000) : pos]
         for seg in (after, before):
             if '"segmentAmount"' in seg and '"usageAmount"' in seg:
                 best = seg
@@ -120,12 +123,14 @@ def parse_page(page, tid):
         if best:
             break
     if best:
+
         def field(name, kind="num"):
-            m_ = re.search(r'"' + name + r'":(' + (r'-?[0-9.]+' if kind == "num" else r'"(?:[^"\\]|\\.)*"') + r')', best)
+            m_ = re.search(r'"' + name + r'":(' + (r"-?[0-9.]+" if kind == "num" else r'"(?:[^"\\]|\\.)*"') + r")", best)
             if not m_:
                 return None
             v = m_.group(1)
             return json.loads(v) if kind == "str" else float(v)
+
         t = field("title", "str")
         if t:
             out["title"] = t
@@ -180,6 +185,7 @@ def from_image(path, planner):
     """The template's fields read off a screenshot of its page (one vision call)."""
     from ai_pc.llm.vlm import ask
     from ai_pc.media import frames as F
+
     fr = F.image(str(path))
     img = F.jpeg(fr, width=min(1280, fr.shape[1]), quality=88)  # the vision helper takes JPEG bytes
     d, _ = ask(planner, IMAGE_SYSTEM, "A screenshot of a template page.", [img], tier="vision")

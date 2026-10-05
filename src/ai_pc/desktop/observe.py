@@ -16,7 +16,9 @@ def render(snap, max_lines=140, name_len=60):
     lines = []
     rich = snap.richness
     kind = "rich" if rich >= 6 else ("thin" if rich else "EMPTY")
-    lines.append(f'APP: {snap.proc} (pid {snap.pid}) | window "{snap.title[:70]}" | richness: {kind} ({rich} interactable of {len(snap.els)} elements)')
+    lines.append(
+        f'APP: {snap.proc} (pid {snap.pid}) | window "{snap.title[:70]}" | richness: {kind} ({rich} interactable of {len(snap.els)} elements)'
+    )
     foc = next((e.id for e in snap.els if e.focus), None)
     lines.append(f"FOCUS: {foc or '-'}")
     if kind != "rich":

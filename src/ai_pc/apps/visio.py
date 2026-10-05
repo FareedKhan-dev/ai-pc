@@ -6,6 +6,7 @@ every box label and line count.
 
   'visio flowchart: Start -> Take order -> Paid? -> Pack -> Ship -> End'   'visio org chart: CEO > CTO, CFO; CTO > Dev lead'
 """
+
 import re
 import xml.etree.ElementTree as ET
 import zipfile
@@ -94,8 +95,16 @@ def read_drawio(path):
         style = c.get("style") or ""
         if c.get("vertex") == "1" and g is not None:
             shape = "diamond" if "rhombus" in style else "ellipse" if "ellipse" in style else "rect"
-            vertices[c.get("id")] = (label, float(g.get("x", 0)), float(g.get("y", 0)), float(g.get("width", 120)), float(g.get("height", 60)),
-                                     shape, color(style, "fillColor", "#FFFFFF"), color(style, "strokeColor", "#333333"))
+            vertices[c.get("id")] = (
+                label,
+                float(g.get("x", 0)),
+                float(g.get("y", 0)),
+                float(g.get("width", 120)),
+                float(g.get("height", 60)),
+                shape,
+                color(style, "fillColor", "#FFFFFF"),
+                color(style, "strokeColor", "#333333"),
+            )
         elif c.get("edge") == "1":
             pts = [(float(p.get("x", 0)), float(p.get("y", 0))) for p in (g.iter("mxPoint") if g is not None else []) if p.get("as") is None]
             edges.append((c.get("source"), c.get("target"), label, pts))
@@ -114,15 +123,21 @@ def vsdx(vertices, edges, dest, title):
         cx, cy = to_in(x + w / 2, y + h / 2)
         W, H = w / PX, h / PX
         if shape == "ellipse":
-            geo = f'<Row T="Ellipse" IX="1">{cell("X", W / 2)}{cell("Y", H / 2)}{cell("A", W)}{cell("B", H / 2)}{cell("C", W / 2)}{cell("D", H)}</Row>'
+            geo = (
+                f'<Row T="Ellipse" IX="1">{cell("X", W / 2)}{cell("Y", H / 2)}{cell("A", W)}{cell("B", H / 2)}{cell("C", W / 2)}{cell("D", H)}</Row>'
+            )
         else:
             pts = [(W / 2, 0), (W, H / 2), (W / 2, H), (0, H / 2), (W / 2, 0)] if shape == "diamond" else [(0, 0), (W, 0), (W, H), (0, H), (0, 0)]
-            geo = "".join(f'<Row T="{"MoveTo" if i == 0 else "LineTo"}" IX="{i + 1}">{cell("X", px)}{cell("Y", py)}</Row>' for i, (px, py) in enumerate(pts))
-        shapes.append(f'<Shape ID="{n}" NameU="{shape.title()} {n}" Name="{shape.title()} {n}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">'
-                      f'{cell("PinX", cx)}{cell("PinY", cy)}{cell("Width", W)}{cell("Height", H)}{cell("LocPinX", W / 2, "Width*0.5")}'
-                      f'{cell("LocPinY", H / 2, "Height*0.5")}{cell("Angle", 0.0)}{cell("FillForegnd", fill)}{cell("LineColor", line)}'
-                      f'<Section N="Geometry" IX="0">{cell("NoFill", 0)}{cell("NoLine", 0)}{cell("NoShow", 0)}{geo}</Section>'
-                      f'<Text>{escape(label)}</Text></Shape>')
+            geo = "".join(
+                f'<Row T="{"MoveTo" if i == 0 else "LineTo"}" IX="{i + 1}">{cell("X", px)}{cell("Y", py)}</Row>' for i, (px, py) in enumerate(pts)
+            )
+        shapes.append(
+            f'<Shape ID="{n}" NameU="{shape.title()} {n}" Name="{shape.title()} {n}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">'
+            f"{cell('PinX', cx)}{cell('PinY', cy)}{cell('Width', W)}{cell('Height', H)}{cell('LocPinX', W / 2, 'Width*0.5')}"
+            f"{cell('LocPinY', H / 2, 'Height*0.5')}{cell('Angle', 0.0)}{cell('FillForegnd', fill)}{cell('LineColor', line)}"
+            f'<Section N="Geometry" IX="0">{cell("NoFill", 0)}{cell("NoLine", 0)}{cell("NoShow", 0)}{geo}</Section>'
+            f"<Text>{escape(label)}</Text></Shape>"
+        )
     n = len(vertices)
     for src, dst, label, way in edges:
         if src not in vertices or dst not in vertices:
@@ -138,36 +153,62 @@ def vsdx(vertices, edges, dest, title):
                 return cx, cy
             k = 1 / max(abs(dx) / hw if hw else 0, abs(dy) / hh if hh else 0)
             return cx + dx * k, cy + dy * k
+
         pts[0], pts[-1] = edge_of(a, pts[1]), edge_of(b, pts[-2])
         page = [to_in(*p) for p in pts]
         bx0, by0 = min(p[0] for p in page), min(p[1] for p in page)
         bw, bh = max(p[0] for p in page) - bx0, max(p[1] for p in page) - by0
-        geo = "".join(f'<Row T="{"MoveTo" if i == 0 else "LineTo"}" IX="{i + 1}">{cell("X", px - bx0)}{cell("Y", py - by0)}</Row>' for i, (px, py) in enumerate(page))
-        shapes.append(f'<Shape ID="{n}" NameU="Connector {n}" Name="Connector {n}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">'
-                      f'{cell("PinX", bx0 + bw / 2)}{cell("PinY", by0 + bh / 2)}{cell("Width", bw)}{cell("Height", bh)}'
-                      f'{cell("LocPinX", bw / 2, "Width*0.5")}{cell("LocPinY", bh / 2, "Height*0.5")}'
-                      f'{cell("BeginX", page[0][0])}{cell("BeginY", page[0][1])}{cell("EndX", page[-1][0])}{cell("EndY", page[-1][1])}'
-                      f'{cell("ObjType", 2)}{cell("EndArrow", 13)}{cell("LineColor", "#333333")}'
-                      f'<Section N="Geometry" IX="0">{cell("NoFill", 1)}{cell("NoLine", 0)}{cell("NoShow", 0)}{geo}</Section>'
-                      + (f"<Text>{escape(label)}</Text>" if label else "") + "</Shape>")
-        connects += [f'<Connect FromSheet="{n}" FromCell="BeginX" FromPart="9" ToSheet="{ids[src]}" ToCell="PinX" ToPart="3"/>',
-                     f'<Connect FromSheet="{n}" FromCell="EndX" FromPart="12" ToSheet="{ids[dst]}" ToCell="PinX" ToPart="3"/>']
-    page1 = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<PageContents xmlns="{NS}" xmlns:r="{REL}" xml:space="preserve">'
-             f'<Shapes>{"".join(shapes)}</Shapes>' + (f'<Connects>{"".join(connects)}</Connects>' if connects else "") + "</PageContents>")
-    pages = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Pages xmlns="{NS}" xmlns:r="{REL}" xml:space="preserve">'
-             f'<Page ID="0" NameU="{escape(title)}" Name="{escape(title)}" ViewScale="-1" ViewCenterX="{_num(width / 2)}" ViewCenterY="{_num(height / 2)}">'
-             f'<PageSheet LineStyle="0" FillStyle="0" TextStyle="0">{cell("PageWidth", width)}{cell("PageHeight", height)}{cell("ShdwOffsetX", 0.125)}'
-             f'{cell("ShdwOffsetY", -0.125)}{cell("PageScale", 1.0)}{cell("DrawingScale", 1.0)}{cell("DrawingSizeType", 0)}{cell("DrawingScaleType", 0)}'
-             f'{cell("InhibitSnap", 0)}{cell("PageLockReplace", 0)}{cell("PageLockDuplicate", 0)}{cell("UIVisibility", 0)}{cell("ShdwType", 0)}'
-             f'{cell("PrintPageOrientation", 2 if width > height else 1)}</PageSheet><Rel r:id="rId1"/></Page></Pages>')
-    core = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
-            'xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>' + escape(title) + "</dc:title><dc:creator>AI PC</dc:creator></cp:coreProperties>")
-    app = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">'
-           "<Application>Microsoft Visio</Application><Template></Template></Properties>")
+        geo = "".join(
+            f'<Row T="{"MoveTo" if i == 0 else "LineTo"}" IX="{i + 1}">{cell("X", px - bx0)}{cell("Y", py - by0)}</Row>'
+            for i, (px, py) in enumerate(page)
+        )
+        shapes.append(
+            f'<Shape ID="{n}" NameU="Connector {n}" Name="Connector {n}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">'
+            f"{cell('PinX', bx0 + bw / 2)}{cell('PinY', by0 + bh / 2)}{cell('Width', bw)}{cell('Height', bh)}"
+            f"{cell('LocPinX', bw / 2, 'Width*0.5')}{cell('LocPinY', bh / 2, 'Height*0.5')}"
+            f"{cell('BeginX', page[0][0])}{cell('BeginY', page[0][1])}{cell('EndX', page[-1][0])}{cell('EndY', page[-1][1])}"
+            f"{cell('ObjType', 2)}{cell('EndArrow', 13)}{cell('LineColor', '#333333')}"
+            f'<Section N="Geometry" IX="0">{cell("NoFill", 1)}{cell("NoLine", 0)}{cell("NoShow", 0)}{geo}</Section>'
+            + (f"<Text>{escape(label)}</Text>" if label else "")
+            + "</Shape>"
+        )
+        connects += [
+            f'<Connect FromSheet="{n}" FromCell="BeginX" FromPart="9" ToSheet="{ids[src]}" ToCell="PinX" ToPart="3"/>',
+            f'<Connect FromSheet="{n}" FromCell="EndX" FromPart="12" ToSheet="{ids[dst]}" ToCell="PinX" ToPart="3"/>',
+        ]
+    page1 = (
+        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<PageContents xmlns="{NS}" xmlns:r="{REL}" xml:space="preserve">'
+        f"<Shapes>{''.join(shapes)}</Shapes>" + (f"<Connects>{''.join(connects)}</Connects>" if connects else "") + "</PageContents>"
+    )
+    pages = (
+        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Pages xmlns="{NS}" xmlns:r="{REL}" xml:space="preserve">'
+        f'<Page ID="0" NameU="{escape(title)}" Name="{escape(title)}" ViewScale="-1" ViewCenterX="{_num(width / 2)}" ViewCenterY="{_num(height / 2)}">'
+        f'<PageSheet LineStyle="0" FillStyle="0" TextStyle="0">{cell("PageWidth", width)}{cell("PageHeight", height)}{cell("ShdwOffsetX", 0.125)}'
+        f"{cell('ShdwOffsetY', -0.125)}{cell('PageScale', 1.0)}{cell('DrawingScale', 1.0)}{cell('DrawingSizeType', 0)}{cell('DrawingScaleType', 0)}"
+        f"{cell('InhibitSnap', 0)}{cell('PageLockReplace', 0)}{cell('PageLockDuplicate', 0)}{cell('UIVisibility', 0)}{cell('ShdwType', 0)}"
+        f'{cell("PrintPageOrientation", 2 if width > height else 1)}</PageSheet><Rel r:id="rId1"/></Page></Pages>'
+    )
+    core = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+        'xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>' + escape(title) + "</dc:title><dc:creator>AI PC</dc:creator></cp:coreProperties>"
+    )
+    app = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">'
+        "<Application>Microsoft Visio</Application><Template></Template></Properties>"
+    )
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
-        for name, data in [("[Content_Types].xml", CONTENT_TYPES), ("_rels/.rels", ROOT_RELS), ("docProps/core.xml", core), ("docProps/app.xml", app),
-                           ("visio/document.xml", DOCUMENT), ("visio/_rels/document.xml.rels", DOC_RELS), ("visio/windows.xml", WINDOWS),
-                           ("visio/pages/pages.xml", pages), ("visio/pages/_rels/pages.xml.rels", PAGES_RELS), ("visio/pages/page1.xml", page1)]:
+        for name, data in [
+            ("[Content_Types].xml", CONTENT_TYPES),
+            ("_rels/.rels", ROOT_RELS),
+            ("docProps/core.xml", core),
+            ("docProps/app.xml", app),
+            ("visio/document.xml", DOCUMENT),
+            ("visio/_rels/document.xml.rels", DOC_RELS),
+            ("visio/windows.xml", WINDOWS),
+            ("visio/pages/pages.xml", pages),
+            ("visio/pages/_rels/pages.xml.rels", PAGES_RELS),
+            ("visio/pages/page1.xml", page1),
+        ]:
             z.writestr(name, data)
     return len(vertices), sum(1 for s in shapes if "Connector" in s)
 
@@ -177,6 +218,7 @@ def parse(text, ctx):
     if not re.search(r"\bvisio\b|\.vsdx\b", c):
         return None
     from ai_pc.apps import diagrams
+
     rest = re.sub(r"^\s*(?:ms\s+|microsoft\s+)?visio\s*|\s*(?:in|as|for)\s+(?:ms\s+|microsoft\s+)?visio\b", "", text, flags=re.I).strip()
     op = diagrams.parse(rest, ctx)
     return dict(op, op="visio") if op else None
@@ -184,6 +226,7 @@ def parse(text, ctx):
 
 def run(op, ctx):
     from ai_pc.apps import diagrams, libreoffice
+
     out = (Path(ctx["out"]) / "visio").resolve()
     out.mkdir(parents=True, exist_ok=True)
     name = {"flow": "flowchart", "tree": "org_chart", "mind": "mind_map"}[op["kind"]]
@@ -200,11 +243,17 @@ def run(op, ctx):
     if libreoffice.soffice():
         libreoffice.convert(dest, "pdf", out)
         from pypdf import PdfReader
+
         words = re.sub(r"\s+", " ", " ".join(pg.extract_text() or "" for pg in PdfReader(str(pdf)).pages).lower()) if pdf.exists() else ""
         labels = [v[0] for v in vertices.values() if v[0]]
         found = sum(1 for lab in labels if re.sub(r"\s+", " ", lab.lower()) in words)
-        checks.append((f"LibreOffice's Visio reader opens it: its PDF shows {found} of {len(labels)} box labels", pdf.exists() and found == len(labels)))
+        checks.append(
+            (f"LibreOffice's Visio reader opens it: its PDF shows {found} of {len(labels)} box labels", pdf.exists() and found == len(labels))
+        )
     bad = [w for w, good in checks if not good]
-    return (f"Visio drawing {dest} (a {name.replace('_', ' ')}; opens in Microsoft Visio, LibreOffice Draw and draw.io)" +
-            (f", with a PDF of it {pdf.name}" if pdf.exists() else "") + ". " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + "."))
+    return (
+        f"Visio drawing {dest} (a {name.replace('_', ' ')}; opens in Microsoft Visio, LibreOffice Draw and draw.io)"
+        + (f", with a PDF of it {pdf.name}" if pdf.exists() else "")
+        + ". "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ".")
+    )

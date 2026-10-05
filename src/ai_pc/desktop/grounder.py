@@ -3,6 +3,7 @@
 Flow: upload the screenshot once (the server encodes it, ~120 ms), then each 'where is X?' question costs ~110 ms.
 `prefetch()` uploads in the background while a planner is still thinking, so grounding is ready the moment it answers.
 """
+
 import io
 import json
 import os
@@ -22,6 +23,7 @@ def make_grounder(kind=None):
     """The configured click model: 'vocaela' (default) or 'tinyclick'."""
     if (kind or GROUNDER).lower() == "vocaela":
         from ai_pc.desktop.vocaela import VocaelaGrounder
+
         return VocaelaGrounder()
     return Grounder()
 
@@ -33,8 +35,12 @@ class Grounder:
         self._pre = None  # (image object, thread, info holder)
 
     def _req(self, path, data=None, raw=False, timeout=30):
-        req = urllib.request.Request(self.url + path, data=data, method="POST" if data is not None else "GET",
-                                     headers={"Content-Type": "application/octet-stream" if raw else "application/json"})
+        req = urllib.request.Request(
+            self.url + path,
+            data=data,
+            method="POST" if data is not None else "GET",
+            headers={"Content-Type": "application/octet-stream" if raw else "application/json"},
+        )
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read())
 
@@ -52,8 +58,9 @@ class Grounder:
             raise GrounderError("grounder server is not running (python services/tinyclick/server.py)")
         env = dict(os.environ, HF_HOME=str(ROOT / "models" / "hf"))
         log = open(ROOT / "runs" / "grounder.log", "ab")
-        subprocess.Popen(GROUNDER_CMD, cwd=str(ROOT), env=env, stdout=log, stderr=log,
-                         creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        subprocess.Popen(
+            GROUNDER_CMD, cwd=str(ROOT), env=env, stdout=log, stderr=log, creationflags=0x00000008 | 0x00000200
+        )  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
         t0 = time.time()
         while time.time() - t0 < timeout:
             if self.alive():

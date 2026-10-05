@@ -12,15 +12,36 @@ targets, then by weight) and scored on room sizes, proportions, the connections 
 best layout wins. All lengths are inches; every room is a rectangle of clear floor (inside the walls); a bath sits in
 the back corner of its bedroom.
 """
+
 import itertools
 import math
 
 from ai_pc.cad.units import ft_in
 
 OUTER, INNER = 9.0, 4.5
-BRIEF = {"plot": [25, 45], "bedrooms": 2, "baths": "attached", "porch": True, "drawing": True, "dining": False, "store": False, "powder": False,
-         "servant": False, "guest": False, "stairs": True, "floors": 1, "porch_side": None, "setbacks": None, "sizes": {}, "grow": {},
-         "furniture": True, "name": "House", "client": "", "corner": False, "stair_type": None}
+BRIEF = {
+    "plot": [25, 45],
+    "bedrooms": 2,
+    "baths": "attached",
+    "porch": True,
+    "drawing": True,
+    "dining": False,
+    "store": False,
+    "powder": False,
+    "servant": False,
+    "guest": False,
+    "stairs": True,
+    "floors": 1,
+    "porch_side": None,
+    "setbacks": None,
+    "sizes": {},
+    "grow": {},
+    "furniture": True,
+    "name": "House",
+    "client": "",
+    "corner": False,
+    "stair_type": None,
+}
 # kind: label, home band, min clear (w, d) feet, target area sq ft, weight (share of spare room), needs daylight
 KINDS = {
     "porch": ("CAR PORCH", "front", (10.0, 15.0), 200, 1.0, False),
@@ -38,8 +59,14 @@ KINDS = {
     "terrace": ("TERRACE", "front", (8.0, 10.0), 150, 1.0, False),
     "family": ("FAMILY LOUNGE", "middle", (10.0, 10.0), 220, 3.0, True),
 }
-MOVABLE = {"stairs": ["middle", "front"], "store": ["middle", "front", "rear"], "powder": ["middle", "front"], "dining": ["middle", "front"],
-           "servant": ["front", "rear"], "guest": ["front", "rear"]}
+MOVABLE = {
+    "stairs": ["middle", "front"],
+    "store": ["middle", "front", "rear"],
+    "powder": ["middle", "front"],
+    "dining": ["middle", "front"],
+    "servant": ["front", "rear"],
+    "guest": ["front", "rear"],
+}
 STAIRS = {"dogleg": (78, 120), "straight": (42, 150)}  # clear width, run (inches): two 3' flights and a landing, or one 3'-6" flight
 BATH_MIN, BATH_TARGET = (60, 84), (66, 96)  # inches: a corner bath 5' x 7' at least, 5'-6" x 8' when there is room
 MAX_W = {"porch": 13 * 12, "store": 7 * 12, "powder": 6 * 12, "kitchen": 13 * 12, "servant": 11 * 12}
@@ -99,9 +126,9 @@ class Item:
         side = math.sqrt(k[3]) * 12
         self.target = max(self.min, side * (1 + 0.12 * grow)) if room["kind"] != "stairs" else self.min
         self.weight = k[4] * (1 + 0.35 * grow)
-        self.max = MAX_W.get(room["kind"], 10 ** 6) if axis == "w" else 10 ** 6
+        self.max = MAX_W.get(room["kind"], 10**6) if axis == "w" else 10**6
         if room["kind"] == "stairs":
-            self.max = self.min + 24 if axis == "w" else 10 ** 6
+            self.max = self.min + 24 if axis == "w" else 10**6
         if want:
             v = want[0] * 12 if axis == "w" else want[1] * 12
             self.min = self.target = v
@@ -139,7 +166,7 @@ def split(total, items):
             sizes[j] = min(items[j].max, sizes[j] + extra * items[j].weight / tw)
         extra = avail - sum(sizes)
     if extra > 0.25:  # everyone is at their maximum: the most important room that may still grow takes the rest
-        js = [j for j in range(len(items)) if items[j].max >= 10 ** 5] or list(range(len(items)))
+        js = [j for j in range(len(items)) if items[j].max >= 10**5] or list(range(len(items)))
         j = max(js, key=lambda j: (items[j].weight, -items[j].max))
         sizes[j] += extra
     out = [math.floor(s) for s in sizes]
@@ -162,9 +189,19 @@ def _shared(a, b):
     return 0.0, None
 
 
-NEEDS = [("lounge", "kitchen", "room", 8), ("lounge", "stairs", "open", 5), ("lounge", "dining", "open", 3), ("dining", "kitchen", "room", 4),
-         ("kitchen", "store", "store", 2), ("lounge", "powder", "bath", 2), ("drawing", "lounge", "room", 1.5), ("porch", "drawing", "room", 3),
-         ("porch", "lounge", "main", 4), ("porch", "servant", "store", 2), ("lounge", "guest", "room", 2)]
+NEEDS = [
+    ("lounge", "kitchen", "room", 8),
+    ("lounge", "stairs", "open", 5),
+    ("lounge", "dining", "open", 3),
+    ("dining", "kitchen", "room", 4),
+    ("kitchen", "store", "store", 2),
+    ("lounge", "powder", "bath", 2),
+    ("drawing", "lounge", "room", 1.5),
+    ("porch", "drawing", "room", 3),
+    ("porch", "lounge", "main", 4),
+    ("porch", "servant", "store", 2),
+    ("lounge", "guest", "room", 2),
+]
 
 
 def _reach(rooms, a, b, kind):
@@ -233,9 +270,11 @@ def _setbacks(W, D):
 
 def _assignments(by, clear_w, b):
     """Ways to place the movable rooms so that every band's minimum widths fit (the fewest moves first, at most four)."""
+
     def need(rs, stair):
-        cols = _columns(rs, 10 ** 6, b, stair)
+        cols = _columns(rs, 10**6, b, stair)
         return sum(_col_item(c, "w", b, stair).min for c in cols) + INNER * max(0, len(cols) - 1)
+
     out = []
     mv = dict(MOVABLE, kitchen=["middle", "rear"]) if b.get("_kitchen_rear") else MOVABLE  # small plots: the kitchen may go to the back
     movable = [r for band in ("middle", "front", "rear") for r in by[band] if r["kind"] in mv]
@@ -300,8 +339,11 @@ def plan(brief, budget_s=2.5):
     ey0, ey1 = sb["front"], D - sb["rear"]
     cx0, cx1, cy0, cy1 = ex0 + OUTER, ex1 - OUTER, ey0 + OUTER, ey1 - OUTER
     clear_w, clear_d = cx1 - cx0, cy1 - cy0
-    by = {"front": [r for r in rooms if KINDS[r["kind"]][1] == "front"], "middle": [r for r in rooms if KINDS[r["kind"]][1] == "middle"],
-          "rear": [r for r in rooms if KINDS[r["kind"]][1] == "rear"]}
+    by = {
+        "front": [r for r in rooms if KINDS[r["kind"]][1] == "front"],
+        "middle": [r for r in rooms if KINDS[r["kind"]][1] == "middle"],
+        "rear": [r for r in rooms if KINDS[r["kind"]][1] == "rear"],
+    }
     notes = []
     bed_min = Item({"id": "bed", "kind": "bedroom", "bath": b["baths"] in ("attached", True, "yes")}, "w", b).min
     fit = max(1, int((clear_w + INNER) // (bed_min + INNER)))
@@ -312,8 +354,10 @@ def plan(brief, budget_s=2.5):
             by["front"].append(extra)
             notes.append(f"{extra['label']} is at the front: only {fit} bedroom(s) fit side by side at the back of a {b['plot'][0]}' wide plot")
         else:
-            notes.append(f"{extra['label']} does not fit on the ground floor of a {b['plot'][0]}' wide plot" +
-                         (" (it is on the first floor)" if b["floors"] > 1 else "; build a first floor for it, or take a wider plot"))
+            notes.append(
+                f"{extra['label']} does not fit on the ground floor of a {b['plot'][0]}' wide plot"
+                + (" (it is on the first floor)" if b["floors"] > 1 else "; build a first floor for it, or take a wider plot")
+            )
             rooms = [r for r in rooms if r["id"] != extra["id"]]
     asgs = _assignments(by, clear_w, b)
     dropped = []
@@ -338,7 +382,7 @@ def plan(brief, budget_s=2.5):
             if b.get("stair_type") in STAIRS:
                 stair_types = [s for s in stair_types if s == b["stair_type"]] or stair_types
             for mo in _orders(asg["middle"], "middle", porch_sides):
-                for rows in ([mo] + [[mo[:k], mo[k:]] for k in range(2, len(mo) - 1)] if len(mo) >= 4 else [mo]):
+                for rows in [mo] + [[mo[:k], mo[k:]] for k in range(2, len(mo) - 1)] if len(mo) >= 4 else [mo]:
                     rows = rows if isinstance(rows[0], list) else [rows]
                     for fo in _orders(asg["front"], "front", porch_sides):
                         for ro in _orders(asg["rear"], "rear", porch_sides):
@@ -369,14 +413,19 @@ def plan(brief, budget_s=2.5):
         opt = next((k for k in ("powder", "store", "servant", "guest", "dining") if b.get(k)), None)
         if opt is not None:
             lay = plan({**brief, opt: False}, budget_s)  # an optional room that does not fit is left out, and said so
-            lay["notes"].insert(0, f"no room for a {KINDS[opt][0].lower()} on a {pw:g}' x {pd:g}' plot with these rooms, so it is left out"
-                                + (" (the space under the stairs is the usual store)" if opt == "store" and any(r["kind"] == "stairs" for r in lay["rooms"]) else ""))
+            lay["notes"].insert(
+                0,
+                f"no room for a {KINDS[opt][0].lower()} on a {pw:g}' x {pd:g}' plot with these rooms, so it is left out"
+                + (" (the space under the stairs is the usual store)" if opt == "store" and any(r["kind"] == "stairs" for r in lay["rooms"]) else ""),
+            )
             lay["dropped"] = [opt] + lay.get("dropped", [])
             return lay
         if not b.get("_kitchen_rear"):  # a small plot: the kitchen at the back, beside the bedroom
             return plan({**brief, "_kitchen_rear": True}, budget_s)
-        for key, note in (("porch", f"no room for a car porch on a {pw:g}' x {pd:g}' plot with these rooms: the front door opens from the road"),
-                          ("drawing", "no room for a separate drawing room: the TV lounge is the sitting room")):
+        for key, note in (
+            ("porch", f"no room for a car porch on a {pw:g}' x {pd:g}' plot with these rooms: the front door opens from the road"),
+            ("drawing", "no room for a separate drawing room: the TV lounge is the sitting room"),
+        ):
             if b.get(key):
                 lay = plan({**brief, key: False}, budget_s)
                 lay["notes"].insert(0, note)
@@ -400,8 +449,17 @@ def plan(brief, budget_s=2.5):
         sb["rear"] += lay["lawn"]
         ey1 -= lay["lawn"]
         notes.append(f"the rooms are at full size, so {lay['lawn'] / 12:.0f}' more is left open at the back (a back lawn)")
-    lay.update(score=round(_score(lay), 2), tried=tried, notes=notes, brief=b, plot=[W, D], setbacks=sb, envelope=[ex0, ey0, ex1, ey1],
-               clear=[cx0, cy0, cx1, ey1 - OUTER], floor="GROUND FLOOR")
+    lay.update(
+        score=round(_score(lay), 2),
+        tried=tried,
+        notes=notes,
+        brief=b,
+        plot=[W, D],
+        setbacks=sb,
+        envelope=[ex0, ey0, ex1, ey1],
+        clear=[cx0, cy0, cx1, ey1 - OUTER],
+        floor="GROUND FLOOR",
+    )
     _openings(lay)
     if b["floors"] > 1:
         lay["upper"] = upper(lay)
@@ -441,8 +499,12 @@ def _place_baths(lay, mid, pat):
 def _try(fo, rows, ro, passage, stair, b, cx0, cy0, clear_w, clear_d, env, sb):
     """One candidate: bands front to back (the front rooms, one or two middle rows, a passage, the back rooms), each
     sized, its rooms in columns (a store or powder room stacked behind its neighbour)."""
-    bands = [("front", fo)] + [("middle" if i == 0 else "middle2", r) for i, r in enumerate(rows)] + \
-        ([("passage", [{"id": "passage", "kind": "passage", "label": "PASSAGE"}])] if passage else []) + [("rear", ro)]
+    bands = (
+        [("front", fo)]
+        + [("middle" if i == 0 else "middle2", r) for i, r in enumerate(rows)]
+        + ([("passage", [{"id": "passage", "kind": "passage", "label": "PASSAGE"}])] if passage else [])
+        + [("rear", ro)]
+    )
     bands = [(n, rs) for n, rs in bands if rs]
     items = []
     for name, rs in bands:
@@ -534,8 +596,19 @@ def _doors(lay):
                 s_ = hi - 6 - w if prefer != "hi" else lo + 6
                 if any(not (s_ + w <= d["a"] - 6 or s_ >= d["b"] + 6) for d in used):
                     return False
-        doors.append({"wall": o, "at": at, "a": s_, "b": s_ + w, "kind": kind, "from": a, "to": b, "into": into or b,
-                      "hinge": "a" if s_ - lo < hi - (s_ + w) else "b"})
+        doors.append(
+            {
+                "wall": o,
+                "at": at,
+                "a": s_,
+                "b": s_ + w,
+                "kind": kind,
+                "from": a,
+                "to": b,
+                "into": into or b,
+                "hinge": "a" if s_ - lo < hi - (s_ + w) else "b",
+            }
+        )
         return True
 
     if "porch" not in rooms and lay.get("floor") != "FIRST FLOOR":  # no porch: the front door opens from the road into the room that leads in
@@ -543,8 +616,19 @@ def _doors(lay):
             r = rooms.get(rid)
             if r and abs(r["y0"] - min(q["y0"] for q in lay["rooms"])) < 0.6 and r["x1"] - r["x0"] >= DOOR["main"] + 16:
                 a0 = r["x0"] + 8
-                doors.append({"wall": "h", "at": r["y0"] - OUTER / 2, "a": a0, "b": a0 + DOOR["main"], "kind": "main", "from": "outside", "to": rid,
-                              "into": rid, "hinge": "a"})
+                doors.append(
+                    {
+                        "wall": "h",
+                        "at": r["y0"] - OUTER / 2,
+                        "a": a0,
+                        "b": a0 + DOOR["main"],
+                        "kind": "main",
+                        "from": "outside",
+                        "to": rid,
+                        "into": rid,
+                        "hinge": "a",
+                    }
+                )
                 break
     if "porch" in rooms:
         if not door("porch", "lounge", "main", into="lounge"):
@@ -556,9 +640,13 @@ def _doors(lay):
         door("drawing", "dining", "room", into="drawing") or door("drawing", "passage", "room", into="drawing")
     if "kitchen" in rooms and not door("lounge", "kitchen", "room", into="kitchen") and not door("dining", "kitchen", "room", into="kitchen"):
         notes.append("the kitchen does not share a wall with the lounge or dining")
-    if "stairs" in rooms and not (door("lounge", "stairs", "open", into="stairs") or door("passage", "stairs", "open", into="stairs")
-                                  or door("porch", "stairs", "open", into="stairs") or door("family", "stairs", "open", into="stairs")
-                                  or door("dining", "stairs", "open", into="stairs")):
+    if "stairs" in rooms and not (
+        door("lounge", "stairs", "open", into="stairs")
+        or door("passage", "stairs", "open", into="stairs")
+        or door("porch", "stairs", "open", into="stairs")
+        or door("family", "stairs", "open", into="stairs")
+        or door("dining", "stairs", "open", into="stairs")
+    ):
         notes.append("the stairs are not reached from the lounge")
     door("lounge", "dining", "open", into="dining") or door("family", "dining", "open", into="dining")  # the first floor has a family lounge
     if "store" in rooms:
@@ -566,32 +654,53 @@ def _doors(lay):
     if "powder" in rooms:
         any(door(v, "powder", "bath", into="powder") for v in ("lounge", "family", "dining", "drawing", "passage"))
     if "servant" in rooms:
-        door("porch", "servant", "store", into="servant") or any(door(v, "servant", "room", into="servant") for v in ("lounge", "family", "passage")) \
-            or door("kitchen", "servant", "store", into="servant")
+        door("porch", "servant", "store", into="servant") or any(
+            door(v, "servant", "room", into="servant") for v in ("lounge", "family", "passage")
+        ) or door("kitchen", "servant", "store", into="servant")
     if "passage" in rooms:
-        door("lounge", "passage", "open", into="passage", prefer="middle") or door("family", "passage", "open", into="passage", prefer="middle") \
-            or door("dining", "passage", "open", into="passage", prefer="middle")
+        door("lounge", "passage", "open", into="passage", prefer="middle") or door(
+            "family", "passage", "open", into="passage", prefer="middle"
+        ) or door("dining", "passage", "open", into="passage", prefer="middle")
     if "kitchenette" in rooms:  # the first floor
         door("family", "kitchenette", "room", into="kitchenette") or door("passage", "kitchenette", "room", into="kitchenette")
     if "terrace" in rooms:
-        door("family", "terrace", "room", into="family") or any(door(r["id"], "terrace", "room", into=r["id"]) for r in lay["rooms"] if r["kind"] == "bedroom")
+        door("family", "terrace", "room", into="family") or any(
+            door(r["id"], "terrace", "room", into=r["id"]) for r in lay["rooms"] if r["kind"] == "bedroom"
+        )
     linked = {d["from"] for d in doors} | {d["to"] for d in doors}
     for r in lay["rooms"]:  # a store or servant room nothing opens into: from any shared room beside it
         if r["id"] not in linked and r["kind"] in ("store", "servant", "powder"):
-            any(door(p, r["id"], "bath" if r["kind"] == "powder" else "store", into=r["id"])
-                for p in ("family", "lounge", "passage", "dining", "terrace", "porch", "kitchen", "kitchenette") if p in rooms)
+            any(
+                door(p, r["id"], "bath" if r["kind"] == "powder" else "store", into=r["id"])
+                for p in ("family", "lounge", "passage", "dining", "terrace", "porch", "kitchen", "kitchenette")
+                if p in rooms
+            )
     for r in lay["rooms"]:
         if r["kind"] == "bedroom" or r["id"] == "guest":
-            if not any(door(via, r["id"], "room", into=r["id"], prefer="lo" if (r.get("bath") or {}).get("side") == "right" else "hi")
-                       for via in ("passage", "lounge", "family", "dining", "porch")):
+            if not any(
+                door(via, r["id"], "room", into=r["id"], prefer="lo" if (r.get("bath") or {}).get("side") == "right" else "hi")
+                for via in ("passage", "lounge", "family", "dining", "porch")
+            ):
                 notes.append(f"{r['label']} has no wall with the lounge or a passage for its door")
     for r in lay["rooms"]:  # a bath opens onto the open floor in front of it (its side stays free for the bed), at its inner corner
         bt = r.get("bath")
         if bt:
             y = bt["y0"] - INNER / 2 if bt.get("end", "rear") == "rear" else bt["y1"] + INNER / 2
             a0 = bt["x0"] + 4 if bt["side"] == "right" else bt["x1"] - 4 - DOOR["bath"]
-            doors.append({"wall": "h", "at": y, "a": a0, "b": a0 + DOOR["bath"], "kind": "bath", "from": r["id"],
-                          "to": r["id"] + "_bath", "into": r["id"] + "_bath", "hinge": "a" if bt["side"] == "right" else "b", "bath": True})
+            doors.append(
+                {
+                    "wall": "h",
+                    "at": y,
+                    "a": a0,
+                    "b": a0 + DOOR["bath"],
+                    "kind": "bath",
+                    "from": r["id"],
+                    "to": r["id"] + "_bath",
+                    "into": r["id"] + "_bath",
+                    "hinge": "a" if bt["side"] == "right" else "b",
+                    "bath": True,
+                }
+            )
     return doors, notes
 
 
@@ -599,7 +708,9 @@ def unreachable(lay, doors=None):
     """Rooms that cannot be walked to from the entrance (the porch, else the front room) through the doors."""
     doors = doors if doors is not None else _doors(lay)[0]
     ids = [r["id"] for r in lay["rooms"]] + [r["id"] + "_bath" for r in lay["rooms"] if r.get("bath")]
-    start = "porch" if any(r["id"] == "porch" for r in lay["rooms"]) else next((r["id"] for r in lay["rooms"] if "front" in r.get("outside", [])), ids[0])
+    start = (
+        "porch" if any(r["id"] == "porch" for r in lay["rooms"]) else next((r["id"] for r in lay["rooms"] if "front" in r.get("outside", [])), ids[0])
+    )
     if any(d["from"] == "outside" for d in doors):
         ids, start = ids + ["outside"], "outside"
     if any(r["id"] == "terrace" for r in lay["rooms"]):
@@ -634,22 +745,45 @@ def _openings(lay):
                 at = env[1] + OUTER / 2 if side == "front" else env[3] - OUTER / 2
                 if bt and side == bt.get("end", "rear"):  # the bath has this corner: the room's window goes beside it, the bath gets a vent
                     lo, hi = (bt["x1"] + INNER, r["x1"]) if bt["side"] == "left" else (r["x0"], bt["x0"] - INNER)
-                    windows.append({"wall": "h", "at": at, "a": (bt["x0"] + bt["x1"]) / 2 - 12, "b": (bt["x0"] + bt["x1"]) / 2 + 12,
-                                    "room": r["id"] + "_bath", "kind": "vent", "side": side})
+                    windows.append(
+                        {
+                            "wall": "h",
+                            "at": at,
+                            "a": (bt["x0"] + bt["x1"]) / 2 - 12,
+                            "b": (bt["x0"] + bt["x1"]) / 2 + 12,
+                            "room": r["id"] + "_bath",
+                            "kind": "vent",
+                            "side": side,
+                        }
+                    )
                 for d in doors:  # the front door's part of the wall is not for the window
                     if d["wall"] == "h" and abs(d["at"] - at) < 1 and d["a"] < hi and d["b"] > lo:
                         lo, hi = (d["b"] + 12, hi) if hi - (d["b"] + 12) >= (d["a"] - 12) - lo else (lo, d["a"] - 12)
                 w = min(widths.get(r["kind"], 36), (hi - lo) * 0.6)
                 if w >= 18:
-                    windows.append({"wall": "h", "at": at, "a": (lo + hi) / 2 - w / 2, "b": (lo + hi) / 2 + w / 2, "room": r["id"], "kind": "window", "side": side})
+                    windows.append(
+                        {
+                            "wall": "h",
+                            "at": at,
+                            "a": (lo + hi) / 2 - w / 2,
+                            "b": (lo + hi) / 2 + w / 2,
+                            "room": r["id"],
+                            "kind": "window",
+                            "side": side,
+                        }
+                    )
             else:
                 lo, hi = r["y0"], r["y1"]
                 w = min(widths.get(r["kind"], 36), (hi - lo) * 0.5)
                 at = env[0] + OUTER / 2 if side == "left" else env[2] - OUTER / 2
-                windows.append({"wall": "v", "at": at, "a": (lo + hi) / 2 - w / 2, "b": (lo + hi) / 2 + w / 2, "room": r["id"], "kind": "window", "side": side})
+                windows.append(
+                    {"wall": "v", "at": at, "a": (lo + hi) / 2 - w / 2, "b": (lo + hi) / 2 + w / 2, "room": r["id"], "kind": "window", "side": side}
+                )
     for r in lay["rooms"]:
         if KINDS[r["kind"]][5] and not r.get("outside"):
-            notes.append(f"{r['label']} has no outside wall: give it a skylight or a ventilator" + (" and an exhaust fan" if r["kind"] == "kitchen" else ""))
+            notes.append(
+                f"{r['label']} has no outside wall: give it a skylight or a ventilator" + (" and an exhaust fan" if r["kind"] == "kitchen" else "")
+            )
     for u in unreachable(lay, doors):
         notes.append(f"{u} cannot be reached from the entrance")
     lay["doors"], lay["windows"] = doors, windows
@@ -703,8 +837,16 @@ def summary(lay):
         out.append({"id": r["id"], "label": r["label"], "w": w, "d": d, "size": f"{ft_in(w)} x {ft_in(d)}", "area_sqft": round(area / 144, 1)})
         if bt:
             n = r["label"].split()[-1] if r["label"].split()[-1].isdigit() else ""
-            out.append({"id": r["id"] + "_bath", "label": f"BATH {n}".strip(), "w": bt["w"], "d": bt["d"], "size": f"{ft_in(bt['w'])} x {ft_in(bt['d'])}",
-                        "area_sqft": round(bt["w"] * bt["d"] / 144, 1)})
+            out.append(
+                {
+                    "id": r["id"] + "_bath",
+                    "label": f"BATH {n}".strip(),
+                    "w": bt["w"],
+                    "d": bt["d"],
+                    "size": f"{ft_in(bt['w'])} x {ft_in(bt['d'])}",
+                    "area_sqft": round(bt["w"] * bt["d"] / 144, 1),
+                }
+            )
     e = lay["envelope"]
     covered = (e[2] - e[0]) * (e[3] - e[1]) / 144
     return {"rooms": out, "covered_sqft": round(covered), "plot_sqft": round(lay["plot"][0] * lay["plot"][1] / 144)}

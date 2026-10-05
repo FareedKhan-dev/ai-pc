@@ -6,6 +6,7 @@ the shop must be on HTTPS. Changes are shown first and done after a yes.
   'woocommerce products'   'add Lawn Suit to woocommerce at 2,500, sku LS-01, 10 in stock'   'set price of LS-01 on woocommerce to 2,300'
   'new orders on woocommerce'   'mark order 345 shipped on woocommerce with TCS 1234567890'
 """
+
 import base64
 
 from ai_pc.apps import storekit
@@ -15,12 +16,16 @@ from ai_pc.hub.http import Api, HubError
 NAME, LABEL = "woocommerce", "WooCommerce store: products, prices, stock, orders, shipping"
 EXAMPLES = ["woocommerce products", "add Lawn Suit to woocommerce at 2,500, sku LS-01, 10 in stock", "new orders on woocommerce"]
 OUTWARD = {"add", "update", "ship"}
-APP = {"label": "WooCommerce",
-       "fields": [("url", "Your shop's address (https://...)", False), ("ck", "Consumer key (ck_...)", True), ("cs", "Consumer secret (cs_...)", True)],
-       "steps": ["In WordPress admin: WooCommerce > Settings > Advanced > REST API > Add key: a description, your user, Permissions Read/Write > Generate.",
-                 "Copy the consumer key (ck_...) and secret (cs_...): the secret is shown once. Settings > Permalinks must not be 'Plain'.",
-                 "Run 'ai-pc apps connect woocommerce' with your shop's https:// address."],
-       "notes": "The shop must use HTTPS. If your host strips the Authorization header, the keys go in the address instead (done automatically)."}
+APP = {
+    "label": "WooCommerce",
+    "fields": [("url", "Your shop's address (https://...)", False), ("ck", "Consumer key (ck_...)", True), ("cs", "Consumer secret (cs_...)", True)],
+    "steps": [
+        "In WordPress admin: WooCommerce > Settings > Advanced > REST API > Add key: a description, your user, Permissions Read/Write > Generate.",
+        "Copy the consumer key (ck_...) and secret (cs_...): the secret is shown once. Settings > Permalinks must not be 'Plain'.",
+        "Run 'ai-pc apps connect woocommerce' with your shop's https:// address.",
+    ],
+    "notes": "The shop must use HTTPS. If your host strips the Authorization header, the keys go in the address instead (done automatically).",
+}
 
 
 class Client:
@@ -49,8 +54,14 @@ class Client:
 
     @staticmethod
     def _p(x):
-        return {"sku": x.get("sku"), "title": x.get("name"), "price": x.get("regular_price") or x.get("price") or "0", "stock": x.get("stock_quantity"),
-                "id": x["id"], "parent": x.get("parent_id") or 0}
+        return {
+            "sku": x.get("sku"),
+            "title": x.get("name"),
+            "price": x.get("regular_price") or x.get("price") or "0",
+            "stock": x.get("stock_quantity"),
+            "id": x["id"],
+            "parent": x.get("parent_id") or 0,
+        }
 
     def products(self):
         out, page = [], 1
@@ -82,8 +93,10 @@ class Client:
         self.call("PUT", path, body)
 
     def orders(self):
-        return [{"id": o["id"], "number": str(o.get("number") or o["id"]), "total": o.get("total", "0"), "created": o.get("date_created", "")}
-                for o in self.call("GET", "orders", params={"status": "processing", "per_page": 50})]
+        return [
+            {"id": o["id"], "number": str(o.get("number") or o["id"]), "total": o.get("total", "0"), "created": o.get("date_created", "")}
+            for o in self.call("GET", "orders", params={"status": "processing", "per_page": 50})
+        ]
 
     def ship(self, number, company=None, tracking=None):
         o = next((x for x in self.orders() if x["number"] == str(number)), None)

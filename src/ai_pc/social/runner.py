@@ -8,6 +8,7 @@ A post a platform can schedule by itself is uploaded at once and the platform pu
   install_task() / remove_task() / task_installed()   Windows Task Scheduler runs 'ai-pc social run' every 5 minutes,
                                                       hidden (pythonw), only after the person's yes
 """
+
 import datetime as dt
 import os
 import subprocess
@@ -73,12 +74,24 @@ def work(store, job, platform, prepare, budget=120, at=None):
             store.update_job(job["id"], status="processing", next_try=_later(r.get("wait", 30), at))
             store.log(job["id"], "processing", r.get("detail", ""))
         elif r["status"] == "scheduled":
-            store.update_job(job["id"], status="scheduled", next_try=None, error=None, remote=dict(job.get("remote", {}), id=r.get("id"),
-                                                                                                       scheduled=True, publish_at=r.get("publish_at")))
+            store.update_job(
+                job["id"],
+                status="scheduled",
+                next_try=None,
+                error=None,
+                remote=dict(job.get("remote", {}), id=r.get("id"), scheduled=True, publish_at=r.get("publish_at")),
+            )
             store.log(job["id"], "scheduled", f"{platform.label} publishes it at {r.get('publish_at')}")
         else:
-            store.update_job(job["id"], status="published", next_try=None, error=None, published_at=iso(now()), notes=r.get("notes"),
-                             remote=dict(job.get("remote", {}), id=r.get("id"), permalink=r.get("permalink"), verified=r.get("verified")))
+            store.update_job(
+                job["id"],
+                status="published",
+                next_try=None,
+                error=None,
+                published_at=iso(now()),
+                notes=r.get("notes"),
+                remote=dict(job.get("remote", {}), id=r.get("id"), permalink=r.get("permalink"), verified=r.get("verified")),
+            )
             store.log(job["id"], "published", r.get("permalink") or r.get("id") or "")
     except SocialError as e:
         job = store.job(job["id"])
@@ -97,8 +110,9 @@ def work(store, job, platform, prepare, budget=120, at=None):
         job = store.job(job["id"])
         n = job.get("attempts", 0)
         if n < MAX_ATTEMPTS:
-            store.update_job(job["id"], status="retry", next_try=_later(BACKOFF[min(max(n - 1, 0), len(BACKOFF) - 1)], at),
-                             error=f"{type(e).__name__}: {e}")
+            store.update_job(
+                job["id"], status="retry", next_try=_later(BACKOFF[min(max(n - 1, 0), len(BACKOFF) - 1)], at), error=f"{type(e).__name__}: {e}"
+            )
         else:
             store.update_job(job["id"], status="failed", error=f"{type(e).__name__}: {e}")
         store.log(job["id"], "error", traceback.format_exc()[-1500:])
@@ -138,8 +152,12 @@ def refresh(store, platforms, at=None):
             store.log(j["id"], "refresh", str(e))
             continue
         if r.get("status") == "published":
-            store.update_job(j["id"], status="published", published_at=r.get("published_at") or pa,
-                             remote=dict(j.get("remote", {}), permalink=r.get("permalink"), verified=True))
+            store.update_job(
+                j["id"],
+                status="published",
+                published_at=r.get("published_at") or pa,
+                remote=dict(j.get("remote", {}), permalink=r.get("permalink"), verified=True),
+            )
             store.log(j["id"], "published", r.get("permalink") or "")
             _post_status(store, j["post_id"])
         out.append({"job": j["id"], "platform": j["platform"], "status": r.get("status")})
@@ -188,8 +206,12 @@ def task_installed():
 def install_task(minutes=5):
     """Every few minutes, hidden, while you are signed in to Windows: 'ai-pc social run' publishes what is due."""
     cmd = f'"{_pythonw()}" -m ai_pc social run --quiet'
-    r = subprocess.run(["schtasks", "/Create", "/TN", TASK, "/TR", cmd, "/SC", "MINUTE", "/MO", str(int(minutes)), "/F"],
-                       capture_output=True, text=True, creationflags=NO_WINDOW)
+    r = subprocess.run(
+        ["schtasks", "/Create", "/TN", TASK, "/TR", cmd, "/SC", "MINUTE", "/MO", str(int(minutes)), "/F"],
+        capture_output=True,
+        text=True,
+        creationflags=NO_WINDOW,
+    )
     if r.returncode:
         raise RuntimeError(f"Task Scheduler refused: {(r.stderr or r.stdout).strip()[:300]}")
     return task_installed()

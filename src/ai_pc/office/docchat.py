@@ -13,6 +13,7 @@ applied (docx_ops), checked on the result, the version is rendered by Word in th
 numbers refreshed), and the reply says what was done, what could not be done and why, and what the checks found.
 Chats live in out/docs/chats/<id>/ (chat.json, v0.docx, v1.docx, ... and their PDFs).
 """
+
 import json
 import re
 import shutil
@@ -30,19 +31,34 @@ from ai_pc.office import docx_ops as OP
 from ai_pc.office import render as RN
 
 CHATS = ROOT / "out" / "docs" / "chats"
-UNDO = re.compile(r"^\s*(?:undo|revert|go back|take (?:that|it) back|cancel (?:that|it|the last (?:change|edit))|scratch that|never ?mind|"
-                  r"put it back|change it back|undo (?:that|the last (?:change|edit)|it))\b", re.I)
+UNDO = re.compile(
+    r"^\s*(?:undo|revert|go back|take (?:that|it) back|cancel (?:that|it|the last (?:change|edit))|scratch that|never ?mind|"
+    r"put it back|change it back|undo (?:that|the last (?:change|edit)|it))\b",
+    re.I,
+)
 REDO = re.compile(r"^\s*redo\b|\bundo the undo\b", re.I)
 GOTO = re.compile(r"\b(?:go|jump|switch|get|revert|take me) (?:back )?to (?:version|v) ?(\d+)\b|\buse (?:version|v) ?(\d+)\b|^\s*v(\d+)\s*$", re.I)
 RESET = re.compile(r"\b(?:start over|from scratch|back to the original|the original (?:version|file|document)|reset (?:it|everything|all))\b", re.I)
-VERSIONS = re.compile(r"\b(?:show|list|see) (?:me )?(?:the |all )?(?:versions|history|changes)\b|\bhow many versions\b|\bversion history\b|^\s*(?:versions?|history)\s*\??\s*$", re.I)
+VERSIONS = re.compile(
+    r"\b(?:show|list|see) (?:me )?(?:the |all )?(?:versions|history|changes)\b|\bhow many versions\b|\bversion history\b|^\s*(?:versions?|history)\s*\??\s*$",
+    re.I,
+)
 HISTORY = re.compile(r"\bwhat (?:did you|have you|you) (?:just )?(?:change|do|did)\b|\bwhat(?:'s| is| has)? (?:changed|different)\b", re.I)
 COMPARE = re.compile(r"\bcompare\b|\bdifference between\b|\bdifferent (?:from|than) (?:the )?(?:original|first|v\d)", re.I)
-EXPORT = re.compile(r"\b(?:export|save (?:it )?as (?:a )?pdf|(?:give|send) me (?:the )?(?:file|pdf|document|docx)|download|make (?:a|the) pdf|pdf (?:version|copy))\b", re.I)
+EXPORT = re.compile(
+    r"\b(?:export|save (?:it )?as (?:a )?pdf|(?:give|send) me (?:the )?(?:file|pdf|document|docx)|download|make (?:a|the) pdf|pdf (?:version|copy))\b",
+    re.I,
+)
 ACK = re.compile(r"^\s*(?:ok(?:ay)?|cool|nice|great|perfect|awesome|thanks?(?: you)?|thank you|good|looks good|love it|fine|done)\W*$", re.I)
-POLITE = re.compile(r"^\s*(?:(?:can|could|would|will) (?:you|u) (?:please |pls )?|please |pls |kindly |i (?:want|need|would like) (?:you )?(?:to )?|i'd like (?:you )?to |let's |lets )", re.I)
-QUESTION = re.compile(r"^\s*(?:what|what's|which|how many|how much|how long|how big|is there|are there|is it|are the|does|do|did|who|where|when|why|"
-                      r"tell me|show me|list|summari[sz]e (?:the |this |my )?(?:document|file|report|it)\b|give me a summary)\b", re.I)
+POLITE = re.compile(
+    r"^\s*(?:(?:can|could|would|will) (?:you|u) (?:please |pls )?|please |pls |kindly |i (?:want|need|would like) (?:you )?(?:to )?|i'd like (?:you )?to |let's |lets )",
+    re.I,
+)
+QUESTION = re.compile(
+    r"^\s*(?:what|what's|which|how many|how much|how long|how big|is there|are there|is it|are the|does|do|did|who|where|when|why|"
+    r"tell me|show me|list|summari[sz]e (?:the |this |my )?(?:document|file|report|it)\b|give me a summary)\b",
+    re.I,
+)
 EDIT_START = re.compile(r"^\s*(?:" + P.EDIT_VERB + r")\b", re.I)
 # "actually, undo that" / "ok so make it blue" / "no, the other one": the words in front are not the request
 FILLER = re.compile(r"^\s*(?:(?:actually|oh|hmm+|wait|sorry|oops|ugh|alright|ok(?:ay)?|so|hey)\b[,!.]*\s+|(?:no|nah|nope)\s*[,!.]+\s*)+(?=\S)", re.I)
@@ -95,9 +111,29 @@ class DocChat:
         folder.mkdir(parents=True, exist_ok=True)
         v0 = folder / f"v0{ext}"
         shutil.copy(src, v0)
-        state = {"id": cid, "kind": "docx", "base": str(src), "folder": str(folder), "cur": 0, "turns": [], "focus": None, "pending": None,
-                 "versions": [{"v": 0, "parent": None, "file": str(v0), "said": None, "done": ["the original file"], "failed": [], "checks": [],
-                               "pages": None, "pdf": None}]}
+        state = {
+            "id": cid,
+            "kind": "docx",
+            "base": str(src),
+            "folder": str(folder),
+            "cur": 0,
+            "turns": [],
+            "focus": None,
+            "pending": None,
+            "versions": [
+                {
+                    "v": 0,
+                    "parent": None,
+                    "file": str(v0),
+                    "said": None,
+                    "done": ["the original file"],
+                    "failed": [],
+                    "checks": [],
+                    "pages": None,
+                    "pdf": None,
+                }
+            ],
+        }
         c = cls(state, **kw)
         if c.render:
             c._render(0)
@@ -191,8 +227,11 @@ class DocChat:
         if ops:
             out.append(self._change(ops, message, turn))
             self.state["focus"] = focus
-        reply = "\n".join(x for x in out if x).strip() or "I'm not sure what to change. You can ask e.g. 'make the headings blue', " \
-                                                         "'add page numbers', 'shorten the introduction' or 'how many pages?'."
+        reply = (
+            "\n".join(x for x in out if x).strip()
+            or "I'm not sure what to change. You can ask e.g. 'make the headings blue', "
+            "'add page numbers', 'shorten the introduction' or 'how many pages?'."
+        )
         turn.update(reply=reply, v_after=self.state["cur"], seconds=round(time.perf_counter() - t0, 2))
         self.state["turns"].append(turn)
         self.last_turn = turn
@@ -210,11 +249,14 @@ class DocChat:
             return "redo", self.redo
         if UNDO.search(low):
             nm = re.search(r"\b(two|2|three|3|four|4|five|5)\s+(?:changes?|steps?|edits?|times|versions?)\b|\b(twice)\b", low)
-            n = {"two": 2, "2": 2, "three": 3, "3": 3, "four": 4, "4": 4, "five": 5, "5": 5, "twice": 2}.get(next((g for g in nm.groups() if g), "") if nm else "", 1)
+            n = {"two": 2, "2": 2, "three": 3, "3": 3, "four": 4, "4": 4, "five": 5, "5": 5, "twice": 2}.get(
+                next((g for g in nm.groups() if g), "") if nm else "", 1
+            )
 
             def undo_n(n=n):
                 outs = [self.undo() for _ in range(n)]
                 return outs[-1] if n == 1 else f"Undone {n} changes: back to v{self.state['cur']}."
+
             return "undo", undo_n
         if RESET.search(low):
             return "reset", lambda: self.goto(0)
@@ -250,9 +292,11 @@ class DocChat:
             return {"ask": "I could not read: " + "; ".join(f"'{c}'" for c in clauses) + ". Try e.g. 'make the headings blue' or 'add page numbers'."}
         self._turn["llm"] = True
         m = self.map()
-        user = (f"OUTLINE:\n{DM.outline_text(m)}\nLAST THING TALKED ABOUT: {json.dumps(focus) if focus else 'nothing'}\n"
-                f"ALREADY DONE FROM THIS MESSAGE: {[OP.describe(o) for o in done_ops] or 'nothing'}\nWHOLE MESSAGE: {message}\n"
-                f"REQUESTS TO TURN INTO OPERATIONS: {clauses}")
+        user = (
+            f"OUTLINE:\n{DM.outline_text(m)}\nLAST THING TALKED ABOUT: {json.dumps(focus) if focus else 'nothing'}\n"
+            f"ALREADY DONE FROM THIS MESSAGE: {[OP.describe(o) for o in done_ops] or 'nothing'}\nWHOLE MESSAGE: {message}\n"
+            f"REQUESTS TO TURN INTO OPERATIONS: {clauses}"
+        )
         try:
             r = self.planner._call("docs", [{"role": "system", "content": OPS_SYSTEM}, {"role": "user", "content": user}])
             d = parse_json(r.text) or {}
@@ -333,12 +377,17 @@ class DocChat:
         msg = f"v{n}: " + "; ".join(done) + "."
         if failed:
             msg += " Couldn't: " + "; ".join(failed) + "."
-        msg += f" Checked: {len(checks) - len(bad)}/{len(checks)} OK" + (" (" + "; ".join(f"{c['op']}: {c['what']}" for c in bad[:3]) + ")" if bad else "") + "."
+        msg += (
+            f" Checked: {len(checks) - len(bad)}/{len(checks)} OK"
+            + (" (" + "; ".join(f"{c['op']}: {c['what']}" for c in bad[:3]) + ")" if bad else "")
+            + "."
+        )
         return msg + page_note
 
     def _render_checks(self, ops, v):
         """What only the rendered pages show: fonts really used, the contents page filled in, page numbers on the pages."""
         from ai_pc.office import verify as VF
+
         ver = self.state["versions"][v]
         out = []
         if not ver.get("pdf"):
@@ -357,7 +406,9 @@ class DocChat:
         if "page_numbers" in kinds and not any(o.get("remove") for o in ops if o.get("op") == "page_numbers"):
             pages = RN.text(ver["pdf"])
             ok = sum(1 for i, t in enumerate(pages) if re.search(rf"(?:^|\D){i + 1}(?:\D|$)", t[-120:] + " " + t[:120])) >= max(1, len(pages) - 1)
-            out.append({"op": "page numbers on the pages", "ok": ok, "what": f"{len(pages)} page(s) numbered" if ok else "numbers not seen on the pages"})
+            out.append(
+                {"op": "page numbers on the pages", "ok": ok, "what": f"{len(pages)} page(s) numbered" if ok else "numbers not seen on the pages"}
+            )
         return out
 
     # ------------------------------------------------------------------ questions
@@ -384,13 +435,22 @@ class DocChat:
         if re.search(r"\b(?:title|called|name of (?:the|this) document)\b", q) and not re.search(r"\bsection", q):
             return f"The title is '{m['title']}'."
         if re.search(r"\b(?:headings|sections|outline|structure|contents|chapters)\b", q) and re.search(r"\b(?:what|list|show|which)\b", q):
-            return "Sections: " + "; ".join(("  " * (s["level"] - 1)) + s["title"] for s in m["sections"][:30]) if m["sections"] else "The document has no headings."
+            return (
+                "Sections: " + "; ".join(("  " * (s["level"] - 1)) + s["title"] for s in m["sections"][:30])
+                if m["sections"]
+                else "The document has no headings."
+            )
         if re.search(r"\bfont\b", q):
             try:
                 h1 = DM._style_font(Document(str(self.path())).styles["Heading 1"])
             except KeyError:
                 h1 = None
-            return f"Body text: {m['fonts']['body'] or '?'}" + (f" {m['fonts']['body_size']} pt" if m['fonts']['body_size'] else "") + (f"; headings: {h1}" if h1 else "") + "."
+            return (
+                f"Body text: {m['fonts']['body'] or '?'}"
+                + (f" {m['fonts']['body_size']} pt" if m["fonts"]["body_size"] else "")
+                + (f"; headings: {h1}" if h1 else "")
+                + "."
+            )
         if re.search(r"\bmargins?\b|\borientation\b|\bpage size\b|\blandscape\b|\bportrait\b", q):
             pg = m["page"]
             return f"{pg['orientation'].title()}, {pg['width_cm']} x {pg['height_cm']} cm, margins {pg['margins_cm']} cm, {pg['columns']} column(s)."
@@ -415,12 +475,23 @@ class DocChat:
         m = self.map()
         t = P.target_in(P.normalize(q), m, self.state.get("focus"))
         ks = DM.find(m, t) if t else []
-        body = "\n".join(m["items"][k]["text"] for k in ks if m["items"][k]["kind"] == "p")[:9000] if ks else \
-            "\n".join(it["text"] for it in m["items"] if it["kind"] == "p")[:9000]
+        body = (
+            "\n".join(m["items"][k]["text"] for k in ks if m["items"][k]["kind"] == "p")[:9000]
+            if ks
+            else "\n".join(it["text"] for it in m["items"] if it["kind"] == "p")[:9000]
+        )
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": "You answer a client's question about their document in 1-4 short sentences, only "
-                                                                         "from the text given. If the text does not say, say so."},
-                                            {"role": "user", "content": f"OUTLINE:\n{DM.outline_text(m, 30)}\n\nTEXT:\n{body}\n\nQUESTION: {q}"}])
+            r = self.planner._call(
+                "fast",
+                [
+                    {
+                        "role": "system",
+                        "content": "You answer a client's question about their document in 1-4 short sentences, only "
+                        "from the text given. If the text does not say, say so.",
+                    },
+                    {"role": "user", "content": f"OUTLINE:\n{DM.outline_text(m, 30)}\n\nTEXT:\n{body}\n\nQUESTION: {q}"},
+                ],
+            )
             return re.sub(r"<think>.*?</think>", "", r.text or "", flags=re.S).strip()[:700] or "I could not find that in the document."
         except Exception as e:  # noqa: BLE001
             return f"I could not answer that just now ({type(e).__name__})."
@@ -449,15 +520,21 @@ class DocChat:
         return f"Now at v{n}" + (f": {'; '.join(v['done'])[:160]}" if n else " (the original file)") + "."
 
     def versions_text(self):
-        lines = [f"{'*' if v['v'] == self.state['cur'] else ' '} v{v['v']}: " + ("; ".join(v["done"])[:110]) + (f" ({v['pages']} p.)" if v.get("pages") else "")
-                 for v in self.state["versions"]]
+        lines = [
+            f"{'*' if v['v'] == self.state['cur'] else ' '} v{v['v']}: "
+            + ("; ".join(v["done"])[:110])
+            + (f" ({v['pages']} p.)" if v.get("pages") else "")
+            for v in self.state["versions"]
+        ]
         return f"{len(self.state['versions'])} version(s):\n" + "\n".join(lines)
 
     def history(self):
         v = self.version
         if v["v"] == 0:
             return "Nothing changed yet."
-        return f"In v{v['v']} (from '{v['said']}'): " + "; ".join(v["done"]) + (f". Not done: {'; '.join(v['failed'])}" if v.get("failed") else "") + "."
+        return (
+            f"In v{v['v']} (from '{v['said']}'): " + "; ".join(v["done"]) + (f". Not done: {'; '.join(v['failed'])}" if v.get("failed") else "") + "."
+        )
 
     def compare(self, text=""):
         nums = [int(x) for x in re.findall(r"\bv(?:ersion)?\s*(\d+)", text)]
@@ -469,8 +546,12 @@ class DocChat:
         ha, hb = [s["title"] for s in ma["sections"]], [s["title"] for s in mb["sections"]]
         added = [h for h in hb if h not in ha]
         gone = [h for h in ha if h not in hb]
-        bits = [f"words {ma['stats']['words']} -> {mb['stats']['words']}", f"pages {self.state['versions'][a].get('pages')} -> {self.state['versions'][b].get('pages')}",
-                f"tables {ma['stats']['tables']} -> {mb['stats']['tables']}", f"charts {ma['stats']['charts']} -> {mb['stats']['charts']}"]
+        bits = [
+            f"words {ma['stats']['words']} -> {mb['stats']['words']}",
+            f"pages {self.state['versions'][a].get('pages')} -> {self.state['versions'][b].get('pages')}",
+            f"tables {ma['stats']['tables']} -> {mb['stats']['tables']}",
+            f"charts {ma['stats']['charts']} -> {mb['stats']['charts']}",
+        ]
         if added:
             bits.append("new sections: " + ", ".join(added[:4]))
         if gone:

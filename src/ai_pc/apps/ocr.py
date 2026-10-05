@@ -5,6 +5,7 @@ drawn at 200 dpi.
 
   'read the text in receipt.jpg'   'ocr scan.pdf to word'   'what is the total on bill.png?'
 """
+
 import json
 import re
 import subprocess
@@ -30,9 +31,15 @@ def read_picture(path, lang="en-US", work=None):
         work.mkdir(parents=True, exist_ok=True)
         src = work / f"{p.stem}.ocr.png"
         im.convert("RGB").resize((int(im.width * scale), int(im.height * scale)), Image.LANCZOS).save(src)
-    r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(PS), "-Path", str(src.resolve()),
-                        "-Lang", lang], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    r = subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", str(PS), "-Path", str(src.resolve()), "-Lang", lang],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=120,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
     if r.returncode != 0 or not r.stdout.strip():
         raise RuntimeError(f"Windows OCR failed: {(r.stderr or r.stdout).strip()[:300]}")
     out = json.loads(r.stdout.strip().splitlines()[-1])
@@ -64,6 +71,7 @@ def read(path, lang="en-US", work=None):
     pages = []
     if p.suffix.lower() == ".pdf":
         import pypdfium2 as pdfium
+
         work = Path(work or p.parent)
         work.mkdir(parents=True, exist_ok=True)
         doc = pdfium.PdfDocument(str(p))
@@ -82,8 +90,9 @@ def fields(text):
     out = {}
     totals = []
     for line in text.splitlines():
-        if re.search(r"\b(?:grand total|total|net payable|amount due|balance due|net amount|payable)\b", line, re.I) and \
-                not re.search(r"\bsub ?-?total\b|\btotal (?:items|qty|quantity)\b", line, re.I):
+        if re.search(r"\b(?:grand total|total|net payable|amount due|balance due|net amount|payable)\b", line, re.I) and not re.search(
+            r"\bsub ?-?total\b|\btotal (?:items|qty|quantity)\b", line, re.I
+        ):
             for m in re.finditer(AMOUNT, line, re.I):
                 v = m.group(1).replace(",", "")
                 if re.fullmatch(r"\d+(?:\.\d+)?", v) and float(v) > 0:
@@ -104,15 +113,23 @@ def fields(text):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
-    if not re.search(r"\bocr\b|\b(?:read|extract|get|copy|pull)\b.*\b(?:text|words|writing)\b|\btext (?:from|in|out of|on)\b|\b(?:what is|what's) the total\b"
-                     r"|\btotal on\b", c):
+    if not re.search(
+        r"\bocr\b|\b(?:read|extract|get|copy|pull)\b.*\b(?:text|words|writing)\b|\btext (?:from|in|out of|on)\b|\b(?:what is|what's) the total\b"
+        r"|\btotal on\b",
+        c,
+    ):
         return None
     f = find_file(text, ctx, PICTURES | {".pdf"})
     if not f:
         return None
-    return {"op": "ocr", "file": f, "to": "docx" if re.search(r"\b(?:word|docx)\b", c) else "txt",
-            "fields": bool(re.search(r"\btotal\b|\breceipt\b|\bbill\b|\binvoice\b", c))}
+    return {
+        "op": "ocr",
+        "file": f,
+        "to": "docx" if re.search(r"\b(?:word|docx)\b", c) else "txt",
+        "fields": bool(re.search(r"\btotal\b|\breceipt\b|\bbill\b|\binvoice\b", c)),
+    }
 
 
 def run(op, ctx):
@@ -124,6 +141,7 @@ def run(op, ctx):
         return f"No text found in {Path(op['file']).name} (is it a photo of text, upright and in focus?)."
     if op.get("to") == "docx":
         from docx import Document
+
         d = Document()
         for i, page in enumerate(r["pages"], 1):
             if len(r["pages"]) > 1:
@@ -138,8 +156,11 @@ def run(op, ctx):
         dest = out / f"{stem}.text.txt"
         dest.write_text(r["text"], encoding="utf-8")
         ok = dest.read_text(encoding="utf-8") == r["text"]
-    reply = f"Read {words} words from {Path(op['file']).name}" + (f" ({len(r['pages'])} pages)" if len(r["pages"]) > 1 else "") + \
-        f"; saved to {dest} ({'checked' if ok else 'NOT the same when read back'})."
+    reply = (
+        f"Read {words} words from {Path(op['file']).name}"
+        + (f" ({len(r['pages'])} pages)" if len(r["pages"]) > 1 else "")
+        + f"; saved to {dest} ({'checked' if ok else 'NOT the same when read back'})."
+    )
     if op.get("fields"):
         f = fields(r["text"])
         if f:

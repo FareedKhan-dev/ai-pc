@@ -7,6 +7,7 @@ every style; the model only returns text (with **bold** / *italic* marks) or pla
   key_terms(planner, text, n)                                  -> [terms]
 Long inputs go in batches, in parallel.
 """
+
 from concurrent.futures import ThreadPoolExecutor
 
 from ai_pc.core.util import parse_json
@@ -39,8 +40,10 @@ def _ask(planner, system, user, tier="docs"):
     r = planner._call(tier, msgs)
     d = parse_json(r.text)
     if d is None:
-        r = planner._call(tier, msgs + [{"role": "assistant", "content": (r.text or "")[:3000]},
-                                        {"role": "user", "content": "Reply with the single JSON object only."}])
+        r = planner._call(
+            tier,
+            msgs + [{"role": "assistant", "content": (r.text or "")[:3000]}, {"role": "user", "content": "Reply with the single JSON object only."}],
+        )
         d = parse_json(r.text)
     return d if isinstance(d, dict) else {}
 
@@ -60,9 +63,10 @@ def rewrite(planner, paragraphs, instruction, keep_count=True, title="", context
         if keep_count and len(out) != len(chunk):
             return None
         return out or None
+
     if not keep_count:
         return one(paragraphs) or paragraphs
-    chunks = [paragraphs[i:i + batch] for i in range(0, len(paragraphs), batch)]
+    chunks = [paragraphs[i : i + batch] for i in range(0, len(paragraphs), batch)]
     with ThreadPoolExecutor(max_workers=6) as ex:
         results = list(ex.map(one, chunks))
     out = []
@@ -71,9 +75,28 @@ def rewrite(planner, paragraphs, instruction, keep_count=True, title="", context
     return out
 
 
-LANG = {"ur": "Urdu (in Urdu script)", "urdu": "Urdu (in Urdu script)", "en": "English", "english": "English", "ar": "Arabic", "arabic": "Arabic",
-        "fr": "French", "french": "French", "de": "German", "german": "German", "es": "Spanish", "spanish": "Spanish", "zh": "Chinese",
-        "chinese": "Chinese", "hi": "Hindi", "hindi": "Hindi", "pa": "Punjabi", "punjabi": "Punjabi", "tr": "Turkish", "turkish": "Turkish"}
+LANG = {
+    "ur": "Urdu (in Urdu script)",
+    "urdu": "Urdu (in Urdu script)",
+    "en": "English",
+    "english": "English",
+    "ar": "Arabic",
+    "arabic": "Arabic",
+    "fr": "French",
+    "french": "French",
+    "de": "German",
+    "german": "German",
+    "es": "Spanish",
+    "spanish": "Spanish",
+    "zh": "Chinese",
+    "chinese": "Chinese",
+    "hi": "Hindi",
+    "hindi": "Hindi",
+    "pa": "Punjabi",
+    "punjabi": "Punjabi",
+    "tr": "Turkish",
+    "turkish": "Turkish",
+}
 
 
 def translate(planner, paragraphs, language, title=""):
@@ -82,8 +105,11 @@ def translate(planner, paragraphs, language, title=""):
 
 
 def write_blocks(planner, about, context, words=200, heading=None, kinds=None):
-    want = f"Write: {about}. About {int(words)} words." + (f" Start with a heading block '{heading}' (level 1)." if heading else
-                                                            " No heading block.") + (f" Use: {', '.join(kinds)}." if kinds else "")
+    want = (
+        f"Write: {about}. About {int(words)} words."
+        + (f" Start with a heading block '{heading}' (level 1)." if heading else " No heading block.")
+        + (f" Use: {', '.join(kinds)}." if kinds else "")
+    )
     d = _ask(planner, BLOCKS_SYSTEM, f"{context}\n\n{want}")
     return [b for b in d.get("blocks") or [] if isinstance(b, dict) and b.get("type")]
 

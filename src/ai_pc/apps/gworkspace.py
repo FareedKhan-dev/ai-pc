@@ -7,13 +7,17 @@ them). Each is read back from Google and its link given; all are private to you 
   "google slides 'Sales update': Q3: sales up 12%; 40 new customers | Q4 plan: open a second shop; hire two people"
   "google form quiz 'Science test': 1. What is H2O? a) Water* b) Salt 2. The sun is a star. True* 3. Capital of Pakistan? answer: Islamabad"
 """
+
 import re
 
 from ai_pc.hub.http import Api, HubError
 
 NAME, LABEL = "gworkspace", "Google Docs, Slides and Forms (quizzes) through Google's APIs"
-EXAMPLES = ["google doc 'Meeting notes': # Decisions\nPrices stay the same.", "google slides 'Sales update': Q3: sales up 12%; 40 new customers",
-            "google form quiz 'Science test': 1. What is H2O? a) Water* b) Salt"]
+EXAMPLES = [
+    "google doc 'Meeting notes': # Decisions\nPrices stay the same.",
+    "google slides 'Sales update': Q3: sales up 12%; 40 new customers",
+    "google form quiz 'Science test': 1. What is H2O? a) Water* b) Salt",
+]
 
 
 class Client:
@@ -24,6 +28,7 @@ class Client:
         tok = self._token
         if not tok:
             from ai_pc.hub.oauth import access_token
+
             tok = access_token("google")
         return Api(base, headers={"Authorization": f"Bearer {tok}"}, service="google", transport=self.transport)
 
@@ -45,13 +50,24 @@ class Client:
             body = (head.group(2) if head else line) + "\n"
             reqs.append({"insertText": {"location": {"index": idx}, "text": body}})
             if head:
-                styles.append({"updateParagraphStyle": {"range": {"startIndex": idx, "endIndex": idx + len(body)},
-                                                        "paragraphStyle": {"namedStyleType": f"HEADING_{len(head.group(1))}"}, "fields": "namedStyleType"}})
+                styles.append(
+                    {
+                        "updateParagraphStyle": {
+                            "range": {"startIndex": idx, "endIndex": idx + len(body)},
+                            "paragraphStyle": {"namedStyleType": f"HEADING_{len(head.group(1))}"},
+                            "fields": "namedStyleType",
+                        }
+                    }
+                )
             idx += len(body)
         if reqs:
             self.call("https://docs.googleapis.com/v1", "POST", f"documents/{did}:batchUpdate", {"requests": reqs + styles})
         back = self.call("https://docs.googleapis.com/v1", "GET", f"documents/{did}")
-        got = "".join(r.get("textRun", {}).get("content", "") for el in back.get("body", {}).get("content", []) for r in (el.get("paragraph") or {}).get("elements", []))
+        got = "".join(
+            r.get("textRun", {}).get("content", "")
+            for el in back.get("body", {}).get("content", [])
+            for r in (el.get("paragraph") or {}).get("elements", [])
+        )
         return did, f"https://docs.google.com/document/d/{did}/edit", got
 
     # ---------------------------------------------------------------- Slides
@@ -66,9 +82,18 @@ class Client:
                 reqs.append({"insertText": {"objectId": el["objectId"], "text": title}})
         for i, (head, points) in enumerate(sections, 1):
             sid, tid, bid = f"aipc_s{i}", f"aipc_t{i}", f"aipc_b{i}"
-            reqs.append({"createSlide": {"objectId": sid, "slideLayoutReference": {"predefinedLayout": "TITLE_AND_BODY"},
-                                         "placeholderIdMappings": [{"layoutPlaceholder": {"type": "TITLE"}, "objectId": tid},
-                                                                   {"layoutPlaceholder": {"type": "BODY"}, "objectId": bid}]}})
+            reqs.append(
+                {
+                    "createSlide": {
+                        "objectId": sid,
+                        "slideLayoutReference": {"predefinedLayout": "TITLE_AND_BODY"},
+                        "placeholderIdMappings": [
+                            {"layoutPlaceholder": {"type": "TITLE"}, "objectId": tid},
+                            {"layoutPlaceholder": {"type": "BODY"}, "objectId": bid},
+                        ],
+                    }
+                }
+            )
             reqs.append({"insertText": {"objectId": tid, "text": head}})
             if points:
                 reqs.append({"insertText": {"objectId": bid, "text": "\n".join(points)}})
@@ -91,8 +116,12 @@ class Client:
             reqs.append({"createItem": {"item": {"title": q["q"], "questionItem": {"question": question}}, "location": {"index": i}}})
         self.call("https://forms.googleapis.com/v1", "POST", f"forms/{fid}:batchUpdate", {"requests": reqs})
         back = self.call("https://forms.googleapis.com/v1", "GET", f"forms/{fid}")
-        return fid, back.get("responderUri") or f"https://docs.google.com/forms/d/{fid}/viewform", len(back.get("items", [])), \
-            (back.get("settings") or {}).get("quizSettings", {}).get("isQuiz")
+        return (
+            fid,
+            back.get("responderUri") or f"https://docs.google.com/forms/d/{fid}/viewform",
+            len(back.get("items", [])),
+            (back.get("settings") or {}).get("quizSettings", {}).get("isQuiz"),
+        )
 
 
 def client(ctx):
@@ -100,8 +129,11 @@ def client(ctx):
 
 
 def parse(text, ctx):
-    m = re.match(r"^\s*(?:make\s+(?:a\s+)?)?google\s+(doc|docs|document|slides|slide deck|presentation|form(?:\s+quiz)?|quiz)\s*(?:'([^']+)'|\"([^\"]+)\")?\s*:\s*(.+)$",
-                 text, re.I | re.S)
+    m = re.match(
+        r"^\s*(?:make\s+(?:a\s+)?)?google\s+(doc|docs|document|slides|slide deck|presentation|form(?:\s+quiz)?|quiz)\s*(?:'([^']+)'|\"([^\"]+)\")?\s*:\s*(.+)$",
+        text,
+        re.I | re.S,
+    )
     if not m:
         return None
     kind = m.group(1).lower()
@@ -129,9 +161,13 @@ def run(op, ctx):
         pid, url, n = c.slides(op["title"], op["sections"])
         return f"Google Slides '{op['title']}': {url} ({n} slides read back: a title slide and {n - 1} for your points)."
     from ai_pc.apps.quiz import read
+
     qs = read(op["spec"])
     if not qs:
         return "No questions found: number them '1. ...' and mark right answers with *."
     fid, url, n, is_quiz = c.quiz(op["title"], qs)
-    return (f"Google Form quiz '{op['title']}': {n} questions read back" + (", marked as a quiz with each right answer worth a point" if is_quiz else "") +
-            f". Send people this link: {url} (edit it at https://docs.google.com/forms/d/{fid}/edit).")
+    return (
+        f"Google Form quiz '{op['title']}': {n} questions read back"
+        + (", marked as a quiz with each right answer worth a point" if is_quiz else "")
+        + f". Send people this link: {url} (edit it at https://docs.google.com/forms/d/{fid}/edit)."
+    )

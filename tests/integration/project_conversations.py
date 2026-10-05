@@ -6,6 +6,7 @@ and refreshed; undo and go back move every file together.
   .venv\\Scripts\\python.exe tests\\integration\\project_conversations.py [--offline]
 --offline: no model (the turns that need one are skipped, and so are the turns that need what they make).
 """
+
 import json
 import re
 import shutil
@@ -74,7 +75,7 @@ class W:
         return bool(v.get("checks")) and all(c["ok"] for c in v["checks"])
 
     def pdfs(self):
-        return self.pc.state["pdfs"][:self.pc.version["pdfs"]]
+        return self.pc.state["pdfs"][: self.pc.version["pdfs"]]
 
 
 def _lahore(x):
@@ -95,30 +96,82 @@ def _title_colours(prs):
 
 TURNS = [
     ("what files are in the project?", "question", lambda x: x.says("workbook"), False),
-    ("clean up the data and add a column Amount = Qty x Unit Price with a total row", "file",
-     lambda x: "Amount" in [c["name"] for c in XM.sheet(x.book())["table"]["cols"]] and XM.sheet(x.book())["table"]["total"] and len(x.recs()) == 16
-     and all(abs(float(r["Amount"]) - float(r["Qty"]) * float(r["Unit Price"])) < 1e-6 for r in x.recs()), False),
-    ("write a two page report on Q1 sales for the management team from the workbook", "report_from_book",
-     lambda x: x.key("report") is not None and _fmt(x.total()[0], x.total()[1]).replace("Rs ", "") in " ".join(p.text for p in x.doc().paragraphs), True),
-    ("put the amount by city into the report after the introduction, with a pie chart of it", "insert_data",
-     lambda x: len(x.links_to("report")) == 2 and x.checks_ok("report") and set(doc_links(x.doc())) >= set(x.links_to("report")), True),
-    ("make a 5 slide deck from the report for the board", "deck_from_report",
-     lambda x: x.key("deck") is not None and len(x.links_to("deck")) == 1 and x.checks_ok("deck"), True),
-    ("add a chart of amount by month to the deck after slide 2", "insert_data",
-     lambda x: len(x.links_to("deck")) == 2 and PO.linked(x.deck(), x.links_to("deck")[-1])[0] == 3 and x.checks_ok("deck"), True),
-    ("make the report's headings dark blue and make the deck's titles dark green", "file",
-     lambda x: _heading_colour(x.doc()) == "1F3864" and _title_colours(x.deck()) == {"1B5E20"}, True),
+    (
+        "clean up the data and add a column Amount = Qty x Unit Price with a total row",
+        "file",
+        lambda x: (
+            "Amount" in [c["name"] for c in XM.sheet(x.book())["table"]["cols"]]
+            and XM.sheet(x.book())["table"]["total"]
+            and len(x.recs()) == 16
+            and all(abs(float(r["Amount"]) - float(r["Qty"]) * float(r["Unit Price"])) < 1e-6 for r in x.recs())
+        ),
+        False,
+    ),
+    (
+        "write a two page report on Q1 sales for the management team from the workbook",
+        "report_from_book",
+        lambda x: x.key("report") is not None and _fmt(x.total()[0], x.total()[1]).replace("Rs ", "") in " ".join(p.text for p in x.doc().paragraphs),
+        True,
+    ),
+    (
+        "put the amount by city into the report after the introduction, with a pie chart of it",
+        "insert_data",
+        lambda x: len(x.links_to("report")) == 2 and x.checks_ok("report") and set(doc_links(x.doc())) >= set(x.links_to("report")),
+        True,
+    ),
+    (
+        "make a 5 slide deck from the report for the board",
+        "deck_from_report",
+        lambda x: x.key("deck") is not None and len(x.links_to("deck")) == 1 and x.checks_ok("deck"),
+        True,
+    ),
+    (
+        "add a chart of amount by month to the deck after slide 2",
+        "insert_data",
+        lambda x: len(x.links_to("deck")) == 2 and PO.linked(x.deck(), x.links_to("deck")[-1])[0] == 3 and x.checks_ok("deck"),
+        True,
+    ),
+    (
+        "make the report's headings dark blue and make the deck's titles dark green",
+        "file",
+        lambda x: _heading_colour(x.doc()) == "1F3864" and _title_colours(x.deck()) == {"1B5E20"},
+        True,
+    ),
     ("how much did Lahore sell?", "file", lambda x: x.says(re.escape(_lahore(x))), False),
-    ("in the workbook, delete the cancelled orders", "file", lambda x: len(x.recs()) == 15 and (x.key("report") is None or x.says("out of date", "the text says")), False),
+    (
+        "in the workbook, delete the cancelled orders",
+        "file",
+        lambda x: len(x.recs()) == 15 and (x.key("report") is None or x.says("out of date", "the text says")),
+        False,
+    ),
     ("is everything up to date?", "question", lambda x: x.says("out of date") or x.key("report") is None, False),
-    ("refresh everything", "refresh", lambda x: not x.pc.stale() and not x.pc.stale_figures() and x.checks_ok("report") and x.checks_ok("deck")
-     and _fmt(x.total()[0], x.total()[1]).replace("Rs ", "") in x.pc.file_text(x.key("report")), True),
+    (
+        "refresh everything",
+        "refresh",
+        lambda x: (
+            not x.pc.stale()
+            and not x.pc.stale_figures()
+            and x.checks_ok("report")
+            and x.checks_ok("deck")
+            and _fmt(x.total()[0], x.total()[1]).replace("Rs ", "") in x.pc.file_text(x.key("report"))
+        ),
+        True,
+    ),
     ("what is the total amount now?", "file", lambda x: x.says(re.escape(_fmt(x.total()[0], x.total()[1]))), False),
-    ("export the report and the deck as one pdf with a cover called Q1 Sales Pack, page numbers and a DRAFT watermark", "pdf_pack",
-     lambda x: x.pdfs() and x.pdfs()[-1]["kind"] == "pack" and x.says(r"Checked: 4/4 OK"), True),
+    (
+        "export the report and the deck as one pdf with a cover called Q1 Sales Pack, page numbers and a DRAFT watermark",
+        "pdf_pack",
+        lambda x: x.pdfs() and x.pdfs()[-1]["kind"] == "pack" and x.says(r"Checked: 4/4 OK"),
+        True,
+    ),
     ("make the pdf smaller", "pdf_compress", lambda x: x.pdfs()[-1]["kind"] == "compressed" and x.says(r"Checked: 2/2 OK"), True),
     ("undo", "undo", lambda x: x.pdfs()[-1]["kind"] == "pack", True),
-    ("make a handout from the deck with the speaker notes", "handout", lambda x: x.key("handout") is not None and x.says("every slide is in it"), True),
+    (
+        "make a handout from the deck with the speaker notes",
+        "handout",
+        lambda x: x.key("handout") is not None and x.says("every slide is in it"),
+        True,
+    ),
     ("what files are in the project?", "question", lambda x: x.says("report", "deck", "handout"), True),
     ("history", "history", lambda x: x.says(r"project version"), False),
     ("go back to v2", "goto", lambda x: x.pc.state["cur"] == 2, False),
@@ -143,6 +196,7 @@ def run(planner):
                 reply = pc.say(msg)
             except Exception as e:  # noqa: BLE001
                 import traceback
+
                 traceback.print_exc()
                 reply, err = "", f"{type(e).__name__}: {e}"
                 pc.last_turn = {"intents": ["crash"]}
@@ -153,10 +207,22 @@ def run(planner):
             except Exception as e:  # noqa: BLE001
                 check_ok, err = False, err or f"check {type(e).__name__}: {e}"
             ok = intent_ok and check_ok and not err
-            rows.append({"msg": msg, "ok": ok, "intents": pc.last_turn.get("intents"), "seconds": round(secs, 1), "llm": bool(pc.last_turn.get("llm")),
-                         "reply": reply[:900], "error": err})
-            print(f"{'OK ' if ok else 'BAD'} [{','.join(pc.last_turn.get('intents') or [])}{'+llm' if pc.last_turn.get('llm') else ''}] "
-                  f"pv{v0}->pv{pc.state['cur']} {secs:5.1f}s  {msg}\n      {reply[:600]}", flush=True)
+            rows.append(
+                {
+                    "msg": msg,
+                    "ok": ok,
+                    "intents": pc.last_turn.get("intents"),
+                    "seconds": round(secs, 1),
+                    "llm": bool(pc.last_turn.get("llm")),
+                    "reply": reply[:900],
+                    "error": err,
+                }
+            )
+            print(
+                f"{'OK ' if ok else 'BAD'} [{','.join(pc.last_turn.get('intents') or [])}{'+llm' if pc.last_turn.get('llm') else ''}] "
+                f"pv{v0}->pv{pc.state['cur']} {secs:5.1f}s  {msg}\n      {reply[:600]}",
+                flush=True,
+            )
             if not ok:
                 print(f"      intent_ok={intent_ok} check_ok={check_ok} {err or ''}")
     finally:
@@ -172,6 +238,7 @@ if __name__ == "__main__":
     planner = None
     if "--offline" not in sys.argv:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     ok, n = run(planner)
     sys.exit(0 if ok == n else 1)

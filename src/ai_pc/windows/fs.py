@@ -8,6 +8,7 @@
 
 Nothing is deleted for good: removing sends to the Recycle Bin, and undo restores from it.
 """
+
 import datetime as dt
 import hashlib
 import json
@@ -31,7 +32,28 @@ KINDS = {
     "presentation": {".ppt", ".pptx", ".odp", ".key"},
     "archive": {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tgz"},
     "installer": {".exe", ".msi", ".msix", ".msixbundle", ".appx", ".appxbundle", ".apk", ".dmg", ".iso"},
-    "code": {".py", ".js", ".ts", ".html", ".htm", ".css", ".json", ".xml", ".java", ".c", ".cpp", ".cs", ".ipynb", ".sql", ".php", ".sh", ".bat", ".ps1", ".yml", ".yaml"},
+    "code": {
+        ".py",
+        ".js",
+        ".ts",
+        ".html",
+        ".htm",
+        ".css",
+        ".json",
+        ".xml",
+        ".java",
+        ".c",
+        ".cpp",
+        ".cs",
+        ".ipynb",
+        ".sql",
+        ".php",
+        ".sh",
+        ".bat",
+        ".ps1",
+        ".yml",
+        ".yaml",
+    },
     "font": {".ttf", ".otf", ".woff", ".woff2"},
     "design": {".psd", ".ai", ".fig", ".sketch", ".xd", ".cdr", ".indd", ".svg", ".eps"},
     "ebook": {".epub", ".mobi", ".azw3"},
@@ -39,9 +61,25 @@ KINDS = {
     "model3d": {".glb", ".gltf", ".fbx", ".obj", ".blend", ".stl", ".3ds", ".dae", ".usdz", ".3mf", ".ply"},
 }
 PARTIAL = {".crdownload", ".part", ".partial", ".download", ".opdownload", ".!ut", ".tmp"}
-FOLDER = {"photo": "Photos", "video": "Videos", "audio": "Music", "document": "Documents", "pdf": "PDFs", "spreadsheet": "Spreadsheets",
-          "presentation": "Presentations", "archive": "Archives", "installer": "Installers", "code": "Code", "font": "Fonts", "design": "Design",
-          "ebook": "Books", "torrent": "Torrents", "model3d": "3D models", "partial": "Unfinished downloads", "other": "Other"}
+FOLDER = {
+    "photo": "Photos",
+    "video": "Videos",
+    "audio": "Music",
+    "document": "Documents",
+    "pdf": "PDFs",
+    "spreadsheet": "Spreadsheets",
+    "presentation": "Presentations",
+    "archive": "Archives",
+    "installer": "Installers",
+    "code": "Code",
+    "font": "Fonts",
+    "design": "Design",
+    "ebook": "Books",
+    "torrent": "Torrents",
+    "model3d": "3D models",
+    "partial": "Unfinished downloads",
+    "other": "Other",
+}
 SKIP_DIRS = {"$recycle.bin", "system volume information", ".git", "node_modules", ".venv", "venv", "__pycache__", ".idea", ".vs", "appdata"}
 
 
@@ -53,8 +91,16 @@ class FsError(Exception):
 def known(name):
     """A known folder by its everyday name (downloads, documents, desktop, pictures, videos, music, onedrive)."""
     from win32com.shell import shell, shellcon
-    ids = {"downloads": "FOLDERID_Downloads", "documents": "FOLDERID_Documents", "desktop": "FOLDERID_Desktop", "pictures": "FOLDERID_Pictures",
-           "photos": "FOLDERID_Pictures", "videos": "FOLDERID_Videos", "music": "FOLDERID_Music"}
+
+    ids = {
+        "downloads": "FOLDERID_Downloads",
+        "documents": "FOLDERID_Documents",
+        "desktop": "FOLDERID_Desktop",
+        "pictures": "FOLDERID_Pictures",
+        "photos": "FOLDERID_Pictures",
+        "videos": "FOLDERID_Videos",
+        "music": "FOLDERID_Music",
+    }
     n = str(name).lower().strip()
     if n == "onedrive":
         od = os.environ.get("OneDrive")
@@ -78,8 +124,14 @@ def known_folders():
 
 def _protected():
     env = os.environ
-    ps = [env.get("SystemRoot", r"C:\Windows"), env.get("ProgramFiles", r"C:\Program Files"), env.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
-          env.get("ProgramData", r"C:\ProgramData"), str(Path.home() / "AppData"), str(PROJECT)]
+    ps = [
+        env.get("SystemRoot", r"C:\Windows"),
+        env.get("ProgramFiles", r"C:\Program Files"),
+        env.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+        env.get("ProgramData", r"C:\ProgramData"),
+        str(Path.home() / "AppData"),
+        str(PROJECT),
+    ]
     return [Path(p).resolve() for p in ps if p]
 
 
@@ -130,11 +182,31 @@ def record(path, root=None):
     st = p.stat()
     born = getattr(st, "st_birthtime", st.st_ctime)
     if os.path.isdir(p):
-        return {"path": str(p), "name": p.name, "stem": p.name, "ext": "", "kind": "folder", "size": 0, "dir": True, "mtime": _iso(st.st_mtime),
-                "ctime": _iso(born), "folder": str(p.parent), "rel": ""}
-    return {"path": str(p), "name": p.name, "stem": p.stem, "ext": p.suffix.lower(), "kind": kind_of(p.name), "size": st.st_size,
-            "mtime": _iso(st.st_mtime), "ctime": _iso(born), "folder": str(p.parent),
-            "rel": str(p.parent.relative_to(root)) if root and Path(root) in p.parents else ""}
+        return {
+            "path": str(p),
+            "name": p.name,
+            "stem": p.name,
+            "ext": "",
+            "kind": "folder",
+            "size": 0,
+            "dir": True,
+            "mtime": _iso(st.st_mtime),
+            "ctime": _iso(born),
+            "folder": str(p.parent),
+            "rel": "",
+        }
+    return {
+        "path": str(p),
+        "name": p.name,
+        "stem": p.stem,
+        "ext": p.suffix.lower(),
+        "kind": kind_of(p.name),
+        "size": st.st_size,
+        "mtime": _iso(st.st_mtime),
+        "ctime": _iso(born),
+        "folder": str(p.parent),
+        "rel": str(p.parent.relative_to(root)) if root and Path(root) in p.parents else "",
+    }
 
 
 def scan(root, recursive=True, limit=150000, budget_s=20, hidden=False):
@@ -160,15 +232,14 @@ def scan(root, recursive=True, limit=150000, budget_s=20, hidden=False):
             if not recursive:
                 dirs = [str(root / d) for d in dn]
             break
-    return {"root": str(root), "files": files, "dirs": dirs, "bytes": sum(f["size"] for f in files), "truncated": truncated,
-            "recursive": recursive}
+    return {"root": str(root), "files": files, "dirs": dirs, "bytes": sum(f["size"] for f in files), "truncated": truncated, "recursive": recursive}
 
 
 NAME_DATES = [  # dates phones, cameras, WhatsApp and Windows write into file names
-    re.compile(r"(?<!\d)(20\d\d|19\d\d)(\d\d)(\d\d)[_-](\d\d)(\d\d)(\d\d)"),                    # IMG_20240812_101500, PXL_20240812_101500123
-    re.compile(r"(?<!\d)(20\d\d|19\d\d)-(\d\d)-(\d\d) at (\d\d?)\.(\d\d)\.(\d\d)"),              # WhatsApp Image 2024-08-25 at 20.11.03
-    re.compile(r"(?<!\d)(20\d\d|19\d\d)-(\d\d)-(\d\d)[ _](\d\d)[.:]?(\d\d)[.:]?(\d\d)(?!\d)"),     # Screenshot 2026-09-12 104455
-    re.compile(r"(?<!\d)(20\d\d|19\d\d)[-_.](\d\d)[-_.](\d\d)(?!\d)"),                               # a date alone: report 2024-08-01
+    re.compile(r"(?<!\d)(20\d\d|19\d\d)(\d\d)(\d\d)[_-](\d\d)(\d\d)(\d\d)"),  # IMG_20240812_101500, PXL_20240812_101500123
+    re.compile(r"(?<!\d)(20\d\d|19\d\d)-(\d\d)-(\d\d) at (\d\d?)\.(\d\d)\.(\d\d)"),  # WhatsApp Image 2024-08-25 at 20.11.03
+    re.compile(r"(?<!\d)(20\d\d|19\d\d)-(\d\d)-(\d\d)[ _](\d\d)[.:]?(\d\d)[.:]?(\d\d)(?!\d)"),  # Screenshot 2026-09-12 104455
+    re.compile(r"(?<!\d)(20\d\d|19\d\d)[-_.](\d\d)[-_.](\d\d)(?!\d)"),  # a date alone: report 2024-08-01
 ]
 
 
@@ -189,6 +260,7 @@ def taken(path):
     it), else None."""
     try:
         from PIL import Image
+
         with Image.open(path) as im:
             ex = im.getexif()
             v = ex.get_ifd(0x8769).get(36867) or ex.get(306)
@@ -217,8 +289,13 @@ def entries(dirs):
 
 def media_seconds(path):
     try:
-        r = subprocess.run(["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(path)], capture_output=True, text=True, timeout=30,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        r = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
         return float(json.loads(r.stdout)["format"]["duration"])
     except Exception:  # noqa: BLE001
         return None
@@ -249,8 +326,21 @@ def date_of(rec, field="mtime"):
 
 
 # ------------------------------------------------------------------------------------------------ finding
-def find(files, kind=None, exts=None, name=None, words=None, larger=None, smaller=None, since=None, until=None, field="mtime", folder=None,
-         sort=None, limit=None):
+def find(
+    files,
+    kind=None,
+    exts=None,
+    name=None,
+    words=None,
+    larger=None,
+    smaller=None,
+    since=None,
+    until=None,
+    field="mtime",
+    folder=None,
+    sort=None,
+    limit=None,
+):
     """Files by kind, extension, name (words, a pattern), size, date (modified, created or taken), folder; sorted."""
     out = []
     kinds = {kind} if isinstance(kind, str) else set(kind or [])
@@ -336,7 +426,11 @@ def plan_organize(idx, by="kind", files=None, field="mtime"):
     steps, names, made = [], set(), set()
     for f in sorted(pool, key=lambda x: x["name"].lower()):
         if by == "date":
-            d = dt.datetime.fromisoformat(taken(f["path"]) or f.get(field) or f["mtime"]) if f["kind"] == "photo" and field == "taken" else date_of(f, field)
+            d = (
+                dt.datetime.fromisoformat(taken(f["path"]) or f.get(field) or f["mtime"])
+                if f["kind"] == "photo" and field == "taken"
+                else date_of(f, field)
+            )
             sub = d.strftime("%Y-%m %B") if d else "Undated"
         elif by == "ext":
             sub = (f["ext"].lstrip(".").upper() or "No extension") + " files"
@@ -358,12 +452,16 @@ def plan_rename(files, pattern=None, replace=None, case=None, start=1):
     case ('lower', 'title'); the extension stays."""
     steps, names = [], set()
     tk = {f["path"]: taken(f["path"]) or f["mtime"] for f in files} if pattern and "taken" in pattern else {}
-    order = sorted(files, key=lambda x: (tk[x["path"]], bool(COPYISH.search(Path(x["name"]).stem)), x["name"].lower())) if tk else \
-        sorted(files, key=lambda x: x["name"].lower())
+    order = (
+        sorted(files, key=lambda x: (tk[x["path"]], bool(COPYISH.search(Path(x["name"]).stem)), x["name"].lower()))
+        if tk
+        else sorted(files, key=lambda x: x["name"].lower())
+    )
     for i, f in enumerate(order):
         src = Path(f["path"])
         stem = src.stem
         if pattern:
+
             def tok(m):
                 t = m.group(1)
                 if t == "name" or t == "stem":
@@ -380,6 +478,7 @@ def plan_rename(files, pattern=None, replace=None, case=None, start=1):
                 if t.startswith("created"):
                     return dt.datetime.fromisoformat(f["ctime"]).strftime(m.group(5) or "%Y-%m-%d")
                 return dt.datetime.fromisoformat(f["mtime"]).strftime(m.group(3) or "%Y-%m-%d")
+
             new = TOKENS.sub(tok, pattern)
         else:
             new = stem
@@ -435,10 +534,12 @@ def duplicates(files):
 
 def _keeper(group):
     """Which copy stays: the one without ' (1)' / 'Copy of' / ' - Copy' in its name, then the oldest."""
+
     def score(f):
         n = f["name"].lower()
         copyish = bool(re.search(r"\(\d+\)|copy of|\s-\scopy|_copy\b|\scopy\b", n))
         return (copyish, f["mtime"], len(n))
+
     return min(group, key=score)
 
 
@@ -460,7 +561,9 @@ def plan_dedupe(files, copies_only=False):
                 continue
             if copies_only and _base(Path(f["name"]).stem) != _base(Path(keep["name"]).stem):
                 continue
-            steps.append({"do": "trash", "src": f["path"], "why": f"the same as {keep['name']}", "keep": keep["path"], "cat": "copy", "size": f["size"]})
+            steps.append(
+                {"do": "trash", "src": f["path"], "why": f"the same as {keep['name']}", "keep": keep["path"], "cat": "copy", "size": f["size"]}
+            )
     return steps
 
 
@@ -489,7 +592,9 @@ def plan_cleanup(idx, old_days=30, notes=None):
         elif f["kind"] == "installer":
             age = (now - date_of(f)).days
             if age > old_days:
-                steps.append({"do": "trash", "src": f["path"], "why": f"an installer from {date_of(f):%d %b %Y}", "cat": "installer", "size": f["size"]})
+                steps.append(
+                    {"do": "trash", "src": f["path"], "why": f"an installer from {date_of(f):%d %b %Y}", "cat": "installer", "size": f["size"]}
+                )
             else:
                 notes.append(f"{f['name']} (an installer from {'today' if age < 1 else f'{age} day(s) ago'}, maybe still needed)")
     gone = {s["src"] for s in steps}
@@ -516,6 +621,7 @@ def plan_unzip(archive, dst=None):
 def recycle(paths):
     """To the Recycle Bin (undo restores them): the Windows shell's own delete, with undo allowed."""
     from win32com.shell import shell, shellcon
+
     flags = shellcon.FOF_ALLOWUNDO | shellcon.FOF_NOCONFIRMATION | shellcon.FOF_SILENT | shellcon.FOF_NOERRORUI | shellcon.FOF_WANTNUKEWARNING
     paths = [str(Path(p).resolve()) for p in paths]
     if not paths:
@@ -530,6 +636,7 @@ def _key(p):
 
 def _bin_folder():
     from win32com.shell import shell, shellcon
+
     pidl = shell.SHGetSpecialFolderLocation(0, shellcon.CSIDL_BITBUCKET)
     return pidl, shell.SHGetDesktopFolder().BindToObject(pidl, None, shell.IID_IShellFolder)
 
@@ -538,6 +645,7 @@ def bin_items(binf=None):
     """What the Recycle Bin holds, newest deletion first: [{"name", "orig", "deleted", "size", "dir", "pidl"}], read from
     each item's $I record (where it was, when it was deleted, its size)."""
     from win32com.shell import shellcon
+
     binf = binf or _bin_folder()[1]
     out = []
     for pidl in binf.EnumObjects(0, shellcon.SHCONTF_FOLDERS | shellcon.SHCONTF_NONFOLDERS | shellcon.SHCONTF_INCLUDEHIDDEN):
@@ -546,16 +654,24 @@ def bin_items(binf=None):
             raw = rpath.with_name("$I" + rpath.name[2:]).read_bytes()
             if int.from_bytes(raw[:8], "little") >= 2:
                 n = int.from_bytes(raw[24:28], "little")
-                orig = raw[28:28 + 2 * n].decode("utf-16-le").rstrip("\0")
+                orig = raw[28 : 28 + 2 * n].decode("utf-16-le").rstrip("\0")
             else:  # the Windows Vista-8 layout: a fixed 520-byte path
-                orig = raw[24:24 + 520].decode("utf-16-le").split("\0")[0]
+                orig = raw[24 : 24 + 520].decode("utf-16-le").split("\0")[0]
             size = int.from_bytes(raw[8:16], "little")
             ft = int.from_bytes(raw[16:24], "little")
             deleted = dt.datetime.fromtimestamp((ft - 116444736000000000) / 1e7)
         except Exception:  # noqa: BLE001
             continue
-        out.append({"name": Path(orig).name, "orig": orig, "deleted": deleted.isoformat(timespec="seconds"), "size": size, "dir": rpath.is_dir(),
-                    "pidl": pidl})
+        out.append(
+            {
+                "name": Path(orig).name,
+                "orig": orig,
+                "deleted": deleted.isoformat(timespec="seconds"),
+                "size": size,
+                "dir": rpath.is_dir(),
+                "pidl": pidl,
+            }
+        )
     out.sort(key=lambda x: x["deleted"], reverse=True)
     return out
 
@@ -566,6 +682,7 @@ def restore(paths):
     the latest one comes back; nothing is restored over a file that is there now. Returns {path: restored?}."""
     import pythoncom
     from win32com.shell import shell, shellcon
+
     want = {_key(p): p for p in paths}
     out = {p: False for p in paths}
     if not paths:
@@ -617,8 +734,11 @@ def run_step(s, guard, server=None):
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src), str(dst))
         ok = dst.exists() and not src.exists() and (size is None or dst.stat().st_size == size)
-        return _check(ok, f"{src.name} -> {dst.relative_to(dst.parent.parent) if dst.parent.parent != dst.parent else dst.name}"), \
-            {"do": "move", "src": str(dst), "dst": str(src)}
+        return _check(ok, f"{src.name} -> {dst.relative_to(dst.parent.parent) if dst.parent.parent != dst.parent else dst.name}"), {
+            "do": "move",
+            "src": str(dst),
+            "dst": str(src),
+        }
     if k == "copy":
         src, dst = guard.check(s["src"], must_exist=True), guard.check(s["dst"])
         if dst.exists():
@@ -682,6 +802,7 @@ def run_step(s, guard, server=None):
 def _image(s, guard):
     """A photo converted, resized or both (EXIF kept): checked by opening the result."""
     from PIL import Image, ImageOps
+
     src = guard.check(s["src"], must_exist=True)
     fmt = (s.get("format") or src.suffix.lstrip(".")).lower().replace("jpg", "jpeg")
     ext = {"jpeg": ".jpg", "png": ".png", "webp": ".webp", "bmp": ".bmp", "gif": ".gif", "tiff": ".tif"}.get(fmt, src.suffix)
@@ -694,7 +815,7 @@ def _image(s, guard):
         w, h = im.size
         tw, th = s.get("width"), s.get("height")
         if tw or th:
-            r = min((tw or 10 ** 9) / w, (th or 10 ** 9) / h)
+            r = min((tw or 10**9) / w, (th or 10**9) / h)
             if r < 1 or s.get("upscale"):
                 im = im.resize((max(1, round(w * r)), max(1, round(h * r))), Image.LANCZOS)
         if fmt == "jpeg" and im.mode in ("RGBA", "LA", "P"):
@@ -714,12 +835,22 @@ def _image(s, guard):
 
 def _office_pdf(s, guard, server):
     from ai_pc.office import render as RN
+
     src = guard.check(s["src"], must_exist=True)
     dst = guard.check(s.get("dst") or src.with_suffix(".pdf"))
     if dst.exists():
         dst = unique(dst)
-    app = {".doc": "word", ".docx": "word", ".rtf": "word", ".odt": "word", ".ppt": "powerpoint", ".pptx": "powerpoint", ".xls": "excel", ".xlsx": "excel",
-           ".xlsm": "excel"}.get(src.suffix.lower())
+    app = {
+        ".doc": "word",
+        ".docx": "word",
+        ".rtf": "word",
+        ".odt": "word",
+        ".ppt": "powerpoint",
+        ".pptx": "powerpoint",
+        ".xls": "excel",
+        ".xlsx": "excel",
+        ".xlsm": "excel",
+    }.get(src.suffix.lower())
     if not app:
         raise FsError(f"{src.name} is not a Word, PowerPoint or Excel file")
     tmp = dst.with_name(f"_aipc_{src.name}")
@@ -732,6 +863,7 @@ def _office_pdf(s, guard, server):
     pages = 0
     if dst.exists():
         from pypdf import PdfReader
+
         pages = len(PdfReader(str(dst)).pages)
     return _check(r.get("ok") and pages > 0, f"{dst.name}: {pages} page(s)"), {"do": "trash", "src": str(dst)}
 
@@ -740,6 +872,7 @@ def _pdf_merge(s, guard):
     import logging
 
     from pypdf import PdfReader, PdfWriter
+
     logging.getLogger("pypdf").setLevel(logging.ERROR)  # 'Annotation sizes differ' and such: harmless
     srcs = [guard.check(p, must_exist=True) for p in s["srcs"]]
     dst = guard.check(s["dst"])
@@ -761,8 +894,13 @@ def _audio(s, guard):
     dst = guard.check(s.get("dst") or src.with_suffix(".mp3"))
     if dst.exists():
         dst = unique(dst)
-    r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", str(src), "-vn", "-acodec", "libmp3lame", "-q:a", "2", str(dst)], capture_output=True, text=True,
-                       timeout=600, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-i", str(src), "-vn", "-acodec", "libmp3lame", "-q:a", "2", str(dst)],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
     a, b = media_seconds(src), media_seconds(dst) if dst.exists() else None
     ok = r.returncode == 0 and b is not None and (a is None or abs(a - b) < 1.0)
     return _check(ok, f"{dst.name}: {b or 0:.1f} s of sound" + (f" (the video is {a:.1f} s)" if a else "")), {"do": "trash", "src": str(dst)}

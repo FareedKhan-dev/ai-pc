@@ -7,6 +7,7 @@ Also, for a board someone made: Gerbers and drill files zipped for a PCB maker, 
 
   'kicad schematic red led on 5v'   'kicad voltage divider 12v to 5v'   'kicad 555 blinker 2 hz on 9v'   'kicad gerbers for board.kicad_pcb'
 """
+
 import copy
 import csv
 import json
@@ -37,12 +38,19 @@ def env():
     for table in ("sym-lib-table", "fp-lib-table"):  # KiCad's own default library tables (they point at its bundled libraries)
         if not (cfg / table).exists():
             (cfg / table).write_bytes((HOME / "share" / "kicad" / "template" / table).read_bytes())
-    return dict(os.environ, KICAD_CONFIG_HOME=str(home / "config"), KICAD_DOCUMENTS_HOME=str(home / "documents"), KICAD_CACHE_HOME=str(home / "cache"),
-                KICAD10_SYMBOL_DIR=str(SYMBOLS), KICAD10_FOOTPRINT_DIR=str(HOME / "share" / "kicad" / "footprints"))
+    return dict(
+        os.environ,
+        KICAD_CONFIG_HOME=str(home / "config"),
+        KICAD_DOCUMENTS_HOME=str(home / "documents"),
+        KICAD_CACHE_HOME=str(home / "cache"),
+        KICAD10_SYMBOL_DIR=str(SYMBOLS),
+        KICAD10_FOOTPRINT_DIR=str(HOME / "share" / "kicad" / "footprints"),
+    )
 
 
 def cli(*args, timeout=180):
     from ai_pc.core import hidden_desktop
+
     return hidden_desktop.run([str(CLI), *map(str, args)], timeout=timeout, env=env())
 
 
@@ -58,9 +66,15 @@ def lib_symbol(lib_id):
         parent = copy.deepcopy(syms[ext[1]])
         own = {p[1]: p for p in S.find(sym, "property")}
         body = [i for i in parent if not (isinstance(i, list) and i and i[0] == "property")]
-        props = [own.get(p[1], p) for p in S.find(parent, "property")] + [p for k, p in own.items() if k not in {q[1] for q in S.find(parent, "property")}]
-        sym = body[:2] + [i for i in body[2:] if not (isinstance(i, list) and i[0] == "symbol")] + props + \
-            [i for i in body if isinstance(i, list) and i and i[0] == "symbol"]
+        props = [own.get(p[1], p) for p in S.find(parent, "property")] + [
+            p for k, p in own.items() if k not in {q[1] for q in S.find(parent, "property")}
+        ]
+        sym = (
+            body[:2]
+            + [i for i in body[2:] if not (isinstance(i, list) and i[0] == "symbol")]
+            + props
+            + [i for i in body if isinstance(i, list) and i and i[0] == "symbol"]
+        )
         for sub in S.find(sym, "symbol"):
             sub[1] = S.Str(str(sub[1]).replace(ext[1] + "_", name + "_", 1))
     sym[1] = S.Str(lib_id)
@@ -94,7 +108,9 @@ def _prop(name, value, x, y, hide=False, angle=0):
 def schematic(circ, project):
     """A .kicad_sch tree: symbols placed on KiCad's grid, every pin joined to its net by a label at the pin's end."""
     sheet = _u()
-    parts = list(circ["parts"]) + [(f"#FLG0{i + 1}", "power:PWR_FLAG", "PWR_FLAG", "", {"1": net}) for i, net in enumerate(circ.get("power_flags", []))]
+    parts = list(circ["parts"]) + [
+        (f"#FLG0{i + 1}", "power:PWR_FLAG", "PWR_FLAG", "", {"1": net}) for i, net in enumerate(circ.get("power_flags", []))
+    ]
     libs, placed, labels = {}, [], []
     x, flag_x = 25.4, 25.4
     for ref, lib_id, value, foot, conns in parts:
@@ -114,10 +130,21 @@ def schematic(circ, project):
             x += width + STUB
         x0 = px0
         top = max([py for _, py, _ in pp.values()] + [3.81])
-        node = ["symbol", ["lib_id", S.Str(lib_id)], ["at", x0, y, 0], ["unit", 1], ["exclude_from_sim", "no"], ["in_bom", "no" if virtual else "yes"],
-                ["on_board", "no" if virtual else "yes"], ["dnp", "no"], ["uuid", _u()],
-                _prop("Reference", ref, x0 + 2.54, y - top - 5.08, hide=virtual), _prop("Value", value, x0 + 2.54, y - top - 2.54),
-                _prop("Footprint", foot, x0, y, hide=True), _prop("Datasheet", "~", x0, y, hide=True)]
+        node = [
+            "symbol",
+            ["lib_id", S.Str(lib_id)],
+            ["at", x0, y, 0],
+            ["unit", 1],
+            ["exclude_from_sim", "no"],
+            ["in_bom", "no" if virtual else "yes"],
+            ["on_board", "no" if virtual else "yes"],
+            ["dnp", "no"],
+            ["uuid", _u()],
+            _prop("Reference", ref, x0 + 2.54, y - top - 5.08, hide=virtual),
+            _prop("Value", value, x0 + 2.54, y - top - 2.54),
+            _prop("Footprint", foot, x0, y, hide=True),
+            _prop("Datasheet", "~", x0, y, hide=True),
+        ]
         node += [["pin", S.Str(n), ["uuid", _u()]] for n in pp]
         node.append(["instances", ["project", S.Str(project), ["path", S.Str("/" + sheet), ["reference", S.Str(ref)], ["unit", 1]]]])
         placed.append(node)
@@ -127,13 +154,34 @@ def schematic(circ, project):
             ex, ey = round(x0 + px, 2), round(y - py, 2)
             lx, ly = round(ex + dx * STUB, 2), round(ey + dy * STUB, 2)
             labels.append(["wire", ["pts", ["xy", ex, ey], ["xy", lx, ly]], ["stroke", ["width", 0], ["type", "default"]], ["uuid", _u()]])
-            labels.append(["label", S.Str(net), ["at", lx, ly, lang], ["fields_autoplaced", "yes"],
-                           ["effects", ["font", ["size", 1.27, 1.27]], ["justify", just, "bottom"]], ["uuid", _u()]])
-    title = ["title_block", ["title", S.Str(circ["title"])], ["company", S.Str("AI PC")]] + \
-        [["comment", i + 1, S.Str(n)] for i, n in enumerate(circ.get("notes", [])[:4])]
-    return ["kicad_sch", ["version", 20250114], ["generator", S.Str("eeschema")], ["generator_version", S.Str("9.0")], ["uuid", S.Str(sheet)],
-            ["paper", S.Str("A4")], title, ["lib_symbols"] + list(libs.values())] + placed + labels + \
-        [["sheet_instances", ["path", S.Str("/"), ["page", S.Str("1")]]], ["embedded_fonts", "no"]]
+            labels.append(
+                [
+                    "label",
+                    S.Str(net),
+                    ["at", lx, ly, lang],
+                    ["fields_autoplaced", "yes"],
+                    ["effects", ["font", ["size", 1.27, 1.27]], ["justify", just, "bottom"]],
+                    ["uuid", _u()],
+                ]
+            )
+    title = ["title_block", ["title", S.Str(circ["title"])], ["company", S.Str("AI PC")]] + [
+        ["comment", i + 1, S.Str(n)] for i, n in enumerate(circ.get("notes", [])[:4])
+    ]
+    return (
+        [
+            "kicad_sch",
+            ["version", 20250114],
+            ["generator", S.Str("eeschema")],
+            ["generator_version", S.Str("9.0")],
+            ["uuid", S.Str(sheet)],
+            ["paper", S.Str("A4")],
+            title,
+            ["lib_symbols"] + list(libs.values()),
+        ]
+        + placed
+        + labels
+        + [["sheet_instances", ["path", S.Str("/"), ["page", S.Str("1")]]], ["embedded_fonts", "no"]]
+    )
 
 
 def netlist_nets(path):
@@ -170,13 +218,20 @@ def check_schematic(circ, folder, stem):
     bom = list(csv.DictReader(bom_file.read_text(encoding="utf-8").splitlines())) if bom_file.exists() else []
     refs_in_bom = {r.strip() for row in bom for r in (row.get("Refs") or row.get("Reference") or "").split(",") if r.strip()}
     from pypdf import PdfReader
+
     pdf_pages = len(PdfReader(str(pdf_file)).pages) if pdf_file.exists() else 0
-    checks = [("KiCad's Electrical Rules Check finds no errors" + (f" ({len(problems['warning'])} warnings)" if problems["warning"] else ""),
-               erc_file.exists() and not problems["error"]),
-              ("KiCad's netlist joins exactly the pins the circuit says (" + ", ".join(f"{k}: {len(v)} pins" for k, v in sorted(want.items())) + ")",
-               {k: v for k, v in got.items()} == want),
-              ("the bill of materials lists every part", refs_in_bom >= {p[0] for p in circ["parts"]}),
-              ("the PDF schematic was made", pdf_pages >= 1)]
+    checks = [
+        (
+            "KiCad's Electrical Rules Check finds no errors" + (f" ({len(problems['warning'])} warnings)" if problems["warning"] else ""),
+            erc_file.exists() and not problems["error"],
+        ),
+        (
+            "KiCad's netlist joins exactly the pins the circuit says (" + ", ".join(f"{k}: {len(v)} pins" for k, v in sorted(want.items())) + ")",
+            {k: v for k, v in got.items()} == want,
+        ),
+        ("the bill of materials lists every part", refs_in_bom >= {p[0] for p in circ["parts"]}),
+        ("the PDF schematic was made", pdf_pages >= 1),
+    ]
     return checks, problems, (erc_file, net_file, bom_file, pdf_file)
 
 
@@ -203,6 +258,7 @@ def gerbers(board, folder):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bkicad\b|\bschematic\b|\bgerbers?\b|\bpcb\b", c):
         return None
@@ -221,13 +277,24 @@ def run(op, ctx):
     if op["op"] == "gerbers":
         files, errors, zpath = gerbers(op["board"], out)
         names = {p.name.lower() for p in files}
-        need = {"top copper": ("-f_cu", ".gtl"), "bottom copper": ("-b_cu", ".gbl"), "solder mask": ("_mask", ".gts"), "board outline": ("edge_cuts", ".gm1"),
-                "drill holes": (".drl",)}
+        need = {
+            "top copper": ("-f_cu", ".gtl"),
+            "bottom copper": ("-b_cu", ".gbl"),
+            "solder mask": ("_mask", ".gts"),
+            "board outline": ("edge_cuts", ".gm1"),
+            "drill holes": (".drl",),
+        }
         have = [k for k, keys in need.items() if any(any(key in n for key in keys) for n in names)]
         missing = [k for k in need if k not in have]
-        return (f"Gerbers and drill files for {Path(op['board']).name}: {zpath} ({len(files)} files; {', '.join(have)}), ready to upload to a PCB maker. " +
-                ("KiCad's Design Rules Check found no errors." if not errors else f"KiCad's DRC found {len(errors)} problem(s): {'; '.join(errors[:3])} - fix them in KiCad first.") +
-                (f" NOT right: missing {', '.join(missing)}." if missing else " Checked: every layer a maker needs is in the zip."))
+        return (
+            f"Gerbers and drill files for {Path(op['board']).name}: {zpath} ({len(files)} files; {', '.join(have)}), ready to upload to a PCB maker. "
+            + (
+                "KiCad's Design Rules Check found no errors."
+                if not errors
+                else f"KiCad's DRC found {len(errors)} problem(s): {'; '.join(errors[:3])} - fix them in KiCad first."
+            )
+            + (f" NOT right: missing {', '.join(missing)}." if missing else " Checked: every layer a maker needs is in the zip.")
+        )
     circ = circuits.from_words(op["words"])
     stem = re.sub(r"[^\w-]+", "_", circ["title"]).strip("_")
     folder = out / stem
@@ -237,6 +304,13 @@ def run(op, ctx):
     checks, problems, files = check_schematic(circ, folder, stem)
     bad = [w for w, ok in checks if not ok]
     parts = ", ".join(f"{p[0]} {p[2]}" for p in circ["parts"])
-    return (f"KiCad project '{circ['title']}': {folder / (stem + '.kicad_pro')} (open it in KiCad). Parts: {parts}. " + " ".join(n + "." for n in circ["notes"]) +
-            " Files: schematic PDF, netlist, BOM CSV, ERC report. " +
-            ("Checked by kicad-cli: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f" (ERC errors: {problems['error'][:3]})."))
+    return (
+        f"KiCad project '{circ['title']}': {folder / (stem + '.kicad_pro')} (open it in KiCad). Parts: {parts}. "
+        + " ".join(n + "." for n in circ["notes"])
+        + " Files: schematic PDF, netlist, BOM CSV, ERC report. "
+        + (
+            "Checked by kicad-cli: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + f" (ERC errors: {problems['error'][:3]})."
+        )
+    )

@@ -4,6 +4,7 @@ fake servers (no accounts, nothing really posted); the model is real.
 
   .venv\\Scripts\\python.exe tests\\integration\\social_conversations.py [--offline]
 """
+
 import shutil
 import sys
 import time
@@ -50,6 +51,7 @@ def main():
     planner = None
     if "--offline" not in sys.argv:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     shutil.rmtree(OUT, ignore_errors=True)
     OUT.mkdir(parents=True)
@@ -59,24 +61,40 @@ def main():
     t0 = time.time()
     st = Store(OUT / "social.db")
     mf, yf, lf, xf = MetaFake(), YouTubeFake(), LinkedInFake(), XFake()
-    creds = {"page_id": "PAGE1", "page_token": "EAAPAGE", "user_token": "EAAUSER", "app_id": "APP1", "ig_id": "IG1", "ig_mode": "facebook", "live": True}
+    creds = {
+        "page_id": "PAGE1",
+        "page_token": "EAAPAGE",
+        "user_token": "EAAUSER",
+        "app_id": "APP1",
+        "ig_id": "IG1",
+        "ig_mode": "facebook",
+        "live": True,
+    }
     ig = ME.Instagram(creds=dict(creds), transport=mf.transport(), store=st, pause=lambda s: None)
     th = TH.Threads(creds={"access_token": "TH"}, transport=mf.transport(), store=st, pause=lambda s: None)
     ig._host_factory = th._host_factory = host_factory
-    plats = {"facebook": ME.Facebook(creds=dict(creds), transport=mf.transport(), store=st, pause=lambda s: None), "instagram": ig, "threads": th,
-             "youtube": YT.YouTube(creds={"access_token": "ya29"}, transport=yf.transport(), store=st, pause=lambda s: None),
-             "linkedin": LI.LinkedIn(creds={"access_token": "AQ"}, transport=lf.transport(), store=st, pause=lambda s: None),
-             "x": XC.X(creds={"access_token": "x"}, transport=xf.transport(), store=st, pause=lambda s: None)}
-    c = SocialChat.start(planner=planner, chats_dir=OUT / "chats", platforms=plats, store=st, files=[OUT / "vertical.mp4", OUT / "square.jpg"], budget=20)
+    plats = {
+        "facebook": ME.Facebook(creds=dict(creds), transport=mf.transport(), store=st, pause=lambda s: None),
+        "instagram": ig,
+        "threads": th,
+        "youtube": YT.YouTube(creds={"access_token": "ya29"}, transport=yf.transport(), store=st, pause=lambda s: None),
+        "linkedin": LI.LinkedIn(creds={"access_token": "AQ"}, transport=lf.transport(), store=st, pause=lambda s: None),
+        "x": XC.X(creds={"access_token": "x"}, transport=xf.transport(), store=st, pause=lambda s: None),
+    }
+    c = SocialChat.start(
+        planner=planner, chats_dir=OUT / "chats", platforms=plats, store=st, files=[OUT / "vertical.mp4", OUT / "square.jpg"], budget=20
+    )
 
     def versions(*want):
         def t(c, r):
             return all(w in r for w in want) and r.startswith(("Ready to post", "Ready to schedule")), r[:300]
+
         return t
 
     def published(*want):
         def t(c, r):
             return all(w in r for w in want) and "CANNOT" not in r, r[:300]
+
         return t
 
     def short_title(c, r):
@@ -86,8 +104,9 @@ def main():
 
     def scheduled_two(c, r):
         p = c.state.get("pending") or {}
-        return {t["platform"] for t in p.get("targets") or []} == {"linkedin", "threads"} and bool((p.get("post") or {}).get("when")) \
-            and "New stock arrived" in (p.get("post") or {}).get("text", ""), r[:300]
+        return {t["platform"] for t in p.get("targets") or []} == {"linkedin", "threads"} and bool(
+            (p.get("post") or {}).get("when")
+        ) and "New stock arrived" in (p.get("post") or {}).get("text", ""), r[:300]
 
     def numbers(c, r):
         return "views" in r and "Last 7 days" in r, r[:300]
@@ -104,20 +123,28 @@ def main():
 
     def delete_ready(c, r):
         return r.startswith("Ready to DELETE") and "Facebook" in r, r[:200]
-    run("a shop's week on social media", c, [
-        ("can you put my new reel on insta and fb? the file is vertical.mp4, caption: Eid Mubarak from Khan Electronics", versions("Instagram reel", "Facebook reel")),
-        ("yes", published("Instagram reel: published", "Facebook reel: published")),
-        ("make my eid video vertical.mp4 a youtube short titled 'Eid Sale 2026'", short_title),
-        ("yes", published("YouTube Short: published")),
-        ("share square.jpg on linkedin and threads tomorrow 9am with the text 'New stock arrived'", scheduled_two),
-        ("no", lambda c, r: (r.startswith("Dropped"), r)),
-        ("tweet 'Shop open till 10 pm tonight'", versions("X post", "X charges $0.015")),
-        ("yes", published("X post: published")),
-        ("how are my posts doing this week", numbers),
-        ("show me the comments", listed),
-        ("reply to the first one saying thanks a lot, see you at the shop", reply_ready),
-        ("yes", replied),
-    ])
+
+    run(
+        "a shop's week on social media",
+        c,
+        [
+            (
+                "can you put my new reel on insta and fb? the file is vertical.mp4, caption: Eid Mubarak from Khan Electronics",
+                versions("Instagram reel", "Facebook reel"),
+            ),
+            ("yes", published("Instagram reel: published", "Facebook reel: published")),
+            ("make my eid video vertical.mp4 a youtube short titled 'Eid Sale 2026'", short_title),
+            ("yes", published("YouTube Short: published")),
+            ("share square.jpg on linkedin and threads tomorrow 9am with the text 'New stock arrived'", scheduled_two),
+            ("no", lambda c, r: (r.startswith("Dropped"), r)),
+            ("tweet 'Shop open till 10 pm tonight'", versions("X post", "X charges $0.015")),
+            ("yes", published("X post: published")),
+            ("how are my posts doing this week", numbers),
+            ("show me the comments", listed),
+            ("reply to the first one saying thanks a lot, see you at the shop", reply_ready),
+            ("yes", replied),
+        ],
+    )
     ok = sum(1 for *_, g in RESULTS if g)
     usd = planner.cost()[1] if planner is not None else 0.0
     print(f"\n{ok}/{len(RESULTS)} turns right in {time.time() - t0:.0f} s; model ${usd:.4f}")

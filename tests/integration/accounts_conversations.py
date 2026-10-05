@@ -3,6 +3,7 @@ figures, balances), with the cheap model reading what the rules cannot.
 
   .venv\\Scripts\\python.exe tests\\integration\\accounts_conversations.py [--offline]
 """
+
 import shutil
 import sys
 import time
@@ -39,6 +40,7 @@ def main():
     planner = None
     if "--offline" not in sys.argv:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     shutil.rmtree(OUT, ignore_errors=True)
     OUT.mkdir(parents=True)
@@ -60,6 +62,7 @@ def main():
     def saved(prefix):
         def t(c, r):
             return prefix in r and "Books checked" in r, r[:300]
+
         return t
 
     def invoice_preview(c, r):
@@ -78,19 +81,24 @@ def main():
 
     def owed(c, r):
         return "Ali Traders: Rs 100,600" in r, r[:300]
-    run("a shop's first week of books", c, [
-        ("set up my business: Khan Electronics, NTN 1234567-8, STRN 3277876123456, Hall Road Lahore", company),
-        ("we sell the LED TV 55 for 85,000, it costs us 70,000, 18% tax, keep a stock count", item),
-        ("got 10 LED TV 55 from Haier at 70k each with 18% tax", bill_preview),
-        ("yes", saved("Bill BILL/")),
-        ("bill Ali Traders for 2 of the LED TV 55 at 85,000 each plus tax, payment in 2 weeks", invoice_preview),
-        ("yes", saved("Invoice INV/")),
-        ("Ali sent 100000 through easypaisa", receipt_preview),
-        ("yes", saved("Receipt RCV/")),
-        ("how's business this month?", profit),
-        ("what's left in the shop?", stock),
-        ("who still has to pay me?", owed),
-    ])
+
+    run(
+        "a shop's first week of books",
+        c,
+        [
+            ("set up my business: Khan Electronics, NTN 1234567-8, STRN 3277876123456, Hall Road Lahore", company),
+            ("we sell the LED TV 55 for 85,000, it costs us 70,000, 18% tax, keep a stock count", item),
+            ("got 10 LED TV 55 from Haier at 70k each with 18% tax", bill_preview),
+            ("yes", saved("Bill BILL/")),
+            ("bill Ali Traders for 2 of the LED TV 55 at 85,000 each plus tax, payment in 2 weeks", invoice_preview),
+            ("yes", saved("Invoice INV/")),
+            ("Ali sent 100000 through easypaisa", receipt_preview),
+            ("yes", saved("Receipt RCV/")),
+            ("how's business this month?", profit),
+            ("what's left in the shop?", stock),
+            ("who still has to pay me?", owed),
+        ],
+    )
     problems = R.verify(b)
     print(f"\nbooks' own checks: {'all pass' if not problems else problems}")
     ok = sum(1 for *_, g in RESULTS if g)

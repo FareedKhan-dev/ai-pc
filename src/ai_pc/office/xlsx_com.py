@@ -22,24 +22,74 @@ Operations (sheet: a name, else the workbook's main table; col: a header name or
   style {target: header|totals|table|<col>, set: {bold, italic, color, fill, font, size, wrap, align}}
   autofit {}     round {col, digits}     validation {col, list: [...]}     split_column {col, sep, names}
 """
+
 import datetime as _dt
 import re
 
 from ai_pc.office.xlsx_map import calc, col_index, find_table, is_formula, is_num, letter, same, serial
 from ai_pc.office.xlsx_map import col as find_col
 
-XL_ERR = {-2146826281: "#DIV/0!", -2146826246: "#N/A", -2146826259: "#NAME?", -2146826288: "#NULL!", -2146826252: "#NUM!",
-          -2146826265: "#REF!", -2146826273: "#VALUE!"}
+XL_ERR = {
+    -2146826281: "#DIV/0!",
+    -2146826246: "#N/A",
+    -2146826259: "#NAME?",
+    -2146826288: "#NULL!",
+    -2146826252: "#NUM!",
+    -2146826265: "#REF!",
+    -2146826273: "#VALUE!",
+}
 CHART_TYPES = {"column": 51, "bar": 57, "line": 65, "pie": 5, "doughnut": -4120, "area": 1, "scatter": -4169, "stacked": 52}
-FN = {"sum": "SUM", "total": "SUM", "average": "AVERAGE", "avg": "AVERAGE", "mean": "AVERAGE", "count": "COUNT", "max": "MAX",
-      "maximum": "MAX", "highest": "MAX", "min": "MIN", "minimum": "MIN", "lowest": "MIN", "median": "MEDIAN"}
+FN = {
+    "sum": "SUM",
+    "total": "SUM",
+    "average": "AVERAGE",
+    "avg": "AVERAGE",
+    "mean": "AVERAGE",
+    "count": "COUNT",
+    "max": "MAX",
+    "maximum": "MAX",
+    "highest": "MAX",
+    "min": "MIN",
+    "minimum": "MIN",
+    "lowest": "MIN",
+    "median": "MEDIAN",
+}
 XL_FN = {"SUM": -4157, "AVERAGE": -4106, "COUNT": -4112, "MAX": -4136, "MIN": -4139}
-FORMATS = {"money": "#,##0", "money2": "#,##0.00", "currency": "#,##0", "rs": '"Rs "#,##0', "rupees": '"Rs "#,##0', "pkr": '"PKR "#,##0',
-           "usd": '"$"#,##0.00', "dollars": '"$"#,##0.00', "percent": "0%", "percent1": "0.0%", "percent2": "0.00%",
-           "thousands": "#,##0", "comma": "#,##0", "decimals1": "0.0", "decimals2": "0.00", "integer": "0", "number": "#,##0.##",
-           "date": "dd-mmm-yyyy", "short_date": "dd/mm/yyyy", "month": "mmm yyyy", "text": "@", "general": "General"}
-FILLS = {"green": "C6EFCE", "red": "FFC7CE", "yellow": "FFEB9C", "orange": "FCD5B4", "blue": "DDEBF7", "grey": "E7E6E6", "gray": "E7E6E6",
-         "purple": "E4DFEC", "pink": "FADADD"}
+FORMATS = {
+    "money": "#,##0",
+    "money2": "#,##0.00",
+    "currency": "#,##0",
+    "rs": '"Rs "#,##0',
+    "rupees": '"Rs "#,##0',
+    "pkr": '"PKR "#,##0',
+    "usd": '"$"#,##0.00',
+    "dollars": '"$"#,##0.00',
+    "percent": "0%",
+    "percent1": "0.0%",
+    "percent2": "0.00%",
+    "thousands": "#,##0",
+    "comma": "#,##0",
+    "decimals1": "0.0",
+    "decimals2": "0.00",
+    "integer": "0",
+    "number": "#,##0.##",
+    "date": "dd-mmm-yyyy",
+    "short_date": "dd/mm/yyyy",
+    "month": "mmm yyyy",
+    "text": "@",
+    "general": "General",
+}
+FILLS = {
+    "green": "C6EFCE",
+    "red": "FFC7CE",
+    "yellow": "FFEB9C",
+    "orange": "FCD5B4",
+    "blue": "DDEBF7",
+    "grey": "E7E6E6",
+    "gray": "E7E6E6",
+    "purple": "E4DFEC",
+    "pink": "FADADD",
+}
 CELL_OP = {">": 5, "<": 6, ">=": 7, "<=": 8, "=": 3, "<>": 4, "between": 1}
 PALETTE = ["1F4E79", "C55A11", "548235", "7030A0", "BF9000", "2E75B6", "7F7F7F", "9E480E"]
 
@@ -59,8 +109,8 @@ def hexof(c):
 
 
 def _lum(hx):
-    r, g, b = (int(hx[i:i + 2], 16) / 255 for i in (0, 2, 4))
-    f = (lambda x: x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4)
+    r, g, b = (int(hx[i : i + 2], 16) / 255 for i in (0, 2, 4))
+    f = lambda x: x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
     return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
 
 
@@ -73,10 +123,12 @@ def _colour(v, fill=False):
     if fill and v in FILLS:
         return FILLS[v]
     from ai_pc.office.docx_ops import colour
+
     try:
         return colour(v)
     except Exception as e:  # noqa: BLE001
         from ai_pc.office.doc_parse import COLOURS
+
         if v in COLOURS:
             return COLOURS[v]
         raise OpError(str(e)) from None
@@ -243,9 +295,15 @@ def op_add_column(app, wb, op):
         t2 = table(ws2)
         key, match, val = get_col(t, lk.get("key")), get_col(t2, lk.get("match") or lk.get("key")), get_col(t2, lk.get("value") or name)
         sh = "'" + str(ws2.Name).replace("'", "''") + "'"
-        expr = (f'IFERROR(INDEX({sh}!${val["letter"]}${t2["first"]}:${val["letter"]}${t2["last"]},MATCH([{key["name"]}],'
-                f'{sh}!${match["letter"]}${t2["first"]}:${match["letter"]}${t2["last"]},0)),"")')
-        found = {str(r[match["idx"] - t2["c0"]]).strip().lower(): r[val["idx"] - t2["c0"]] for r in t2["rows"] if r[match["idx"] - t2["c0"]] not in (None, "")}
+        expr = (
+            f"IFERROR(INDEX({sh}!${val['letter']}${t2['first']}:${val['letter']}${t2['last']},MATCH([{key['name']}],"
+            f'{sh}!${match["letter"]}${t2["first"]}:${match["letter"]}${t2["last"]},0)),"")'
+        )
+        found = {
+            str(r[match["idx"] - t2["c0"]]).strip().lower(): r[val["idx"] - t2["c0"]]
+            for r in t2["rows"]
+            if r[match["idx"] - t2["c0"]] not in (None, "")
+        }
         expect = [None if b else found.get(str(r[key["name"]]).strip().lower(), "") for r, b in zip(recs, blank)]
         missing = sum(1 for r, b in zip(recs, blank) if not b and str(r[key["name"]]).strip().lower() not in found)
         kind = f"looked up from '{ws2.Name}' by {key['name']}" + (f"; {missing} key(s) not found there (left blank)" if missing else "")
@@ -268,7 +326,10 @@ def op_add_column(app, wb, op):
                 return f"=SUM(${L}${t1['first']}:{L}{row})"
         elif op.get("rank"):
             desc = op.get("desc", True) is not False
-            expect = [None if b or not is_num(v) else float(1 + sum(1 for x in nums if (x > float(v) if desc else x < float(v)))) for v, b in zip(vals, blank)]
+            expect = [
+                None if b or not is_num(v) else float(1 + sum(1 for x in nums if (x > float(v) if desc else x < float(v))))
+                for v, b in zip(vals, blank)
+            ]
             kind, fmt = f"rank by {src['name']} ({'highest' if desc else 'lowest'} = 1)", "0"
 
             def per_row(t1, row, n=src["name"], d=desc):
@@ -296,14 +357,16 @@ def op_add_column(app, wb, op):
         expect = [None if b else calc(expr, r) for r, b in zip(recs, blank)]
     elif op.get("values") is not None:
         vals = list(op["values"])
-        expect = (vals + [None] * len(recs))[:len(recs)]
+        expect = (vals + [None] * len(recs))[: len(recs)]
         kind = "values"
     else:
         expect = [None] * len(recs)
         kind = "empty"
     if expr and per_row is None:
+
         def per_row(t1, row, e=expr):
             return to_a1(e, t1, row)
+
     if op.get("after"):
         k = get_col(t, op["after"])["idx"] + 1
     elif op.get("before"):
@@ -325,10 +388,17 @@ def op_add_column(app, wb, op):
             r.Value = tuple(("" if v is None else v,) for v in expect)
         else:
             r.ClearContents()
-        fmt = FORMATS.get(str(op.get("format") or "").lower()) or op.get("format") or fmt or _fmt_for(name, expr, t, [v for v in expect if v is not None])
+        fmt = (
+            FORMATS.get(str(op.get("format") or "").lower())
+            or op.get("format")
+            or fmt
+            or _fmt_for(name, expr, t, [v for v in expect if v is not None])
+        )
         r.NumberFormat = fmt
     tot = ""
-    no_total = bool(re.search(r"TODAY\(|NOW\(", str(expr or ""), re.I) or re.search(r"\bdays?\b|\bage\b|rank|rate\b|price|\bid\b|year|month", name, re.I))
+    no_total = bool(
+        re.search(r"TODAY\(|NOW\(", str(expr or ""), re.I) or re.search(r"\bdays?\b|\bage\b|rank|rate\b|price|\bid\b|year|month", name, re.I)
+    )
     if t1["total"] and per_row is not None and op.get("total") is not False and any(is_num(x) for x in expect) and (not no_total or op.get("total")):
         fn = FN.get(str(op.get("total") or "").lower()) or tot_fn
         if not fn and not (op.get("running") or op.get("rank")):
@@ -355,9 +425,11 @@ def op_add_column(app, wb, op):
     if errs:
         what += f"; {len(errs)} Excel error(s) ({errs[0]})"
     say = f" ({sample} down the rows)" if sample else ""
-    return {"done": f"column '{name}' added at {letter(k)}" + (f", {kind}" if kind not in ("formula", "values", "empty") else "") + say + tot,
-            "ok": not bad and (not errs or all(e == "#DIV/0!" for e in errs) and any(x == "#DIV/0!" for x in expect)),
-            "what": what + (f"; e.g. Excel {bad[0][0]} vs Python {bad[0][1]}" if bad else "")}
+    return {
+        "done": f"column '{name}' added at {letter(k)}" + (f", {kind}" if kind not in ("formula", "values", "empty") else "") + say + tot,
+        "ok": not bad and (not errs or all(e == "#DIV/0!" for e in errs) and any(x == "#DIV/0!" for x in expect)),
+        "what": what + (f"; e.g. Excel {bad[0][0]} vs Python {bad[0][1]}" if bad else ""),
+    }
 
 
 REF = re.compile(r"(?:(?:'((?:[^']|'')+)'|([A-Za-z0-9_.]+))!)?(\$?)([A-Z]{1,3})(\$?)(\d+)(?::(\$?)([A-Z]{1,3})(\$?)(\d+))?(?![\w(])")
@@ -406,8 +478,10 @@ def op_delete_column(app, wb, op):
     c = get_col(t, op.get("col"))
     deps = dependents(wb, str(ws.Name), c["idx"], skip_col=True)
     if deps and not op.get("force"):
-        raise OpError(f"{len(deps)} formula(s) use '{c['name']}' ({', '.join(deps[:4])}{'...' if len(deps) > 4 else ''}); deleting it would turn "
-                      f"them into #REF! errors. Say 'delete {c['name']} anyway' to keep those cells as their current values and delete it")
+        raise OpError(
+            f"{len(deps)} formula(s) use '{c['name']}' ({', '.join(deps[:4])}{'...' if len(deps) > 4 else ''}); deleting it would turn "
+            f"them into #REF! errors. Say 'delete {c['name']} anyway' to keep those cells as their current values and delete it"
+        )
     for d in deps:  # forced: the cells that used it keep the values they show now
         sh, cell = d.rsplit("!", 1)
         x = wb.Worksheets(sh).Range(cell)
@@ -418,8 +492,11 @@ def op_delete_column(app, wb, op):
     gone = all(x["name"].lower() != c["name"].lower() for x in t2["cols"])
     if filt and not ws.AutoFilterMode:
         rng(ws, t2["header"], t2["c0"], t2["last"], t2["c1"]).AutoFilter()
-    return {"done": f"column '{c['name']}' ({c['letter']}) deleted" + (f"; {len(deps)} cell(s) that used it now hold values" if deps else ""),
-            "ok": gone, "what": f"{len(t['cols'])} -> {len(t2['cols'])} columns"}
+    return {
+        "done": f"column '{c['name']}' ({c['letter']}) deleted" + (f"; {len(deps)} cell(s) that used it now hold values" if deps else ""),
+        "ok": gone,
+        "what": f"{len(t['cols'])} -> {len(t2['cols'])} columns",
+    }
 
 
 def op_rename_column(app, wb, op):
@@ -430,7 +507,11 @@ def op_rename_column(app, wb, op):
     if not new:
         raise OpError("what should it be called?")
     ws.Cells(t["header"], c["idx"]).Value = new
-    return {"done": f"column '{c['name']}' renamed '{new}'", "ok": str(ws.Cells(t["header"], c["idx"]).Value) == new, "what": f"{c['letter']}{t['header']} = '{new}'"}
+    return {
+        "done": f"column '{c['name']}' renamed '{new}'",
+        "ok": str(ws.Cells(t["header"], c["idx"]).Value) == new,
+        "what": f"{c['letter']}{t['header']} = '{new}'",
+    }
 
 
 def op_move_column(app, wb, op):
@@ -449,8 +530,11 @@ def op_move_column(app, wb, op):
     ws.Columns(k).Insert()  # cut and insert: Excel moves the references with it
     t2 = table(ws)
     names = [x["name"] for x in t2["cols"]]
-    return {"done": f"column '{c['name']}' moved (now {get_col(t2, c['name'])['letter']})", "ok": c["name"] in names and len(names) == len(t["cols"]),
-            "what": " | ".join(names)}
+    return {
+        "done": f"column '{c['name']}' moved (now {get_col(t2, c['name'])['letter']})",
+        "ok": c["name"] in names and len(names) == len(t["cols"]),
+        "what": " | ".join(names),
+    }
 
 
 def op_hide(app, wb, op):
@@ -460,7 +544,11 @@ def op_hide(app, wb, op):
         if not show and sum(1 for w in wb.Worksheets if int(w.Visible) == -1) < 2:
             raise OpError("the only visible sheet cannot be hidden")
         ws.Visible = -1 if show else 0
-        return {"done": f"sheet '{ws.Name}' {'shown' if show else 'hidden'}", "ok": (int(ws.Visible) == -1) == show, "what": f"visible={int(ws.Visible)}"}
+        return {
+            "done": f"sheet '{ws.Name}' {'shown' if show else 'hidden'}",
+            "ok": (int(ws.Visible) == -1) == show,
+            "what": f"visible={int(ws.Visible)}",
+        }
     t = table(ws)
     cols = [get_col(t, x) for x in (op.get("cols") or [op.get("col")]) if x]
     if not cols:
@@ -531,8 +619,12 @@ def op_sort(app, wb, op):
         if c["kind"] == "date":
             return "newest first" if desc else "oldest first"
         return "highest first" if desc else "lowest first"
-    return {"done": "sorted by " + ", then ".join(f"{c['name']} ({order(c, desc)})" for c, desc in keys), "ok": ok,
-            "what": f"{len(rows)} rows in order; first: {_say(rows[0][0]) if rows else '-'}"}
+
+    return {
+        "done": "sorted by " + ", then ".join(f"{c['name']} ({order(c, desc)})" for c, desc in keys),
+        "ok": ok,
+        "what": f"{len(rows)} rows in order; first: {_say(rows[0][0]) if rows else '-'}",
+    }
 
 
 def _match(v, opn, val, val2=None):
@@ -580,10 +672,11 @@ def op_filter(app, wb, op):
     vals = col_values(ws, t, c)
     if ws.FilterMode:
         ws.ShowAllData()
-    crit = (lambda x: f"{serial(_dt.datetime.strptime(x, '%Y-%m-%d')):.0f}" if isinstance(x, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", x) else x)
+    crit = lambda x: f"{serial(_dt.datetime.strptime(x, '%Y-%m-%d')):.0f}" if isinstance(x, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", x) else x
     if opn == "in" or isinstance(val, list):
         import pythoncom
         from win32com.client import VARIANT
+
         items = [str(x) for x in (val if isinstance(val, list) else [val])]
         whole.AutoFilter(field, VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_VARIANT, items), 7)
         opn, val = "in", items
@@ -609,8 +702,11 @@ def op_filter(app, wb, op):
     else:
         want = sum(1 for v, b in zip(vals, t["blank"]) if not b and _match(v, opn, val, op.get("value2")))
     total = sum(1 for b in t["blank"] if not b)
-    return {"done": f"filter on {c['name']}: {opn} {_say(val) if not isinstance(val, list) else ', '.join(map(str, val))} ({shown} of {total} rows show)",
-            "ok": shown == want, "what": f"{shown} rows show, Python counts {want}"}
+    return {
+        "done": f"filter on {c['name']}: {opn} {_say(val) if not isinstance(val, list) else ', '.join(map(str, val))} ({shown} of {total} rows show)",
+        "ok": shown == want,
+        "what": f"{shown} rows show, Python counts {want}",
+    }
 
 
 def _delete_rows(ws, t, rows):
@@ -637,8 +733,12 @@ def op_remove_duplicates(app, wb, op):
     t2 = table(ws)
     keys = [tuple(_key(r[c["idx"] - t2["c0"]]) for c in cols) for r, b in zip(t2["rows"], t2["blank"]) if not b]
     before = sum(1 for b in t["blank"] if not b)
-    return {"done": f"{len(dup)} duplicate row(s) removed" + (f" (same {', '.join(c['name'] for c in cols)})" if op.get("cols") else " (every column the same)"),
-            "ok": len(keys) == len(set(keys)) == before - len(dup), "what": f"{before} -> {len(keys)} rows, all unique"}
+    return {
+        "done": f"{len(dup)} duplicate row(s) removed"
+        + (f" (same {', '.join(c['name'] for c in cols)})" if op.get("cols") else " (every column the same)"),
+        "ok": len(keys) == len(set(keys)) == before - len(dup),
+        "what": f"{before} -> {len(keys)} rows, all unique",
+    }
 
 
 def op_delete_rows(app, wb, op):
@@ -653,7 +753,11 @@ def op_delete_rows(app, wb, op):
         say = f"row(s) {', '.join(map(str, hit))}"
     else:
         c = get_col(t, w.get("col"))
-        hit = [t["first"] + i for i, r in enumerate(t["rows"]) if not t["blank"][i] and _match(r[c["idx"] - t["c0"]], str(w.get("op") or "="), w.get("value"), w.get("value2"))]
+        hit = [
+            t["first"] + i
+            for i, r in enumerate(t["rows"])
+            if not t["blank"][i] and _match(r[c["idx"] - t["c0"]], str(w.get("op") or "="), w.get("value"), w.get("value2"))
+        ]
         say = f"row(s) where {c['name']} {w.get('op') or '='} {_say(w.get('value'))}"
     if not hit:
         raise OpError(f"there are no {say}")
@@ -694,17 +798,22 @@ def op_add_row(app, wb, op):
     t2 = table(ws)
     got = {c["name"]: _py(ws.Cells(new, c["idx"]).Value) for c in t2["cols"]}
     shown = {c["name"]: str(ws.Cells(new, c["idx"]).Text).strip() for c in t2["cols"]}
+
     def agrees(k, v):
         got_v = _py(ws.Cells(new, k).Value)
         if isinstance(v, str) and isinstance(got_v, (_dt.date, _dt.datetime)):
             d = _parse_date(v, "dmy")
             return d is not None and d.date() == got_v.date()
         return same(got_v, v) or (isinstance(v, str) and _key(got_v) == _key(v))
+
     bad = [k for k, v in given.items() if not agrees(k, v)]
     errs = [k for k, v in got.items() if isinstance(v, str) and v in XL_ERR.values()]
     more = f"; the {str(t2['total_label'] or 'totals').lower()} row now covers {len(t2['rows'])} rows" if t2["total"] else ""
-    return {"done": "row added: " + ", ".join(f"{k} {shown.get(k) or _say(v)}" for k, v in got.items() if v not in (None, ""))[:220] + more,
-            "ok": len(t2["rows"]) == len(t["rows"]) + 1 and not bad and not errs, "what": f"{len(t['rows'])} -> {len(t2['rows'])} rows" + (f"; errors in {errs}" if errs else "")}
+    return {
+        "done": "row added: " + ", ".join(f"{k} {shown.get(k) or _say(v)}" for k, v in got.items() if v not in (None, ""))[:220] + more,
+        "ok": len(t2["rows"]) == len(t["rows"]) + 1 and not bad and not errs,
+        "what": f"{len(t['rows'])} -> {len(t2['rows'])} rows" + (f"; errors in {errs}" if errs else ""),
+    }
 
 
 # ------------------------------------------------------------------------------------------------ totals, summaries, pivots, charts
@@ -713,8 +822,13 @@ def op_total_row(app, wb, op):
     t = table(ws)
     fn = FN.get(str(op.get("fn") or "sum").lower(), "SUM")
     rate = re.compile(r"price|rate|\bunit\b|rank|share|running|\bid\b|serial|\bno\.?$|year|month|\bday|age\b|%|percent", re.I)
-    cols = [get_col(t, x) for x in (op.get("cols") or [])] or \
-        [c for c in t["cols"] if c["kind"] in ("number", "money", "percent") and c["idx"] != t["c0"] and not (fn == "SUM" and c["kind"] != "percent" and rate.search(c["name"]))]
+    cols = [get_col(t, x) for x in (op.get("cols") or [])] or [
+        c
+        for c in t["cols"]
+        if c["kind"] in ("number", "money", "percent")
+        and c["idx"] != t["c0"]
+        and not (fn == "SUM" and c["kind"] != "percent" and rate.search(c["name"]))
+    ]
     if not cols:
         raise OpError("no number columns to total")
     tr = t["total"] or t["last"] + 1
@@ -731,8 +845,21 @@ def op_total_row(app, wb, op):
         ws.Cells(tr, c["idx"]).Formula = f"={f}({L}{t['first']}:{L}{t['last']})"
         ws.Cells(tr, c["idx"]).NumberFormat = ws.Cells(t["first"], c["idx"]).NumberFormat
         xs = [float(v) for v in col_values(ws, t, c) if is_num(v)]
-        expect[c["idx"]] = (sum(xs) if f == "SUM" else sum(xs) / len(xs) if f == "AVERAGE" and xs else len(xs) if f == "COUNT" else max(xs) if f == "MAX" and xs
-                            else min(xs) if f == "MIN" and xs else sorted(xs)[len(xs) // 2] if f == "MEDIAN" and xs else None)
+        expect[c["idx"]] = (
+            sum(xs)
+            if f == "SUM"
+            else sum(xs) / len(xs)
+            if f == "AVERAGE" and xs
+            else len(xs)
+            if f == "COUNT"
+            else max(xs)
+            if f == "MAX" and xs
+            else min(xs)
+            if f == "MIN" and xs
+            else sorted(xs)[len(xs) // 2]
+            if f == "MEDIAN" and xs
+            else None
+        )
         said.append(f"{c['name']} {f.lower()}")
     row = rng(ws, tr, t["c0"], tr, t["c1"])
     row.Font.Bold = True
@@ -741,8 +868,11 @@ def op_total_row(app, wb, op):
     app.Calculate()
     bad = [c["name"] for c in cols if expect.get(c["idx"]) is not None and not same(ws.Cells(tr, c["idx"]).Value, expect[c["idx"]])]
     shown = ", ".join(f"{c['name']} {_say(_py(ws.Cells(tr, c['idx']).Value))}" for c in cols[:4])
-    return {"done": f"{label.lower()} row {'updated' if t['total'] else 'added'} at row {tr} ({shown})", "ok": not bad,
-            "what": f"{len(cols) - len(bad)}/{len(cols)} totals match Python" + (f"; wrong: {bad}" if bad else "")}
+    return {
+        "done": f"{label.lower()} row {'updated' if t['total'] else 'added'} at row {tr} ({shown})",
+        "ok": not bad,
+        "what": f"{len(cols) - len(bad)}/{len(cols)} totals match Python" + (f"; wrong: {bad}" if bad else ""),
+    }
 
 
 def _new_sheet(wb, name):
@@ -923,8 +1053,15 @@ def op_summary(app, wb, op):
         else:
             s2.Cells(r, 1).Value = k
         cond = f'{B},">="&{serial(a):.0f},{B},"<"&{serial(b):.0f}' if period else f"{B},$A{r}"
-        mine = [x for x in recs if (a <= x[by["name"]] < b if period and isinstance(x[by["name"]], (_dt.date, _dt.datetime)) else
-                                    (not period and _key(x[by["name"]]) == _key(k)))]
+        mine = [
+            x
+            for x in recs
+            if (
+                a <= x[by["name"]] < b
+                if period and isinstance(x[by["name"]], (_dt.date, _dt.datetime))
+                else (not period and _key(x[by["name"]]) == _key(k))
+            )
+        ]
         if fn == "COUNT":
             s2.Cells(r, 2).Formula = f"=COUNTIFS({cond})"
             expect[(r, 2)] = len(mine)
@@ -936,8 +1073,17 @@ def op_summary(app, wb, op):
             s2.Cells(r, j + 2).Formula = f"={body}" if f == "SUMIFS" else f'=IFERROR({body},"")'  # a group left empty shows blank, not #DIV/0!
             s2.Cells(r, j + 2).NumberFormat = ws.Cells(t["first"], c["idx"]).NumberFormat
             xs = [float(x[c["name"]]) for x in mine if is_num(x[c["name"]])]
-            expect[(r, j + 2)] = (sum(xs) if f == "SUMIFS" else sum(xs) / len(xs) if f == "AVERAGEIFS" and xs else max(xs) if f == "MAXIFS" and xs
-                                  else min(xs) if xs else None)
+            expect[(r, j + 2)] = (
+                sum(xs)
+                if f == "SUMIFS"
+                else sum(xs) / len(xs)
+                if f == "AVERAGEIFS" and xs
+                else max(xs)
+                if f == "MAXIFS" and xs
+                else min(xs)
+                if xs
+                else None
+            )
     last = len(groups) + 1
     if fn in ("SUM", "COUNT"):
         s2.Cells(last + 1, 1).Value = "Total"
@@ -954,11 +1100,24 @@ def op_summary(app, wb, op):
     done = f"sheet '{s2.Name}': {fn.lower()} of {', '.join(c['name'] for c in vals) or 'rows'} by {period or by['name']} ({len(groups)} groups, live formulas)"
     if op.get("chart"):
         kind = str(op.get("chart") if isinstance(op.get("chart"), str) else ("line" if period else "column" if len(groups) <= 12 else "bar"))
-        _add_chart(s2, kind, rng(s2, 2, 1, last, 1), [rng(s2, 2, 2, last, 2)], [s2.Cells(1, 2)], f"{heads[1]} by {heads[0]}",
-                   s2.Cells(1, len(heads) + 2).Left, s2.Cells(1, 1).Top, _look(wb, ws, t))
+        _add_chart(
+            s2,
+            kind,
+            rng(s2, 2, 1, last, 1),
+            [rng(s2, 2, 2, last, 2)],
+            [s2.Cells(1, 2)],
+            f"{heads[1]} by {heads[0]}",
+            s2.Cells(1, len(heads) + 2).Left,
+            s2.Cells(1, 1).Top,
+            _look(wb, ws, t),
+        )
         done += f" and a {kind} chart"
-    return {"done": done, "ok": not bad, "what": f"{len(expect) - len(bad)}/{len(expect)} groups match Python" + (f"; e.g. {bad[0]}" if bad else ""),
-            "sheet": str(s2.Name)}
+    return {
+        "done": done,
+        "ok": not bad,
+        "what": f"{len(expect) - len(bad)}/{len(expect)} groups match Python" + (f"; e.g. {bad[0]}" if bad else ""),
+        "sheet": str(s2.Name),
+    }
 
 
 def op_pivot(app, wb, op):
@@ -969,7 +1128,9 @@ def op_pivot(app, wb, op):
     rows_f = [get_col(t, x) for x in (op.get("rows") or ([op["by"]] if op.get("by") else []))]
     cols_f = [get_col(t, x) for x in (op.get("columns") or [])]
     fn = FN.get(str(op.get("fn") or "sum").lower(), "SUM")
-    vals = [get_col(t, x) for x in (op.get("values") or [])] or [c for c in t["cols"] if c["kind"] in ("number", "money") and c not in rows_f + cols_f][:1]
+    vals = [get_col(t, x) for x in (op.get("values") or [])] or [
+        c for c in t["cols"] if c["kind"] in ("number", "money") and c not in rows_f + cols_f
+    ][:1]
     if not rows_f:
         raise OpError("a pivot by which column?")
     if not vals:
@@ -1031,17 +1192,29 @@ def op_pivot(app, wb, op):
             if r[v0["name"]] in (None, "") and fn != "COUNT":
                 continue
             want.setdefault(k, []).append(float(r[v0["name"]]) if is_num(r[v0["name"]]) else 0.0)
-        agg = {k: (sum(v) if fn == "SUM" else sum(v) / len(v) if fn == "AVERAGE" else len(v) if fn == "COUNT" else max(v) if fn == "MAX" else min(v)) for k, v in want.items()}
-        got = {_key(row[0]): row[1] for row in tr[1:] if row and row[0] not in (None, "") and not str(row[0]).lower().startswith(("grand total", "row labels"))}
+        agg = {
+            k: (sum(v) if fn == "SUM" else sum(v) / len(v) if fn == "AVERAGE" else len(v) if fn == "COUNT" else max(v) if fn == "MAX" else min(v))
+            for k, v in want.items()
+        }
+        got = {
+            _key(row[0]): row[1]
+            for row in tr[1:]
+            if row and row[0] not in (None, "") and not str(row[0]).lower().startswith(("grand total", "row labels"))
+        }
         bad = [k for k in agg if k not in got or not same(got[k], agg[k])]
         ok = not bad and len(got) == len(agg)
         what = f"{len(agg) - len(bad)}/{len(agg)} groups match Python"
     if grand is not None:
         ok = ok and got_grand is not None and same(got_grand, grand)
         what += ("; " if what else "") + f"grand total {_say(got_grand)} vs Python {_say(grand)}"
-    return {"done": f"pivot table on sheet '{s2.Name}': {fn.lower()} of {', '.join(c['name'] for c in vals)} by {', '.join(c['name'] for c in rows_f)}"
-                    + (f" across {', '.join(c['name'] for c in cols_f)}" if cols_f else "") + (f" (dates by {period or 'month'})" if any(c['kind'] == 'date' for c in rows_f + cols_f) else ""),
-            "ok": ok, "what": what or "pivot built", "sheet": str(s2.Name)}
+    return {
+        "done": f"pivot table on sheet '{s2.Name}': {fn.lower()} of {', '.join(c['name'] for c in vals)} by {', '.join(c['name'] for c in rows_f)}"
+        + (f" across {', '.join(c['name'] for c in cols_f)}" if cols_f else "")
+        + (f" (dates by {period or 'month'})" if any(c["kind"] == "date" for c in rows_f + cols_f) else ""),
+        "ok": ok,
+        "what": what or "pivot built",
+        "sheet": str(s2.Name),
+    }
 
 
 def op_chart(app, wb, op):
@@ -1051,7 +1224,9 @@ def op_chart(app, wb, op):
     if kind not in CHART_TYPES:
         kind = "column"
     x = get_col(t, op["x"]) if op.get("x") else next((c for c in t["cols"] if c["kind"] in ("text", "date")), t["cols"][0])
-    ys = [get_col(t, y) for y in (op.get("y") or [])] or [c for c in t["cols"] if c["kind"] in ("number", "money", "percent") and c["idx"] != x["idx"]][:1]
+    ys = [get_col(t, y) for y in (op.get("y") or [])] or [
+        c for c in t["cols"] if c["kind"] in ("number", "money", "percent") and c["idx"] != x["idx"]
+    ][:1]
     if not ys:
         raise OpError("no number column to chart")
     if any(t["blank"]):
@@ -1062,11 +1237,23 @@ def op_chart(app, wb, op):
         if kind in ("pie", "doughnut") and len(distinct) > 12:
             raise OpError(f"{x['name']} has {len(distinct)} different values: too many slices for a pie; a column or bar chart reads better")
         name = f"{ys[0]['name']} by {'month' if x['kind'] == 'date' else x['name']}"
-        r = op_summary(app, wb, {"sheet": str(ws.Name), "by": x["name"], "values": [y["name"] for y in ys], "fn": op.get("fn") or "sum",
-                                 "chart": kind if not (x["kind"] == "date" and kind == "column") else "line" if len(distinct) > 6 else kind,
-                                 "name": name, **({"period": "month"} if x["kind"] == "date" else {})})
-        r["done"] = (f"{kind} chart of {' and '.join(y['name'] for y in ys)} by {'month' if x['kind'] == 'date' else x['name']}: {x['name']} repeats, so its totals"
-                     f" went on a new sheet '{r['sheet']}' (live formulas) with the chart beside them")
+        r = op_summary(
+            app,
+            wb,
+            {
+                "sheet": str(ws.Name),
+                "by": x["name"],
+                "values": [y["name"] for y in ys],
+                "fn": op.get("fn") or "sum",
+                "chart": kind if not (x["kind"] == "date" and kind == "column") else "line" if len(distinct) > 6 else kind,
+                "name": name,
+                **({"period": "month"} if x["kind"] == "date" else {}),
+            },
+        )
+        r["done"] = (
+            f"{kind} chart of {' and '.join(y['name'] for y in ys)} by {'month' if x['kind'] == 'date' else x['name']}: {x['name']} repeats, so its totals"
+            f" went on a new sheet '{r['sheet']}' (live formulas) with the chart beside them"
+        )
         return r
     if kind in ("pie", "doughnut"):
         ys = ys[:1]
@@ -1088,14 +1275,28 @@ def op_chart(app, wb, op):
         ur = ws.UsedRange
         below = int(ur.Row) + int(ur.Rows.Count) + 1
         left, top = _free_spot(ws, ws.Cells(1, t["c0"]).Left, ws.Cells(max(below, (t["total"] or t["last"]) + 2), 1).Top, w, h)
-    ch = _add_chart(host, kind, col_range(ws, t, x), [col_range(ws, t, y) for y in ys], [ws.Cells(t["header"], y["idx"]) for y in ys], title,
-                    left, top, _look(wb, ws, t), w, h)
+    ch = _add_chart(
+        host,
+        kind,
+        col_range(ws, t, x),
+        [col_range(ws, t, y) for y in ys],
+        [ws.Cells(t["header"], y["idx"]) for y in ys],
+        title,
+        left,
+        top,
+        _look(wb, ws, t),
+        w,
+        h,
+    )
     after = sum(int(s.ChartObjects().Count) for s in wb.Worksheets)
     pts = int(ch.SeriesCollection(1).Points().Count)
     n = len(t["rows"])
     where = f"on sheet {host.Name}" if str(host.Name) != str(ws.Name) else ("under the table" if place == "below" else "beside the table")
-    return {"done": f"{kind} chart '{title}' {where}", "ok": after == before + 1 and pts == n and int(ch.SeriesCollection().Count) == len(ys),
-            "what": f"{int(ch.SeriesCollection().Count)} series of {pts} points ({n} rows)"}
+    return {
+        "done": f"{kind} chart '{title}' {where}",
+        "ok": after == before + 1 and pts == n and int(ch.SeriesCollection().Count) == len(ys),
+        "what": f"{int(ch.SeriesCollection().Count)} series of {pts} points ({n} rows)",
+    }
 
 
 # ------------------------------------------------------------------------------------------------ formats
@@ -1116,8 +1317,11 @@ def op_number_format(app, wb, op):
         ws.Columns(c["idx"]).AutoFit()
     got = {str(ws.Cells(t["first"], c["idx"]).NumberFormat) for c in cols}
     shown = str(ws.Cells(t["first"], cols[0]["idx"]).Text)
-    return {"done": f"{', '.join(c['name'] for c in cols)} shown as {f} (e.g. {shown})", "ok": got == {code} and "###" not in shown,
-            "what": f"format {code}; first cell shows '{shown}'"}
+    return {
+        "done": f"{', '.join(c['name'] for c in cols)} shown as {f} (e.g. {shown})",
+        "ok": got == {code} and "###" not in shown,
+        "what": f"format {code}; first cell shows '{shown}'",
+    }
 
 
 def _select(ws, cell):
@@ -1138,12 +1342,17 @@ def op_conditional(app, wb, op):
     v, v2 = op.get("value"), op.get("value2")
     whole_rows = bool(op.get("rows")) or rule == "formula"
     target = rng(ws, t["first"], t["c0"], t["last"], t["c1"]) if whole_rows else col_range(ws, t, c)
-    fill = _colour(op.get("color") or ("green" if rule in (">", ">=", "top", "above") else "red" if rule in ("<", "<=", "bottom", "below", "duplicates", "formula") else "yellow"),
-                   fill=True)
+    fill = _colour(
+        op.get("color")
+        or (
+            "green" if rule in (">", ">=", "top", "above") else "red" if rule in ("<", "<=", "bottom", "below", "duplicates", "formula") else "yellow"
+        ),
+        fill=True,
+    )
     vals = col_values(ws, t, c)
     recs = records(t)
     n0 = int(target.FormatConditions.Count)
-    lit = (lambda x: str(x) if is_num(x) or re.fullmatch(r"-?\d+(?:\.\d+)?", str(x)) else '"' + str(x).replace('"', '""') + '"')
+    lit = lambda x: str(x) if is_num(x) or re.fullmatch(r"-?\d+(?:\.\d+)?", str(x)) else '"' + str(x).replace('"', '""') + '"'
     L, r1 = c["letter"], t["first"]
     want = None
     if rule == "formula":  # any condition on a row: "[Due Date]<TODAY()" , 'AND([Status]<>"Paid",[Amount]>50000)'
@@ -1162,9 +1371,9 @@ def op_conditional(app, wb, op):
         elif rule == "between":
             expr = f"=AND(${L}{r1}>={lit(v)},${L}{r1}<={lit(v2)})"
         elif rule == "contains":
-            expr = f'=ISNUMBER(SEARCH({lit(v)},${L}{r1}))'
+            expr = f"=ISNUMBER(SEARCH({lit(v)},${L}{r1}))"
         elif rule == "blank":
-            expr = f'=LEN(TRIM(${L}{r1}))=0'
+            expr = f"=LEN(TRIM(${L}{r1}))=0"
         else:
             raise OpError(f"whole rows cannot be highlighted by '{rule}'")
         _select(ws, ws.Cells(t["first"], t["c0"] if whole_rows else c["idx"]))  # relative references count from the selected cell
@@ -1188,6 +1397,7 @@ def op_conditional(app, wb, op):
         fc = target.FormatConditions.AddUniqueValues()
         fc.DupeUnique = 1 if rule == "duplicates" else 0
         from collections import Counter
+
         cnt = Counter(_key(x) for x in vals if x not in (None, ""))
         want = sum(1 for x in vals if x not in (None, "") and ((cnt[_key(x)] > 1) == (rule == "duplicates")))
     elif rule in ("above", "below"):
@@ -1198,7 +1408,11 @@ def op_conditional(app, wb, op):
         want = sum(1 for x in nums if (x > avg if rule == "above" else x < avg))
     elif rule in ("scale", "heatmap", "colors", "colours"):
         target.FormatConditions.AddColorScale(3)
-        return {"done": f"colour scale on {c['name']} (low red, high green)", "ok": int(target.FormatConditions.Count) == n0 + 1, "what": "rule added"}
+        return {
+            "done": f"colour scale on {c['name']} (low red, high green)",
+            "ok": int(target.FormatConditions.Count) == n0 + 1,
+            "what": "rule added",
+        }
     elif rule in ("bars", "databars"):
         target.FormatConditions.AddDatabar()
         return {"done": f"data bars on {c['name']}", "ok": int(target.FormatConditions.Count) == n0 + 1, "what": "rule added"}
@@ -1217,11 +1431,28 @@ def op_conditional(app, wb, op):
                 lit_cells += 1
         except Exception:  # noqa: BLE001
             pass
-    say = {"top": f"in the top {v or 3}", "bottom": f"in the bottom {v or 3}", "duplicates": "is a duplicate", "unique": "is unique", "above": "is above average",
-           "below": "is below average", "contains": f"contains '{v}'", "blank": "is blank", "between": f"is between {_say(v)} and {_say(v2)}",
-           "formula": f"{op.get('formula')}"}.get(rule, f"{rule} {_say(v)}")
-    return {"done": (f"rows highlighted where {say}" if rule == "formula" else f"{'rows' if whole_rows else c['name'] + ' cells'} highlighted where {c['name']} {say}")
-                    + f" ({lit_cells} now)", "ok": want is None or lit_cells == want, "what": f"Excel paints {lit_cells}" + (f", Python expects {want}" if want is not None else "")}
+    say = {
+        "top": f"in the top {v or 3}",
+        "bottom": f"in the bottom {v or 3}",
+        "duplicates": "is a duplicate",
+        "unique": "is unique",
+        "above": "is above average",
+        "below": "is below average",
+        "contains": f"contains '{v}'",
+        "blank": "is blank",
+        "between": f"is between {_say(v)} and {_say(v2)}",
+        "formula": f"{op.get('formula')}",
+    }.get(rule, f"{rule} {_say(v)}")
+    return {
+        "done": (
+            f"rows highlighted where {say}"
+            if rule == "formula"
+            else f"{'rows' if whole_rows else c['name'] + ' cells'} highlighted where {c['name']} {say}"
+        )
+        + f" ({lit_cells} now)",
+        "ok": want is None or lit_cells == want,
+        "what": f"Excel paints {lit_cells}" + (f", Python expects {want}" if want is not None else ""),
+    }
 
 
 def op_clear_highlights(app, wb, op):
@@ -1232,7 +1463,11 @@ def op_clear_highlights(app, wb, op):
     if not n:
         raise OpError("there are no highlights there")
     target.FormatConditions.Delete()
-    return {"done": f"{n} highlight rule(s) removed from {op.get('col') or 'the table'}", "ok": int(target.FormatConditions.Count) == 0, "what": "none left"}
+    return {
+        "done": f"{n} highlight rule(s) removed from {op.get('col') or 'the table'}",
+        "ok": int(target.FormatConditions.Count) == 0,
+        "what": "none left",
+    }
 
 
 def op_freeze(app, wb, op):
@@ -1250,8 +1485,14 @@ def op_freeze(app, wb, op):
         w.SplitRow = rows
         w.FreezePanes = True
     ok = (bool(w.FreezePanes) == bool(rows or cols)) and (not (rows or cols) or (int(w.SplitRow) == rows and int(w.SplitColumn) == cols))
-    return {"done": (f"top {rows} row(s)" if rows else "") + (" and " if rows and cols else "") + (f"first {cols} column(s)" if cols else "")
-            + (" frozen" if rows or cols else "panes unfrozen"), "ok": ok, "what": f"split at row {int(w.SplitRow)}, column {int(w.SplitColumn)}"}
+    return {
+        "done": (f"top {rows} row(s)" if rows else "")
+        + (" and " if rows and cols else "")
+        + (f"first {cols} column(s)" if cols else "")
+        + (" frozen" if rows or cols else "panes unfrozen"),
+        "ok": ok,
+        "what": f"split at row {int(w.SplitRow)}, column {int(w.SplitColumn)}",
+    }
 
 
 def op_style(app, wb, op):
@@ -1348,8 +1589,12 @@ def op_validation(app, wb, op):
     r.Validation.Delete()
     r.Validation.Add(3, 1, 1, ",".join(items))
     outside = [v for v in col_values(ws, t, c) if v not in (None, "") and str(v).strip().lower() not in {i.lower() for i in items}]
-    return {"done": f"{c['name']} is now a dropdown: {', '.join(items)}" + (f" ({len(outside)} existing value(s) are not in the list, e.g. '{outside[0]}')" if outside else ""),
-            "ok": int(ws.Cells(t["first"], c["idx"]).Validation.Type) == 3, "what": f"list validation on {r.Address}"}
+    return {
+        "done": f"{c['name']} is now a dropdown: {', '.join(items)}"
+        + (f" ({len(outside)} existing value(s) are not in the list, e.g. '{outside[0]}')" if outside else ""),
+        "ok": int(ws.Cells(t["first"], c["idx"]).Validation.Type) == 3,
+        "what": f"list validation on {r.Address}",
+    }
 
 
 # ------------------------------------------------------------------------------------------------ cleaning messy data
@@ -1389,7 +1634,11 @@ def op_clean_text(app, wb, op):
         raise OpError(f"{', '.join(c['name'] for c in cols)} already clean ({how})")
     t2 = table(ws)
     left = sum(1 for c in cols for v in col_values(ws, t2, get_col(t2, c["name"])) if isinstance(v, str) and v != _clean(v, how))
-    return {"done": f"{changed} cell(s) cleaned ({how}) in {', '.join(c['name'] for c in cols)}", "ok": left == 0, "what": f"{left} cell(s) still need it"}
+    return {
+        "done": f"{changed} cell(s) cleaned ({how}) in {', '.join(c['name'] for c in cols)}",
+        "ok": left == 0,
+        "what": f"{left} cell(s) still need it",
+    }
 
 
 def op_fill_blanks(app, wb, op):
@@ -1411,8 +1660,11 @@ def op_fill_blanks(app, wb, op):
         raise OpError(f"{c['name']} has no blank cells")
     _write_column(r, F, out)
     left = sum(1 for v, b in zip(col_values(ws, t, c), t["blank"]) if not b and v in (None, ""))
-    return {"done": f"{n} blank cell(s) in {c['name']} filled ({'with the value above' if how == 'above' else repr(op.get('value', 0))})", "ok": left == 0 or how == "above",
-            "what": f"{left} blank(s) left"}
+    return {
+        "done": f"{n} blank cell(s) in {c['name']} filled ({'with the value above' if how == 'above' else repr(op.get('value', 0))})",
+        "ok": left == 0 or how == "above",
+        "what": f"{left} blank(s) left",
+    }
 
 
 MULT = {"k": 1e3, "thousand": 1e3, "m": 1e6, "mn": 1e6, "million": 1e6, "lakh": 1e5, "lakhs": 1e5, "lac": 1e5, "crore": 1e7, "cr": 1e7}
@@ -1471,12 +1723,19 @@ def op_to_number(app, wb, op):
         raise OpError(f"{', '.join(c['name'] for c in cols)} already hold numbers" + (f" (not numbers: {stuck[:3]})" if stuck else ""))
     t2 = table(ws)
     texts = sum(1 for c in cols for v in col_values(ws, t2, get_col(t2, c["name"])) if isinstance(v, str) and v.strip())
-    return {"done": f"{conv} text value(s) in {', '.join(c['name'] for c in cols)} turned into numbers" + (f"; could not read {len(stuck)}: {stuck[:3]}" if stuck else ""),
-            "ok": texts == len(stuck), "what": f"{texts} text cell(s) left"}
+    return {
+        "done": f"{conv} text value(s) in {', '.join(c['name'] for c in cols)} turned into numbers"
+        + (f"; could not read {len(stuck)}: {stuck[:3]}" if stuck else ""),
+        "ok": texts == len(stuck),
+        "what": f"{texts} text cell(s) left",
+    }
 
 
-DATE_FMTS = {"dmy": ["%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%y", "%d-%m-%y"], "mdy": ["%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y"],
-             "ymd": ["%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"]}
+DATE_FMTS = {
+    "dmy": ["%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%y", "%d-%m-%y"],
+    "mdy": ["%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y"],
+    "ymd": ["%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"],
+}
 NAMED = ["%d %b %Y", "%d-%b-%Y", "%d-%b-%y", "%d %B %Y", "%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%d %b, %Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"]
 
 
@@ -1534,8 +1793,12 @@ def op_to_date(app, wb, op):
     vals = col_values(ws, t, c)
     dates = sum(1 for x in vals if isinstance(x, (_dt.date, _dt.datetime)))
     filled = sum(1 for x in vals if x not in (None, ""))
-    return {"done": f"{conv} date(s) in {c['name']} read as {'day/month' if order == 'dmy' else 'month/day' if order == 'mdy' else 'year-month-day'} and made real dates"
-                    + (f"; could not read {len(stuck)}: {stuck[:3]}" if stuck else ""), "ok": dates == filled - len(stuck), "what": f"{dates}/{filled} cells are dates"}
+    return {
+        "done": f"{conv} date(s) in {c['name']} read as {'day/month' if order == 'dmy' else 'month/day' if order == 'mdy' else 'year-month-day'} and made real dates"
+        + (f"; could not read {len(stuck)}: {stuck[:3]}" if stuck else ""),
+        "ok": dates == filled - len(stuck),
+        "what": f"{dates}/{filled} cells are dates",
+    }
 
 
 def _norm_cat(v):
@@ -1550,6 +1813,7 @@ def op_map_values(app, wb, op):
     r = col_range(ws, t, c)
     F = [x[0] for x in _rows(r.Formula)]
     from collections import Counter
+
     texts = [" ".join(f.split()) for f in F if isinstance(f, str) and f.strip() and not is_formula(f)]
     mapping = {}
     if op.get("map"):
@@ -1574,8 +1838,11 @@ def op_map_values(app, wb, op):
         spell.setdefault(_norm_cat(v), set()).add(v)
     multi = [k for k, s in spell.items() if len(s) > 1]
     kinds = sorted(set(vals))
-    return {"done": f"{changed} cell(s) in {c['name']} made consistent: {', '.join(kinds[:8])}{'...' if len(kinds) > 8 else ''}", "ok": not multi,
-            "what": f"{len(kinds)} distinct value(s)" + (f"; still mixed: {multi[:3]}" if multi else "")}
+    return {
+        "done": f"{changed} cell(s) in {c['name']} made consistent: {', '.join(kinds[:8])}{'...' if len(kinds) > 8 else ''}",
+        "ok": not multi,
+        "what": f"{len(kinds)} distinct value(s)" + (f"; still mixed: {multi[:3]}" if multi else ""),
+    }
 
 
 def op_replace(app, wb, op):
@@ -1617,7 +1884,7 @@ def op_split_column(app, wb, op):
         if not sep and len(names) == 2 and len(s.split()) > 2:  # "Muhammad Ali Khan": first name, then the rest
             bits = [s.split()[0], " ".join(s.split()[1:])]
         bits = [b.strip() for b in bits] + [""] * len(names)
-        parts.append(bits[:len(names)])
+        parts.append(bits[: len(names)])
     k = c["idx"] + 1
     rng(ws, 1, k, 1, k + len(names) - 1).EntireColumn.Insert()
     t1 = table(ws)
@@ -1640,7 +1907,11 @@ def op_rename_sheet(app, wb, op):
     if new.lower() in {str(w.Name).lower() for w in wb.Sheets} and new.lower() != old.lower():
         raise OpError(f"there is already a sheet '{new}'")
     ws.Name = new
-    return {"done": f"sheet '{old}' renamed '{new}' (formulas that point at it follow)", "ok": str(ws.Name) == new, "what": ", ".join(str(w.Name) for w in wb.Worksheets)}
+    return {
+        "done": f"sheet '{old}' renamed '{new}' (formulas that point at it follow)",
+        "ok": str(ws.Name) == new,
+        "what": ", ".join(str(w.Name) for w in wb.Worksheets),
+    }
 
 
 def op_add_sheet(app, wb, op):
@@ -1663,24 +1934,56 @@ def op_delete_sheet(app, wb, op):
                 if is_formula(f) and any(sh.lower() == name.lower() for sh, *_ in refs_in(f, str(w.Name))):
                     users.append(f"{w.Name}!{letter(cc0 + j)}{r0 + i}")
     if users and not op.get("force"):
-        raise OpError(f"{len(users)} formula(s) on other sheets use '{name}' ({', '.join(users[:3])}); say 'delete the {name} sheet anyway' to keep their values")
+        raise OpError(
+            f"{len(users)} formula(s) on other sheets use '{name}' ({', '.join(users[:3])}); say 'delete the {name} sheet anyway' to keep their values"
+        )
     for u in users:
         sh, cell = u.rsplit("!", 1)
         x = wb.Worksheets(sh).Range(cell)
         x.Value = x.Value
     app.DisplayAlerts = False
     ws.Delete()
-    return {"done": f"sheet '{name}' deleted" + (f"; {len(users)} cell(s) that used it keep their values" if users else ""),
-            "ok": name not in [str(w.Name) for w in wb.Worksheets], "what": ", ".join(str(w.Name) for w in wb.Worksheets)}
+    return {
+        "done": f"sheet '{name}' deleted" + (f"; {len(users)} cell(s) that used it keep their values" if users else ""),
+        "ok": name not in [str(w.Name) for w in wb.Worksheets],
+        "what": ", ".join(str(w.Name) for w in wb.Worksheets),
+    }
 
 
-OPS = {"add_column": op_add_column, "delete_column": op_delete_column, "rename_column": op_rename_column, "move_column": op_move_column,
-       "hide": op_hide, "sort": op_sort, "filter": op_filter, "remove_duplicates": op_remove_duplicates, "delete_rows": op_delete_rows,
-       "add_row": op_add_row, "total_row": op_total_row, "summary": op_summary, "pivot": op_pivot, "chart": op_chart,
-       "number_format": op_number_format, "conditional": op_conditional, "clear_highlights": op_clear_highlights, "freeze": op_freeze,
-       "style": op_style, "autofit": op_autofit, "round": op_round, "validation": op_validation, "clean_text": op_clean_text,
-       "fill_blanks": op_fill_blanks, "to_number": op_to_number, "to_date": op_to_date, "map_values": op_map_values, "replace": op_replace,
-       "split_column": op_split_column, "rename_sheet": op_rename_sheet, "add_sheet": op_add_sheet, "delete_sheet": op_delete_sheet}
+OPS = {
+    "add_column": op_add_column,
+    "delete_column": op_delete_column,
+    "rename_column": op_rename_column,
+    "move_column": op_move_column,
+    "hide": op_hide,
+    "sort": op_sort,
+    "filter": op_filter,
+    "remove_duplicates": op_remove_duplicates,
+    "delete_rows": op_delete_rows,
+    "add_row": op_add_row,
+    "total_row": op_total_row,
+    "summary": op_summary,
+    "pivot": op_pivot,
+    "chart": op_chart,
+    "number_format": op_number_format,
+    "conditional": op_conditional,
+    "clear_highlights": op_clear_highlights,
+    "freeze": op_freeze,
+    "style": op_style,
+    "autofit": op_autofit,
+    "round": op_round,
+    "validation": op_validation,
+    "clean_text": op_clean_text,
+    "fill_blanks": op_fill_blanks,
+    "to_number": op_to_number,
+    "to_date": op_to_date,
+    "map_values": op_map_values,
+    "replace": op_replace,
+    "split_column": op_split_column,
+    "rename_sheet": op_rename_sheet,
+    "add_sheet": op_add_sheet,
+    "delete_sheet": op_delete_sheet,
+}
 
 
 def run_ops(app, wb, ops):
@@ -1740,6 +2043,7 @@ def grab(app, wb, spec):
             except Exception:  # noqa: BLE001
                 t = str(cell.Value)
         return t
+
     texts = [[shown(i, j) for j in range(n_c)] for i in range(n_r)]
     texts, vals = texts[head_row:], vals[head_row:]
     keep = [j for j in range(n_c) if any(row[j] for row in texts)]  # columns that are empty all the way down go
@@ -1757,5 +2061,14 @@ def grab(app, wb, spec):
         for j, v in enumerate(row):
             if isinstance(v, (_dt.date, _dt.datetime)):
                 row[j] = v.isoformat()[:10]
-    return {"sheet": str(ws.Name), "kind": what, "header": header, "rows": body, "values": bvals, "total": total, "total_values": total_v,
-            "address": str(r.Address), "number_formats": [str(r.Cells(2 + head_row, j + 1).NumberFormat) for j in keep] if n_r > 1 + head_row else []}
+    return {
+        "sheet": str(ws.Name),
+        "kind": what,
+        "header": header,
+        "rows": body,
+        "values": bvals,
+        "total": total,
+        "total_values": total_v,
+        "address": str(r.Address),
+        "number_formats": [str(r.Cells(2 + head_row, j + 1).NumberFormat) for j in keep] if n_r > 1 + head_row else [],
+    }

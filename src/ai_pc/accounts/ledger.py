@@ -1,18 +1,19 @@
 """The books: double-entry accounting in SQLite (state/accounts/books.db), the way accountants keep them.
 
-  - money in whole paisa; every journal entry must balance (debits = credits) or nothing is saved
-  - documents are numbered without gaps per kind and fiscal year (Pakistan: July to June), e.g. INV/26-27/0001
-  - a posted document never changes: a mistake is corrected by a credit note, or the document is voided by a reversing
-    entry (its number stays, marked void), so the audit trail is complete
-  - stock at weighted-average cost; selling stock books its cost (COGS) at the average of that moment
-  - sales tax per line (rate on the value excluding tax, rounded to the paisa); further tax on supplies to unregistered
-    buyers when the business sets its rate; income tax a customer withholds is recorded when it pays
+- money in whole paisa; every journal entry must balance (debits = credits) or nothing is saved
+- documents are numbered without gaps per kind and fiscal year (Pakistan: July to June), e.g. INV/26-27/0001
+- a posted document never changes: a mistake is corrected by a credit note, or the document is voided by a reversing
+  entry (its number stays, marked void), so the audit trail is complete
+- stock at weighted-average cost; selling stock books its cost (COGS) at the average of that moment
+- sales tax per line (rate on the value excluding tax, rounded to the paisa); further tax on supplies to unregistered
+  buyers when the business sets its rate; income tax a customer withholds is recorded when it pays
 
-  b = Books()            b.setup(name=..., ntn=..., strn=...)          b.party("Ali Traders", kind="customer", ...)
-  b.item("LED TV 55", rate="85,000", tax="18", stock=True)          d = b.invoice("Ali Traders", lines, due_days=15)
-  b.receipt("Ali Traders", "100,000", bank=True)    b.bill(...)    b.expense(...)    b.credit_note(...)    b.void(doc)
-  reports.py reads the postings: trial balance, profit and loss, balance sheet, ageing, statements, stock, sales tax.
+b = Books()            b.setup(name=..., ntn=..., strn=...)          b.party("Ali Traders", kind="customer", ...)
+b.item("LED TV 55", rate="85,000", tax="18", stock=True)          d = b.invoice("Ali Traders", lines, due_days=15)
+b.receipt("Ali Traders", "100,000", bank=True)    b.bill(...)    b.expense(...)    b.credit_note(...)    b.void(doc)
+reports.py reads the postings: trial balance, profit and loss, balance sheet, ageing, statements, stock, sales tax.
 """
+
 import datetime as dt
 import json
 import re
@@ -26,24 +27,47 @@ from ai_pc.core.config import STATE
 DB = STATE / "accounts" / "books.db"
 
 CHART = [  # code, name, type, role
-    ("1000", "Cash in Hand", "asset", "cash"), ("1010", "Bank Account", "asset", "bank"), ("1100", "Accounts Receivable", "asset", "receivable"),
-    ("1200", "Stock in Hand", "asset", "inventory"), ("1300", "Input Sales Tax", "asset", "input_tax"),
+    ("1000", "Cash in Hand", "asset", "cash"),
+    ("1010", "Bank Account", "asset", "bank"),
+    ("1100", "Accounts Receivable", "asset", "receivable"),
+    ("1200", "Stock in Hand", "asset", "inventory"),
+    ("1300", "Input Sales Tax", "asset", "input_tax"),
     ("1310", "Income Tax Deducted by Customers", "asset", "wht_receivable"),
-    ("2000", "Accounts Payable", "liability", "payable"), ("2100", "Output Sales Tax", "liability", "output_tax"),
-    ("2110", "Further Tax Payable", "liability", "further_tax"), ("2200", "Income Tax Withheld from Suppliers", "liability", "wht_payable"),
-    ("3000", "Owner's Capital", "equity", "capital"), ("3100", "Owner's Drawings", "equity", "drawings"), ("3200", "Retained Earnings", "equity", "retained"),
+    ("2000", "Accounts Payable", "liability", "payable"),
+    ("2100", "Output Sales Tax", "liability", "output_tax"),
+    ("2110", "Further Tax Payable", "liability", "further_tax"),
+    ("2200", "Income Tax Withheld from Suppliers", "liability", "wht_payable"),
+    ("3000", "Owner's Capital", "equity", "capital"),
+    ("3100", "Owner's Drawings", "equity", "drawings"),
+    ("3200", "Retained Earnings", "equity", "retained"),
     ("3900", "Opening Balance Equity", "equity", "opening"),
-    ("4000", "Sales", "income", "sales"), ("4100", "Service Income", "income", "service_income"), ("4900", "Other Income", "income", "other_income"),
+    ("4000", "Sales", "income", "sales"),
+    ("4100", "Service Income", "income", "service_income"),
+    ("4900", "Other Income", "income", "other_income"),
     ("5000", "Cost of Goods Sold", "expense", "cogs"),
-    ("6000", "Rent", "expense", None), ("6010", "Salaries and Wages", "expense", None), ("6020", "Electricity and Utilities", "expense", None),
-    ("6030", "Internet and Phone", "expense", None), ("6040", "Transport and Fuel", "expense", None), ("6050", "Repairs and Maintenance", "expense", None),
-    ("6060", "Marketing and Advertising", "expense", None), ("6070", "Bank Charges", "expense", "bank_charges"), ("6080", "Office Supplies", "expense", None),
-    ("6090", "General Expenses", "expense", "general"), ("6100", "Discount Allowed", "expense", "discount"),
+    ("6000", "Rent", "expense", None),
+    ("6010", "Salaries and Wages", "expense", None),
+    ("6020", "Electricity and Utilities", "expense", None),
+    ("6030", "Internet and Phone", "expense", None),
+    ("6040", "Transport and Fuel", "expense", None),
+    ("6050", "Repairs and Maintenance", "expense", None),
+    ("6060", "Marketing and Advertising", "expense", None),
+    ("6070", "Bank Charges", "expense", "bank_charges"),
+    ("6080", "Office Supplies", "expense", None),
+    ("6090", "General Expenses", "expense", "general"),
+    ("6100", "Discount Allowed", "expense", "discount"),
 ]
-EXPENSE_WORDS = {"6000": r"rent", "6010": r"salar|wage|staff|payroll", "6020": r"electric|wapda|lesco|k-?electric|gas|sui|water|utilit",
-                 "6030": r"internet|phone|mobile|ptcl|broadband|jazz|zong|telenor|ufone", "6040": r"transport|fuel|petrol|diesel|freight|courier|travel|rickshaw|taxi",
-                 "6050": r"repair|maintenance|service charge", "6060": r"marketing|advert|ads|facebook ads|promotion|printing|banner",
-                 "6070": r"bank charge|bank fee", "6080": r"stationery|office suppl|paper|printer"}
+EXPENSE_WORDS = {
+    "6000": r"rent",
+    "6010": r"salar|wage|staff|payroll",
+    "6020": r"electric|wapda|lesco|k-?electric|gas|sui|water|utilit",
+    "6030": r"internet|phone|mobile|ptcl|broadband|jazz|zong|telenor|ufone",
+    "6040": r"transport|fuel|petrol|diesel|freight|courier|travel|rickshaw|taxi",
+    "6050": r"repair|maintenance|service charge",
+    "6060": r"marketing|advert|ads|facebook ads|promotion|printing|banner",
+    "6070": r"bank charge|bank fee",
+    "6080": r"stationery|office suppl|paper|printer",
+}
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS company (k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE IF NOT EXISTS accounts (code TEXT PRIMARY KEY, name TEXT, type TEXT, role TEXT);
@@ -62,8 +86,17 @@ CREATE TABLE IF NOT EXISTS sequences (kind TEXT, fy TEXT, n INTEGER, PRIMARY KEY
 CREATE TABLE IF NOT EXISTS links (doc_id INTEGER, system TEXT, remote TEXT, at TEXT, PRIMARY KEY (doc_id, system));
 CREATE TABLE IF NOT EXISTS audit (ts TEXT, what TEXT, detail TEXT);
 """
-PREFIX = {"invoice": "INV", "quote": "QUO", "bill": "BILL", "receipt": "RCV", "payment": "PAY", "expense": "EXP", "credit_note": "CN",
-          "journal": "JV", "void": "VOID"}
+PREFIX = {
+    "invoice": "INV",
+    "quote": "QUO",
+    "bill": "BILL",
+    "receipt": "RCV",
+    "payment": "PAY",
+    "expense": "EXP",
+    "credit_note": "CN",
+    "journal": "JV",
+    "void": "VOID",
+}
 
 
 class BooksError(Exception):
@@ -207,6 +240,7 @@ class Books:
             q += " AND doc_id<=?"
             a.append(upto)
         from decimal import Decimal
+
         qty, value = Decimal(0), 0
         for sq, cost in self.cx.execute(q + " ORDER BY rowid", a):
             sq = Decimal(sq)
@@ -237,7 +271,9 @@ class Books:
             raise BooksError(f"the entry does not balance (debits {dr}, credits {cr}): nothing was saved")
         if not lines:
             raise BooksError("an entry with nothing in it")
-        cur = self.cx.execute("INSERT INTO journal (date, doc_id, memo, created) VALUES (?,?,?,?)", (str(date), doc_id, memo, dt.datetime.now().isoformat()))
+        cur = self.cx.execute(
+            "INSERT INTO journal (date, doc_id, memo, created) VALUES (?,?,?,?)", (str(date), doc_id, memo, dt.datetime.now().isoformat())
+        )
         eid = cur.lastrowid
         self.cx.executemany("INSERT INTO postings VALUES (?,?,?,?,?)", [(eid, a, p, d, c) for a, d, c, p in lines])
         return eid
@@ -248,9 +284,20 @@ class Books:
     def _save_doc(self, kind, date, due, party, body, total, status="posted"):
         number = self._number(kind, date)
         body = dict(body, number=number)
-        cur = self.cx.execute("INSERT INTO documents (kind, number, date, due, party_id, status, total, body, created) VALUES (?,?,?,?,?,?,?,?,?)",
-                              (kind, number, str(date), str(due) if due else None, party["id"] if party else None, status, total, json.dumps(body),
-                               dt.datetime.now().isoformat(timespec="seconds")))
+        cur = self.cx.execute(
+            "INSERT INTO documents (kind, number, date, due, party_id, status, total, body, created) VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                kind,
+                number,
+                str(date),
+                str(due) if due else None,
+                party["id"] if party else None,
+                status,
+                total,
+                json.dumps(body),
+                dt.datetime.now().isoformat(timespec="seconds"),
+            ),
+        )
         return cur.lastrowid, number
 
     def _tx(self):
@@ -268,6 +315,7 @@ class Books:
         for r in rows:
             it = self.find_item(r["item"]) if r.get("item") else None
             from decimal import Decimal
+
             qty = Decimal(str(r.get("qty", 1)))
             if qty <= 0:
                 raise BooksError("a quantity must be more than zero")
@@ -285,10 +333,22 @@ class Books:
             t_rate = r.get("tax") if r.get("tax") is not None else (it or {}).get("tax", default_tax)
             t = pct(amount, t_rate) if t_rate not in (None, "", 0, "0") else 0
             f = pct(amount, further) if further and t else 0
-            line = {"item_id": (it or {}).get("id"), "description": r.get("description") or (it or {}).get("name") or r.get("item"),
-                    "qty": str(qty), "unit": r.get("unit") or (it or {}).get("unit") or "pcs", "rate": rate, "discount": r.get("discount"),
-                    "amount": amount, "tax_rate": str(t_rate) if t else None, "tax": t, "further_tax": f, "hs_code": (it or {}).get("hs_code"),
-                    "stock": bool((it or {}).get("stock")), "kind": (it or {}).get("kind", "goods"), "account": r.get("account")}
+            line = {
+                "item_id": (it or {}).get("id"),
+                "description": r.get("description") or (it or {}).get("name") or r.get("item"),
+                "qty": str(qty),
+                "unit": r.get("unit") or (it or {}).get("unit") or "pcs",
+                "rate": rate,
+                "discount": r.get("discount"),
+                "amount": amount,
+                "tax_rate": str(t_rate) if t else None,
+                "tax": t,
+                "further_tax": f,
+                "hs_code": (it or {}).get("hs_code"),
+                "stock": bool((it or {}).get("stock")),
+                "kind": (it or {}).get("kind", "goods"),
+                "account": r.get("account"),
+            }
             out.append(line)
             sub, tax, ftax = sub + amount, tax + t, ftax + f
         return out, {"subtotal": sub, "tax": tax, "further_tax": ftax, "total": sub + tax + ftax}
@@ -302,8 +362,9 @@ class Books:
         d = self._when(date)
         lines, t = self.lines(rows, p)
         with self._tx():
-            doc_id, number = self._save_doc("quote", d, d + dt.timedelta(days=valid_days), p, {"lines": lines, "totals": t, "notes": notes}, t["total"],
-                                            status="open")
+            doc_id, number = self._save_doc(
+                "quote", d, d + dt.timedelta(days=valid_days), p, {"lines": lines, "totals": t, "notes": notes}, t["total"], status="open"
+            )
             self._audit("quote", number)
         return self.doc(doc_id)
 
@@ -313,8 +374,9 @@ class Books:
         due = d + dt.timedelta(days=int(due_days if due_days is not None else (p.get("terms") or self.company().get("terms") or 0)))
         lines, t = self.lines(rows, p)
         with self._tx():
-            doc_id, number = self._save_doc("invoice", d, due, p, {"lines": lines, "totals": t, "notes": notes, "from_quote": from_quote, "ref": ref},
-                                            t["total"])
+            doc_id, number = self._save_doc(
+                "invoice", d, due, p, {"lines": lines, "totals": t, "notes": notes, "from_quote": from_quote, "ref": ref}, t["total"]
+            )
             post = [("1100", t["total"], 0, p["id"])]
             for ln in lines:
                 post.append(("4100" if ln["kind"] == "service" else "4000", 0, ln["amount"], None))
@@ -323,14 +385,17 @@ class Books:
                 if ln["stock"] and ln["item_id"]:
                     qty, avg, _ = self.on_hand(ln["item_id"])
                     from decimal import Decimal
+
                     if qty < Decimal(ln["qty"]):
                         raise BooksError(f"only {qty} {ln['unit']} of {ln['description']} in stock; {ln['qty']} asked (record the purchase first)")
                     cost = mul(avg, ln["qty"])
                     ln["cost"] = cost
                     self.cx.execute("INSERT INTO stock VALUES (?,?,?,?,?)", (ln["item_id"], str(d), str(-Decimal(ln["qty"])), avg, doc_id))
                     post += [("5000", cost, 0, None), ("1200", 0, cost, None)]
-            self.cx.execute("UPDATE documents SET body=? WHERE id=?", (json.dumps({"lines": lines, "totals": t, "notes": notes, "from_quote": from_quote,
-                                                                                   "ref": ref, "number": number}), doc_id))
+            self.cx.execute(
+                "UPDATE documents SET body=? WHERE id=?",
+                (json.dumps({"lines": lines, "totals": t, "notes": notes, "from_quote": from_quote, "ref": ref, "number": number}), doc_id),
+            )
             self._post(d, doc_id, f"Invoice {number} to {p['name']}", post)
             if from_quote:
                 self.cx.execute("UPDATE documents SET status='invoiced' WHERE id=?", (from_quote,))
@@ -347,13 +412,18 @@ class Books:
             doc_id, number = self._save_doc("bill", d, due, p, {"lines": lines, "totals": t, "ref": ref, "notes": notes}, t["total"])
             post = [("2000", 0, t["total"], p["id"]), ("1300", t["tax"], 0, None)]
             from decimal import Decimal
+
             for ln in lines:
                 if ln["stock"] and ln["item_id"]:
                     unit_cost = int((Decimal(ln["amount"]) / Decimal(ln["qty"])).quantize(Decimal("1")))
                     self.cx.execute("INSERT INTO stock VALUES (?,?,?,?,?)", (ln["item_id"], str(d), ln["qty"], unit_cost, doc_id))
                     post.append(("1200", ln["amount"], 0, None))
                 else:  # goods not counted in stock are a purchase (cost of goods); services go to their expense
-                    default = "5000" if ln.get("kind", "goods") == "goods" and not re.search("|".join(EXPENSE_WORDS.values()), ln["description"] or "", re.I) else "6090"
+                    default = (
+                        "5000"
+                        if ln.get("kind", "goods") == "goods" and not re.search("|".join(EXPENSE_WORDS.values()), ln["description"] or "", re.I)
+                        else "6090"
+                    )
                     acc = self.expense_account(ln.get("account") or ln["description"] or "", default)["code"]
                     post.append((acc, ln["amount"], 0, None))
             self._post(d, doc_id, f"Bill {ref or number} from {p['name']}", post)
@@ -369,8 +439,14 @@ class Books:
         src = "1010" if paid_from == "bank" else "1000"
         p = self._party(party, "supplier") if party else None
         with self._tx():
-            doc_id, number = self._save_doc("expense", d, None, p, {"what": what, "account": acc["code"], "amount": amt, "tax": t, "paid_from": paid_from,
-                                                                     "notes": notes}, amt + t)
+            doc_id, number = self._save_doc(
+                "expense",
+                d,
+                None,
+                p,
+                {"what": what, "account": acc["code"], "amount": amt, "tax": t, "paid_from": paid_from, "notes": notes},
+                amt + t,
+            )
             self._post(d, doc_id, f"{what}", [(acc["code"], amt, 0, None), ("1300", t, 0, None), (src, 0, amt + t, None)])
             self._audit("expense", f"{number} {what} {amt + t}")
         return self.doc(doc_id)
@@ -384,7 +460,12 @@ class Books:
         wht = to_paisa(withheld) if withheld and not isinstance(withheld, int) else int(withheld or 0)
         with self._tx():
             doc_id, number = self._save_doc("receipt", d, None, p, {"amount": amt, "withheld": wht, "bank": bank, "notes": notes}, amt + wht)
-            self._post(d, doc_id, f"Received from {p['name']}", [("1010" if bank else "1000", amt, 0, None), ("1310", wht, 0, None), ("1100", 0, amt + wht, p["id"])])
+            self._post(
+                d,
+                doc_id,
+                f"Received from {p['name']}",
+                [("1010" if bank else "1000", amt, 0, None), ("1310", wht, 0, None), ("1100", 0, amt + wht, p["id"])],
+            )
             left = self._allocate(doc_id, p["id"], "invoice", amt + wht, against)
             self._audit("receipt", f"{number} {p['name']} {amt + wht} (unallocated {left})")
         return self.doc(doc_id)
@@ -397,7 +478,9 @@ class Books:
         wht = to_paisa(withheld) if withheld and not isinstance(withheld, int) else int(withheld or 0)
         with self._tx():
             doc_id, number = self._save_doc("payment", d, None, p, {"amount": amt, "withheld": wht, "bank": bank, "notes": notes}, amt + wht)
-            self._post(d, doc_id, f"Paid {p['name']}", [("2000", amt + wht, 0, p["id"]), ("2200", 0, wht, None), ("1010" if bank else "1000", 0, amt, None)])
+            self._post(
+                d, doc_id, f"Paid {p['name']}", [("2000", amt + wht, 0, p["id"]), ("2200", 0, wht, None), ("1010" if bank else "1000", 0, amt, None)]
+            )
             left = self._allocate(doc_id, p["id"], "bill", amt + wht, against)
             self._audit("payment", f"{number} {p['name']} {amt + wht} (unallocated {left})")
         return self.doc(doc_id)
@@ -420,6 +503,7 @@ class Books:
         else:
             pick = [dict(x) for x in src]
         from decimal import Decimal
+
         lines, sub, tax, ftax = [], 0, 0, 0
         for ln in pick:
             k = Decimal(ln["qty"]) / Decimal(next(x for x in src if x["description"] == ln["description"])["qty"])
@@ -431,7 +515,9 @@ class Books:
             sub, tax, ftax = sub + amount, tax + t, ftax + f
         t = {"subtotal": sub, "tax": tax, "further_tax": ftax, "total": sub + tax + ftax}
         with self._tx():
-            doc_id, number = self._save_doc("credit_note", d, None, p, {"lines": lines, "totals": t, "invoice": invoice_number, "reason": reason}, t["total"])
+            doc_id, number = self._save_doc(
+                "credit_note", d, None, p, {"lines": lines, "totals": t, "invoice": invoice_number, "reason": reason}, t["total"]
+            )
             post = [("1100", 0, t["total"], p["id"]), ("2100", tax, 0, None), ("2110", ftax, 0, None)]
             for ln in lines:
                 post.append(("4100" if ln["kind"] == "service" else "4000", ln["amount"], 0, None))
@@ -454,10 +540,13 @@ class Books:
         with self._tx():
             entries = self.cx.execute("SELECT id FROM journal WHERE doc_id=?", (d["id"],)).fetchall()
             for (eid,) in entries:
-                rev = [(a, c, dr, p) for a, p, dr, c in self.cx.execute("SELECT account, party_id, debit, credit FROM postings WHERE entry_id=?", (eid,))]
+                rev = [
+                    (a, c, dr, p) for a, p, dr, c in self.cx.execute("SELECT account, party_id, debit, credit FROM postings WHERE entry_id=?", (eid,))
+                ]
                 self._post(_today(), d["id"], f"Void {number}" + (f": {reason}" if reason else ""), rev)
             for iid, qty, cost in self.cx.execute("SELECT item_id, qty, cost FROM stock WHERE doc_id=?", (d["id"],)).fetchall():
                 from decimal import Decimal
+
                 self.cx.execute("INSERT INTO stock VALUES (?,?,?,?,?)", (iid, str(_today()), str(-Decimal(qty)), cost, d["id"]))
             self.cx.execute("DELETE FROM allocations WHERE pay_id=?", (d["id"],))
             self.cx.execute("UPDATE documents SET status='void' WHERE id=?", (d["id"],))
@@ -511,8 +600,9 @@ class Books:
     def open_docs(self, party_id, kind="invoice"):
         out = []
         for i, number, date, due, total, status in self.cx.execute(
-                "SELECT id, number, date, due, total, status FROM documents WHERE party_id=? AND kind=? AND status NOT IN ('void') ORDER BY date, id",
-                (party_id, kind)):
+            "SELECT id, number, date, due, total, status FROM documents WHERE party_id=? AND kind=? AND status NOT IN ('void') ORDER BY date, id",
+            (party_id, kind),
+        ):
             bal = total - self.paid(i)
             if bal > 0:
                 out.append({"id": i, "number": number, "date": date, "due": due, "total": total, "balance": bal})
@@ -530,8 +620,15 @@ class Books:
             d["paid"] = self.paid(d["id"])
             d["credited"] = self.paid(d["id"], ["credit_note"])
             d["balance"] = d["total"] - d["paid"] if d["status"] != "void" else 0
-            d["state"] = "void" if d["status"] == "void" else "paid" if d["balance"] <= 0 else "partly paid" if d["paid"] else \
-                ("overdue" if d.get("due") and d["due"] < str(_today()) else "unpaid")
+            d["state"] = (
+                "void"
+                if d["status"] == "void"
+                else "paid"
+                if d["balance"] <= 0
+                else "partly paid"
+                if d["paid"]
+                else ("overdue" if d.get("due") and d["due"] < str(_today()) else "unpaid")
+            )
         d["party"] = self.party_by_id(d["party_id"]) if d.get("party_id") else None
         d["links"] = {s: rem for s, rem in self.cx.execute("SELECT system, remote FROM links WHERE doc_id=?", (d["id"],))}
         return d
@@ -565,7 +662,9 @@ class Books:
         return [self.doc(i) for (i,) in self.cx.execute(q, a + [limit]).fetchall()]
 
     def link(self, doc_id, system, remote):
-        self.cx.execute("INSERT OR REPLACE INTO links VALUES (?,?,?,?)", (doc_id, system, str(remote), dt.datetime.now().isoformat(timespec="seconds")))
+        self.cx.execute(
+            "INSERT OR REPLACE INTO links VALUES (?,?,?,?)", (doc_id, system, str(remote), dt.datetime.now().isoformat(timespec="seconds"))
+        )
 
     def _party(self, party, kind, create=True):
         if isinstance(party, dict):

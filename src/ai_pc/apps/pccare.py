@@ -4,6 +4,7 @@ battery. Reads run at once; installs, updates, removals and scans wait for a yes
 
   'which apps can be updated?'  'update vlc'  'install 7-zip'  'how much disk space is left?'  'is my antivirus on?'  'wifi'  'battery'
 """
+
 import json
 import re
 import subprocess
@@ -39,7 +40,7 @@ def table(text):
     names = re.findall(r"\S+", lines[head])
     starts = [m.start() for m in re.finditer(r"\S+", lines[head])]
     rows = []
-    for ln in lines[head + 2:]:
+    for ln in lines[head + 2 :]:
         if not ln.strip() or re.match(r"^\s*\d+ (?:upgrades?|packages?) ", ln) or set(ln.strip()) <= {"-"}:
             continue
         cells, col, buf, k = [], 0, "", 1
@@ -83,8 +84,10 @@ def disks():
 
 
 def defender():
-    code, out, err = _ps("Get-MpComputerStatus | Select-Object AntivirusEnabled,RealTimeProtectionEnabled,AntivirusSignatureAge,QuickScanAge,"
-                         "AntivirusSignatureLastUpdated | ConvertTo-Json -Compress")
+    code, out, err = _ps(
+        "Get-MpComputerStatus | Select-Object AntivirusEnabled,RealTimeProtectionEnabled,AntivirusSignatureAge,QuickScanAge,"
+        "AntivirusSignatureLastUpdated | ConvertTo-Json -Compress"
+    )
     try:
         return json.loads(out.strip().splitlines()[-1])
     except (ValueError, IndexError):
@@ -109,15 +112,19 @@ def battery():
 
 def parse(text, ctx):
     c = text.lower().strip(" ?.!")
-    if re.search(r"\b(?:apps?|programs?|software)\b.*\b(?:update|upgrade)|\b(?:updates?|upgrades?) (?:available|for my apps)|\boutdated\b", c) and \
-            not re.search(r"^\s*(?:update|upgrade)\s+(?!all\b)\w", c):
+    if re.search(
+        r"\b(?:apps?|programs?|software)\b.*\b(?:update|upgrade)|\b(?:updates?|upgrades?) (?:available|for my apps)|\boutdated\b", c
+    ) and not re.search(r"^\s*(?:update|upgrade)\s+(?!all\b)\w", c):
         return {"op": "upgrades"}
     m = re.match(r"^\s*(?:please\s+)?(update|upgrade)\s+(?:the\s+)?(.+?)(?:\s+app)?$", c)
     if m and not re.search(r"\b(?:windows|drivers?|bios)\b", m.group(2)):
         return {"op": "upgrade", "what": m.group(2)}
     m = re.match(r"^\s*(?:please\s+)?(?:install|download and install|get me)\s+(?:the\s+)?(.+?)(?:\s+app)?$", c)
-    if m and not re.search(r"\b(?:on|to|onto)\s+(?:my\s+|the\s+|a\s+)?(?:phone|mobile|tablet|android|iphone|device)\b", c) \
-            and not re.search(r"\bextension\b|\bvs ?code\b|\bplugin\b", c):  # a phone is not this PC; editor extensions are not apps
+    if (
+        m
+        and not re.search(r"\b(?:on|to|onto)\s+(?:my\s+|the\s+|a\s+)?(?:phone|mobile|tablet|android|iphone|device)\b", c)
+        and not re.search(r"\bextension\b|\bvs ?code\b|\bplugin\b", c)
+    ):  # a phone is not this PC; editor extensions are not apps
         return {"op": "install", "what": m.group(1)}
     m = re.match(r"^\s*(?:please\s+)?(?:uninstall|remove the app|remove program)\s+(.+?)$", c)
     if m:
@@ -148,8 +155,11 @@ def preview(op, ctx):
     if op["op"] == "upgrade" and op["what"] in ("all", "everything", "all apps"):
         ups = upgrades()
         op["ids"] = [r["Id"] for r in ups]
-        return f"Ready to update {len(ups)} apps: " + ", ".join(f"{r['Name']} {r['Version']} -> {r['Available']}" for r in ups) + \
-            ". An app that installs for all users asks Windows for permission (a blue box you click)."
+        return (
+            f"Ready to update {len(ups)} apps: "
+            + ", ".join(f"{r['Name']} {r['Version']} -> {r['Available']}" for r in ups)
+            + ". An app that installs for all users asks Windows for permission (a blue box you click)."
+        )
     rows = search(op["what"]) if op["op"] == "install" else installed(op["what"])
     r = _pick(rows, op["what"])
     if not r:
@@ -157,16 +167,25 @@ def preview(op, ctx):
         return f"No app called '{op['what']}' {'in winget' if op['op'] == 'install' else 'is installed'}; nothing will happen."
     op["id"], op["name"] = r["Id"], r["Name"]
     verb = {"install": "install", "upgrade": "update", "uninstall": "remove"}[op["op"]]
-    return f"Ready to {verb} {r['Name']} ({r['Id']}" + (f", {r.get('Version')}" if r.get("Version") else "") + \
-        (f" -> {r.get('Available')}" if op["op"] == "upgrade" and r.get("Available") else "") + ") with winget."
+    return (
+        f"Ready to {verb} {r['Name']} ({r['Id']}"
+        + (f", {r.get('Version')}" if r.get("Version") else "")
+        + (f" -> {r.get('Available')}" if op["op"] == "upgrade" and r.get("Available") else "")
+        + ") with winget."
+    )
 
 
 def run(op, ctx):
     k = op["op"]
     if k == "upgrades":
         ups = upgrades()
-        return "All apps are up to date." if not ups else f"{len(ups)} apps can be updated: " + \
-            "; ".join(f"{r['Name']} {r['Version']} -> {r['Available']}" for r in ups) + ". Say 'update all apps' or 'update <name>'."
+        return (
+            "All apps are up to date."
+            if not ups
+            else f"{len(ups)} apps can be updated: "
+            + "; ".join(f"{r['Name']} {r['Version']} -> {r['Available']}" for r in ups)
+            + ". Say 'update all apps' or 'update <name>'."
+        )
     if k == "installed":
         rows = installed(op.get("what"))
         return "Not installed." if not rows else "; ".join(f"{r['Name']} {r['Version']}" for r in rows[:10])
@@ -176,28 +195,48 @@ def run(op, ctx):
         s = defender()
         if "error" in s:
             return f"Couldn't read Windows Security: {s['error']}"
-        return (f"Antivirus {'on' if s.get('AntivirusEnabled') else 'OFF'}, real-time protection {'on' if s.get('RealTimeProtectionEnabled') else 'OFF'}; "
-                f"virus definitions {s.get('AntivirusSignatureAge')} day(s) old; last quick scan {s.get('QuickScanAge')} day(s) ago.")
+        return (
+            f"Antivirus {'on' if s.get('AntivirusEnabled') else 'OFF'}, real-time protection {'on' if s.get('RealTimeProtectionEnabled') else 'OFF'}; "
+            f"virus definitions {s.get('AntivirusSignatureAge')} day(s) old; last quick scan {s.get('QuickScanAge')} day(s) ago."
+        )
     if k == "wifi":
         w = wifi()
-        return "Not connected to Wi-Fi." if not w.get("SSID") else f"Wi-Fi {w['SSID']}: signal {w.get('Signal')}, {w.get('Receive rate (Mbps)', '?')} Mbps, {w.get('Radio type', '')}."
+        return (
+            "Not connected to Wi-Fi."
+            if not w.get("SSID")
+            else f"Wi-Fi {w['SSID']}: signal {w.get('Signal')}, {w.get('Receive rate (Mbps)', '?')} Mbps, {w.get('Radio type', '')}."
+        )
     if k == "battery":
         b = battery()
-        return "No battery (a desktop PC)." if b is None else f"Battery {b['percent']}%" + (", charging" if b["plugged"] else
-                                                                                         f", about {b['hours_left']} h left" if b["hours_left"] else "") + "."
+        return (
+            "No battery (a desktop PC)."
+            if b is None
+            else f"Battery {b['percent']}%" + (", charging" if b["plugged"] else f", about {b['hours_left']} h left" if b["hours_left"] else "") + "."
+        )
     if not op.get("confirmed"):
         return preview(op, ctx)
     if k == "scan":
         code, out, err = _ps("Start-MpScan -ScanType QuickScan; (Get-MpComputerStatus).QuickScanAge", timeout=3600)
-        return "Quick scan done; " + ("no age reported." if code else f"last quick scan now {out.strip().splitlines()[-1]} day(s) ago.") + \
-            (f" ({err.strip()[:200]})" if code else "")
+        return (
+            "Quick scan done; "
+            + ("no age reported." if code else f"last quick scan now {out.strip().splitlines()[-1]} day(s) ago.")
+            + (f" ({err.strip()[:200]})" if code else "")
+        )
     if op.get("missing"):
         return "Nothing to do."
     ids = op.get("ids") or [op["id"]]
     done = []
     for pid in ids:
-        cmd = ["winget", {"install": "install", "upgrade": "upgrade", "uninstall": "uninstall"}[k], "--id", pid, "--exact", "--silent",
-               "--accept-source-agreements", "--disable-interactivity"] + (["--accept-package-agreements"] if k != "uninstall" else [])
+        cmd = [
+            "winget",
+            {"install": "install", "upgrade": "upgrade", "uninstall": "uninstall"}[k],
+            "--id",
+            pid,
+            "--exact",
+            "--silent",
+            "--accept-source-agreements",
+            "--disable-interactivity",
+        ] + (["--accept-package-agreements"] if k != "uninstall" else [])
         code, out, err = _run(cmd, timeout=1800)
         done.append((pid, code == 0, (out + err).strip().splitlines()[-1:] or [""]))
     # check: what winget now says is installed
@@ -206,6 +245,9 @@ def run(op, ctx):
     for pid, ok, msg in done:
         there = pid in after
         good = ok and (there if k != "uninstall" else not there)
-        lines.append(f"{pid}: {'done' if good else 'NOT done'}" + ("" if good else f" ({msg[0][:120]})") +
-                     (f", now {after[pid].get('Version')}" if there and k != "uninstall" else ""))
+        lines.append(
+            f"{pid}: {'done' if good else 'NOT done'}"
+            + ("" if good else f" ({msg[0][:120]})")
+            + (f", now {after[pid].get('Version')}" if there and k != "uninstall" else "")
+        )
     return "; ".join(lines) + "."

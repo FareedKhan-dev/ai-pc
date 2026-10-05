@@ -5,6 +5,7 @@ own file, tasks are '- [ ]' lines found across every note and ticked off by thei
   'note: call the supplier about the TV order'   'todo: pay the electricity bill by Friday'   'my tasks'   'done: pay the electricity bill'
   "new note 'Meeting with Ali': prices agreed at 84,000"   'find notes about tax'   'notes folder is D:\\Obsidian\\Vault'
 """
+
 import datetime as dt
 import json
 import re
@@ -128,7 +129,8 @@ def run(op, ctx):
                 found.append(f"{f.stem}: {line.strip()[:120]}")
         return "Nothing found." if not found else f"{len(found)} notes:\n" + "\n".join(found[:15])
     if k == "show":
-        f = next((x for x in v.rglob("*.md") if x.stem.lower() == op["title"].lower()), None) or \
-            next((x for x in v.rglob("*.md") if op["title"].lower() in x.stem.lower()), None)
+        f = next((x for x in v.rglob("*.md") if x.stem.lower() == op["title"].lower()), None) or next(
+            (x for x in v.rglob("*.md") if op["title"].lower() in x.stem.lower()), None
+        )
         return f"No note called '{op['title']}'." if not f else f.read_text(encoding="utf-8")[:3000]
     return "?"

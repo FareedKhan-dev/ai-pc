@@ -11,6 +11,7 @@ Figma's own PNG of the frame (one API call; skipped with a note when Figma's mon
 Canva: the design exported as PowerPoint (read by pptxtree.py) and as PNG pages (the reference, and the source for
 anything with no web equivalent). Email designs can come as Canva's own HTML instead.
 """
+
 import re
 import shutil
 import zipfile
@@ -50,12 +51,22 @@ def _finish(folder, page, ref, notes, message, source):
     except DC.CheckError as e:
         dc = {"ok": False, "lines": [f"the page could not be measured ({e})"], "placed": [0, 0], "picture": None}
     sha = proj.commit(message)
-    return {"project": proj, "page": page, "check": dc, "web": web, "sha": sha, "fonts": (saved, missing), "notes": page.notes, "source": source,
-            "name": page.title}
+    return {
+        "project": proj,
+        "page": page,
+        "check": dc,
+        "web": web,
+        "sha": sha,
+        "fonts": (saved, missing),
+        "notes": page.notes,
+        "source": source,
+        "name": page.title,
+    }
 
 
 def from_figma(conn, link, frame=None, projects_dir=None, reference=True):
     from ai_pc.hub.services.figma import key_of
+
     key, node = key_of(link)
     data = conn.file(key)
     if node:
@@ -95,6 +106,7 @@ def from_figma(conn, link, frame=None, projects_dir=None, reference=True):
 def _stack(pngs, width, out):
     """Several page pictures one under another, at the page width (the reference for a page made of sections)."""
     from PIL import Image
+
     ims = [Image.open(p).convert("RGB") for p in pngs]
     ims = [im.resize((int(width), max(1, int(round(im.height * width / im.width))))) for im in ims]
     sheet = Image.new("RGB", (int(width), sum(im.height for im in ims)), "white")
@@ -137,8 +149,17 @@ def from_canva(conn, name, pages=None, email=False, projects_dir=None):
         _unzip(z, folder)
         web = V.check(proj, design=False)
         sha = proj.commit(f"First version, Canva's HTML of the email design '{d['name']}'")
-        return {"project": proj, "page": None, "check": None, "web": web, "sha": sha, "fonts": ([], []), "notes": [], "source": "canva",
-                "name": d["name"]}
+        return {
+            "project": proj,
+            "page": None,
+            "check": None,
+            "web": web,
+            "sha": sha,
+            "fonts": ([], []),
+            "notes": [],
+            "source": "canva",
+            "name": d["name"],
+        }
     pptx = conn.export(d, "pptx", folder=work, name="design")["files"][0]
     pngs = conn.export(d, "png", folder=work, pages=pages, name="page")["files"]
     nums = list(pages) if pages else list(range(1, len(pngs) + 1))
@@ -161,16 +182,22 @@ def summary(r):
     files = [f for f in proj.files() if not f.startswith(".")]
     if page is None:
         web = "; ".join(c["what"] for c in r["web"] if c["level"] != "info")
-        return f"Made {proj.folder.name} (web) from Canva's own HTML for the email design '{r['name']}': {', '.join(files[:8])}. {web}. " \
-               f"Version {r['sha']}. Folder: {proj.folder}."
+        return (
+            f"Made {proj.folder.name} (web) from Canva's own HTML for the email design '{r['name']}': {', '.join(files[:8])}. {web}. "
+            f"Version {r['sha']}. Folder: {proj.folder}."
+        )
     kinds = [e.get("type") for cls, e in page.elements.items() if cls != page.root]
     pics = sum(1 for a in page.assets if not a.startswith("assets/fonts/"))
     icons = sum(1 for k in kinds if k in D.VECTORS)
     saved, missing = r["fonts"]
     where = {"figma": "the Figma frame", "canva": "the Canva design"}[r["source"]]
-    head = f"Made {proj.folder.name} (web) from {where} '{r['name']}' ({D.fmt(page.w)} x {D.fmt(page.h)}): {len(kinds)} elements, " \
-           f"{kinds.count('TEXT')} texts, {pics} pictures, {icons} icons" + (f"; fonts saved in the project: {', '.join(saved)}" if saved else "") + \
-           (f"; not free to include (a stand-in is used): {', '.join(missing)}" if missing else "") + "."
+    head = (
+        f"Made {proj.folder.name} (web) from {where} '{r['name']}' ({D.fmt(page.w)} x {D.fmt(page.h)}): {len(kinds)} elements, "
+        f"{kinds.count('TEXT')} texts, {pics} pictures, {icons} icons"
+        + (f"; fonts saved in the project: {', '.join(saved)}" if saved else "")
+        + (f"; not free to include (a stand-in is used): {', '.join(missing)}" if missing else "")
+        + "."
+    )
     bad = [c for c in r["web"] if not c["ok"] and c["level"] == "fail"]
     web = "the page loads with no errors" if not bad else "; ".join(c["what"] for c in bad)
     dc = r["check"] or {}

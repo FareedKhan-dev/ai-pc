@@ -10,6 +10,7 @@ Keys are typed at a hidden prompt and kept DPAPI-encrypted in the vault; tokens 
 
   connect(name, values) -> {"who", "where", "warnings"}     fresh_token(platform) -> a valid access token
 """
+
 import base64
 import hashlib
 import secrets
@@ -47,19 +48,56 @@ def _token(url, form, transport=None, basic=None):
 
 # ---------------------------------------------------------------- the platforms' sign-in rules
 PROVIDERS = {
-    "youtube": {"auth": "https://accounts.google.com/o/oauth2/v2/auth", "token": "https://oauth2.googleapis.com/token", "port": 0, "path": "/",
-                "scopes": ["https://www.googleapis.com/auth/youtube.force-ssl", "https://www.googleapis.com/auth/youtube.readonly",
-                           "https://www.googleapis.com/auth/yt-analytics.readonly"], "sep": " ", "pkce": "s256", "id": "client_id",
-                "extra": {"access_type": "offline", "prompt": "consent"}, "secret_in_body": True},
-    "tiktok": {"auth": "https://www.tiktok.com/v2/auth/authorize/", "token": "https://open.tiktokapis.com/v2/oauth/token/", "port": 3005, "path": "/callback/",
-               "scopes": ["user.info.basic", "user.info.profile", "user.info.stats", "video.upload", "video.publish", "video.list"], "sep": ",",
-               "pkce": "hex", "id": "client_key", "secret_in_body": True},
-    "linkedin": {"auth": "https://www.linkedin.com/oauth/v2/authorization", "token": "https://www.linkedin.com/oauth/v2/accessToken", "port": 3006,
-                 "path": "/callback", "scopes": ["openid", "profile", "email", "w_member_social"], "sep": " ", "pkce": None, "id": "client_id",
-                 "secret_in_body": True, "no_refresh": True},
-    "x": {"auth": "https://x.com/i/oauth2/authorize", "token": "https://api.x.com/2/oauth2/token", "port": 3007, "path": "/callback",
-          "scopes": ["tweet.read", "tweet.write", "users.read", "media.write", "offline.access"], "sep": " ", "pkce": "s256", "id": "client_id",
-          "public": True},
+    "youtube": {
+        "auth": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token": "https://oauth2.googleapis.com/token",
+        "port": 0,
+        "path": "/",
+        "scopes": [
+            "https://www.googleapis.com/auth/youtube.force-ssl",
+            "https://www.googleapis.com/auth/youtube.readonly",
+            "https://www.googleapis.com/auth/yt-analytics.readonly",
+        ],
+        "sep": " ",
+        "pkce": "s256",
+        "id": "client_id",
+        "extra": {"access_type": "offline", "prompt": "consent"},
+        "secret_in_body": True,
+    },
+    "tiktok": {
+        "auth": "https://www.tiktok.com/v2/auth/authorize/",
+        "token": "https://open.tiktokapis.com/v2/oauth/token/",
+        "port": 3005,
+        "path": "/callback/",
+        "scopes": ["user.info.basic", "user.info.profile", "user.info.stats", "video.upload", "video.publish", "video.list"],
+        "sep": ",",
+        "pkce": "hex",
+        "id": "client_key",
+        "secret_in_body": True,
+    },
+    "linkedin": {
+        "auth": "https://www.linkedin.com/oauth/v2/authorization",
+        "token": "https://www.linkedin.com/oauth/v2/accessToken",
+        "port": 3006,
+        "path": "/callback",
+        "scopes": ["openid", "profile", "email", "w_member_social"],
+        "sep": " ",
+        "pkce": None,
+        "id": "client_id",
+        "secret_in_body": True,
+        "no_refresh": True,
+    },
+    "x": {
+        "auth": "https://x.com/i/oauth2/authorize",
+        "token": "https://api.x.com/2/oauth2/token",
+        "port": 3007,
+        "path": "/callback",
+        "scopes": ["tweet.read", "tweet.write", "users.read", "media.write", "offline.access"],
+        "sep": " ",
+        "pkce": "s256",
+        "id": "client_id",
+        "public": True,
+    },
 }
 
 
@@ -77,6 +115,7 @@ def signin(name, values, open_url=webbrowser.open, show=print, timeout=300, tran
             q.update(code_challenge=_hex256(verifier), code_challenge_method="S256")
         q.update(p.get("extra") or {})
         return p["auth"] + "?" + urllib.parse.urlencode(q)
+
     try:
         got, redirect = _loopback(build, "127.0.0.1", p["port"], p["path"], show=show, open_url=open_url, timeout=timeout, who=name.title())
     except HubError as e:
@@ -110,7 +149,9 @@ def save(name, values, tok):
 def refresh(name, creds, transport=None):
     p = PROVIDERS[name]
     if p.get("no_refresh") or not creds.get("refresh_token"):
-        raise SocialError("auth", f"{name.title()}: the sign-in has expired; run 'ai-pc social connect {name}' (one click if you are still signed in)")
+        raise SocialError(
+            "auth", f"{name.title()}: the sign-in has expired; run 'ai-pc social connect {name}' (one click if you are still signed in)"
+        )
     form = {"grant_type": "refresh_token", "refresh_token": creds["refresh_token"], p["id"]: creds.get(p["id"]) or creds.get("client_id")}
     if p.get("secret_in_body") and creds.get("client_secret"):
         form["client_secret"] = creds["client_secret"]
@@ -154,35 +195,65 @@ def _meta_get(url, params, transport=None):
 
 def meta_connect(values, open_url=None, show=print, transport=None):
     """values: app_id, app_secret, user_token (from Graph API Explorer), optional page (a name, when you run several Pages)."""
-    long = _meta_get(f"{GRAPH}/oauth/access_token", {"grant_type": "fb_exchange_token", "client_id": values["app_id"],
-                                                     "client_secret": values["app_secret"], "fb_exchange_token": values["user_token"]}, transport)
+    long = _meta_get(
+        f"{GRAPH}/oauth/access_token",
+        {
+            "grant_type": "fb_exchange_token",
+            "client_id": values["app_id"],
+            "client_secret": values["app_secret"],
+            "fb_exchange_token": values["user_token"],
+        },
+        transport,
+    )
     utok = long["access_token"]
-    pages = _meta_get(f"{GRAPH}/me/accounts", {"fields": "id,name,access_token,tasks,instagram_business_account{id,username}", "access_token": utok},
-                      transport).get("data") or []
+    pages = (
+        _meta_get(
+            f"{GRAPH}/me/accounts", {"fields": "id,name,access_token,tasks,instagram_business_account{id,username}", "access_token": utok}, transport
+        ).get("data")
+        or []
+    )
     if not pages:
         raise SocialError("auth", "this Facebook account manages no Page (or the token lacks pages_show_list)")
     want = (values.get("page") or "").strip().lower()
     page = next((p for p in pages if want and want in p["name"].lower()), pages[0])
     ig = page.get("instagram_business_account") or {}
-    upd = {"app_id": values["app_id"], "app_secret": values["app_secret"], "user_token": utok,
-           "user_expires_at": time.time() + int(long.get("expires_in") or 60 * 86400), "page_id": page["id"], "page_name": page["name"],
-           "page_token": page["access_token"], "ig_id": ig.get("id"), "ig_username": ig.get("username"), "ig_mode": "facebook",
-           "pages": [{"id": p["id"], "name": p["name"]} for p in pages]}
+    upd = {
+        "app_id": values["app_id"],
+        "app_secret": values["app_secret"],
+        "user_token": utok,
+        "user_expires_at": time.time() + int(long.get("expires_in") or 60 * 86400),
+        "page_id": page["id"],
+        "page_name": page["name"],
+        "page_token": page["access_token"],
+        "ig_id": ig.get("id"),
+        "ig_username": ig.get("username"),
+        "ig_mode": "facebook",
+        "pages": [{"id": p["id"], "name": p["name"]} for p in pages],
+    }
     vault.put("meta", upd)
-    warn = [f"Page '{page['name']}'" + (f" and Instagram @{ig.get('username')}" if ig else " (no Instagram professional account is linked to it)"),
-            "Meta asks you to renew the Instagram sign-in every 60 days ('ai-pc social connect instagram'); the Page's own token does not expire",
-            "switch the Meta app to Live (App settings: privacy policy address, then App Mode: Live), or only you can see the Page posts"]
+    warn = [
+        f"Page '{page['name']}'" + (f" and Instagram @{ig.get('username')}" if ig else " (no Instagram professional account is linked to it)"),
+        "Meta asks you to renew the Instagram sign-in every 60 days ('ai-pc social connect instagram'); the Page's own token does not expire",
+        "switch the Meta app to Live (App settings: privacy policy address, then App Mode: Live), or only you can see the Page posts",
+    ]
     if len(pages) > 1:
-        warn.append("other Pages you manage: " + ", ".join(p["name"] for p in pages if p["id"] != page["id"]) + " (connect again with 'page' to switch)")
+        warn.append(
+            "other Pages you manage: " + ", ".join(p["name"] for p in pages if p["id"] != page["id"]) + " (connect again with 'page' to switch)"
+        )
     return {"who": page["name"], "where": "Facebook Page" + (f" + Instagram @{ig.get('username')}" if ig else ""), "warnings": warn}
 
 
 def threads_connect(values, open_url=None, show=print, transport=None):
     """values: app_secret (the Threads app secret), token (a Threads token from Graph API Explorer)."""
-    long = _meta_get("https://graph.threads.net/access_token", {"grant_type": "th_exchange_token", "client_secret": values["app_secret"],
-                                                                 "access_token": values["token"]}, transport)
-    vault.put("threads", {"access_token": long["access_token"], "expires_at": time.time() + int(long.get("expires_in") or 60 * 86400) - 60,
-                          "issued_at": time.time()})
+    long = _meta_get(
+        "https://graph.threads.net/access_token",
+        {"grant_type": "th_exchange_token", "client_secret": values["app_secret"], "access_token": values["token"]},
+        transport,
+    )
+    vault.put(
+        "threads",
+        {"access_token": long["access_token"], "expires_at": time.time() + int(long.get("expires_in") or 60 * 86400) - 60, "issued_at": time.time()},
+    )
     me = _meta_get("https://graph.threads.net/v1.0/me", {"fields": "id,username", "access_token": long["access_token"]}, transport)
     vault.put("threads", {"user_id": me.get("id")})
     return {"who": "@" + (me.get("username") or "?"), "where": "Threads", "warnings": ["the token renews itself before its 60 days run out"]}
@@ -191,10 +262,22 @@ def threads_connect(values, open_url=None, show=print, transport=None):
 def instagram_login_connect(values, open_url=None, show=print, transport=None):
     """Instagram without a Facebook Page: values: token (the dashboard's 'Generate token', already long-lived)."""
     me = _meta_get("https://graph.instagram.com/v26.0/me", {"fields": "user_id,username", "access_token": values["token"]}, transport)
-    vault.put("meta", {"ig_mode": "instagram", "access_token": values["token"], "expires_at": time.time() + 59 * 86400, "issued_at": time.time(),
-                       "ig_id": me.get("user_id") or me.get("id"), "ig_username": me.get("username")})
-    return {"who": "@" + (me.get("username") or "?"), "where": "Instagram (Instagram login)",
-            "warnings": ["with Instagram login, Meta allows no deleting and no video upload from this PC (videos go by a temporary web address)"]}
+    vault.put(
+        "meta",
+        {
+            "ig_mode": "instagram",
+            "access_token": values["token"],
+            "expires_at": time.time() + 59 * 86400,
+            "issued_at": time.time(),
+            "ig_id": me.get("user_id") or me.get("id"),
+            "ig_username": me.get("username"),
+        },
+    )
+    return {
+        "who": "@" + (me.get("username") or "?"),
+        "where": "Instagram (Instagram login)",
+        "warnings": ["with Instagram login, Meta allows no deleting and no video upload from this PC (videos go by a temporary web address)"],
+    }
 
 
 def _threads_refresh(c, transport=None):
@@ -211,7 +294,9 @@ def _meta_refresh(c, transport=None):
     if c.get("ig_mode") == "instagram":
         if c.get("expires_at", 0) <= time.time():
             raise SocialError("auth", "the Instagram token ran out; run 'ai-pc social connect instagram'")
-        js = _meta_get("https://graph.instagram.com/refresh_access_token", {"grant_type": "ig_refresh_token", "access_token": c["access_token"]}, transport)
+        js = _meta_get(
+            "https://graph.instagram.com/refresh_access_token", {"grant_type": "ig_refresh_token", "access_token": c["access_token"]}, transport
+        )
         upd = {"access_token": js["access_token"], "expires_at": time.time() + int(js.get("expires_in") or 60 * 86400) - 60, "issued_at": time.time()}
         vault.put("meta", upd)
         return upd
@@ -225,84 +310,119 @@ RENEW_EARLY = {"threads": 7 * 86400, "meta": 7 * 86400}  # long-lived tokens are
 # ---------------------------------------------------------------- what the person does on each platform's site (ai-pc social steps)
 APPS = {
     "youtube": {
-        "label": "YouTube", "fields": [("client_id", "OAuth client ID (....apps.googleusercontent.com)", False), ("client_secret", "OAuth client secret", True)],
-        "steps": ["Open https://console.cloud.google.com and create a project named 'AI PC social'.",
-                  "APIs & Services > Library: enable 'YouTube Data API v3' and 'YouTube Analytics API'.",
-                  "Google Auth Platform > Branding: name AI PC and your email. Audience: External; add the Google account that owns your channel as a "
-                  "test user, then press 'Publish app' (In production) so the sign-in does not expire every 7 days. Google will show 'Google hasn't "
-                  "verified this app' when you sign in: press Advanced > Go to AI PC (it is your own app).",
-                  "Google Auth Platform > Clients > Create client > Desktop app; copy the Client ID and Client secret.",
-                  "Run 'ai-pc social connect youtube' and paste them; a Google sign-in page opens once (choose the channel's account)."],
+        "label": "YouTube",
+        "fields": [("client_id", "OAuth client ID (....apps.googleusercontent.com)", False), ("client_secret", "OAuth client secret", True)],
+        "steps": [
+            "Open https://console.cloud.google.com and create a project named 'AI PC social'.",
+            "APIs & Services > Library: enable 'YouTube Data API v3' and 'YouTube Analytics API'.",
+            "Google Auth Platform > Branding: name AI PC and your email. Audience: External; add the Google account that owns your channel as a "
+            "test user, then press 'Publish app' (In production) so the sign-in does not expire every 7 days. Google will show 'Google hasn't "
+            "verified this app' when you sign in: press Advanced > Go to AI PC (it is your own app).",
+            "Google Auth Platform > Clients > Create client > Desktop app; copy the Client ID and Client secret.",
+            "Run 'ai-pc social connect youtube' and paste them; a Google sign-in page opens once (choose the channel's account).",
+        ],
         "notes": "Free: 100 uploads a day. YouTube keeps videos uploaded through a new, unaudited Google project PRIVATE (they cannot be made "
-                 "public); to post publicly, apply for YouTube's free API audit at https://support.google.com/youtube/contact/yt_api_form "
-                 "(it asks for a privacy policy page). Until then uploads are private videos you can check."},
+        "public); to post publicly, apply for YouTube's free API audit at https://support.google.com/youtube/contact/yt_api_form "
+        "(it asks for a privacy policy page). Until then uploads are private videos you can check.",
+    },
     "tiktok": {
-        "label": "TikTok", "fields": [("client_key", "Client key", False), ("client_secret", "Client secret", True)],
-        "steps": ["Open https://developers.tiktok.com, log in, then Manage apps > Connect an app; name it AI PC, pick a category, platform Desktop "
-                  "(TikTok asks for a website address, a terms page and a privacy page: a free GitHub Pages site works).",
-                  "Add the products Login Kit (Desktop redirect URI: http://127.0.0.1:3005/callback/) and Content Posting API (turn on Direct Post).",
-                  "Scopes: user.info.basic, user.info.profile, user.info.stats, video.upload, video.publish, video.list.",
-                  "Sandbox: create a sandbox and add your own TikTok account as a target user (no review needed).",
-                  "Content Posting API asks you to verify the website address (a DNS record or a file) before it works.",
-                  "Copy the Client key and Client secret, then run 'ai-pc social connect tiktok'."],
+        "label": "TikTok",
+        "fields": [("client_key", "Client key", False), ("client_secret", "Client secret", True)],
+        "steps": [
+            "Open https://developers.tiktok.com, log in, then Manage apps > Connect an app; name it AI PC, pick a category, platform Desktop "
+            "(TikTok asks for a website address, a terms page and a privacy page: a free GitHub Pages site works).",
+            "Add the products Login Kit (Desktop redirect URI: http://127.0.0.1:3005/callback/) and Content Posting API (turn on Direct Post).",
+            "Scopes: user.info.basic, user.info.profile, user.info.stats, video.upload, video.publish, video.list.",
+            "Sandbox: create a sandbox and add your own TikTok account as a target user (no review needed).",
+            "Content Posting API asks you to verify the website address (a DNS record or a file) before it works.",
+            "Copy the Client key and Client secret, then run 'ai-pc social connect tiktok'.",
+        ],
         "notes": "TikTok audits apps before they may post publicly and does not audit personal tools, so the AI PC sends videos to your TikTok "
-                 "inbox as drafts (you post them from the app in one tap) or posts them as private 'only me'. It cannot delete posts."},
+        "inbox as drafts (you post them from the app in one tap) or posts them as private 'only me'. It cannot delete posts.",
+    },
     "linkedin": {
-        "label": "LinkedIn", "fields": [("client_id", "Client ID", False), ("client_secret", "Primary Client Secret", True)],
-        "steps": ["Open https://www.linkedin.com/developers/apps and click Create app (LinkedIn links every app to a LinkedIn Page: pick your "
-                  "business page, or create one first); add a logo and agree.",
-                  "Products: add 'Share on LinkedIn' and 'Sign In with LinkedIn using OpenID Connect' (granted at once, no review).",
-                  "Auth: under Authorized redirect URLs add http://127.0.0.1:3006/callback; copy the Client ID and Primary Client Secret.",
-                  "Run 'ai-pc social connect linkedin' and paste them; a LinkedIn sign-in page opens once."],
+        "label": "LinkedIn",
+        "fields": [("client_id", "Client ID", False), ("client_secret", "Primary Client Secret", True)],
+        "steps": [
+            "Open https://www.linkedin.com/developers/apps and click Create app (LinkedIn links every app to a LinkedIn Page: pick your "
+            "business page, or create one first); add a logo and agree.",
+            "Products: add 'Share on LinkedIn' and 'Sign In with LinkedIn using OpenID Connect' (granted at once, no review).",
+            "Auth: under Authorized redirect URLs add http://127.0.0.1:3006/callback; copy the Client ID and Primary Client Secret.",
+            "Run 'ai-pc social connect linkedin' and paste them; a LinkedIn sign-in page opens once.",
+        ],
         "notes": "Free. Posts go to your own profile (a company Page needs LinkedIn's Community Management API, which is for registered "
-                 "businesses). The sign-in lasts 60 days, then one click renews it. LinkedIn gives personal apps no post statistics."},
+        "businesses). The sign-in lasts 60 days, then one click renews it. LinkedIn gives personal apps no post statistics.",
+    },
     "facebook": {
-        "label": "Facebook Page (and Instagram)", "fields": [("app_id", "Meta App ID", False), ("app_secret", "Meta App secret", True),
-                                                             ("user_token", "User token from Graph API Explorer", True)],
-        "steps": ["Open https://developers.facebook.com/apps and click Create app; name it AI PC; use cases: 'Manage everything on your Page' and "
-                  "'Manage messaging & content on Instagram' (choose 'API setup with Facebook login').",
-                  "App settings > Basic: copy the App ID and App secret; add a privacy policy address (any page of yours, e.g. a free GitHub Pages "
-                  "page), then switch App Mode to Live (in Development mode only you can see the Page posts). You are the app's admin, so "
-                  "no App Review is needed.",
-                  "Open https://developers.facebook.com/tools/explorer, pick the AI PC app, and add the permissions pages_show_list, "
-                  "pages_read_engagement, pages_manage_posts, pages_manage_engagement, pages_read_user_content, read_insights, "
-                  "business_management, instagram_basic, instagram_content_publish, instagram_manage_comments, instagram_manage_insights, "
-                  "instagram_manage_contents; click Generate Access Token and allow your Page (and its Instagram account).",
-                  "Copy the token, then run 'ai-pc social connect facebook' and paste the App ID, App secret and token. The token is made long-lived "
-                  "here and the Page's own token (which does not expire) is taken from it."],
+        "label": "Facebook Page (and Instagram)",
+        "fields": [
+            ("app_id", "Meta App ID", False),
+            ("app_secret", "Meta App secret", True),
+            ("user_token", "User token from Graph API Explorer", True),
+        ],
+        "steps": [
+            "Open https://developers.facebook.com/apps and click Create app; name it AI PC; use cases: 'Manage everything on your Page' and "
+            "'Manage messaging & content on Instagram' (choose 'API setup with Facebook login').",
+            "App settings > Basic: copy the App ID and App secret; add a privacy policy address (any page of yours, e.g. a free GitHub Pages "
+            "page), then switch App Mode to Live (in Development mode only you can see the Page posts). You are the app's admin, so "
+            "no App Review is needed.",
+            "Open https://developers.facebook.com/tools/explorer, pick the AI PC app, and add the permissions pages_show_list, "
+            "pages_read_engagement, pages_manage_posts, pages_manage_engagement, pages_read_user_content, read_insights, "
+            "business_management, instagram_basic, instagram_content_publish, instagram_manage_comments, instagram_manage_insights, "
+            "instagram_manage_contents; click Generate Access Token and allow your Page (and its Instagram account).",
+            "Copy the token, then run 'ai-pc social connect facebook' and paste the App ID, App secret and token. The token is made long-lived "
+            "here and the Page's own token (which does not expire) is taken from it.",
+        ],
         "notes": "Free. Instagram needs a professional (business or creator) account linked to the Page. Instagram takes pictures only from a "
-                 "web address: run 'ai-pc social setup-tunnel' once (Cloudflare's free tunnel tool) so the AI PC can lend it one for a minute."},
+        "web address: run 'ai-pc social setup-tunnel' once (Cloudflare's free tunnel tool) so the AI PC can lend it one for a minute.",
+    },
     "instagram": {
-        "label": "Instagram", "fields": [("app_id", "Meta App ID", False), ("app_secret", "Meta App secret", True),
-                                         ("user_token", "User token from Graph API Explorer", True)],
-        "steps": ["Instagram comes with Facebook: do 'ai-pc social steps facebook' (one Meta app, one token covers both), then "
-                  "'ai-pc social connect instagram' with the same App ID, App secret and a fresh token.",
-                  "Meta asks for a fresh token every 60 days for Instagram; the AI PC tells you a week before."],
-        "notes": "Instagram allows 50 API posts in 24 hours. Pictures need 'ai-pc social setup-tunnel' once (see Facebook's note)."},
+        "label": "Instagram",
+        "fields": [
+            ("app_id", "Meta App ID", False),
+            ("app_secret", "Meta App secret", True),
+            ("user_token", "User token from Graph API Explorer", True),
+        ],
+        "steps": [
+            "Instagram comes with Facebook: do 'ai-pc social steps facebook' (one Meta app, one token covers both), then "
+            "'ai-pc social connect instagram' with the same App ID, App secret and a fresh token.",
+            "Meta asks for a fresh token every 60 days for Instagram; the AI PC tells you a week before.",
+        ],
+        "notes": "Instagram allows 50 API posts in 24 hours. Pictures need 'ai-pc social setup-tunnel' once (see Facebook's note).",
+    },
     "threads": {
-        "label": "Threads", "fields": [("app_secret", "Threads app secret", True), ("token", "Threads token from Graph API Explorer", True)],
-        "steps": ["In your Meta app (https://developers.facebook.com/apps) add the use case 'Access the Threads API' with threads_basic, "
-                  "threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights, threads_delete.",
-                  "Use case settings: add your Threads profile as a Threads Tester, then accept it in Threads (Settings > Account > Website "
-                  "permissions > Invites). Copy the Threads app secret.",
-                  "In https://developers.facebook.com/tools/explorer switch to threads.net, pick the app and generate a Threads token.",
-                  "Run 'ai-pc social connect threads' and paste the Threads app secret and the token."],
+        "label": "Threads",
+        "fields": [("app_secret", "Threads app secret", True), ("token", "Threads token from Graph API Explorer", True)],
+        "steps": [
+            "In your Meta app (https://developers.facebook.com/apps) add the use case 'Access the Threads API' with threads_basic, "
+            "threads_content_publish, threads_read_replies, threads_manage_replies, threads_manage_insights, threads_delete.",
+            "Use case settings: add your Threads profile as a Threads Tester, then accept it in Threads (Settings > Account > Website "
+            "permissions > Invites). Copy the Threads app secret.",
+            "In https://developers.facebook.com/tools/explorer switch to threads.net, pick the app and generate a Threads token.",
+            "Run 'ai-pc social connect threads' and paste the Threads app secret and the token.",
+        ],
         "notes": "Free; 250 posts in 24 hours. Threads takes media only from a web address: run 'ai-pc social setup-tunnel' once. The token "
-                 "renews itself."},
+        "renews itself.",
+    },
     "x": {
-        "label": "X", "fields": [("client_id", "OAuth 2.0 Client ID", False)],
-        "steps": ["Open https://console.x.com, sign in with your X account and create a Project and an App.",
-                  "App > User authentication settings: App permissions 'Read and write'; Type of App 'Native App'; Callback URI "
-                  "http://127.0.0.1:3007/callback; Website URL: any page of yours.",
-                  "Copy the OAuth 2.0 Client ID (no secret is needed for a Native App).",
-                  "Billing: X has no free tier since February 2026: add a card or credits (new accounts get $20 in credits for adding a card).",
-                  "Run 'ai-pc social connect x'; an X sign-in page opens once."],
-        "notes": "Paid per use: $0.015 a post, $0.20 when the post has a link, $0.005 to delete. The AI PC shows the cost before posting."},
+        "label": "X",
+        "fields": [("client_id", "OAuth 2.0 Client ID", False)],
+        "steps": [
+            "Open https://console.x.com, sign in with your X account and create a Project and an App.",
+            "App > User authentication settings: App permissions 'Read and write'; Type of App 'Native App'; Callback URI "
+            "http://127.0.0.1:3007/callback; Website URL: any page of yours.",
+            "Copy the OAuth 2.0 Client ID (no secret is needed for a Native App).",
+            "Billing: X has no free tier since February 2026: add a card or credits (new accounts get $20 in credits for adding a card).",
+            "Run 'ai-pc social connect x'; an X sign-in page opens once.",
+        ],
+        "notes": "Paid per use: $0.015 a post, $0.20 when the post has a link, $0.005 to delete. The AI PC shows the cost before posting.",
+    },
 }
 
 
 def connect(name, values, open_url=webbrowser.open, show=print, transport=None):
     from ai_pc.social.platforms import connector
+
     if name in META_CONNECT:
         return META_CONNECT[name](values, open_url, show, transport)
     signin(name, values, open_url, show, transport=transport)
@@ -312,5 +432,8 @@ def connect(name, values, open_url=webbrowser.open, show=print, transport=None):
     return who
 
 
-META_CONNECT = {"facebook": meta_connect, "instagram": lambda v, *a, **k: (instagram_login_connect if v.get("token") else meta_connect)(v, *a, **k),
-                "threads": threads_connect}
+META_CONNECT = {
+    "facebook": meta_connect,
+    "instagram": lambda v, *a, **k: (instagram_login_connect if v.get("token") else meta_connect)(v, *a, **k),
+    "threads": threads_connect,
+}

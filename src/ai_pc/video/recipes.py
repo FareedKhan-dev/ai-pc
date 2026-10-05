@@ -16,6 +16,7 @@ right beats. So the planner names recipes and this module writes the edits:
 compose(plan) turns a planner's style + shots + recipes (+ hand-placed extras) into a full plan: beat-exact cuts
 (cutting.py), a generated music bed when no music was given (music.py), and every recipe's edits.
 """
+
 import json
 import re
 
@@ -30,21 +31,69 @@ ROOT_DERIVED = MU.OUT  # media/derived: files this agent makes (music beds, the 
 SECTIONS = ("intro", "verse", "build", "drop", "break", "outro")
 LOOK_WORDS = r"\b(warm|golden|cool|teal|orange|dark|moody|bright|vivid|pastel|black and white|b&w|vintage|retro|neon|grade|grading|colou?r|look)\b"
 MUSIC_WORDS = r"\b(music|song|beat|bpm|phonk|pop|lofi|lo-fi|house|edm|trap|piano|epic|chill|soundtrack)\b"
-SECTION_ALIASES = {"hook": "intro", "opening": "intro", "opener": "intro", "climax": "drop", "chorus": "drop", "peak": "drop",
-                   "hero": "drop", "finale": "outro", "ending": "outro", "end": "outro", "credits": "outro", "bridge": "break",
-                   "breakdown": "break", "pause": "break", "buildup": "build", "build-up": "build", "pre-drop": "build",
-                   "rise": "build", "middle": "verse", "body": "verse", "main": "verse", "story": "verse"}
+SECTION_ALIASES = {
+    "hook": "intro",
+    "opening": "intro",
+    "opener": "intro",
+    "climax": "drop",
+    "chorus": "drop",
+    "peak": "drop",
+    "hero": "drop",
+    "finale": "outro",
+    "ending": "outro",
+    "end": "outro",
+    "credits": "outro",
+    "bridge": "break",
+    "breakdown": "break",
+    "pause": "break",
+    "buildup": "build",
+    "build-up": "build",
+    "pre-drop": "build",
+    "rise": "build",
+    "middle": "verse",
+    "body": "verse",
+    "main": "verse",
+    "story": "verse",
+}
 EXPLORE = 2  # untried items a video may try (a failure costs one re-export; a success joins the palette for good)
 # themed looks: never chosen on their own unless the request is about that theme (a heart-and-"Love" vignette was
 # once picked for "vignette" in a football reel)
-THEMES = {"heart", "love", "romantic", "valentine", "wedding", "christmas", "xmas", "birthday", "halloween", "new year",
-          "lunar", "festival", "cartoon", "cute", "kawaii", "baby", "anime", "santa", "snowman", "pumpkin", "graduation"}
+THEMES = {
+    "heart",
+    "love",
+    "romantic",
+    "valentine",
+    "wedding",
+    "christmas",
+    "xmas",
+    "birthday",
+    "halloween",
+    "new year",
+    "lunar",
+    "festival",
+    "cartoon",
+    "cute",
+    "kawaii",
+    "baby",
+    "anime",
+    "santa",
+    "snowman",
+    "pumpkin",
+    "graduation",
+}
 
 
 def _desc(cat, key):
     n = cat.index.notes.get(key, {})
-    return " ".join([str(n.get("en") or ""), str(n.get("desc") or ""), " ".join(map(str, n.get("tags") or [])),
-                     str(n.get("mood") or ""), str(n.get("look") or "")]).lower()
+    return " ".join(
+        [
+            str(n.get("en") or ""),
+            str(n.get("desc") or ""),
+            " ".join(map(str, n.get("tags") or [])),
+            str(n.get("mood") or ""),
+            str(n.get("look") or ""),
+        ]
+    ).lower()
 
 
 def _themes(cat, key):
@@ -84,6 +133,7 @@ class Ctx:
 
             def key(h):
                 return f"{h['category']}:{h['name']}"
+
             if self.keep:  # a follow-up changes what was asked, not the rest: what this edit already uses and still fits stays
                 wide = self.cat.index.search(query, categories=list(cats), k=80, exclude=self.cat.missing, boost=self.cat.boost)
                 pool = [key(h) for h in wide if h["score"] >= 0.2 * (wide[0]["score"] if wide else 0)]
@@ -101,6 +151,7 @@ class Ctx:
                     return hs
                 near = [h for h in hs if h["score"] >= share * (hs[0]["score"] if hs else 0)]
                 return sorted(near, key=lambda h: -h["score"] * self.cat.recent.get(key(h), 1.0)) + [h for h in hs if h not in near]
+
             known = fresh([h for h in hits if self.cat.boost.get(key(h), 1) >= 1.1 and h["score"] >= 0.45 * top], 0.75)
             new = fresh([h for h in hits if key(h) not in self.cat.boost and h["score"] >= 0.7 * top], 0.75)
             if "font" in cats and getattr(self, "latin", False):  # English words: a face designed for Latin letters first
@@ -154,11 +205,30 @@ def r_zoom_punch(x, r):
         if not c:
             continue
         dur = round(min(0.45, x.beat * 0.85), 3)
-        out.append({"id": x.id("zp"), "type": "zoom", "on": c["id"], "start": round(t - c["start"], 3), "duration": dur,
-                    "to": float(r.get("strength", 1.14)), "back": True, "expect": "a punch-in zoom on the beat"})
+        out.append(
+            {
+                "id": x.id("zp"),
+                "type": "zoom",
+                "on": c["id"],
+                "start": round(t - c["start"], 3),
+                "duration": dur,
+                "to": float(r.get("strength", 1.14)),
+                "back": True,
+                "expect": "a punch-in zoom on the beat",
+            }
+        )
         if r.get("blur"):
-            out.append({"id": x.id("bl"), "type": "effect", "name": x.pick(["scene_effect"], "motion blur radial zoom blur"),
-                        "start": round(t, 3), "duration": 0.15, "layer": "accent", "expect": "a quick motion blur with the punch"})
+            out.append(
+                {
+                    "id": x.id("bl"),
+                    "type": "effect",
+                    "name": x.pick(["scene_effect"], "motion blur radial zoom blur"),
+                    "start": round(t, 3),
+                    "duration": 0.15,
+                    "layer": "accent",
+                    "expect": "a quick motion blur with the punch",
+                }
+            )
     return out
 
 
@@ -167,14 +237,22 @@ def r_shake(x, r):
     for t in x.times(r.get("on", "downbeats"), r.get("every", 1), r.get("sections")):
         c = x.clip_at(t)
         if c:
-            out.append({"id": x.id("sk"), "type": "shake", "on": c["id"], "start": round(t - c["start"], 3),
-                        "duration": round(min(0.4, x.beat), 3), "strength": float(r.get("strength", 0.5)),
-                        "expect": "the picture shakes on the hit"})
+            out.append(
+                {
+                    "id": x.id("sk"),
+                    "type": "shake",
+                    "on": c["id"],
+                    "start": round(t - c["start"], 3),
+                    "duration": round(min(0.4, x.beat), 3),
+                    "strength": float(r.get("strength", 0.5)),
+                    "expect": "the picture shakes on the hit",
+                }
+            )
     return out
 
 
 FLASH_GAP = 1.5  # seconds between white flashes at least: on bars, not beats (more is a strobe and washes the edit out)
-HIT_GAP = 0.8    # colour-split hits: subtler, may come more often (still well under 3 a second)
+HIT_GAP = 0.8  # colour-split hits: subtler, may come more often (still well under 3 a second)
 
 
 def _spaced(x, r, on, every, gap=FLASH_GAP):
@@ -190,14 +268,34 @@ def _spaced(x, r, on, every, gap=FLASH_GAP):
 
 def r_flash(x, r):
     name = x.pick(["scene_effect"], "white flash quick light burst")
-    return [{"id": x.id("fl"), "type": "effect", "name": name, "start": round(max(0.0, t - 0.02), 3), "duration": 0.2, "layer": "accent",
-             "expect": "a white flash on the hit"} for t in _spaced(x, r, r.get("on", "drop"), r.get("every", 1))]
+    return [
+        {
+            "id": x.id("fl"),
+            "type": "effect",
+            "name": name,
+            "start": round(max(0.0, t - 0.02), 3),
+            "duration": 0.2,
+            "layer": "accent",
+            "expect": "a white flash on the hit",
+        }
+        for t in _spaced(x, r, r.get("on", "drop"), r.get("every", 1))
+    ]
 
 
 def r_rgb_hit(x, r):
     name = x.pick(["scene_effect"], "rgb split chromatic aberration glitch hit")
-    return [{"id": x.id("rg"), "type": "effect", "name": name, "start": round(t, 3), "duration": 0.25, "layer": "accent",
-             "expect": "a colour-split glitch hit on the beat"} for t in _spaced(x, r, r.get("on", "downbeats"), r.get("every", 2), HIT_GAP)]
+    return [
+        {
+            "id": x.id("rg"),
+            "type": "effect",
+            "name": name,
+            "start": round(t, 3),
+            "duration": 0.25,
+            "layer": "accent",
+            "expect": "a colour-split glitch hit on the beat",
+        }
+        for t in _spaced(x, r, r.get("on", "downbeats"), r.get("every", 2), HIT_GAP)
+    ]
 
 
 def r_transitions(x, r):
@@ -215,8 +313,16 @@ def r_transitions(x, r):
             continue
         if b.get("speed") == "freeze" and fam == "dissolve":
             continue
-        out.append({"id": x.id("tr"), "type": "transition", "after": a["id"], "name": name, "duration": dur,
-                    "expect": f"a {fam} transition from {a['id']} to {b['id']}"})
+        out.append(
+            {
+                "id": x.id("tr"),
+                "type": "transition",
+                "after": a["id"],
+                "name": name,
+                "duration": dur,
+                "expect": f"a {fam} transition from {a['id']} to {b['id']}",
+            }
+        )
     return out
 
 
@@ -228,8 +334,16 @@ def r_ken_burns(x, r):
             continue
         d = round(c["end"] - c["start"], 3)
         pts = [[0, 1.0], [d, amt]] if i % 2 == 0 else [[0, amt], [d, 1.0]]
-        out.append({"id": x.id("kb"), "type": "keyframes", "on": c["id"], "property": "scale", "points": pts,
-                    "expect": "the shot slowly pushes in" if i % 2 == 0 else "the shot slowly pulls out"})
+        out.append(
+            {
+                "id": x.id("kb"),
+                "type": "keyframes",
+                "on": c["id"],
+                "property": "scale",
+                "points": pts,
+                "expect": "the shot slowly pushes in" if i % 2 == 0 else "the shot slowly pulls out",
+            }
+        )
     return out
 
 
@@ -249,17 +363,48 @@ def r_grade(x, r):
         # the footage is already dark: a dark look at full strength (plus a vignette) crushes faces into black
         strength, skip = min(strength, 40.0), {"vignette"}
     if f:
-        out.append({"id": x.id("gr"), "type": "filter", "name": f, "start": 0, "duration": x.total, "strength": strength,
-                    "expect": f"one colour look over the whole video ({look})"})
-    for flag, query in (("grain", "film grain texture noise"), ("vignette", "vignette dark edges"), ("letterbox", "letterbox black bars cinematic aspect")):
+        out.append(
+            {
+                "id": x.id("gr"),
+                "type": "filter",
+                "name": f,
+                "start": 0,
+                "duration": x.total,
+                "strength": strength,
+                "expect": f"one colour look over the whole video ({look})",
+            }
+        )
+    for flag, query in (
+        ("grain", "film grain texture noise"),
+        ("vignette", "vignette dark edges"),
+        ("letterbox", "letterbox black bars cinematic aspect"),
+    ):
         if r.get(flag) and flag not in skip:
-            out.append({"id": x.id("tx"), "type": "effect", "name": x.pick(["scene_effect"], query, plain=True), "start": 0, "duration": x.total,
-                        "layer": "texture", "expect": f"{flag} over the whole video"})
+            out.append(
+                {
+                    "id": x.id("tx"),
+                    "type": "effect",
+                    "name": x.pick(["scene_effect"], query, plain=True),
+                    "start": 0,
+                    "duration": x.total,
+                    "layer": "texture",
+                    "expect": f"{flag} over the whole video",
+                }
+            )
     if r.get("light_leak"):  # a leak is a short glow at a few section changes: longer or more often washes the picture out
         secs = x.sections[1:]
-        for s in secs[::max(1, -(-len(secs) // 3))][:3]:
-            out.append({"id": x.id("lk"), "type": "effect", "name": x.pick(["scene_effect"], "light leak warm glow"), "start": s["start"],
-                        "duration": min(0.8, s["end"] - s["start"]), "layer": "accent", "expect": "a warm light leak opening the section"})
+        for s in secs[:: max(1, -(-len(secs) // 3))][:3]:
+            out.append(
+                {
+                    "id": x.id("lk"),
+                    "type": "effect",
+                    "name": x.pick(["scene_effect"], "light leak warm glow"),
+                    "start": s["start"],
+                    "duration": min(0.8, s["end"] - s["start"]),
+                    "layer": "accent",
+                    "expect": "a warm light leak opening the section",
+                }
+            )
     return out
 
 
@@ -267,8 +412,14 @@ def _text_style(x, r, big=False):
     ts = x.style.get("text") or {}
     font = r.get("font") or x.pick(["font"], ts.get("font", "bold heavy display"))
     size = float(r.get("size") or ts.get("size", 14)) + (6 if big else 0)
-    return font, size, r.get("color") or ts.get("color", "#FFFFFF"), r.get("accent") or ts.get("accent", "#FFD23F"), \
-        x.pick(["text_intro"], r.get("intro") or ts.get("intro", "pop in")), int(ts.get("outline", 60))
+    return (
+        font,
+        size,
+        r.get("color") or ts.get("color", "#FFFFFF"),
+        r.get("accent") or ts.get("accent", "#FFD23F"),
+        x.pick(["text_intro"], r.get("intro") or ts.get("intro", "pop in")),
+        int(ts.get("outline", 60)),
+    )
 
 
 def _when(x, at):
@@ -299,17 +450,50 @@ def r_kinetic_title(x, r):
         st = t + i * step
         if st >= x.total - 0.3:
             break
-        out.append({"id": x.id("kt"), "type": "text", "text": w.upper(), "start": round(st, 3), "duration": round(min(dur, x.total - st), 3),
-                    "position": "center", "size": size + (4 if last else 0), "scale": 1.5, "font": font, "bold": True,
-                    "color": accent if last else color, "outline": {"color": "#000000", "width": outline}, "shadow": True,
-                    "intro": intro, "intro_duration": 0.18, "expect": f"the word {w.upper()} slams in on the beat"})
-        out.append({"id": x.id("kh"), "type": "sfx", "sound": "impact" if last else "hit", "at": round(st, 3), "volume": 0.9 if last else 0.6,
-                    "expect": "a hit sound with the word"})
+        out.append(
+            {
+                "id": x.id("kt"),
+                "type": "text",
+                "text": w.upper(),
+                "start": round(st, 3),
+                "duration": round(min(dur, x.total - st), 3),
+                "position": "center",
+                "size": size + (4 if last else 0),
+                "scale": 1.5,
+                "font": font,
+                "bold": True,
+                "color": accent if last else color,
+                "outline": {"color": "#000000", "width": outline},
+                "shadow": True,
+                "intro": intro,
+                "intro_duration": 0.18,
+                "expect": f"the word {w.upper()} slams in on the beat",
+            }
+        )
+        out.append(
+            {
+                "id": x.id("kh"),
+                "type": "sfx",
+                "sound": "impact" if last else "hit",
+                "at": round(st, 3),
+                "volume": 0.9 if last else 0.6,
+                "expect": "a hit sound with the word",
+            }
+        )
         if last:
             c = x.clip_at(st)
             if c:
-                out.append({"id": x.id("ks"), "type": "shake", "on": c["id"], "start": round(st - c["start"], 3), "duration": 0.4, "strength": 0.7,
-                            "expect": "the picture shakes as the last word lands"})
+                out.append(
+                    {
+                        "id": x.id("ks"),
+                        "type": "shake",
+                        "on": c["id"],
+                        "start": round(st - c["start"], 3),
+                        "duration": 0.4,
+                        "strength": 0.7,
+                        "expect": "the picture shakes as the last word lands",
+                    }
+                )
     return out
 
 
@@ -317,10 +501,25 @@ def r_hook(x, r):
     font, size, color, accent, intro, outline = _text_style(x, r)
     text = str(r.get("text") or "WAIT FOR IT").strip()[:40]
     d = float(r.get("duration", 1.6))
-    return [{"id": x.id("hk"), "type": "text", "text": text, "start": 0.0, "duration": d, "position": "upper", "size": size, "font": font,
-             "bold": True, "color": color, "outline": {"color": "#000000", "width": outline}, "intro": intro, "intro_duration": 0.25,
-             "expect": f"the hook '{text}' in the first seconds"},
-            {"id": x.id("hs"), "type": "sfx", "sound": "swoosh", "at": 0.0, "volume": 0.6, "expect": "a swoosh with the hook"}]
+    return [
+        {
+            "id": x.id("hk"),
+            "type": "text",
+            "text": text,
+            "start": 0.0,
+            "duration": d,
+            "position": "upper",
+            "size": size,
+            "font": font,
+            "bold": True,
+            "color": color,
+            "outline": {"color": "#000000", "width": outline},
+            "intro": intro,
+            "intro_duration": 0.25,
+            "expect": f"the hook '{text}' in the first seconds",
+        },
+        {"id": x.id("hs"), "type": "sfx", "sound": "swoosh", "at": 0.0, "volume": 0.6, "expect": "a swoosh with the hook"},
+    ]
 
 
 def r_captions(x, r):
@@ -328,9 +527,21 @@ def r_captions(x, r):
     if not lines:
         return []
     font, size, color, accent, intro, outline = _text_style(x, r)
-    return [{"id": x.id("cp"), "type": "captions", "lines": lines, "position": r.get("position", "lower"), "size": float(r.get("size") or size),
-             "font": font, "bold": True, "color": color, "outline": {"color": "#000000", "width": outline}, "intro": intro,
-             "expect": "captions are readable and on time"}]
+    return [
+        {
+            "id": x.id("cp"),
+            "type": "captions",
+            "lines": lines,
+            "position": r.get("position", "lower"),
+            "size": float(r.get("size") or size),
+            "font": font,
+            "bold": True,
+            "color": color,
+            "outline": {"color": "#000000", "width": outline},
+            "intro": intro,
+            "expect": "captions are readable and on time",
+        }
+    ]
 
 
 def r_sfx(x, r, edits, music_has_drop):
@@ -340,11 +551,21 @@ def r_sfx(x, r, edits, music_has_drop):
             if e["type"] == "transition":
                 c = next((c for c in x.tl if c["id"] == e["after"]), None)
                 if c:
-                    out.append({"id": x.id("sw"), "type": "sfx", "sound": r["transitions"], "at": round(max(0.0, c["end"] - 0.3), 3),
-                                "volume": 0.55, "expect": "a whoosh with the transition"})
+                    out.append(
+                        {
+                            "id": x.id("sw"),
+                            "type": "sfx",
+                            "sound": r["transitions"],
+                            "at": round(max(0.0, c["end"] - 0.3), 3),
+                            "volume": 0.55,
+                            "expect": "a whoosh with the transition",
+                        }
+                    )
     if r.get("drop") and x.drop is not None and not music_has_drop:
-        out += [{"id": x.id("rs"), "type": "sfx", "sound": "riser", "at": round(x.drop, 3), "volume": 0.8, "expect": "a riser builds into the drop"},
-                {"id": x.id("im"), "type": "sfx", "sound": "impact", "at": round(x.drop, 3), "volume": 1.0, "expect": "an impact on the drop"}]
+        out += [
+            {"id": x.id("rs"), "type": "sfx", "sound": "riser", "at": round(x.drop, 3), "volume": 0.8, "expect": "a riser builds into the drop"},
+            {"id": x.id("im"), "type": "sfx", "sound": "impact", "at": round(x.drop, 3), "volume": 1.0, "expect": "an impact on the drop"},
+        ]
     return out
 
 
@@ -355,17 +576,44 @@ def r_face_punch(x, r, analyses):
         a = by.get(c.get("file"))
         if not a or a.get("kind") != "video":
             continue
-        out.append({"id": x.id("fp"), "type": "zoom", "on": c["id"], "start": round(min(0.3, (c["end"] - c["start"]) / 3), 3),
-                    "duration": round(max(0.4, (c["end"] - c["start"]) * 0.6), 3), "to": float(r.get("strength", 1.5)), "back": False,
-                    "expect": "a dramatic zoom onto the face"})
-        out.append({"id": x.id("fb"), "type": "sfx", "sound": "sub_drop", "at": round(c["start"] + min(0.3, (c["end"] - c["start"]) / 3), 3),
-                    "volume": 1.0, "expect": "a boom with the zoom"})
+        out.append(
+            {
+                "id": x.id("fp"),
+                "type": "zoom",
+                "on": c["id"],
+                "start": round(min(0.3, (c["end"] - c["start"]) / 3), 3),
+                "duration": round(max(0.4, (c["end"] - c["start"]) * 0.6), 3),
+                "to": float(r.get("strength", 1.5)),
+                "back": False,
+                "expect": "a dramatic zoom onto the face",
+            }
+        )
+        out.append(
+            {
+                "id": x.id("fb"),
+                "type": "sfx",
+                "sound": "sub_drop",
+                "at": round(c["start"] + min(0.3, (c["end"] - c["start"]) / 3), 3),
+                "volume": 1.0,
+                "expect": "a boom with the zoom",
+            }
+        )
         break  # one per edit is the joke; more is noise
     return out
 
 
-RECIPES = {"zoom_punch": r_zoom_punch, "shake": r_shake, "flash": r_flash, "rgb_hit": r_rgb_hit, "transitions": r_transitions,
-           "ken_burns": r_ken_burns, "grade": r_grade, "kinetic_title": r_kinetic_title, "hook": r_hook, "captions": r_captions}
+RECIPES = {
+    "zoom_punch": r_zoom_punch,
+    "shake": r_shake,
+    "flash": r_flash,
+    "rgb_hit": r_rgb_hit,
+    "transitions": r_transitions,
+    "ken_burns": r_ken_burns,
+    "grade": r_grade,
+    "kinetic_title": r_kinetic_title,
+    "hook": r_hook,
+    "captions": r_captions,
+}
 SPECIAL = {"sfx", "jump_zoom", "face_punch"}
 
 
@@ -389,6 +637,7 @@ def merged_recipes(style, wanted):
 def speech_cut(plan, analyses, log=print):
     """Shots cut from what is said: pauses and filler words dropped (jump cuts), with a map from file time to timeline."""
     from ai_pc.media import speech as SP
+
     sp = plan["speech"]
     a = next((a for a in analyses.values() if a.get("file", "").lower() == str(sp.get("file", "")).lower()), None)
     if not a:
@@ -399,15 +648,36 @@ def speech_cut(plan, analyses, log=print):
         log("speech: nothing to transcribe (no speech or no model); cut as normal shots")
         return None
     words = tr["words"]
-    runs = SP.speech_runs(words, max_pause=float(sp.get("max_pause", 0.35)), drop_fillers=sp.get("drop_fillers", True)) \
-        if sp.get("cut_pauses", True) else [[0.0, float(a.get("seconds") or words[-1]["end"])]]
+    runs = (
+        SP.speech_runs(words, max_pause=float(sp.get("max_pause", 0.35)), drop_fillers=sp.get("drop_fillers", True))
+        if sp.get("cut_pauses", True)
+        else [[0.0, float(a.get("seconds") or words[-1]["end"])]]
+    )
     clips, tl, t = [], [], 0.0
     for i, (r0, r1) in enumerate(runs):
         cid = f"t{i + 1}"
-        clips.append({"id": cid, "file": a["file"], "from": r0, "duration": round(r1 - r0, 4), "speed": 1.0,
-                      **({"chroma": "auto", "background": "#0A0A12"} if a.get("screen") else {})})
-        tl.append({"id": cid, "start": round(t, 4), "end": round(t + r1 - r0, 4), "section": "drop", "speed": "normal",
-                   "kind": "video", "src": [r0, r1], "file": a["file"]})
+        clips.append(
+            {
+                "id": cid,
+                "file": a["file"],
+                "from": r0,
+                "duration": round(r1 - r0, 4),
+                "speed": 1.0,
+                **({"chroma": "auto", "background": "#0A0A12"} if a.get("screen") else {}),
+            }
+        )
+        tl.append(
+            {
+                "id": cid,
+                "start": round(t, 4),
+                "end": round(t + r1 - r0, 4),
+                "section": "drop",
+                "speed": "normal",
+                "kind": "video",
+                "src": [r0, r1],
+                "file": a["file"],
+            }
+        )
         t += r1 - r0
 
     def to_tl(ft):  # file time -> timeline time (None if that moment was cut out)
@@ -415,6 +685,7 @@ def speech_cut(plan, analyses, log=print):
             if c["src"][0] - 1e-6 <= ft <= c["src"][1] + 1e-6:
                 return c["start"] + ft - c["src"][0]
         return None
+
     kept = [{**w, "start": to_tl(w["start"]), "end": to_tl(w["end"])} for w in words]
     kept = [w for w in kept if w["start"] is not None and w["end"] is not None and w["w"].lower().strip(",.!?") not in SP.FILLERS]
     layers = []
@@ -423,8 +694,16 @@ def speech_cut(plan, analyses, log=print):
             continue
         hit = next((w for w in kept if str(b.get("word", "")).lower().strip() in w["w"].lower()), None)
         if hit:
-            layers.append({"id": f"br{j + 1}", "file": b.get("file"), "at": round(hit["start"], 3), "from": b.get("around") or 0,
-                           "duration": float(b.get("seconds", 1.5)), "reframe": "subject"})
+            layers.append(
+                {
+                    "id": f"br{j + 1}",
+                    "file": b.get("file"),
+                    "at": round(hit["start"], 3),
+                    "from": b.get("around") or 0,
+                    "duration": float(b.get("seconds", 1.5)),
+                    "reframe": "subject",
+                }
+            )
     saved = (a.get("seconds") or 0) - t
     log(f"speech: {len(words)} words, {len(runs)} cuts, {max(0.0, saved):.1f} s of pauses/fillers removed, {len(layers)} b-roll")
     return {"shots": [], "clips": clips, "timeline": tl, "words": kept, "layers": layers, "speech": sp}
@@ -433,6 +712,7 @@ def speech_cut(plan, analyses, log=print):
 def talk_edits(x, plan, talk, style):
     """Captions from the words (1-3 per line, never across a cut), emphasis words coloured with a punch-in and a pop."""
     from ai_pc.media import speech as SP
+
     sp, words, out = talk["speech"], talk["words"], []
     emph = [str(w).lower().strip(",.!?") for w in (sp.get("emphasis") or [])] or [w["w"].lower().strip(",.!?") for w in SP.keywords(words)]
     font, size, color, accent, intro, outline = _text_style(x, {})
@@ -441,39 +721,78 @@ def talk_edits(x, plan, talk, style):
         groups = [[w for w in words if c["start"] - 1e-6 <= w["start"] < c["end"]] for c in x.tl]  # never caption across a cut
         for ch in (ch for g in groups for ch in SP.chunks(g, n=3 if sp.get("captions") != "minimal" else 5)):
             hot = any(w.lower().strip(",.!?") in emph for w in ch["words"])
-            lines.append({"start": round(ch["start"], 3), "end": round(max(ch["end"], ch["start"] + 0.35), 3), "text": ch["text"].upper(), "hot": hot})
+            lines.append(
+                {"start": round(ch["start"], 3), "end": round(max(ch["end"], ch["start"] + 0.35), 3), "text": ch["text"].upper(), "hot": hot}
+            )
         plain = [l for l in lines if not l["hot"]]
         hot = [l for l in lines if l["hot"]]
         if plain:
-            out.append({"id": "cap1", "type": "captions", "lines": [{k: l[k] for k in ("start", "end", "text")} for l in plain],
-                        "position": "lower", "size": size, "font": font, "bold": True, "color": color,
-                        "outline": {"color": "#000000", "width": outline}, "intro": intro, "expect": "captions follow the words"})
+            out.append(
+                {
+                    "id": "cap1",
+                    "type": "captions",
+                    "lines": [{k: l[k] for k in ("start", "end", "text")} for l in plain],
+                    "position": "lower",
+                    "size": size,
+                    "font": font,
+                    "bold": True,
+                    "color": color,
+                    "outline": {"color": "#000000", "width": outline},
+                    "intro": intro,
+                    "expect": "captions follow the words",
+                }
+            )
         if hot:
-            out.append({"id": "cap2", "type": "captions", "lines": [{k: l[k] for k in ("start", "end", "text")} for l in hot],
-                        "position": "lower", "size": size + 2, "font": font, "bold": True, "color": accent,
-                        "outline": {"color": "#000000", "width": outline}, "intro": intro, "expect": "the key words pop in the accent colour"})
+            out.append(
+                {
+                    "id": "cap2",
+                    "type": "captions",
+                    "lines": [{k: l[k] for k in ("start", "end", "text")} for l in hot],
+                    "position": "lower",
+                    "size": size + 2,
+                    "font": font,
+                    "bold": True,
+                    "color": accent,
+                    "outline": {"color": "#000000", "width": outline},
+                    "intro": intro,
+                    "expect": "the key words pop in the accent colour",
+                }
+            )
     covered = [(l["at"], l["at"] + l["duration"]) for l in talk.get("layers", [])]
     for i, w in enumerate(w for w in words if w["w"].lower().strip(",.!?") in emph):
         c = x.clip_at(w["start"])
         if not c or any(a - 0.1 <= w["start"] <= b for a, b in covered):
             continue  # under a b-roll the punch-in would not be seen
-        out.append({"id": f"ez{i + 1}", "type": "zoom", "on": c["id"], "start": round(w["start"] - c["start"], 3),
-                    "duration": round(min(0.6, c["end"] - w["start"] - 0.05), 3), "to": 1.12, "back": True,
-                    "expect": f"a punch-in on the word '{w['w']}'"})
-        out.append({"id": f"ep{i + 1}", "type": "sfx", "sound": "hit", "at": round(w["start"], 3), "volume": 0.35,
-                    "expect": "a soft pop on the key word"})
+        out.append(
+            {
+                "id": f"ez{i + 1}",
+                "type": "zoom",
+                "on": c["id"],
+                "start": round(w["start"] - c["start"], 3),
+                "duration": round(min(0.6, c["end"] - w["start"] - 0.05), 3),
+                "to": 1.12,
+                "back": True,
+                "expect": f"a punch-in on the word '{w['w']}'",
+            }
+        )
+        out.append(
+            {"id": f"ep{i + 1}", "type": "sfx", "sound": "hit", "at": round(w["start"], 3), "volume": 0.35, "expect": "a soft pop on the key word"}
+        )
     return out
 
 
-WHERE_WORDS = [("end", r"end(?:s|ing)? (?:with|on)|at the end|closing|outro|end card|to finish|finish(?:es|ing)? with"),
-               ("drop", r"(?:at|on) the drop|when (?:it|the beat) drops|at the climax"),
-               ("start", r"open(?:s|ing)? with|at the (?:start|beginning)|intro title|starts? with")]
+WHERE_WORDS = [
+    ("end", r"end(?:s|ing)? (?:with|on)|at the end|closing|outro|end card|to finish|finish(?:es|ing)? with"),
+    ("drop", r"(?:at|on) the drop|when (?:it|the beat) drops|at the climax"),
+    ("start", r"open(?:s|ing)? with|at the (?:start|beginning)|intro title|starts? with"),
+]
 
 
 def place_by_request(extras, request, drop, total):
     """Where the client said a text goes ("the text SATURDAY NIGHT at the drop", "end with see you next week"), from
     the words around it in the request; a text the plan put elsewhere (e.g. both at 0 s) is moved there."""
     import re
+
     req = " ".join(str(request or "").lower().split())
     notes = []
     for e in extras:
@@ -515,6 +834,7 @@ def anchor_extras(extras, tl, drop, total):
     placed by name: "at"/"start" = "drop" | "end" | "start" | a shot id. A sound effect whose expect puts it on / into
     the drop lands exactly there (a riser then ends on it). Returns notes on what moved."""
     import re
+
     starts = {c["id"]: c["start"] for c in tl}
     notes = []
     for e in extras:
@@ -523,8 +843,15 @@ def anchor_extras(extras, tl, drop, total):
             if not isinstance(v, str):
                 continue
             key = v.strip().lower()
-            t = drop if key in ("drop", "climax") else max(0.0, total - 1.0) if key in ("end", "ending", "outro") else \
-                0.0 if key in ("start", "intro", "beginning") else starts.get(v.strip())
+            t = (
+                drop
+                if key in ("drop", "climax")
+                else max(0.0, total - 1.0)
+                if key in ("end", "ending", "outro")
+                else 0.0
+                if key in ("start", "intro", "beginning")
+                else starts.get(v.strip())
+            )
             if t is None:
                 try:
                     t = float(v)
@@ -533,8 +860,13 @@ def anchor_extras(extras, tl, drop, total):
             e[k] = round(t, 3)
         if str(e.get("type")).lower() == "sfx" and drop is not None and not e.get("on"):
             at = e.get("at", e.get("start"))
-            if isinstance(at, (int, float)) and abs(at - drop) > 0.25 and re.search(
-                    r"\b(on|onto|into|at|before|to|hits?|lands?)( exactly)? (on )?the (music'?s? )?drop\b", str(e.get("expect") or "").lower()):
+            if (
+                isinstance(at, (int, float))
+                and abs(at - drop) > 0.25
+                and re.search(
+                    r"\b(on|onto|into|at|before|to|hits?|lands?)( exactly)? (on )?the (music'?s? )?drop\b", str(e.get("expect") or "").lower()
+                )
+            ):
                 notes.append(f"{e.get('id')}: {at:.1f} s -> the drop at {drop:.2f} s")
                 e["at"] = round(drop, 3)
                 e.pop("start", None)
@@ -554,8 +886,7 @@ def space_accents(edits, extras, x, gap=0.3):
     """One accent per hit: a recipe accent (flash, colour split, light leak) that lands on the same moment as another
     quick effect moves to the next free beat, else it is dropped; the planner's own hits keep their place.
     Returns (moved, dropped)."""
-    taken = [t for t in (_at(e) for e in extras if str(e.get("type")).lower() == "effect" and float(e.get("duration") or 1) <= 0.8)
-             if t is not None]
+    taken = [t for t in (_at(e) for e in extras if str(e.get("type")).lower() == "effect" and float(e.get("duration") or 1) <= 0.8) if t is not None]
     moved = dropped = 0
     keep = []
     for e in edits:
@@ -597,11 +928,23 @@ def label_edits(x, style, skip=()):
     out = []
     for text, s0, s1 in runs:
         d = s1 - s0
-        e = {"id": x.id("lb"), "type": "text", "text": text[:60], "start": round(s0 + min(0.15, d * 0.1), 3),
-             "duration": round(max(0.8, d - 0.3), 3), "position": ls.get("position", "bottom_left"), "size": float(ls.get("size", 9)),
-             "font": font, "bold": True, "color": ts.get("color", "#FFFFFF"), "intro": x.pick(["text_intro"], ls.get("intro", "slide in")),
-             "intro_duration": 0.35, "outro": x.pick(["text_outro"], "fade out"), "outro_duration": 0.3,
-             "expect": f"the label '{text[:40]}' on this shot"}
+        e = {
+            "id": x.id("lb"),
+            "type": "text",
+            "text": text[:60],
+            "start": round(s0 + min(0.15, d * 0.1), 3),
+            "duration": round(max(0.8, d - 0.3), 3),
+            "position": ls.get("position", "bottom_left"),
+            "size": float(ls.get("size", 9)),
+            "font": font,
+            "bold": True,
+            "color": ts.get("color", "#FFFFFF"),
+            "intro": x.pick(["text_intro"], ls.get("intro", "slide in")),
+            "intro_duration": 0.35,
+            "outro": x.pick(["text_outro"], "fade out"),
+            "outro_duration": 0.3,
+            "expect": f"the label '{text[:40]}' on this shot",
+        }
         if ls.get("background"):
             e["background"] = {"color": ls["background"], "alpha": 0.55, "round": 0.25}
             e["outline"] = {"color": "#000000", "width": 0}
@@ -614,27 +957,54 @@ def label_edits(x, style, skip=()):
 def voiceover_edits(x, vo, analyses, style, music_edits, log=print):
     """Narration over the pictures: the narration track, captions from its words, the music ducked while it speaks."""
     from ai_pc.media import speech as SP
+
     a = next((a for a in analyses.values() if a.get("file", "").lower() == str(vo.get("file", "")).lower()), None)
     if not a:
         log(f"voiceover: '{vo.get('file')}' is not an available file")
         return []
     start_in = float(vo.get("from", 0) or 0)
     length = min(x.total - 0.3, float(vo.get("duration") or (a.get("seconds") or 0) - start_in))
-    out = [{"id": "vo", "type": "audio", "file": a["file"], "at": float(vo.get("at", 0.3) or 0.3), "from": start_in, "duration": round(length, 3),
-            "volume": float(vo.get("volume", 1.0)), "expect": "the narration is heard clearly"}]
+    out = [
+        {
+            "id": "vo",
+            "type": "audio",
+            "file": a["file"],
+            "at": float(vo.get("at", 0.3) or 0.3),
+            "from": start_in,
+            "duration": round(length, 3),
+            "volume": float(vo.get("volume", 1.0)),
+            "expect": "the narration is heard clearly",
+        }
+    ]
     at = out[0]["at"]
     tr = SP.transcribe(a["path"], log=log)
     if not tr or not tr.get("words"):
         return out
-    words = [{**w, "start": w["start"] - start_in + at, "end": w["end"] - start_in + at} for w in tr["words"]
-             if start_in <= w["start"] and w["end"] <= start_in + length]
+    words = [
+        {**w, "start": w["start"] - start_in + at, "end": w["end"] - start_in + at}
+        for w in tr["words"]
+        if start_in <= w["start"] and w["end"] <= start_in + length
+    ]
     if vo.get("captions", "minimal") != "none" and words:
         ts = style.get("text") or {}
-        lines = [{"start": round(c["start"], 3), "end": round(max(c["end"], c["start"] + 0.5), 3), "text": c["text"]}
-                 for c in SP.chunks(words, n=7 if vo.get("captions", "minimal") == "minimal" else 3, max_chars=42)]
-        out.append({"id": "voc", "type": "captions", "lines": lines, "position": "bottom", "size": 7, "font": x.pick(["font"], ts.get("font", "sans")),
-                    "color": "#FFFFFF", "background": {"color": "#000000", "alpha": 0.45, "round": 0.2}, "outline": {"color": "#000000", "width": 0},
-                    "expect": "subtitles follow the narration"})
+        lines = [
+            {"start": round(c["start"], 3), "end": round(max(c["end"], c["start"] + 0.5), 3), "text": c["text"]}
+            for c in SP.chunks(words, n=7 if vo.get("captions", "minimal") == "minimal" else 3, max_chars=42)
+        ]
+        out.append(
+            {
+                "id": "voc",
+                "type": "captions",
+                "lines": lines,
+                "position": "bottom",
+                "size": 7,
+                "font": x.pick(["font"], ts.get("font", "sans")),
+                "color": "#FFFFFF",
+                "background": {"color": "#000000", "alpha": 0.45, "round": 0.2},
+                "outline": {"color": "#000000", "width": 0},
+                "expect": "subtitles follow the narration",
+            }
+        )
     runs = SP.speech_runs(words, max_pause=0.8, drop_fillers=False, pad=0.15)
     for m in music_edits:  # the music steps back while the narrator speaks
         kf = []
@@ -681,6 +1051,7 @@ def match_look(clips, analyses, target, total, log=print):
     brightness keyframes written without its adjust material; a dimming layer is exact and always renders.)
     Returns (layers, edits) or ([], []) when the footage is not brighter than the sample."""
     from PIL import Image
+
     by = {a["file"].lower(): a for a in analyses.values() if a.get("file")}
     want = float(target.get("brightness") or 0)
     steps, t = [], 0.0
@@ -699,8 +1070,15 @@ def match_look(clips, analyses, target, total, log=print):
         Image.new("RGB", (1080, 1080), (0, 0, 0)).save(path)
     AN.analyze([str(path)], planner=None, log=lambda *a: None)
     analyses.update({path.name: {"file": path.name, "path": str(path), "kind": "image", "width": 1080, "height": 1080, "seconds": 0}})
-    layer = {"id": "lk_dim", "file": path.name, "at": 0, "duration": round(total, 3), "reframe": "center", "opacity": steps[0][1],
-             "expect": "the picture dimmed to the sample's exposure"}
+    layer = {
+        "id": "lk_dim",
+        "file": path.name,
+        "at": 0,
+        "duration": round(total, 3),
+        "reframe": "center",
+        "opacity": steps[0][1],
+        "expect": "the picture dimmed to the sample's exposure",
+    }
     pts = []
     for i, (s0, a) in enumerate(steps):  # the opacity steps at each cut (two points per cut: hold, then jump)
         if i and abs(a - steps[i - 1][1]) > 0.01:
@@ -708,8 +1086,21 @@ def match_look(clips, analyses, target, total, log=print):
         elif not i:
             pts.append([0.0, a])
     pts.append([round(total, 3), steps[-1][1]])
-    edits = [{"id": "lk_dim_kf", "type": "keyframes", "on": "lk_dim", "property": "alpha", "points": pts, "adjust": True,
-              "expect": "dimming follows each shot's brightness"}] if len(pts) > 2 else []
+    edits = (
+        [
+            {
+                "id": "lk_dim_kf",
+                "type": "keyframes",
+                "on": "lk_dim",
+                "property": "alpha",
+                "points": pts,
+                "adjust": True,
+                "expect": "dimming follows each shot's brightness",
+            }
+        ]
+        if len(pts) > 2
+        else []
+    )
     log(f"  exposure matched to the sample: a dimming layer, opacity {min(a for _, a in steps):.2f}-{max(a for _, a in steps):.2f} by shot")
     return [layer], edits
 
@@ -729,12 +1120,12 @@ def footage_look(analyses):
 
 def enforce_pacing(shots, style, plan, analyses=None):
     """Shots longer than the style allows in their section, handled the way an editor would:
-      - a held moment stays whole, only capped (4x the section's norm): the opening, the climax (first drop shot), the
-        last shot, slow motion, speed ramps, freezes, shots marked "hold" and shots extras point at;
-      - a labelled story beat (a place, step, room) keeps its own footage, capped at a bar or 2x the norm;
-      - other long shots become several cuts: a file with several camera shots is cut at different moments of it (other
-        angles); a single continuous take is not jump-cut but alternated with cutaways from other files (spread_files
-        picks them). Only the first part keeps the label, the key moment and the id that extras point at."""
+    - a held moment stays whole, only capped (4x the section's norm): the opening, the climax (first drop shot), the
+      last shot, slow motion, speed ramps, freezes, shots marked "hold" and shots extras point at;
+    - a labelled story beat (a place, step, room) keeps its own footage, capped at a bar or 2x the norm;
+    - other long shots become several cuts: a file with several camera shots is cut at different moments of it (other
+      angles); a single continuous take is not jump-cut but alternated with cutaways from other files (spread_files
+      picks them). Only the first part keeps the label, the key moment and the id that extras point at."""
     limit = style.get("beats_per_shot") or {}
     shots = expand_fills([s for s in shots if isinstance(s, dict)], limit)
     keep = {e.get("on") for e in plan.get("edits") or [] if isinstance(e, dict) and e.get("on")}
@@ -782,30 +1173,60 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
     except (TypeError, ValueError):
         pace = 1.0
     psec = plan.get("pace_sections") if isinstance(plan.get("pace_sections"), dict) else {}
+
     def scaled(v, f):  # whole beats, rounded the way asked (2 beats x 0.75 = 1 beat: faster; x 1.3 = 3: calmer)
         return max(1, int(float(v) * f + (0.25 if f < 1 else 0.75)))
+
     psec = plan.get("pace_sections") if isinstance(plan.get("pace_sections"), dict) else {}
     if psec:  # "faster cuts on the drop": only those sections' shots get shorter, the sections keep their length
-        style = {**style, "beats_per_shot": {k: scaled(v, float(psec[k])) if k in psec else v for k, v in (style.get("beats_per_shot") or {}).items()}}
-        plan = {**plan, "shots": [{**s_, "beats": scaled(s_["beats"], float(psec[s_.get("section")]))} if isinstance(s_, dict) and
-                                   s_.get("section") in psec and isinstance(s_.get("beats"), (int, float)) and not s_.get("hold") and not s_.get("label")
-                                   else s_ for s_ in plan.get("shots") or []]}
+        style = {
+            **style,
+            "beats_per_shot": {k: scaled(v, float(psec[k])) if k in psec else v for k, v in (style.get("beats_per_shot") or {}).items()},
+        }
+        plan = {
+            **plan,
+            "shots": [
+                {**s_, "beats": scaled(s_["beats"], float(psec[s_.get("section")]))}
+                if isinstance(s_, dict)
+                and s_.get("section") in psec
+                and isinstance(s_.get("beats"), (int, float))
+                and not s_.get("hold")
+                and not s_.get("label")
+                else s_
+                for s_ in plan.get("shots") or []
+            ],
+        }
     if pace != 1.0:  # "faster cuts" / "let it breathe": every shot length on the grid scales (fit() keeps the total)
         style = {**style, "beats_per_shot": {k: scaled(v, pace) for k, v in (style.get("beats_per_shot") or {}).items()}}
-        plan = {**plan, "shots": [{**s_, "beats": scaled(s_["beats"], pace)} if isinstance(s_, dict) and
-                                   isinstance(s_.get("beats"), (int, float)) and not s_.get("hold") else s_ for s_ in plan.get("shots") or []]}
+        plan = {
+            **plan,
+            "shots": [
+                {**s_, "beats": scaled(s_["beats"], pace)}
+                if isinstance(s_, dict) and isinstance(s_.get("beats"), (int, float)) and not s_.get("hold")
+                else s_
+                for s_ in plan.get("shots") or []
+            ],
+        }
     unwanted = {str(f).lower() for f in plan.get("avoid_files") or []}
     if unwanted:  # the client does not want these files: their shots go, the cut fills the time from the rest
-        kept_shots = [s_ for s_ in plan.get("shots") or [] if not (isinstance(s_, dict) and (
-            str(s_.get("file") or "").lower() in unwanted or (s_.get("files") and all(str(f).lower() in unwanted for f in s_["files"]))))]
-        kept_shots = [{**s_, "files": [f for f in s_["files"] if str(f).lower() not in unwanted]} if isinstance(s_, dict) and s_.get("files") else s_
-                      for s_ in kept_shots]
+        kept_shots = [
+            s_
+            for s_ in plan.get("shots") or []
+            if not (
+                isinstance(s_, dict)
+                and (str(s_.get("file") or "").lower() in unwanted or (s_.get("files") and all(str(f).lower() in unwanted for f in s_["files"])))
+            )
+        ]
+        kept_shots = [
+            {**s_, "files": [f for f in s_["files"] if str(f).lower() not in unwanted]} if isinstance(s_, dict) and s_.get("files") else s_
+            for s_ in kept_shots
+        ]
         order = [s_.get("id") for s_ in plan.get("shots") or [] if isinstance(s_, dict)]
         kept_ids = [s_.get("id") for s_ in kept_shots if isinstance(s_, dict)]
         moved = {}
         for i, sid in enumerate(order):  # an extra on a removed shot goes to the next kept shot (else the one before)
             if sid not in kept_ids and kept_ids:
-                nxt = next((o for o in order[i + 1:] if o in kept_ids), None) or next((o for o in reversed(order[:i]) if o in kept_ids), None)
+                nxt = next((o for o in order[i + 1 :] if o in kept_ids), None) or next((o for o in reversed(order[:i]) if o in kept_ids), None)
                 moved[sid] = nxt
         extras = [({**e, "on": moved[e["on"]]} if isinstance(e, dict) and e.get("on") in moved else e) for e in plan.get("edits") or []]
         plan = {**plan, "shots": kept_shots or plan.get("shots"), "edits": extras}
@@ -814,7 +1235,13 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
     # "like this sample" means the sample decides the STYLE (grade, music, rhythm, effects); the edit type keeps the
     # structure and content. Only what the request itself names (a look, a music style) overrides the sample.
     ref_look = bool(ref) and not re.search(LOOK_WORDS, req_l)
-    if ref and ref.get("music") and not re.search(MUSIC_WORDS, req_l) and not (isinstance(music, dict) and music.get("file")) and not plan.get("_music_asked"):
+    if (
+        ref
+        and ref.get("music")
+        and not re.search(MUSIC_WORDS, req_l)
+        and not (isinstance(music, dict) and music.get("file"))
+        and not plan.get("_music_asked")
+    ):
         music = dict(ref["music"])
     user_music, mfrom, _mat = None, 0.0, 0.0
     if isinstance(music, dict) and music.get("file"):
@@ -837,8 +1264,11 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
     talk = speech_cut(plan, analyses, log) if isinstance(plan.get("speech"), dict) else None
     shots = talk["shots"] if talk else enforce_pacing(plan.get("shots") or [], style, plan, analyses)
     if not shots:  # no shot list: every file, best moments, the style's pacing
-        shots = [{"id": f"s{i + 1}", "file": a["file"], "section": ("intro" if i == 0 else "drop")} for i, a in enumerate(analyses.values())
-                 if a.get("kind") in ("video", "image")]
+        shots = [
+            {"id": f"s{i + 1}", "file": a["file"], "section": ("intro" if i == 0 else "drop")}
+            for i, a in enumerate(analyses.values())
+            if a.get("kind") in ("video", "image")
+        ]
     try:
         target = float(plan.get("target_seconds") or 0) or None
     except (TypeError, ValueError):
@@ -853,6 +1283,7 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
         bps = style.get("beats_per_shot") or {}
         n0, t0 = len(shots), sum(cutting.shot_lengths(shots, beat, bps, drop_at))
         from ai_pc.video.awareness import off_brief
+
         avoid = off_brief(request, analyses)
         avoid.update({a["file"]: "the client asked not to use it" for a in analyses.values() if str(a.get("file", "")).lower() in unwanted})
         less = {str(f).lower() for f in plan.get("less_files") or []}
@@ -873,12 +1304,25 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
     total = tl[-1]["end"]
     edits_music, music_has_drop = [], False
     want_music = not (music in ("none", None, False) or (isinstance(music, dict) and music.get("none")))
-    gen_style = (music.get("generate") if isinstance(music, dict) else music if isinstance(music, str) and music not in ("none",) else None) or style.get("music")
+    gen_style = (
+        music.get("generate") if isinstance(music, dict) else music if isinstance(music, str) and music not in ("none",) else None
+    ) or style.get("music")
     if user_music:
         snd = user_music["sound"]
         beats = [round(b - mfrom, 4) for b in snd["beats"] if b >= mfrom and b - mfrom < total]
-        edits_music.append({"id": "music", "type": "audio", "file": user_music["file"], "at": 0, "from": mfrom, "duration": total,
-                            "volume": float((music or {}).get("volume", 0.8)), "fade_out": 1.0, "expect": "the music plays under the edit"})
+        edits_music.append(
+            {
+                "id": "music",
+                "type": "audio",
+                "file": user_music["file"],
+                "at": 0,
+                "from": mfrom,
+                "duration": total,
+                "volume": float((music or {}).get("volume", 0.8)),
+                "fade_out": 1.0,
+                "expect": "the music plays under the edit",
+            }
+        )
         grid = {"beats": beats, "downbeats": beats[::4], "drop": drop, "source": "music file", "bpm": snd["bpm"]}
     elif (want_music or plan.get("music") is None) and gen_style and not (talk and plan.get("music") is None):
         secs_for_music = []
@@ -888,19 +1332,45 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
             else:
                 secs_for_music.append({"name": c["section"], "start": c["start"], "end": c["end"]})
         long_edit = total > 25 or len(secs_for_music) > 4
-        path, grid = MU.bed(gen_style, total, bpm=round(60 / beat), drop_at=drop if drop is not None else None,
-                            sections=secs_for_music if long_edit else None)
+        path, grid = MU.bed(
+            gen_style, total, bpm=round(60 / beat), drop_at=drop if drop is not None else None, sections=secs_for_music if long_edit else None
+        )
         AN.analyze([str(path)], planner=None, log=lambda *a: None)
-        analyses.update({path.name: {"file": path.name, "path": str(path), "kind": "audio", "seconds": total,
-                                     "sound": {"kind": "music", "bpm": grid["bpm"], "beats": grid["beats"], "drop": grid["drop"]}}})
-        edits_music.append({"id": "music", "type": "audio", "file": path.name, "at": 0, "from": 0, "duration": total,
-                            "volume": 0.22 if talk else (0.35 if plan.get("voiceover") else 0.85), "duck_under_speech": bool(talk), "fade_out": 1.0,
-                            "expect": f"a generated {gen_style} beat at {grid['bpm']} BPM" + (" quietly under the voice" if talk else "")})
+        analyses.update(
+            {
+                path.name: {
+                    "file": path.name,
+                    "path": str(path),
+                    "kind": "audio",
+                    "seconds": total,
+                    "sound": {"kind": "music", "bpm": grid["bpm"], "beats": grid["beats"], "drop": grid["drop"]},
+                }
+            }
+        )
+        edits_music.append(
+            {
+                "id": "music",
+                "type": "audio",
+                "file": path.name,
+                "at": 0,
+                "from": 0,
+                "duration": total,
+                "volume": 0.22 if talk else (0.35 if plan.get("voiceover") else 0.85),
+                "duck_under_speech": bool(talk),
+                "fade_out": 1.0,
+                "expect": f"a generated {gen_style} beat at {grid['bpm']} BPM" + (" quietly under the voice" if talk else ""),
+            }
+        )
         music_has_drop = True
     else:
         n = int(total / beat) + 1
-        grid = {"beats": [round(i * beat, 4) for i in range(n)], "downbeats": [round(i * beat, 4) for i in range(0, n, 4)], "drop": drop,
-                "source": "tempo only (no music)", "bpm": round(60 / beat)}
+        grid = {
+            "beats": [round(i * beat, 4) for i in range(n)],
+            "downbeats": [round(i * beat, 4) for i in range(0, n, 4)],
+            "drop": drop,
+            "source": "tempo only (no music)",
+            "bpm": round(60 / beat),
+        }
     sections = []
     for c in tl:  # sections from the shots themselves
         if sections and sections[-1]["name"] == c["section"]:
@@ -925,7 +1395,9 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
             pass
     x.own_grade = covered / max(1e-6, total)
     x.request = " ".join([str(request or ""), str(plan.get("name") or "")]).lower()
-    words = " ".join([request] + [str(s.get("label") or "") for s in shots] + [str(e.get("text") or "") for e in plan.get("edits") or [] if isinstance(e, dict)])
+    words = " ".join(
+        [request] + [str(s.get("label") or "") for s in shots] + [str(e.get("text") or "") for e in plan.get("edits") or [] if isinstance(e, dict)]
+    )
     x.latin = sum(ch.isascii() for ch in words) >= 0.9 * max(1, len(words))
     # style defaults < the sample's measured recipes < what the designer chose explicitly
     own = [r for r in plan.get("recipes") or [] if isinstance(r, dict) and not (ref_look and r.get("use") == "grade")]
@@ -960,9 +1432,12 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
         made["speech"] = [e["id"] for e in edits if str(e["id"]).startswith(("cap", "ez", "ep"))]
     extras = [dict(e) for e in (plan.get("edits") or []) if isinstance(e, dict)]
     if ref_look:  # the sample decides the look: the planner's own colour filters would fight its grade
+
         def is_filter(e):
             return str(e.get("type")).lower() == "filter" or (
-                str(e.get("type")).lower() == "effect" and any(cat.item(k)["category"] == "filter" for k in cat.exact(e.get("name"))))
+                str(e.get("type")).lower() == "effect" and any(cat.item(k)["category"] == "filter" for k in cat.exact(e.get("name")))
+            )
+
         dropped = [e.get("id") for e in extras if is_filter(e)]
         extras = [e for e in extras if not is_filter(e)]
         if dropped:
@@ -985,12 +1460,28 @@ def compose(plan, analyses, cat, log=print, request="", picks=None, keep=()):
         vo = voiceover_edits(x, plan["voiceover"], analyses, style, edits_music, log)
         edits += vo
         made["voiceover"] = [e["id"] for e in vo]
-    out = {"name": plan.get("name") or style_name, "platform": plan.get("platform"), "canvas": plan.get("canvas"), "think": plan.get("think"),
-           "style": style_name, "clips": clips, "layers": (plan.get("layers") or []) + (talk["layers"] if talk else []),
-           "edits": edits_music + edits + extras,
-           "_rhythm": {"bpm": grid.get("bpm"), "source": grid.get("source"), "drop": drop, "shots": len(clips), "recipes": [r["use"] for r in recipes],
-                       "sections": [{"name": z["name"], "start": round(z["start"], 3), "end": round(z["end"], 3)} for z in sections]},
-           "_recipe_ids": made, "_picks": {json.dumps(list(k)): v for k, v in x._picks.items()}}
-    log(f"composed {style_name}: {len(clips)} shots on a {grid.get('bpm')} BPM grid ({grid.get('source')}), drop at "
-        f"{drop if drop is None else round(drop, 2)} s, {len(edits)} recipe edits + {len(extras)} hand-placed")
+    out = {
+        "name": plan.get("name") or style_name,
+        "platform": plan.get("platform"),
+        "canvas": plan.get("canvas"),
+        "think": plan.get("think"),
+        "style": style_name,
+        "clips": clips,
+        "layers": (plan.get("layers") or []) + (talk["layers"] if talk else []),
+        "edits": edits_music + edits + extras,
+        "_rhythm": {
+            "bpm": grid.get("bpm"),
+            "source": grid.get("source"),
+            "drop": drop,
+            "shots": len(clips),
+            "recipes": [r["use"] for r in recipes],
+            "sections": [{"name": z["name"], "start": round(z["start"], 3), "end": round(z["end"], 3)} for z in sections],
+        },
+        "_recipe_ids": made,
+        "_picks": {json.dumps(list(k)): v for k, v in x._picks.items()},
+    }
+    log(
+        f"composed {style_name}: {len(clips)} shots on a {grid.get('bpm')} BPM grid ({grid.get('source')}), drop at "
+        f"{drop if drop is None else round(drop, 2)} s, {len(edits)} recipe edits + {len(extras)} hand-placed"
+    )
     return out

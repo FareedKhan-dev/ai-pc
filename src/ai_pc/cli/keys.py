@@ -6,6 +6,7 @@
 
 The environment and a .env file in the project folder are read first (see src/ai_pc/core/keys.py).
 """
+
 import argparse
 import getpass
 import sys
@@ -22,6 +23,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     from ai_pc.core import vault
     from ai_pc.core.keys import VAULT_ENTRY
+
     keys = vault.get(VAULT_ENTRY) or {}
     if a.cmd == "list":
         print("\n".join(sorted(keys)) if keys else "(no keys stored)")

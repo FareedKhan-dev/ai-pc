@@ -11,6 +11,7 @@ Things to say: 'make a ... script / app / website', 'add ...', 'fix this error: 
 'open it in VS Code', 'show the code', 'explain the code', 'what changed?', 'undo', 'redo', 'history', 'list projects',
 'open project <name or folder>'. Projects live in out\\code\\projects (each with its own .venv, git history and .vscode setup).
 """
+
 import argparse
 import sys
 
@@ -26,6 +27,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
     from ai_pc.coding.codechat import CodeChat
     from ai_pc.llm.planner import ChatPlanner
+
     planner = ChatPlanner()
     c = CodeChat.start(planner=planner)
     print(f"Coding chat {c.state['id']}. 'quit' to leave.")

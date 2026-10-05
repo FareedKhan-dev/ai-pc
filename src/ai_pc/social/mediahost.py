@@ -10,6 +10,7 @@ the file:
 
   host = MediaHost(mode=None, facebook=connector)   url = host.open(path)   ...   host.close()
 """
+
 import http.server
 import mimetypes
 import re
@@ -66,8 +67,11 @@ class MediaHost:
 
     def open(self, path):
         if self.mode is None:
-            raise SocialError("policy", "Instagram and Threads take pictures only from a web address: run 'ai-pc social setup-tunnel' once "
-                                        "(Cloudflare's free tunnel tool), or connect your Facebook Page")
+            raise SocialError(
+                "policy",
+                "Instagram and Threads take pictures only from a web address: run 'ai-pc social setup-tunnel' once "
+                "(Cloudflare's free tunnel tool), or connect your Facebook Page",
+            )
         if self.mode == "page_photo":
             return self._page_photo(path)
         if self.srv is None:
@@ -86,8 +90,13 @@ class MediaHost:
         if self.launcher:
             self.proc, self.base = self.launcher(local)
             return
-        self.proc = subprocess.Popen([str(self.cloudflared), "tunnel", "--no-autoupdate", "--url", local], stdout=subprocess.PIPE,
-                                     stderr=subprocess.STDOUT, text=True, creationflags=NO_WINDOW)
+        self.proc = subprocess.Popen(
+            [str(self.cloudflared), "tunnel", "--no-autoupdate", "--url", local],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            creationflags=NO_WINDOW,
+        )
         t0 = time.time()
         while time.time() - t0 < 40:
             line = self.proc.stdout.readline()

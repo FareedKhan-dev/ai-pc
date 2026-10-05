@@ -6,6 +6,7 @@ is still loading, never loops without a deadline, and checks the kill switch bet
 It never touches the user's mouse: every click is a UI Automation Invoke when the control offers one, otherwise mouse
 messages posted straight to JianYing's window (the cursor does not move, and JianYing can stay behind other windows).
 """
+
 import shutil
 import time
 from pathlib import Path
@@ -16,9 +17,9 @@ import win32con
 import win32gui
 import win32process
 
-MAIN = "剪映专业版"   # JianYing's main window title
-EXPORT_WIN = "导出"   # the export dialog (its own window, owned by the main window)
-LOGIN_WIN = "登录"    # JianYing asks for a login when a project uses an item an anonymous user cannot get
+MAIN = "剪映专业版"  # JianYing's main window title
+EXPORT_WIN = "导出"  # the export dialog (its own window, owned by the main window)
+LOGIN_WIN = "登录"  # JianYing asks for a login when a project uses an item an anonymous user cannot get
 
 
 class DriverError(Exception):
@@ -109,6 +110,7 @@ def click_until(ctrl, done, wait=3.0, tries=2, log=None):
 def close_app_windows(titles, exe="jianyingpro.exe"):
     """Close (WM_CLOSE = cancel) visible top-level windows of JianYing with these titles. Returns the titles closed."""
     from ai_pc.desktop.appknow import exe_path
+
     found = []
 
     def cb(h, _):
@@ -119,6 +121,7 @@ def close_app_windows(titles, exe="jianyingpro.exe"):
                     found.append((h, win32gui.GetWindowText(h)))
         except Exception:  # noqa: BLE001
             pass
+
     win32gui.EnumWindows(cb, None)
     for h, _ in found:
         win32gui.PostMessage(h, win32con.WM_CLOSE, 0, 0)
@@ -128,8 +131,7 @@ def close_app_windows(titles, exe="jianyingpro.exe"):
 def keep_behind(hwnd):
     """Put a window at the bottom of the stack without activating it (the user's windows stay in front)."""
     try:
-        win32gui.SetWindowPos(hwnd, win32con.HWND_BOTTOM, 0, 0, 0, 0,
-                              win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
+        win32gui.SetWindowPos(hwnd, win32con.HWND_BOTTOM, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
     except Exception:  # noqa: BLE001
         pass
 
@@ -302,10 +304,12 @@ class JianyingDriver:
                 self._say(f"rendering to {src} ... ({how})")
             else:
                 self._say("an export of this project is already running; waiting for it")
+
         def finished_or_blocked():
             if close_app_windows({LOGIN_WIN}):
                 self.abort_export("JianYing asked for a login to export: an item of this project needs an account")
             return finished()
+
         done = self._wait(finished_or_blocked, render_timeout, "the export to finish", poll=1.0)
         self._say("render finished")
         # the video is complete now: take it into the project first (it must never stay in the user's Videos folder),

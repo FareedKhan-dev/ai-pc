@@ -5,6 +5,7 @@ diagram (Windows OCR reads its box labels), and the SVG parses.
 
   'drawio flowchart: Start -> Take order -> Pack -> Ship -> End'   'drawio export process.drawio to pdf'
 """
+
 import re
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -23,10 +24,27 @@ def exe():
 
 def export(src, dest, fmt):
     from ai_pc.core import hidden_desktop
+
     data = (HOME / "home").resolve()
     data.mkdir(parents=True, exist_ok=True)
-    args = [str(exe()), f"--user-data-dir={data}", "--disable-update", "--disable-gpu", "--export", "--format", fmt, "--border", "10",
-            "--output", str(dest)] + (["--scale", "2"] if fmt == "png" else []) + (["--all-pages", "--crop"] if fmt == "pdf" else []) + [str(src)]
+    args = (
+        [
+            str(exe()),
+            f"--user-data-dir={data}",
+            "--disable-update",
+            "--disable-gpu",
+            "--export",
+            "--format",
+            fmt,
+            "--border",
+            "10",
+            "--output",
+            str(dest),
+        ]
+        + (["--scale", "2"] if fmt == "png" else [])
+        + (["--all-pages", "--crop"] if fmt == "pdf" else [])
+        + [str(src)]
+    )
     return hidden_desktop.run(args, timeout=180)
 
 
@@ -46,6 +64,7 @@ def labels(drawio_file):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bdraw\.?io\b|\bdiagrams\.net\b", c):
         return None
@@ -54,6 +73,7 @@ def parse(text, ctx):
     if f:
         return {"op": "export", "file": f, "formats": fmts}
     from ai_pc.apps import diagrams
+
     rest = re.sub(r"^\s*(?:in\s+|with\s+)?draw\.?io\s*|\s*(?:in|with)\s+draw\.?io\b", "", text, flags=re.I).strip()
     op = diagrams.parse(rest, ctx)
     return dict(op, op="diagram", formats=fmts) if op else None
@@ -66,6 +86,7 @@ def run(op, ctx):
     out.mkdir(parents=True, exist_ok=True)
     if op["op"] == "diagram":
         from ai_pc.apps import diagrams
+
         name = {"flow": "flowchart", "tree": "org_chart", "mind": "mind_map"}[op["kind"]]
         made = diagrams.make(op["kind"], op["spec"], out / "source", name, op.get("title", ""))
         src = next(p for p in made["files"] if p.suffix == ".drawio")
@@ -85,6 +106,7 @@ def run(op, ctx):
         if fmt == "png" and words:
             try:
                 from ai_pc.apps import ocr
+
                 seen = re.sub(r"\s+", " ", ocr.read_picture(dest, work=out / "_ocr")["text"].lower())
                 found = sum(1 for w in words if all(t in seen for t in re.findall(r"[a-z0-9]{3,}", w.lower())))
             except Exception:  # noqa: BLE001
@@ -98,7 +120,10 @@ def run(op, ctx):
                 checks.append(("the SVG parses", False))
         if fmt == "pdf":
             from pypdf import PdfReader
+
             checks.append((f"the PDF has {len(PdfReader(str(dest)).pages)} page(s)", len(PdfReader(str(dest)).pages) >= 1))
     bad = [w for w, ok in checks if not ok]
-    return (f"draw.io exported {src.name} to {', '.join(p.name for p in made) or 'nothing'} in {out} (rendered by draw.io itself; the .drawio opens in draw.io "
-            "to edit). " + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + "."))
+    return (
+        f"draw.io exported {src.name} to {', '.join(p.name for p in made) or 'nothing'} in {out} (rendered by draw.io itself; the .drawio opens in draw.io "
+        "to edit). " + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ".")
+    )

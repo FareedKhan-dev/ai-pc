@@ -10,6 +10,7 @@ desktop) in front, or the document open in Word, Excel or PowerPoint in front.
   sh.start(); sh.ready.wait(); sh.registered -> {"bar": "Ctrl+Alt+Space"}
   context_files(foreground())                  -> ["C:\\Users\\me\\Videos\\clip.mp4"]
 """
+
 import ctypes
 import os
 import re
@@ -50,17 +51,38 @@ kernel32.GetConsoleWindow.restype = wintypes.HWND
 
 MODS = {"alt": 0x1, "ctrl": 0x2, "control": 0x2, "shift": 0x4, "win": 0x8}
 MOD_NOREPEAT = 0x4000
-VK = {"space": 0x20, "enter": 0x0D, "return": 0x0D, "tab": 0x09, "esc": 0x1B, "insert": 0x2D, "home": 0x24, "end": 0x23, "pause": 0x13,
-      "`": 0xC0, "backquote": 0xC0, "grave": 0xC0, ";": 0xBA, "/": 0xBF, "\\": 0xDC, ".": 0xBE, ",": 0xBC, "=": 0xBB,
-      **{f"f{i}": 0x6F + i for i in range(1, 25)}}
+VK = {
+    "space": 0x20,
+    "enter": 0x0D,
+    "return": 0x0D,
+    "tab": 0x09,
+    "esc": 0x1B,
+    "insert": 0x2D,
+    "home": 0x24,
+    "end": 0x23,
+    "pause": 0x13,
+    "`": 0xC0,
+    "backquote": 0xC0,
+    "grave": 0xC0,
+    ";": 0xBA,
+    "/": 0xBF,
+    "\\": 0xDC,
+    ".": 0xBE,
+    ",": 0xBC,
+    "=": 0xBB,
+    **{f"f{i}": 0x6F + i for i in range(1, 25)},
+}
 NAMES = {0x20: "Space", 0x0D: "Enter", 0x09: "Tab", 0xC0: "`", **{0x6F + i: f"F{i}" for i in range(1, 25)}}
 WM_HOTKEY, WM_APP, WM_CLOSE, WM_DESTROY, WM_COMMAND, WM_NULL = 0x0312, 0x8000, 0x0010, 0x0002, 0x0111, 0x0000
 WM_LBUTTONUP, WM_RBUTTONUP, WM_CONTEXTMENU = 0x0202, 0x0205, 0x007B
 WM_TRAY, WM_SHOWBAR = WM_APP + 7, WM_APP + 1
 NIN_BALLOONUSERCLICK = 0x0405
 ERROR_ALREADY_EXISTS = 183
-OFFICE = {"OpusApp": ("Word.Application", "ActiveDocument"), "XLMAIN": ("Excel.Application", "ActiveWorkbook"),
-          "PPTFrameClass": ("PowerPoint.Application", "ActivePresentation")}
+OFFICE = {
+    "OpusApp": ("Word.Application", "ActiveDocument"),
+    "XLMAIN": ("Excel.Application", "ActiveWorkbook"),
+    "PPTFrameClass": ("PowerPoint.Application", "ActivePresentation"),
+}
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 
@@ -100,8 +122,9 @@ class Shell(threading.Thread):
     {name, held} when its key is let go, "show" from a second start, "tray" {click} for the icon, "menu" {id} for its menu.
     """
 
-    def __init__(self, on_event, hotkeys, name="AIPC_Shell", tray=True, tip="AI PC", icon=None, menu=None, key_state=key_down,
-                 fallbacks=(), front=None):
+    def __init__(
+        self, on_event, hotkeys, name="AIPC_Shell", tray=True, tip="AI PC", icon=None, menu=None, key_state=key_down, fallbacks=(), front=None
+    ):
         super().__init__(daemon=True, name="aipc-shell")
         self.on_event, self.wanted, self.cls_name = on_event, dict(hotkeys), name
         self.tray, self.tip, self.icon_path, self.menu = tray, tip, icon, menu  # menu(): [(id, label, checked)] or None for a line
@@ -115,13 +138,21 @@ class Shell(threading.Thread):
         import win32api
         import win32con
         import win32gui
+
         try:
             self._taskbar = win32gui.RegisterWindowMessage("TaskbarCreated")
             wc = win32gui.WNDCLASS()
             wc.hInstance = win32api.GetModuleHandle(None)
             wc.lpszClassName = self.cls_name
-            wc.lpfnWndProc = {WM_HOTKEY: self._hotkey, WM_SHOWBAR: self._show, WM_TRAY: self._tray_msg, WM_COMMAND: self._command,
-                              self._taskbar: self._readd, WM_CLOSE: self._close, WM_DESTROY: self._destroy}
+            wc.lpfnWndProc = {
+                WM_HOTKEY: self._hotkey,
+                WM_SHOWBAR: self._show,
+                WM_TRAY: self._tray_msg,
+                WM_COMMAND: self._command,
+                self._taskbar: self._readd,
+                WM_CLOSE: self._close,
+                WM_DESTROY: self._destroy,
+            }
             atom = win32gui.RegisterClass(wc)
             # an ordinary top-level window that is never shown (a message-only window would miss 'TaskbarCreated')
             self.hwnd = win32gui.CreateWindow(atom, self.tip, win32con.WS_OVERLAPPED, 0, 0, 0, 0, 0, 0, wc.hInstance, None)
@@ -160,6 +191,7 @@ class Shell(threading.Thread):
             while self.key_state(vk) and time.monotonic() - t0 < 120:
                 time.sleep(0.02)
             self.on_event("hotkey_up", {"name": name, "held": time.monotonic() - t0})
+
         threading.Thread(target=watch, daemon=True, name="aipc-hold").start()
         return 0
 
@@ -169,11 +201,13 @@ class Shell(threading.Thread):
 
     def _close(self, hwnd, msg, wparam, lparam):
         import win32gui
+
         win32gui.DestroyWindow(hwnd)
         return 0
 
     def _destroy(self, hwnd, msg, wparam, lparam):
         import win32gui
+
         for i in self.ids:
             user32.UnregisterHotKey(hwnd, i)
         if self.tray_ok:
@@ -189,6 +223,7 @@ class Shell(threading.Thread):
         import win32api
         import win32con
         import win32gui
+
         if self._hicon:
             return self._hicon
         if self.icon_path and Path(self.icon_path).is_file():
@@ -201,6 +236,7 @@ class Shell(threading.Thread):
 
     def _add_tray(self):
         import win32gui
+
         flags = win32gui.NIF_ICON | win32gui.NIF_MESSAGE | win32gui.NIF_TIP
         try:
             win32gui.Shell_NotifyIcon(win32gui.NIM_ADD, (self.hwnd, 0, flags, WM_TRAY, self._load_icon(), self.tip))
@@ -224,6 +260,7 @@ class Shell(threading.Thread):
     def _popup(self):
         import win32con
         import win32gui
+
         m = win32gui.CreatePopupMenu()
         for item in self.menu() or []:
             if item is None:
@@ -249,9 +286,11 @@ class Shell(threading.Thread):
         if not self.tray_ok:
             return False
         import win32gui
+
         try:
-            win32gui.Shell_NotifyIcon(win32gui.NIM_MODIFY, (self.hwnd, 0, win32gui.NIF_INFO, WM_TRAY, self._load_icon(), self.tip,
-                                                            text[:250], 10000, title[:60], 0x4))  # NIIF_USER: our icon
+            win32gui.Shell_NotifyIcon(
+                win32gui.NIM_MODIFY, (self.hwnd, 0, win32gui.NIF_INFO, WM_TRAY, self._load_icon(), self.tip, text[:250], 10000, title[:60], 0x4)
+            )  # NIIF_USER: our icon
             return True
         except Exception:  # noqa: BLE001
             return False
@@ -307,6 +346,7 @@ def explorer_selection(top):
     import win32com.client
     import win32gui
     from win32com.shell import shell
+
     front_tab = win32gui.FindWindowEx(top, 0, "ShellTabWindowClass", None)  # the tab in front is the first one
     wins = win32com.client.Dispatch("Shell.Application").Windows()
     for i in range(wins.Count):
@@ -315,7 +355,11 @@ def explorer_selection(top):
             if w is None or int(w.HWND) != top:
                 continue
             try:
-                tab = w._oleobj_.QueryInterface(pythoncom.IID_IServiceProvider).QueryService(shell.SID_STopLevelBrowser, shell.IID_IShellBrowser).GetWindow()
+                tab = (
+                    w._oleobj_.QueryInterface(pythoncom.IID_IServiceProvider)
+                    .QueryService(shell.SID_STopLevelBrowser, shell.IID_IShellBrowser)
+                    .GetWindow()
+                )
             except Exception:  # noqa: BLE001 - older Explorer: one tab per window
                 tab = None
             if tab and front_tab and tab != front_tab:
@@ -330,6 +374,7 @@ def explorer_selection(top):
 def desktop_selection():
     """The files selected on the desktop."""
     import win32com.client
+
     d = win32com.client.Dispatch("Shell.Application").Windows().FindWindowSW(0, 0, 8, 0, 1)  # SWC_DESKTOP, SWFO_NEEDDISPATCH
     items = d.Document.SelectedItems()
     return [items.Item(j).Path for j in range(min(items.Count, 50))]
@@ -338,6 +383,7 @@ def desktop_selection():
 def office_document(cls):
     """The saved file open in the Word / Excel / PowerPoint window in front."""
     import win32com.client
+
     prog, prop = OFFICE[cls]
     doc = getattr(win32com.client.GetActiveObject(prog), prop)
     name = str(doc.FullName) if doc is not None else ""
@@ -354,6 +400,7 @@ def context_files(fg, timeout=1.5):
 
     def work():
         import pythoncom
+
         pythoncom.CoInitialize()
         try:
             if cls in ("CabinetWClass", "ExploreWClass"):
@@ -366,6 +413,7 @@ def context_files(fg, timeout=1.5):
             pass
         finally:
             pythoncom.CoUninitialize()
+
     t = threading.Thread(target=work, daemon=True, name="aipc-context")
     t.start()
     t.join(timeout)
@@ -381,8 +429,15 @@ def context_files(fg, timeout=1.5):
 
 def where_from(fg):
     """'File Explorer' / 'Word' / 'the desktop' for the chips that show where the files came from."""
-    return {"CabinetWClass": "File Explorer", "ExploreWClass": "File Explorer", "Progman": "the desktop", "WorkerW": "the desktop",
-            "OpusApp": "Word", "XLMAIN": "Excel", "PPTFrameClass": "PowerPoint"}.get((fg or {}).get("class", ""), "")
+    return {
+        "CabinetWClass": "File Explorer",
+        "ExploreWClass": "File Explorer",
+        "Progman": "the desktop",
+        "WorkerW": "the desktop",
+        "OpusApp": "Word",
+        "XLMAIN": "Excel",
+        "PPTFrameClass": "PowerPoint",
+    }.get((fg or {}).get("class", ""), "")
 
 
 def bring_to_front(hwnd):
@@ -436,6 +491,7 @@ def work_area(hwnd=None):
 def theme():
     """{"dark": bool, "accent": "#rrggbb" or None} from the Windows settings (Personalization > Colors)."""
     import winreg
+
     dark, accent = False, None
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as k:
@@ -459,13 +515,18 @@ def style_window(hwnd, dark, border=None):
     def attr(n, value):
         v = ctypes.c_int(value)
         return dwm.DwmSetWindowAttribute(wintypes.HWND(top), n, ctypes.byref(v), ctypes.sizeof(v)) == 0
+
     ok = attr(33, 2)  # DWMWA_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND
     attr(20, 1 if dark else 0)  # DWMWA_USE_IMMERSIVE_DARK_MODE
     if border:
         r, g, b = int(border[1:3], 16), int(border[3:5], 16), int(border[5:7], 16)
         attr(34, r | (g << 8) | (b << 16))  # DWMWA_BORDER_COLOR (COLORREF)
     try:
-        get, put = (user32.GetClassLongPtrW, user32.SetClassLongPtrW) if hasattr(user32, "GetClassLongPtrW") else (user32.GetClassLongW, user32.SetClassLongW)
+        get, put = (
+            (user32.GetClassLongPtrW, user32.SetClassLongPtrW)
+            if hasattr(user32, "GetClassLongPtrW")
+            else (user32.GetClassLongW, user32.SetClassLongW)
+        )
         get.restype = put.restype = ctypes.c_size_t
         get.argtypes = [wintypes.HWND, ctypes.c_int]
         put.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_size_t]
@@ -491,6 +552,7 @@ def clipboard_files_or_image(save_dir):
     """Files copied in Explorer, or a copied picture saved as a PNG in save_dir; [] for plain text (the box pastes that)."""
     try:
         from PIL import ImageGrab
+
         got = ImageGrab.grabclipboard()
     except Exception:  # noqa: BLE001
         return []
@@ -514,6 +576,7 @@ def copy_files(paths):
     """Put files on the clipboard, so Ctrl+V pastes them in Explorer, WhatsApp, Slack, an email."""
     import win32clipboard
     import win32con
+
     win32clipboard.OpenClipboard()
     try:
         win32clipboard.EmptyClipboard()
@@ -542,6 +605,7 @@ def launch_command(root, executable=None, startup=False):
 
 def starts_with_windows(name="AIPC"):
     import winreg
+
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
             return bool(winreg.QueryValueEx(k, name)[0])
@@ -552,6 +616,7 @@ def starts_with_windows(name="AIPC"):
 def set_starts_with_windows(on, command, name="AIPC"):
     """Start the bar when you sign in to Windows (your own Run list; turned on or off only from the tray menu)."""
     import winreg
+
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
         if on:
             winreg.SetValueEx(k, name, 0, winreg.REG_SZ, command)
@@ -566,6 +631,7 @@ def make_shortcut(lnk, command, icon=None, workdir=None):
     """A Windows shortcut (.lnk) that runs command (to pin the bar to Start or the taskbar)."""
     import pythoncom
     from win32com.shell import shell
+
     exe, args = re.match(r'^"([^"]+)"\s*(.*)$', command).groups()
     pythoncom.CoInitialize()
     link = pythoncom.CoCreateInstance(shell.CLSID_ShellLink, None, pythoncom.CLSCTX_INPROC_SERVER, shell.IID_IShellLink)

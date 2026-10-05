@@ -6,6 +6,7 @@ about for printing and converted.
   .venv\\Scripts\\python.exe tests\\integration\\three_conversations.py [--offline]
 About eight minutes. Chats are kept under out\\_tests\\three\\conv.
 """
+
 import re
 import shutil
 import sys
@@ -51,6 +52,7 @@ def main():
     planner = None
     if "--offline" not in sys.argv:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     if OUT.exists():
         shutil.rmtree(OUT, ignore_errors=True)
@@ -81,13 +83,18 @@ def main():
 
     def bigger_lounge(c, r, b):
         return c.cur()["v"] != b and "Plan:" in r and passed(c), r[:160]
-    run("a house in everyday words", c, [
-        ("can you show me what a 7 marla double storey house with 3 bedrooms would look like in 3D", new_house),
-        ("I want to see it from the street", front),
-        ("paint it beige and give the front some wooden texture", repaint),
-        ("now spin the camera slowly around the whole house, 4 seconds is enough", orbit),
-        ("the tv lounge feels small, can it be larger?", bigger_lounge),
-    ])
+
+    run(
+        "a house in everyday words",
+        c,
+        [
+            ("can you show me what a 7 marla double storey house with 3 bedrooms would look like in 3D", new_house),
+            ("I want to see it from the street", front),
+            ("paint it beige and give the front some wooden texture", repaint),
+            ("now spin the camera slowly around the whole house, 4 seconds is enough", orbit),
+            ("the tv lounge feels small, can it be larger?", bigger_lounge),
+        ],
+    )
 
     c = ThreeChat.start(chats_dir=OUT / "chats", planner=planner, log=quiet)
 
@@ -98,10 +105,15 @@ def main():
     def tagline(c, r, b):
         p = c.cur()["params"]
         return bool(p.get("sub")) and "drive" in p["sub"].lower() and passed(c), str(p)
-    run("a title animation for a shop", c, [
-        ("make me a logo animation for 'Pak Motors' that looks like chrome", logo),
-        ("put 'Drive your dream' underneath it", tagline),
-    ])
+
+    run(
+        "a title animation for a shop",
+        c,
+        [
+            ("make me a logo animation for 'Pak Motors' that looks like chrome", logo),
+            ("put 'Drive your dream' underneath it", tagline),
+        ],
+    )
 
     c = ThreeChat.start(chats_dir=OUT / "chats", planner=planner, log=quiet, files=[OUT / "card.png"])
 
@@ -111,10 +123,15 @@ def main():
 
     def laptop(c, r, b):
         return c.cur()["params"]["kind"] == "laptop" and passed(c), str(c.cur()["params"])
-    run("a visiting card on things", c, [
-        ("my client wants their visiting card card.png shown on a coffee mug", mug),
-        ("show it on a laptop screen too instead", laptop),
-    ])
+
+    run(
+        "a visiting card on things",
+        c,
+        [
+            ("my client wants their visiting card card.png shown on a coffee mug", mug),
+            ("show it on a laptop screen too instead", laptop),
+        ],
+    )
 
     c = ThreeChat.start(chats_dir=OUT / "chats", planner=planner, log=quiet, files=[OUT / "open_box.obj"])
 
@@ -127,11 +144,16 @@ def main():
     def converted(c, r, b):
         o = c.cur()["outputs"]
         return "export" in o and o["export"].endswith(".stl") and passed(c), str(o)
-    run("a 3D file for printing", c, [
-        ("open the model open_box.obj", opened),
-        ("can a 3D printer handle this?", printable),
-        ("give it to me as an STL file", converted),
-    ])
+
+    run(
+        "a 3D file for printing",
+        c,
+        [
+            ("open the model open_box.obj", opened),
+            ("can a 3D printer handle this?", printable),
+            ("give it to me as an STL file", converted),
+        ],
+    )
 
     ok = sum(1 for *_, g in RESULTS if g)
     usd = planner.cost()[1] if planner is not None else 0.0

@@ -6,6 +6,7 @@ saved on this PC, and pictures or videos uploaded to your Canva uploads (and del
 Everything Canva does with a file is a job: start it, then ask until it is done. Canva allows about 20 imports and 20
 exports a minute per person (and 500 exports a day); download links last 24 hours, so files are fetched at once.
 """
+
 import base64
 import json
 import mimetypes
@@ -20,14 +21,37 @@ from ai_pc.hub.services import Base, norm, pick
 
 API = "https://api.canva.com/rest/v1"
 EXPORTS = STATE / "hub" / "canva" / "exports"
-PRESETS = {"presentation": "presentation", "slides": "presentation", "deck": "presentation", "doc": "doc", "document": "doc", "whiteboard": "whiteboard"}
-SIZES = {"instagram post": (1080, 1080), "instagram story": (1080, 1920), "facebook post": (1200, 630), "youtube thumbnail": (1280, 720),
-         "a4": (2480, 3508), "poster": (2480, 3508), "flyer": (2480, 3508), "business card": (1050, 600), "logo": (500, 500), "banner": (1500, 500)}
+PRESETS = {
+    "presentation": "presentation",
+    "slides": "presentation",
+    "deck": "presentation",
+    "doc": "doc",
+    "document": "doc",
+    "whiteboard": "whiteboard",
+}
+SIZES = {
+    "instagram post": (1080, 1080),
+    "instagram story": (1080, 1920),
+    "facebook post": (1200, 630),
+    "youtube thumbnail": (1280, 720),
+    "a4": (2480, 3508),
+    "poster": (2480, 3508),
+    "flyer": (2480, 3508),
+    "business card": (1050, 600),
+    "logo": (500, 500),
+    "banner": (1500, 500),
+}
 FORMATS = {"pdf", "png", "jpg", "gif", "pptx", "mp4", "html_bundle", "csv"}
-MIME = {".pdf": "application/pdf", ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".psd": "image/vnd.adobe.photoshop",
-        ".ai": "application/postscript", ".key": "application/vnd.apple.keynote", ".odp": "application/vnd.oasis.opendocument.presentation"}
+MIME = {
+    ".pdf": "application/pdf",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".psd": "image/vnd.adobe.photoshop",
+    ".ai": "application/postscript",
+    ".key": "application/vnd.apple.keynote",
+    ".odp": "application/vnd.oasis.opendocument.presentation",
+}
 
 
 def _b64(s):
@@ -59,8 +83,16 @@ class Canva(Base):
     def designs(self, query=None, limit=50):
         out, cont = [], None
         while len(out) < limit:
-            js = self.api().get("designs", params={"query": query or None, "ownership": "any", "limit": min(100, limit - len(out)),
-                                                   "sort_by": "relevance" if query else "modified_descending", "continuation": cont})
+            js = self.api().get(
+                "designs",
+                params={
+                    "query": query or None,
+                    "ownership": "any",
+                    "limit": min(100, limit - len(out)),
+                    "sort_by": "relevance" if query else "modified_descending",
+                    "continuation": cont,
+                },
+            )
             for d in js.get("items", []):
                 out.append(self._design(d))
             cont = js.get("continuation")
@@ -71,9 +103,16 @@ class Canva(Base):
     @staticmethod
     def _design(d):
         th = d.get("thumbnail") or {}
-        return {"id": d["id"], "name": d.get("title") or "(untitled)", "link": (d.get("urls") or {}).get("edit_url"),
-                "view": (d.get("urls") or {}).get("view_url"), "pages": d.get("page_count"), "updated": d.get("updated_at"),
-                "w": th.get("width"), "h": th.get("height")}
+        return {
+            "id": d["id"],
+            "name": d.get("title") or "(untitled)",
+            "link": (d.get("urls") or {}).get("edit_url"),
+            "view": (d.get("urls") or {}).get("view_url"),
+            "pages": d.get("page_count"),
+            "updated": d.get("updated_at"),
+            "w": th.get("width"),
+            "h": th.get("height"),
+        }
 
     def find(self, name):
         """A design by its name (Canva's search first, then the names themselves)."""
@@ -115,8 +154,10 @@ class Canva(Base):
             job = self.api().get(f"{path}/{jid}").get("job") or {}
         if job.get("status") != "success":
             err = job.get("error") or {}
-            hint = {"license_required": " (the design uses paid Canva elements your plan does not include)",
-                    "approval_required": " (the design needs approval in Canva first)"}.get(err.get("code"), "")
+            hint = {
+                "license_required": " (the design uses paid Canva elements your plan does not include)",
+                "approval_required": " (the design needs approval in Canva first)",
+            }.get(err.get("code"), "")
             raise HubError(f"canva: the {what} failed: {err.get('message') or err.get('code') or job.get('status')}{hint}")
         return job
 
@@ -128,8 +169,9 @@ class Canva(Base):
         meta = {"title_base64": _b64(title or p.stem)}
         if p.suffix.lower() in MIME:
             meta["mime_type"] = MIME[p.suffix.lower()]
-        start = self.api().request("POST", "imports", data=p.read_bytes(), headers={"Content-Type": "application/octet-stream",
-                                                                                     "Import-Metadata": json.dumps(meta)})
+        start = self.api().request(
+            "POST", "imports", data=p.read_bytes(), headers={"Content-Type": "application/octet-stream", "Import-Metadata": json.dumps(meta)}
+        )
         job = self._job("imports", start, "import")
         ds = ((job.get("result") or {}).get("designs")) or []
         if not ds:
@@ -180,15 +222,25 @@ class Canva(Base):
         p = Path(path)
         if not p.is_file():
             raise HubError(f"canva: no file {p}")
-        start = self.api().request("POST", "asset-uploads", data=p.read_bytes(),
-                                   headers={"Content-Type": "application/octet-stream", "Asset-Upload-Metadata": json.dumps({"name_base64": _b64(name or p.stem)})})
+        start = self.api().request(
+            "POST",
+            "asset-uploads",
+            data=p.read_bytes(),
+            headers={"Content-Type": "application/octet-stream", "Asset-Upload-Metadata": json.dumps({"name_base64": _b64(name or p.stem)})},
+        )
         job = self._job("asset-uploads", start, "upload")
         a = job.get("asset") or {}
         if not a.get("id"):
             raise HubError("canva: the upload finished without an asset")
         back = self.api().get(f"assets/{a['id']}").get("asset") or {}
-        return {"id": a["id"], "name": a.get("name"), "where": "your Canva uploads", "verified": back.get("id") == a["id"],
-                "undo": {"service": "canva", "op": "delete_asset", "id": a["id"]}, "type": mimetypes.guess_type(p.name)[0]}
+        return {
+            "id": a["id"],
+            "name": a.get("name"),
+            "where": "your Canva uploads",
+            "verified": back.get("id") == a["id"],
+            "undo": {"service": "canva", "op": "delete_asset", "id": a["id"]},
+            "type": mimetypes.guess_type(p.name)[0],
+        }
 
     def delete_asset(self, id):  # noqa: A002
         self.api().delete(f"assets/{id}")

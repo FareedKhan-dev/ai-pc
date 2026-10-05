@@ -9,6 +9,7 @@
 
 Default is a DRY RUN (plans and prints, touches nothing). Add --live to act. Ctrl+Alt+Q aborts a live run.
 """
+
 import argparse
 import json
 import sys
@@ -24,8 +25,10 @@ from ai_pc.desktop.skills import SkillStore
 def _planner(kind):
     if kind == "file":
         from ai_pc.llm.planner import FilePlanner
+
         return FilePlanner()
     from ai_pc.llm.planner import ChatPlanner
+
     return ChatPlanner()
 
 
@@ -56,8 +59,13 @@ def main(argv=None):
 
     if args.cmd == "run":
         params = dict(kv.split("=", 1) for kv in args.param)
-        agent = Agent(planner=_planner(args.planner), grounder=make_grounder(), confirm=Confirmer(args.confirm),
-                      dry_run=not args.live, allow_apps=args.allow_app)
+        agent = Agent(
+            planner=_planner(args.planner),
+            grounder=make_grounder(),
+            confirm=Confirmer(args.confirm),
+            dry_run=not args.live,
+            allow_apps=args.allow_app,
+        )
         if not args.live:
             print("DRY RUN: nothing will be executed (add --live to act)")
         res = agent.run(args.goal, app=args.app, params=params, use_skill=not args.no_skill, learn=not args.no_learn, deep=args.deep)
@@ -68,7 +76,9 @@ def main(argv=None):
         if args.action == "list":
             for sk in st.list():
                 stt = sk.get("stats", {})
-                print(f"{sk['name']:<40s} steps={len(sk['steps']):<3d} params={sk['params']} runs={stt.get('runs', 0)} ok={stt.get('ok', 0)} {'DISABLED' if sk.get('disabled') else ''}")
+                print(
+                    f"{sk['name']:<40s} steps={len(sk['steps']):<3d} params={sk['params']} runs={stt.get('runs', 0)} ok={stt.get('ok', 0)} {'DISABLED' if sk.get('disabled') else ''}"
+                )
                 print(f"    intent: {sk['intent']}")
         elif args.action == "show":
             print(json.dumps(st.get(args.name), indent=1, ensure_ascii=False))

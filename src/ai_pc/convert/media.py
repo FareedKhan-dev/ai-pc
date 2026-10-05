@@ -1,14 +1,15 @@
 """What a video or sound file is, measured with FFprobe and FFmpeg (no model):
 
-  p = probe(path)        container, length, size, bitrate; the picture as it is shown (rotation and odd pixel shapes
-                         applied), frame rate and whether it varies, bit depth, colour (HDR), interlacing; the sound
-                         tracks; subtitles; whether an MP4 starts playing before it has fully downloaded
-  describe(p)            the same in plain words
-  keyframes(path, t)     where the picture can be cut without re-encoding, near a time
-  bars(p)                black bars around the picture (w, h, x, y), measured at three places
-  interlaced(path)       True when the frames are interlaced (combing on movement)
-  decodes(path, ...)     errors met when the file is played through (empty = it plays)
+p = probe(path)        container, length, size, bitrate; the picture as it is shown (rotation and odd pixel shapes
+                       applied), frame rate and whether it varies, bit depth, colour (HDR), interlacing; the sound
+                       tracks; subtitles; whether an MP4 starts playing before it has fully downloaded
+describe(p)            the same in plain words
+keyframes(path, t)     where the picture can be cut without re-encoding, near a time
+bars(p)                black bars around the picture (w, h, x, y), measured at three places
+interlaced(path)       True when the frames are interlaced (combing on movement)
+decodes(path, ...)     errors met when the file is played through (empty = it plays)
 """
+
 import json
 import os
 import re
@@ -19,16 +20,72 @@ from pathlib import Path
 from ai_pc.sound.measure import run
 
 AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus", ".wma", ".amr", ".aiff", ".aif", ".mka"}
-VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".flv", ".m4v", ".3gp", ".ts", ".mts", ".m2ts", ".mpg", ".mpeg", ".vob", ".gif", ".ogv"}
+VIDEO_EXTS = {
+    ".mp4",
+    ".mov",
+    ".mkv",
+    ".webm",
+    ".avi",
+    ".wmv",
+    ".flv",
+    ".m4v",
+    ".3gp",
+    ".ts",
+    ".mts",
+    ".m2ts",
+    ".mpg",
+    ".mpeg",
+    ".vob",
+    ".gif",
+    ".ogv",
+}
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp", ".heic"}
-CODEC_WORDS = {"h264": "H.264", "hevc": "HEVC (H.265)", "av1": "AV1", "vp9": "VP9", "vp8": "VP8", "mpeg4": "MPEG-4 (Xvid)", "msmpeg4v3": "DivX",
-               "mpeg2video": "MPEG-2", "mpeg1video": "MPEG-1", "prores": "ProRes", "dnxhd": "DNxHD", "mjpeg": "Motion JPEG", "wmv3": "Windows Media",
-               "vc1": "Windows Media (VC-1)", "wmv2": "Windows Media", "gif": "GIF", "theora": "Theora", "ffv1": "FFV1 (lossless)", "rawvideo": "uncompressed",
-               "aac": "AAC", "mp3": "MP3", "opus": "Opus", "vorbis": "Vorbis", "ac3": "Dolby Digital (AC-3)", "eac3": "Dolby Digital Plus", "dts": "DTS",
-               "truehd": "Dolby TrueHD", "flac": "FLAC", "alac": "Apple Lossless", "wmav2": "Windows Media Audio", "wmapro": "Windows Media Audio",
-               "amr_nb": "AMR (phone recording)", "amr_wb": "AMR-WB", "mp2": "MP2", "pcm_s16le": "uncompressed (PCM)", "pcm_s24le": "uncompressed (PCM 24-bit)",
-               "pcm_f32le": "uncompressed (PCM float)", "pcm_s16be": "uncompressed (PCM)", "mov_text": "text", "subrip": "SRT", "ass": "ASS",
-               "hdmv_pgs_subtitle": "picture (PGS)", "dvd_subtitle": "picture (DVD)", "webvtt": "WebVTT"}
+CODEC_WORDS = {
+    "h264": "H.264",
+    "hevc": "HEVC (H.265)",
+    "av1": "AV1",
+    "vp9": "VP9",
+    "vp8": "VP8",
+    "mpeg4": "MPEG-4 (Xvid)",
+    "msmpeg4v3": "DivX",
+    "mpeg2video": "MPEG-2",
+    "mpeg1video": "MPEG-1",
+    "prores": "ProRes",
+    "dnxhd": "DNxHD",
+    "mjpeg": "Motion JPEG",
+    "wmv3": "Windows Media",
+    "vc1": "Windows Media (VC-1)",
+    "wmv2": "Windows Media",
+    "gif": "GIF",
+    "theora": "Theora",
+    "ffv1": "FFV1 (lossless)",
+    "rawvideo": "uncompressed",
+    "aac": "AAC",
+    "mp3": "MP3",
+    "opus": "Opus",
+    "vorbis": "Vorbis",
+    "ac3": "Dolby Digital (AC-3)",
+    "eac3": "Dolby Digital Plus",
+    "dts": "DTS",
+    "truehd": "Dolby TrueHD",
+    "flac": "FLAC",
+    "alac": "Apple Lossless",
+    "wmav2": "Windows Media Audio",
+    "wmapro": "Windows Media Audio",
+    "amr_nb": "AMR (phone recording)",
+    "amr_wb": "AMR-WB",
+    "mp2": "MP2",
+    "pcm_s16le": "uncompressed (PCM)",
+    "pcm_s24le": "uncompressed (PCM 24-bit)",
+    "pcm_f32le": "uncompressed (PCM float)",
+    "pcm_s16be": "uncompressed (PCM)",
+    "mov_text": "text",
+    "subrip": "SRT",
+    "ass": "ASS",
+    "hdmv_pgs_subtitle": "picture (PGS)",
+    "dvd_subtitle": "picture (DVD)",
+    "webvtt": "WebVTT",
+}
 TEXT_SUBS = {"mov_text", "subrip", "ass", "ssa", "webvtt", "text"}
 
 
@@ -98,23 +155,63 @@ def probe(path):
         avg, rfr = _ratio(v.get("avg_frame_rate")), _ratio(v.get("r_frame_rate"))
         fps = avg if 0 < avg < 1000 else rfr
         image = (fmt.get("format_name") or "").startswith("image2") or (v.get("codec_name") in ("png", "mjpeg", "bmp", "webp", "tiff") and dur < 0.1)
-        video = {"codec": v.get("codec_name"), "profile": v.get("profile"), "level": v.get("level"), "tag": v.get("codec_tag_string"),
-                 "w": dw, "h": h_, "coded_w": w, "coded_h": h, "rotation": rot, "sar": round(sar, 4), "pix_fmt": pix,
-                 "bits": 12 if "12" in pix else 10 if ("10" in pix or "p010" in pix) else 8,
-                 "chroma": "444" if "444" in pix else "422" if "422" in pix else "rgb" if ("rgb" in pix or "bgr" in pix or pix.startswith("gbr")) else "420",
-                 "fps": round(fps, 3), "r_fps": round(rfr, 3),
-                 "vfr": bool(avg and rfr and abs(rfr - avg) / max(rfr, avg) > 0.02 and not image),
-                 "hdr": v.get("color_transfer") in ("smpte2084", "arib-std-b67"), "transfer": v.get("color_transfer"),
-                 "interlaced": {"progressive": False, "tt": True, "bb": True, "tb": True, "bt": True}.get(v.get("field_order")),
-                 "frames": int(v["nb_frames"]) if str(v.get("nb_frames") or "").isdigit() else None,
-                 "bitrate": int(v.get("bit_rate") or 0), "image": bool(image)}
-    tracks = [{"codec": a.get("codec_name"), "sr": int(a.get("sample_rate") or 0), "channels": int(a.get("channels") or 0),
-               "layout": a.get("channel_layout"), "bitrate": int(a.get("bit_rate") or 0), "lang": (a.get("tags") or {}).get("language")} for a in aus]
-    p = {"path": str(path), "name": path.name, "size": size, "duration": dur, "format": fmt.get("format_name", ""),
-         "container": _container(fmt.get("format_name"), path, v), "bitrate": int(fmt.get("bit_rate") or (size * 8 / dur if dur else 0)),
-         "video": video, "audio": tracks[0] if tracks else None, "audio_tracks": tracks,
-         "subs": [{"codec": s.get("codec_name"), "lang": (s.get("tags") or {}).get("language"), "text": s.get("codec_name") in TEXT_SUBS} for s in subs],
-         "faststart": faststart(path) if path.suffix.lower() in (".mp4", ".mov", ".m4a", ".m4v", ".3gp") else None}
+        video = {
+            "codec": v.get("codec_name"),
+            "profile": v.get("profile"),
+            "level": v.get("level"),
+            "tag": v.get("codec_tag_string"),
+            "w": dw,
+            "h": h_,
+            "coded_w": w,
+            "coded_h": h,
+            "rotation": rot,
+            "sar": round(sar, 4),
+            "pix_fmt": pix,
+            "bits": 12 if "12" in pix else 10 if ("10" in pix or "p010" in pix) else 8,
+            "chroma": "444"
+            if "444" in pix
+            else "422"
+            if "422" in pix
+            else "rgb"
+            if ("rgb" in pix or "bgr" in pix or pix.startswith("gbr"))
+            else "420",
+            "fps": round(fps, 3),
+            "r_fps": round(rfr, 3),
+            "vfr": bool(avg and rfr and abs(rfr - avg) / max(rfr, avg) > 0.02 and not image),
+            "hdr": v.get("color_transfer") in ("smpte2084", "arib-std-b67"),
+            "transfer": v.get("color_transfer"),
+            "interlaced": {"progressive": False, "tt": True, "bb": True, "tb": True, "bt": True}.get(v.get("field_order")),
+            "frames": int(v["nb_frames"]) if str(v.get("nb_frames") or "").isdigit() else None,
+            "bitrate": int(v.get("bit_rate") or 0),
+            "image": bool(image),
+        }
+    tracks = [
+        {
+            "codec": a.get("codec_name"),
+            "sr": int(a.get("sample_rate") or 0),
+            "channels": int(a.get("channels") or 0),
+            "layout": a.get("channel_layout"),
+            "bitrate": int(a.get("bit_rate") or 0),
+            "lang": (a.get("tags") or {}).get("language"),
+        }
+        for a in aus
+    ]
+    p = {
+        "path": str(path),
+        "name": path.name,
+        "size": size,
+        "duration": dur,
+        "format": fmt.get("format_name", ""),
+        "container": _container(fmt.get("format_name"), path, v),
+        "bitrate": int(fmt.get("bit_rate") or (size * 8 / dur if dur else 0)),
+        "video": video,
+        "audio": tracks[0] if tracks else None,
+        "audio_tracks": tracks,
+        "subs": [
+            {"codec": s.get("codec_name"), "lang": (s.get("tags") or {}).get("language"), "text": s.get("codec_name") in TEXT_SUBS} for s in subs
+        ],
+        "faststart": faststart(path) if path.suffix.lower() in (".mp4", ".mov", ".m4a", ".m4v", ".3gp") else None,
+    }
     return p
 
 
@@ -198,7 +295,9 @@ def describe(p):
     if p.get("subs"):
         bits.append(f"{len(p['subs'])} subtitle track{'s' if len(p['subs']) > 1 else ''}")
     br = p.get("bitrate") or 0
-    rate = (f" ({br / 1e6:.1f} Mbps)" if br >= 1e6 else f" ({br / 1e3:.0f} kbps)") if br and p["duration"] > 0.5 and not (v and v.get("image")) else ""
+    rate = (
+        (f" ({br / 1e6:.1f} Mbps)" if br >= 1e6 else f" ({br / 1e3:.0f} kbps)") if br and p["duration"] > 0.5 and not (v and v.get("image")) else ""
+    )
     bits.append(f"{human(p['size'])}{rate}")
     return f"{p['name']} ({p['container'].upper()}): " + ", ".join(bits)
 
@@ -227,8 +326,25 @@ def bars(p, limit=24):
     found = []
     for frac in (0.2, 0.5, 0.8):
         t = max(0.0, dur * frac - 1)
-        code, _, err = run(["ffmpeg", "-hide_banner", "-ss", f"{t:.2f}", "-i", p["path"], "-t", "2", "-vf", f"cropdetect=limit={limit}:round=2:reset=0",
-                            "-an", "-f", "null", "-"], timeout=120)
+        code, _, err = run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-ss",
+                f"{t:.2f}",
+                "-i",
+                p["path"],
+                "-t",
+                "2",
+                "-vf",
+                f"cropdetect=limit={limit}:round=2:reset=0",
+                "-an",
+                "-f",
+                "null",
+                "-",
+            ],
+            timeout=120,
+        )
         m = re.findall(r"crop=(\d+):(\d+):(\d+):(\d+)", err)
         if m:
             found.append(tuple(int(x) for x in m[-1]))
@@ -252,8 +368,11 @@ def interlaced(path, frames=300):
     return tff + bff > 2 * max(prog, 1)
 
 
-BENIGN = re.compile(r"Trailing garbage|deprecated pixel format|Last message repeated|non monotonically increasing dts|"
-                    r"Application provided invalid, non monotonically|Could not find codec parameters|Estimating duration", re.I)
+BENIGN = re.compile(
+    r"Trailing garbage|deprecated pixel format|Last message repeated|non monotonically increasing dts|"
+    r"Application provided invalid, non monotonically|Could not find codec parameters|Estimating duration",
+    re.I,
+)
 
 
 def decodes(path, duration=None, pixels=None, budget_s=45.0):
@@ -264,7 +383,13 @@ def decodes(path, duration=None, pixels=None, budget_s=45.0):
     spans = [(None, None)] if work < budget_s * 8 else [(0.0, 4.0), (max(0.0, dur / 2 - 2), 4.0), (max(0.0, dur - 4.5), 4.0)]
     errs = []
     for s, t in spans:
-        args = ["ffmpeg", "-hide_banner", "-v", "error"] + (["-ss", f"{s:.2f}"] if s else []) + ["-i", str(p)] + (["-t", f"{t:.2f}"] if t else []) + ["-f", "null", "-"]
+        args = (
+            ["ffmpeg", "-hide_banner", "-v", "error"]
+            + (["-ss", f"{s:.2f}"] if s else [])
+            + ["-i", str(p)]
+            + (["-t", f"{t:.2f}"] if t else [])
+            + ["-f", "null", "-"]
+        )
         code, _, err = run(args, timeout=max(120, int(budget_s * 4)))
         lines = [x for x in err.splitlines() if x.strip() and not BENIGN.search(x)]
         if code:

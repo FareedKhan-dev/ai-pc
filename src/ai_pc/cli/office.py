@@ -18,6 +18,7 @@ In a talk every message makes one version (undo, redo, 'go back to v2', 'compare
 'export'); questions about a workbook's data are computed, not guessed.
 Word, PowerPoint and Excel run hidden in the background; your mouse, keyboard and open documents are never touched.
 """
+
 import argparse
 import json
 import sys
@@ -66,8 +67,10 @@ def main(argv=None):
                 sys.exit(f"not a file inside the project folder: {f}")
             out.append(str(p))
         return out
+
     if a.cmd == "new":
         from ai_pc.office.studio import DocStudio
+
         st = DocStudio(log=_log, look=not a.no_look, fix_rounds=a.fix)
         s = st.new(a.request, inside(a.files), theme=a.theme, pages=a.pages)
         c = s["checks"]["counts"]
@@ -75,12 +78,22 @@ def main(argv=None):
         print(f"document  {s.get('pptx') or s.get('xlsx') or s['docx']}")
         print(f"pdf       {s.get('pdf')}")
         front = (s.get("pages") or 0) - (s.get("body_pages") or s.get("pages") or 0)
-        size = (f", {len(s['sheets'])} sheet(s): " + ", ".join(f"{x['name']} ({x['rows']} rows)" if x["kind"] == "table" else x["name"] for x in s["sheets"])
-                if s.get("sheets") else f", {s.get('body_pages') or s.get('pages')} {'slide' if s['doctype'] == 'presentation' else 'page'}(s)")
-        print(f"what      {s['doctype']}, theme {s['theme']}{size}" + (f" + {front} front (cover, contents)" if front else "")
-              + (f" for {s['target_pages']} asked" if s.get("target_pages") else "")
-              + (f", {s.get('words')} words" if s.get("words") else ""))
-        print(f"checks    {c.get('pass', 0)} pass, {c.get('warn', 0)} warn, {c.get('fail', 0)} fail" + (f", {c['skip']} skipped" if c.get("skip") else ""))
+        size = (
+            f", {len(s['sheets'])} sheet(s): "
+            + ", ".join(f"{x['name']} ({x['rows']} rows)" if x["kind"] == "table" else x["name"] for x in s["sheets"])
+            if s.get("sheets")
+            else f", {s.get('body_pages') or s.get('pages')} {'slide' if s['doctype'] == 'presentation' else 'page'}(s)"
+        )
+        print(
+            f"what      {s['doctype']}, theme {s['theme']}{size}"
+            + (f" + {front} front (cover, contents)" if front else "")
+            + (f" for {s['target_pages']} asked" if s.get("target_pages") else "")
+            + (f", {s.get('words')} words" if s.get("words") else "")
+        )
+        print(
+            f"checks    {c.get('pass', 0)} pass, {c.get('warn', 0)} warn, {c.get('fail', 0)} fail"
+            + (f", {c['skip']} skipped" if c.get("skip") else "")
+        )
         for r in s["checks"]["results"]:
             if r["status"] in ("warn", "fail", "skip"):
                 print(f"  {r['status'].upper():5s} {r['id']:7s} {r['why'][:150]}")
@@ -93,10 +106,12 @@ def main(argv=None):
         from ai_pc.office.bookchat import BookChat
         from ai_pc.office.deckchat import DeckChat
         from ai_pc.office.docchat import CHATS, DocChat
+
         kinds = {".docx": DocChat, ".pptx": DeckChat, ".xlsx": BookChat, ".xlsm": BookChat}
         planner = None
         if not a.offline:
             from ai_pc.llm.planner import ChatPlanner
+
             planner = ChatPlanner()
         if a.chat:
             sf = CHATS / a.chat / "chat.json"
@@ -112,7 +127,9 @@ def main(argv=None):
             if cls is None:
                 sys.exit("talk edits .docx, .pptx and .xlsx files")
             chat = cls.start(src, planner=planner)
-        print(f"Chat {chat.state['id']} about {Path(chat.state['base']).name}, at v{chat.state['cur']}. Ask, change, undo, 'export' when happy; 'quit' to leave.")
+        print(
+            f"Chat {chat.state['id']} about {Path(chat.state['base']).name}, at v{chat.state['cur']}. Ask, change, undo, 'export' when happy; 'quit' to leave."
+        )
         try:
             if a.say:
                 for msg in a.say:
@@ -134,9 +151,11 @@ def main(argv=None):
         print(f"(chat {chat.state['id']}: {len(chat.state['versions'])} versions, now v{chat.state['cur']}; files in {chat.folder}; AI ${usd:.4f})")
     elif a.cmd == "project":
         from ai_pc.office.projectchat import ProjectChat
+
         planner = None
         if not a.offline:
             from ai_pc.llm.planner import ChatPlanner
+
             planner = ChatPlanner()
         if a.load:
             pc = ProjectChat.load(a.load, planner=planner, log=_log)
@@ -168,15 +187,23 @@ def main(argv=None):
     elif a.cmd == "check":
         from ai_pc.office import render as RN
         from ai_pc.office import verify as VF
+
         src = inside([a.docx])[0]
         r = RN.to_pdf(src, update_fields=False, save=False, pdf=str(Path(src).with_suffix(".check.pdf")))
         if not r.get("ok"):
             sys.exit(f"could not render: {r.get('error')}")
         import docx
+
         d = docx.Document(src)
-        blocks = [{"type": "heading", "text": p.text, "level": int(p.style.name.split()[-1])} if p.style.name.startswith("Heading") and p.style.name.split()[-1].isdigit()
-                  else {"type": "paragraph", "text": p.text} for p in d.paragraphs if p.text.strip()]
+        blocks = [
+            {"type": "heading", "text": p.text, "level": int(p.style.name.split()[-1])}
+            if p.style.name.startswith("Heading") and p.style.name.split()[-1].isdigit()
+            else {"type": "paragraph", "text": p.text}
+            for p in d.paragraphs
+            if p.text.strip()
+        ]
         from ai_pc.office import docplan as DP
+
         plan = DP.resolve({"doctype": "other", "blocks": blocks, "cover": False, "toc": False})
         sec = d.sections[0]
         plan["page"]["orientation"] = "landscape" if sec.page_width > sec.page_height else "portrait"

@@ -8,6 +8,7 @@
 JianYing is driven with UI Automation and window messages only: the user's mouse and keyboard are never touched.
 Kill switch: Ctrl+Alt+Q.
 """
+
 import sys
 
 
@@ -16,9 +17,11 @@ def main(argv=None):
     for stream in (sys.stdout, sys.stderr):  # item names are often Chinese: never crash on the console's code page
         stream.reconfigure(encoding="utf-8", errors="replace")
     from ai_pc.video.jy_export import GUARD, export
+
     args = [a for a in argv if not a.startswith("--")]
     if "--trace-hang" in argv:
         import faulthandler
+
         faulthandler.dump_traceback_later(45, exit=True)
     r = export(args[0] if args else "agent_jy_test", log=lambda m: print(m, flush=True), start="--start" in argv)
     if r["ok"]:

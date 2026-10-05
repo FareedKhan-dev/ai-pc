@@ -5,6 +5,7 @@ PDF' writes its file without the Save dialog, which is how this is checked.
 
   'which printers do I have?'   'print invoice.pdf'   'print report.docx on HP LaserJet, 2 copies'   'print queue'
 """
+
 import re
 from pathlib import Path
 
@@ -17,6 +18,7 @@ OFFICE = {".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".rtf", ".odt"}
 
 def printers():
     import win32print
+
     default = win32print.GetDefaultPrinter()
     flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
     return [{"name": p[2], "default": p[2] == default} for p in win32print.EnumPrinters(flags)]
@@ -24,8 +26,9 @@ def printers():
 
 def queue(printer=None):
     import win32print
+
     out = []
-    for p in ([printer] if printer else [x["name"] for x in printers()]):
+    for p in [printer] if printer else [x["name"] for x in printers()]:
         h = win32print.OpenPrinter(p)
         try:
             for j in win32print.EnumJobs(h, 0, 50, 1):
@@ -40,14 +43,17 @@ def pages_of(path, work, dpi=300):
     p = Path(path)
     if p.suffix.lower() in PICTURES:
         from PIL import Image
+
         return [Image.open(p).convert("RGB")]
     if p.suffix.lower() in OFFICE:
         from ai_pc.office import render
+
         work.mkdir(parents=True, exist_ok=True)
         pdf = work / f"{p.stem}.pdf"
         render.to_pdf(p, pdf)
         p = pdf
     import pypdfium2 as pdfium
+
     doc = pdfium.PdfDocument(str(p))
     try:
         return [doc[i].render(scale=dpi / 72).to_pil().convert("RGB") for i in range(len(doc))]
@@ -61,6 +67,7 @@ def print_file(path, printer=None, copies=1, output=None, work=None):
     import win32print
     import win32ui
     from PIL import ImageWin
+
     printer = printer or win32print.GetDefaultPrinter()
     imgs = pages_of(path, Path(work or Path(path).parent))
     hdc = win32ui.CreateDC()
@@ -90,6 +97,7 @@ def parse(text, ctx):
         return {"op": "queue"}
     if re.match(r"^\s*print\b", c):
         from ai_pc.apps.appschat import find_file
+
         f = find_file(text, ctx, PICTURES | OFFICE | {".pdf"})
         if not f:
             return None
@@ -102,10 +110,14 @@ def parse(text, ctx):
 
 def preview(op, ctx):
     import win32print
+
     printer = op.get("printer") or win32print.GetDefaultPrinter()
     op["printer"] = printer
-    return f"Ready to print {Path(op['file']).name}, {op.get('copies', 1)} cop{'y' if op.get('copies', 1) == 1 else 'ies'}, on {printer}" + \
-        (" (it writes a PDF file, no paper)" if "pdf" in printer.lower() else "") + "."
+    return (
+        f"Ready to print {Path(op['file']).name}, {op.get('copies', 1)} cop{'y' if op.get('copies', 1) == 1 else 'ies'}, on {printer}"
+        + (" (it writes a PDF file, no paper)" if "pdf" in printer.lower() else "")
+        + "."
+    )
 
 
 def run(op, ctx):
@@ -124,11 +136,13 @@ def run(op, ctx):
     n = print_file(op["file"], op.get("printer"), op.get("copies", 1), dest, out / "work")
     if to_pdf:
         import time
+
         for _ in range(40):  # the spooler finishes the file a moment after
             if dest.exists() and dest.stat().st_size > 0:
                 break
             time.sleep(0.25)
         from pypdf import PdfReader
+
         got = len(PdfReader(str(dest)).pages) if dest.exists() else 0
         return f"Printed {n} page(s) x {op.get('copies', 1)} to {dest} ({'checked: ' + str(got) + ' pages in the file' if got == n * op.get('copies', 1) else 'NOT right: ' + str(got) + ' pages'})."
     return f"Sent {n} page(s) x {op.get('copies', 1)} to {op['printer']}. Say 'print queue' to see it waiting."

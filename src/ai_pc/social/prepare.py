@@ -7,6 +7,7 @@ reported, never cut silently (a video is shortened only when asked: post["trim"]
   prepare(post, job) -> {"media": [files], "kinds": ["image"|"video"], "text", "title", "parts", "tags", "cover",
                          "notes": [...], "problems": [...], "checks": [...]}
 """
+
 import hashlib
 import json
 from pathlib import Path
@@ -49,6 +50,7 @@ def _nearest(r, lo, hi, prefer):
 def fit_image(path, rule, fill="crop", out_dir=WORK):
     """A picture made acceptable: shape within rule["aspect"], width within min/max, JPEG under max_mb, sRGB, no metadata."""
     from ai_pc.photo import ops as PO
+
     notes = []
     im = Image.open(path)
     im = ImageOps.exif_transpose(im)
@@ -58,7 +60,10 @@ def fit_image(path, rule, fill="crop", out_dir=WORK):
             import io
 
             from PIL import ImageCms
-            im = ImageCms.profileToProfile(im.convert("RGB"), ImageCms.ImageCmsProfile(io.BytesIO(icc)), ImageCms.createProfile("sRGB"), outputMode="RGB")
+
+            im = ImageCms.profileToProfile(
+                im.convert("RGB"), ImageCms.ImageCmsProfile(io.BytesIO(icc)), ImageCms.createProfile("sRGB"), outputMode="RGB"
+            )
             notes.append("colours converted to sRGB")
         except Exception:  # noqa: BLE001
             pass
@@ -107,9 +112,14 @@ def check_image(path, rule):
     im = Image.open(path)
     w, h = im.size
     lo, hi = rule.get("aspect", (0.01, 100))
-    out = [{"ok": lo - 1e-3 <= w / h <= hi + 1e-3, "what": f"shape {w}x{h} ({w / h:.2f}) within {lo:.2f}-{hi:.2f}"},
-           {"ok": Path(path).stat().st_size <= rule.get("max_mb", 8) * 1e6, "what": f"{Path(path).stat().st_size / 1e6:.1f} MB within {rule.get('max_mb', 8)} MB"},
-           {"ok": im.format in ("JPEG", "PNG") or im.format.lower() in rule.get("formats", ("jpeg",)), "what": f"format {im.format}"}]
+    out = [
+        {"ok": lo - 1e-3 <= w / h <= hi + 1e-3, "what": f"shape {w}x{h} ({w / h:.2f}) within {lo:.2f}-{hi:.2f}"},
+        {
+            "ok": Path(path).stat().st_size <= rule.get("max_mb", 8) * 1e6,
+            "what": f"{Path(path).stat().st_size / 1e6:.1f} MB within {rule.get('max_mb', 8)} MB",
+        },
+        {"ok": im.format in ("JPEG", "PNG") or im.format.lower() in rule.get("formats", ("jpeg",)), "what": f"format {im.format}"},
+    ]
     if rule.get("min_w"):
         out.append({"ok": w >= rule["min_w"], "what": f"{w} px wide, at least {rule['min_w']}"})
     return out
@@ -121,6 +131,7 @@ def fit_video(path, rule, fill="blur", trim=False, out_dir=WORK, log=None):
     from ai_pc.convert import encode as E
     from ai_pc.convert import media as MD
     from ai_pc.convert.presets import issues
+
     p = MD.probe(path)
     v = p.get("video") or {}
     notes, problems = [], []
@@ -136,7 +147,9 @@ def fit_video(path, rule, fill="blur", trim=False, out_dir=WORK, log=None):
             chain.append({"op": "trim", "args": {"start": 0, "end": hi_s}})
             notes.append(f"shortened to the first {hi_s} s (as asked)")
         else:
-            problems.append(f"the video is {MD.mmss(d)}; {rule['label']} takes up to {MD.mmss(hi_s)} (say 'cut it to {MD.mmss(hi_s)}', or choose another kind of post)")
+            problems.append(
+                f"the video is {MD.mmss(d)}; {rule['label']} takes up to {MD.mmss(hi_s)} (say 'cut it to {MD.mmss(hi_s)}', or choose another kind of post)"
+            )
     if problems:
         return None, notes, problems
     w, h = v.get("w") or 1, v.get("h") or 1
@@ -178,15 +191,18 @@ def fit_video(path, rule, fill="blur", trim=False, out_dir=WORK, log=None):
 
 def check_video(path, rule):
     from ai_pc.convert import media as MD
+
     p = MD.probe(path)
     v = p.get("video") or {}
     a = (p.get("audio") or [{}])[0] if isinstance(p.get("audio"), list) else (p.get("audio") or {})
     w, h = v.get("w") or 1, v.get("h") or 1
     alo, ahi = rule.get("aspect", (0.01, 100))
-    out = [{"ok": v.get("codec") in ("h264", "hevc"), "what": f"video {v.get('codec')}"},
-           {"ok": alo - 0.01 <= w / h <= ahi + 0.01, "what": f"{w}x{h} ({w / h:.2f}) within {alo:.2f}-{ahi:.2f}"},
-           {"ok": rule.get("min_s", 0) - 0.05 <= p["duration"] <= (rule.get("max_s") or 1e9) + 0.05, "what": f"{p['duration']:.1f} s"},
-           {"ok": not rule.get("max_mb") or p["size"] <= rule["max_mb"] * 1e6, "what": f"{p['size'] / 1e6:.1f} MB"}]
+    out = [
+        {"ok": v.get("codec") in ("h264", "hevc"), "what": f"video {v.get('codec')}"},
+        {"ok": alo - 0.01 <= w / h <= ahi + 0.01, "what": f"{w}x{h} ({w / h:.2f}) within {alo:.2f}-{ahi:.2f}"},
+        {"ok": rule.get("min_s", 0) - 0.05 <= p["duration"] <= (rule.get("max_s") or 1e9) + 0.05, "what": f"{p['duration']:.1f} s"},
+        {"ok": not rule.get("max_mb") or p["size"] <= rule["max_mb"] * 1e6, "what": f"{p['size'] / 1e6:.1f} MB"},
+    ]
     if a:
         out.append({"ok": a.get("codec") in ("aac", "mp3", None), "what": f"sound {a.get('codec')}"})
     return out
@@ -199,6 +215,7 @@ def slideshow(images, out_dir=WORK, seconds=3.0, size=(1080, 1920)):
     import subprocess
 
     from ai_pc.photo import ops as PO
+
     key = hashlib.sha1(json.dumps([_key(i) for i in images] + [seconds, size]).encode()).hexdigest()[:16]
     folder = Path(out_dir) / f"slides_{key}"
     out = folder / "slideshow.mp4"
@@ -224,8 +241,28 @@ def slideshow(images, out_dir=WORK, seconds=3.0, size=(1080, 1920)):
         chain.append(f"{last}[{i}:v]xfade=transition=fade:duration={fade}:offset={i * seconds - fade * (i - 1) - fade + fade * 0:.3f}{lab}")
         last = lab
     vf = (";".join(chain) + ";" if chain else "") + f"{last}fps=30,format=yuv420p[v]"
-    args += ["-filter_complex", vf, "-map", "[v]", "-map", f"{len(frames)}:a", "-c:v", "libx264", "-preset", "medium", "-crf", "20",
-             "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", str(out)]
+    args += [
+        "-filter_complex",
+        vf,
+        "-map",
+        "[v]",
+        "-map",
+        f"{len(frames)}:a",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "20",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-shortest",
+        "-movflags",
+        "+faststart",
+        str(out),
+    ]
     r = subprocess.run(args, capture_output=True, text=True, creationflags=0x08000000)
     if r.returncode or not out.exists():
         raise ValueError(f"the slideshow could not be made ({r.stderr[-300:]})")
@@ -238,13 +275,25 @@ def prepare(post, job, out_dir=WORK, log=None):
     rule = specs.media(plat, fmt)
     limits = specs.text(plat, fmt)
     words = fit(post.get("text", ""), plat, fmt, limits, title=post.get("title"), link=post.get("link"), utm=post.get("utm"))
-    res = {"media": [], "kinds": [], "text": words["text"], "title": words["title"], "parts": words["parts"], "tags": words["tags"],
-           "notes": list(words["notes"]), "problems": list(words["problems"]), "checks": [], "cover": None}
+    res = {
+        "media": [],
+        "kinds": [],
+        "text": words["text"],
+        "title": words["title"],
+        "parts": words["parts"],
+        "tags": words["tags"],
+        "notes": list(words["notes"]),
+        "problems": list(words["problems"]),
+        "checks": [],
+        "cover": None,
+    }
     files = list(post.get("media") or [])
     if rule.get("pictures_as_video") and files and all(kind_of(f) == "image" for f in files if Path(f).exists()):
         try:
             files = [slideshow([f for f in files if Path(f).exists()][: rule.get("max_slides", 35)], out_dir)]
-            res["notes"].append(f"{len(post['media'])} picture(s) made into a slideshow video ({rule['label']} takes picture posts only from a web address)")
+            res["notes"].append(
+                f"{len(post['media'])} picture(s) made into a slideshow video ({rule['label']} takes picture posts only from a web address)"
+            )
         except ValueError as e:
             res["problems"].append(str(e))
             return res
@@ -280,6 +329,7 @@ def prepare(post, job, out_dir=WORK, log=None):
         res["kinds"].append(k)
         if k == "video" and "duration" not in res:
             from ai_pc.convert import media as MD
+
             res["duration"] = MD.probe(out)["duration"]
         res["notes"] += [f"{Path(f).name}: {n}" for n in notes if n != "ready as it was"]
         res["checks"] += [dict(c, file=Path(f).name) for c in checks]

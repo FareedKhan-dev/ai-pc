@@ -8,6 +8,7 @@ do the arithmetic).
   c.say("which city sold the most?")
   c.say("make a pivot of amount by city and month, and highlight orders over 5 lakh in green")
 """
+
 import datetime as _dt
 import json
 import re
@@ -138,20 +139,47 @@ def run_query(q, m, errors=None):
 def _run_query(q, m, errors=None):
     fn = q.get("fn")
     if fn == "sheets":
-        return "Sheets: " + "; ".join(f"{s['name']}" + (f" (table of {len(s['table']['rows'])} rows)" if s["table"] and s["kind"] != "pivot" else " (pivot table)" if s["kind"] == "pivot"
-                                                        else " (summary)" if s["pairs"] else "") for s in m["sheets"]) + "."
+        return (
+            "Sheets: "
+            + "; ".join(
+                f"{s['name']}"
+                + (
+                    f" (table of {len(s['table']['rows'])} rows)"
+                    if s["table"] and s["kind"] != "pivot"
+                    else " (pivot table)"
+                    if s["kind"] == "pivot"
+                    else " (summary)"
+                    if s["pairs"]
+                    else ""
+                )
+                for s in m["sheets"]
+            )
+            + "."
+        )
     s = XM.sheet(m, q.get("sheet")) or XM.sheet(m)
     if not s or not s.get("table"):
         return "That sheet holds no table."
     t = s["table"]
     if fn == "columns":
-        return f"{s['name']} has {len(t['cols'])} columns: " + ", ".join(f"{c['letter']} {c['name']}" + (" (formula)" if c["formula"] else "") for c in t["cols"]) + "."
+        return (
+            f"{s['name']} has {len(t['cols'])} columns: "
+            + ", ".join(f"{c['letter']} {c['name']}" + (" (formula)" if c["formula"] else "") for c in t["cols"])
+            + "."
+        )
     if fn == "errors":
         es = [e for e in errors or [] if e.get("sheet") == s["name"]] if errors is not None else []
-        return f"No Excel errors on {s['name']}." if not es else f"{len(es)} Excel error(s) on {s['name']}: " + ", ".join(f"{e['error']} at {XM.letter(e['col'])}{e['row']}" for e in es[:6]) + "."
+        return (
+            f"No Excel errors on {s['name']}."
+            if not es
+            else f"{len(es)} Excel error(s) on {s['name']}: " + ", ".join(f"{e['error']} at {XM.letter(e['col'])}{e['row']}" for e in es[:6]) + "."
+        )
     if fn == "formula":
         c = XM.col(None, s, q.get("col"))
-        return f"{c['name']} is typed in, not calculated." if c and not c["formula"] else (f"{c['name']} is calculated as {c['formula']} (row {t['first']}; the same down the rows)." if c else "No such column.")
+        return (
+            f"{c['name']} is typed in, not calculated."
+            if c and not c["formula"]
+            else (f"{c['name']} is calculated as {c['formula']} (row {t['first']}; the same down the rows)." if c else "No such column.")
+        )
     if fn == "blanks":
         bl = [(c["name"], c["blank"]) for c in t["cols"] if c["blank"]]
         return "No blank cells in the table." if not bl else "Blank cells: " + ", ".join(f"{n} {k}" for n, k in bl) + "."
@@ -162,8 +190,11 @@ def _run_query(q, m, errors=None):
         keys = [str(r[c["name"]]).strip().lower() if c else tuple(str(v).strip().lower() for v in r.values()) for r in rows]
         cnt = Counter(keys)
         d = sum(n - 1 for n in cnt.values() if n > 1)
-        return f"No duplicates{' in ' + c['name'] if c else ' (whole rows)'}." if not d else f"{d} duplicate(s){' in ' + c['name'] if c else ' (whole rows)'}: " + \
-            ", ".join(str(k) for k, n in cnt.items() if n > 1)[:200] + "."
+        return (
+            f"No duplicates{' in ' + c['name'] if c else ' (whole rows)'}."
+            if not d
+            else f"{d} duplicate(s){' in ' + c['name'] if c else ' (whole rows)'}: " + ", ".join(str(k) for k, n in cnt.items() if n > 1)[:200] + "."
+        )
     if fn == "count" and not q.get("by"):
         return f"{len(rows)} row(s){wt}."
     label = XM.col(None, s, q.get("label")) if q.get("label") else next((c for c in t["cols"] if c["kind"] == "text"), t["cols"][0])
@@ -198,9 +229,15 @@ def _run_query(q, m, errors=None):
         if fn == "top":
             n = int(q.get("n") or 5)
             pick = order[:n] if q.get("desc", True) else order[::-1][:n]
-            return f"{'Top' if q.get('desc', True) else 'Bottom'} {len(pick)} by {what}{wt}: " + ", ".join(f"{a} {_fmt(b, col)}" for a, b in pick) + "."
-        return f"{what.capitalize()} by {by['name']}{wt}: " + ", ".join(f"{a} {_fmt(b, col if f2 != 'count' else None)}" for a, b in order[:12]) + \
-            (f" (and {len(order) - 12} more)" if len(order) > 12 else "") + "."
+            return (
+                f"{'Top' if q.get('desc', True) else 'Bottom'} {len(pick)} by {what}{wt}: " + ", ".join(f"{a} {_fmt(b, col)}" for a, b in pick) + "."
+            )
+        return (
+            f"{what.capitalize()} by {by['name']}{wt}: "
+            + ", ".join(f"{a} {_fmt(b, col if f2 != 'count' else None)}" for a, b in order[:12])
+            + (f" (and {len(order) - 12} more)" if len(order) > 12 else "")
+            + "."
+        )
     if fn == "distinct" and col:
         vs = sorted({str(r[col["name"]]) for r in rows if r[col["name"]] not in (None, "")})
         return f"{len(vs)} different {col['name']} value(s){wt}: " + ", ".join(vs[:12]) + ("..." if len(vs) > 12 else "") + "."
@@ -213,8 +250,11 @@ def _run_query(q, m, errors=None):
         nums.sort(key=lambda r: float(r[col["name"]]), reverse=(fn != "argmin" and q.get("desc", True)))
         if fn == "top":
             n = int(q.get("n") or 5)
-            return f"{'Top' if q.get('desc', True) else 'Bottom'} {min(n, len(nums))} by {col['name']}{wt}: " + \
-                ", ".join(f"{r[label['name']]} {_fmt(r[col['name']], col)}" for r in nums[:n]) + "."
+            return (
+                f"{'Top' if q.get('desc', True) else 'Bottom'} {min(n, len(nums))} by {col['name']}{wt}: "
+                + ", ".join(f"{r[label['name']]} {_fmt(r[col['name']], col)}" for r in nums[:n])
+                + "."
+            )
         r = nums[0]
         tie = [x for x in nums if float(x[col["name"]]) == float(r[col["name"]])]
         return f"{', '.join(str(x[label['name']]) for x in tie)}: {col['name']} {_fmt(r[col['name']], col)}{' (a tie)' if len(tie) > 1 else ''}{wt}."
@@ -233,9 +273,30 @@ class BookChat(DocChat):
         folder.mkdir(parents=True, exist_ok=True)
         v0 = folder / f"v0{src.suffix.lower()}"
         shutil.copy(src, v0)
-        state = {"id": cid, "kind": "xlsx", "base": str(src), "folder": str(folder), "cur": 0, "turns": [], "focus": None, "pending": None,
-                 "versions": [{"v": 0, "parent": None, "file": str(v0), "said": None, "done": ["the original file"], "failed": [], "checks": [],
-                               "errors": [], "pages": None, "pdf": None}]}
+        state = {
+            "id": cid,
+            "kind": "xlsx",
+            "base": str(src),
+            "folder": str(folder),
+            "cur": 0,
+            "turns": [],
+            "focus": None,
+            "pending": None,
+            "versions": [
+                {
+                    "v": 0,
+                    "parent": None,
+                    "file": str(v0),
+                    "said": None,
+                    "done": ["the original file"],
+                    "failed": [],
+                    "checks": [],
+                    "errors": [],
+                    "pages": None,
+                    "pdf": None,
+                }
+            ],
+        }
         kw.setdefault("render", True)
         c = cls(state, **kw)
         c._render(0)
@@ -309,11 +370,17 @@ class BookChat(DocChat):
 
     def _llm(self, clauses, message, done_ops, focus):
         if self.planner is None:
-            return {"ask": "I could not read: " + "; ".join(f"'{c}'" for c in clauses) + ". Try e.g. 'sort by amount, highest first' or 'add a column Total = Qty times Price'."}
+            return {
+                "ask": "I could not read: "
+                + "; ".join(f"'{c}'" for c in clauses)
+                + ". Try e.g. 'sort by amount, highest first' or 'add a column Total = Qty times Price'."
+            }
         self._turn["llm"] = True
         m = self.map()
-        user = (f"WORKBOOK:\n{XM.outline(m, rows=3)}\nMAIN TABLE: {m['main']}\nLAST TALKED ABOUT: {json.dumps(focus) if focus else 'none'}\n"
-                f"ALREADY DONE IN THIS MESSAGE: {json.dumps(done_ops)[:600] if done_ops else 'nothing'}\nWHOLE MESSAGE: {message}\nREQUESTS: {clauses}")
+        user = (
+            f"WORKBOOK:\n{XM.outline(m, rows=3)}\nMAIN TABLE: {m['main']}\nLAST TALKED ABOUT: {json.dumps(focus) if focus else 'none'}\n"
+            f"ALREADY DONE IN THIS MESSAGE: {json.dumps(done_ops)[:600] if done_ops else 'nothing'}\nWHOLE MESSAGE: {message}\nREQUESTS: {clauses}"
+        )
         try:
             r = self.planner._call("docs", [{"role": "system", "content": BOOK_SYSTEM}, {"role": "user", "content": user}])
             d = parse_json(r.text) or {}
@@ -339,8 +406,13 @@ class BookChat(DocChat):
         self._turn["llm"] = True
         m = self.map()
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": QUERY_SYSTEM},
-                                            {"role": "user", "content": f"WORKBOOK:\n{XM.outline(m, rows=4)}\nMAIN TABLE: {m['main']}\nQUESTION: {q}"}])
+            r = self.planner._call(
+                "fast",
+                [
+                    {"role": "system", "content": QUERY_SYSTEM},
+                    {"role": "user", "content": f"WORKBOOK:\n{XM.outline(m, rows=4)}\nMAIN TABLE: {m['main']}\nQUESTION: {q}"},
+                ],
+            )
             d = parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return f"I could not answer that just now ({type(e).__name__})."
@@ -355,7 +427,11 @@ class BookChat(DocChat):
 
     def answer(self, q):
         m = self.map()
-        parts = [p.strip() for p in re.split(r"\?\s*|\s+and\s+(?=(?:what|which|who|how|is|are|does|do)\b)|,\s*(?=(?:what|which|who|how)\b)", q) if p and p.strip()]
+        parts = [
+            p.strip()
+            for p in re.split(r"\?\s*|\s+and\s+(?=(?:what|which|who|how|is|are|does|do)\b)|,\s*(?=(?:what|which|who|how)\b)", q)
+            if p and p.strip()
+        ]
         outs, last = [], None
         for p in parts or [q]:
             qq = BP.question_query(p, m, self.state.get("focus"))
@@ -405,7 +481,11 @@ class BookChat(DocChat):
             keep = [op for op, x in zip(ops, res) if not x.get("dirty")]
             dirty = [x for x in res if x.get("dirty")]
             shutil.copy(self.path(v0), dst)
-            r = self._job({"app": "excel", "src": str(dst), "save": True, "ops": keep}) if keep else {"ok": True, "ops": [], "errors": self.version.get("errors")}
+            r = (
+                self._job({"app": "excel", "src": str(dst), "save": True, "ops": keep})
+                if keep
+                else {"ok": True, "ops": [], "errors": self.version.get("errors")}
+            )
             res = (r.get("ops") or []) + dirty
             ops = keep
         done = [x["done"] for x in res if not x.get("error")]
@@ -417,9 +497,25 @@ class BookChat(DocChat):
         before = Counter((e["sheet"], e["error"]) for e in self.version.get("errors") or [])
         after = Counter((e["sheet"], e["error"]) for e in r.get("errors") or [])
         new = after - before
-        checks.append({"op": "no new Excel errors", "ok": not new, "what": ", ".join(f"{k[1]} x{c} on {k[0]}" for k, c in new.items()) if new else "none"})
-        self.state["versions"].append({"v": n, "parent": v0, "file": str(dst), "said": said, "done": done, "failed": failed, "checks": checks,
-                                       "errors": r.get("errors") or [], "charts": r.get("charts"), "print_fit": r.get("print_fit") or [], "pages": None, "pdf": None})
+        checks.append(
+            {"op": "no new Excel errors", "ok": not new, "what": ", ".join(f"{k[1]} x{c} on {k[0]}" for k, c in new.items()) if new else "none"}
+        )
+        self.state["versions"].append(
+            {
+                "v": n,
+                "parent": v0,
+                "file": str(dst),
+                "said": said,
+                "done": done,
+                "failed": failed,
+                "checks": checks,
+                "errors": r.get("errors") or [],
+                "charts": r.get("charts"),
+                "print_fit": r.get("print_fit") or [],
+                "pages": None,
+                "pdf": None,
+            }
+        )
         self.state["cur"] = n
         turn["ops"] += ops
         bad = [c for c in checks if not c["ok"]]
@@ -428,7 +524,11 @@ class BookChat(DocChat):
             msg += f" ({', '.join(r['print_fit'])} now print{'s' if len(r['print_fit']) == 1 else ''} landscape, one page wide.)"
         if failed:
             msg += " Couldn't: " + "; ".join(failed) + "."
-        msg += f" Checked: {len(checks) - len(bad)}/{len(checks)} OK" + (" (" + "; ".join(f"{c['op']}: {c['what']}" for c in bad[:3]) + ")" if bad else "") + "."
+        msg += (
+            f" Checked: {len(checks) - len(bad)}/{len(checks)} OK"
+            + (" (" + "; ".join(f"{c['op']}: {c['what']}" for c in bad[:3]) + ")" if bad else "")
+            + "."
+        )
         return msg
 
     # ------------------------------------------------------------------ versions side by side, export

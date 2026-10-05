@@ -6,6 +6,7 @@ composition with keyframes inside After Effects. Checked by playing the Lottie f
 
   "after effects title: 'Eid Sale' subtitle 'Up to 50% off' blue background, 4 seconds"
 """
+
 import json
 import re
 import shutil
@@ -17,8 +18,19 @@ from ai_pc.core.config import ROOT
 NAME, LABEL = "aftereffects", "After Effects: title animations (Lottie + .jsx script)"
 EXAMPLES = ["after effects title: 'Eid Sale' subtitle 'Up to 50% off' blue background, 4 seconds"]
 LOTTIE_JS = ROOT / "tools" / "js" / "lottie.min.js"
-COLORS = {"blue": (0.09, 0.32, 0.62), "black": (0.07, 0.07, 0.09), "red": (0.72, 0.11, 0.11), "green": (0.11, 0.45, 0.24), "purple": (0.35, 0.16, 0.55),
-          "white": (1, 1, 1), "gold": (1, 0.76, 0.03), "yellow": (0.99, 0.85, 0.21), "orange": (0.98, 0.55, 0.0), "pink": (0.85, 0.11, 0.38), "grey": (0.4, 0.4, 0.42)}
+COLORS = {
+    "blue": (0.09, 0.32, 0.62),
+    "black": (0.07, 0.07, 0.09),
+    "red": (0.72, 0.11, 0.11),
+    "green": (0.11, 0.45, 0.24),
+    "purple": (0.35, 0.16, 0.55),
+    "white": (1, 1, 1),
+    "gold": (1, 0.76, 0.03),
+    "yellow": (0.99, 0.85, 0.21),
+    "orange": (0.98, 0.55, 0.0),
+    "pink": (0.85, 0.11, 0.38),
+    "grey": (0.4, 0.4, 0.42),
+}
 
 
 def _static(v):
@@ -42,9 +54,25 @@ def _ks(p, o=None, s=None):
 
 
 def _text(idx, name, text, size, color, frames, p, o, s=None):
-    return {"ddd": 0, "ind": idx, "ty": 5, "nm": name, "sr": 1, "ks": _ks(p, o, s), "ao": 0, "ip": 0, "op": frames, "st": 0, "bm": 0,
-            "t": {"d": {"k": [{"s": {"s": size, "f": "Arial-Bold", "t": text, "j": 2, "tr": 0, "lh": size * 1.2, "ls": 0, "fc": list(color)}, "t": 0}]},
-                  "p": {}, "m": {"g": 1, "a": _static([0, 0])}, "a": []}}
+    return {
+        "ddd": 0,
+        "ind": idx,
+        "ty": 5,
+        "nm": name,
+        "sr": 1,
+        "ks": _ks(p, o, s),
+        "ao": 0,
+        "ip": 0,
+        "op": frames,
+        "st": 0,
+        "bm": 0,
+        "t": {
+            "d": {"k": [{"s": {"s": size, "f": "Arial-Bold", "t": text, "j": 2, "tr": 0, "lh": size * 1.2, "ls": 0, "fc": list(color)}, "t": 0}]},
+            "p": {},
+            "m": {"g": 1, "a": _static([0, 0])},
+            "a": [],
+        },
+    }
 
 
 def lottie(title, subtitle="", bg="blue", seconds=4, fps=30, size=(1920, 1080), accent="gold"):
@@ -52,21 +80,87 @@ def lottie(title, subtitle="", bg="blue", seconds=4, fps=30, size=(1920, 1080), 
     frames = int(seconds * fps)
     tc = (1, 1, 1) if bg not in ("white", "yellow", "gold") else (0.07, 0.07, 0.09)
     title_size = max(40, min(180, int(w * 0.9 / max(4, len(title)) * 1.6)))
-    layers = [_text(1, "Title", title, title_size, tc, frames, _static([w / 2, h * 0.5, 0]), _anim((8, 0), (28, 100)), _anim((8, [80, 80, 100]), (28, [100, 100, 100])))]
+    layers = [
+        _text(
+            1,
+            "Title",
+            title,
+            title_size,
+            tc,
+            frames,
+            _static([w / 2, h * 0.5, 0]),
+            _anim((8, 0), (28, 100)),
+            _anim((8, [80, 80, 100]), (28, [100, 100, 100])),
+        )
+    ]
     if subtitle:
-        layers.append(_text(2, "Subtitle", subtitle, int(title_size * 0.42), COLORS.get(accent, COLORS["gold"]), frames,
-                            _anim((22, [w / 2, h * 0.68, 0]), (42, [w / 2, h * 0.64, 0])), _anim((22, 0), (42, 100))))
-    bar = {"ddd": 0, "ind": 3, "ty": 4, "nm": "Accent bar", "sr": 1, "ks": _ks(_static([w / 2, h * 0.56, 0]), None, _anim((0, [0, 100, 100]), (20, [100, 100, 100]))),
-           "ao": 0, "ip": 0, "op": frames, "st": 0, "bm": 0,
-           "shapes": [{"ty": "gr", "nm": "Bar", "it": [{"ty": "rc", "nm": "Rect", "s": _static([w * 0.5, h * 0.012]), "p": _static([0, 0]), "r": _static(6)},
-                                                      {"ty": "fl", "nm": "Fill", "c": _static(list(COLORS.get(accent, COLORS["gold"])) + [1]), "o": _static(100), "r": 1},
-                                                      {"ty": "tr", "p": _static([0, 0]), "a": _static([0, 0]), "s": _static([100, 100]), "r": _static(0), "o": _static(100)}]}]}
+        layers.append(
+            _text(
+                2,
+                "Subtitle",
+                subtitle,
+                int(title_size * 0.42),
+                COLORS.get(accent, COLORS["gold"]),
+                frames,
+                _anim((22, [w / 2, h * 0.68, 0]), (42, [w / 2, h * 0.64, 0])),
+                _anim((22, 0), (42, 100)),
+            )
+        )
+    bar = {
+        "ddd": 0,
+        "ind": 3,
+        "ty": 4,
+        "nm": "Accent bar",
+        "sr": 1,
+        "ks": _ks(_static([w / 2, h * 0.56, 0]), None, _anim((0, [0, 100, 100]), (20, [100, 100, 100]))),
+        "ao": 0,
+        "ip": 0,
+        "op": frames,
+        "st": 0,
+        "bm": 0,
+        "shapes": [
+            {
+                "ty": "gr",
+                "nm": "Bar",
+                "it": [
+                    {"ty": "rc", "nm": "Rect", "s": _static([w * 0.5, h * 0.012]), "p": _static([0, 0]), "r": _static(6)},
+                    {"ty": "fl", "nm": "Fill", "c": _static(list(COLORS.get(accent, COLORS["gold"])) + [1]), "o": _static(100), "r": 1},
+                    {"ty": "tr", "p": _static([0, 0]), "a": _static([0, 0]), "s": _static([100, 100]), "r": _static(0), "o": _static(100)},
+                ],
+            }
+        ],
+    }
     r, g, b = COLORS.get(bg, COLORS["blue"])
-    solid = {"ddd": 0, "ind": 4, "ty": 1, "nm": "Background", "sr": 1, "ks": _ks(_static([w / 2, h / 2, 0])), "ao": 0, "ip": 0, "op": frames, "st": 0, "bm": 0,
-             "sw": w, "sh": h, "sc": f"#{round(r * 255):02x}{round(g * 255):02x}{round(b * 255):02x}"}
+    solid = {
+        "ddd": 0,
+        "ind": 4,
+        "ty": 1,
+        "nm": "Background",
+        "sr": 1,
+        "ks": _ks(_static([w / 2, h / 2, 0])),
+        "ao": 0,
+        "ip": 0,
+        "op": frames,
+        "st": 0,
+        "bm": 0,
+        "sw": w,
+        "sh": h,
+        "sc": f"#{round(r * 255):02x}{round(g * 255):02x}{round(b * 255):02x}",
+    }
     solid["ks"]["a"] = _static([w / 2, h / 2, 0])
-    return {"v": "5.12.0", "fr": fps, "ip": 0, "op": frames, "w": w, "h": h, "nm": title, "ddd": 0, "assets": [],
-            "fonts": {"list": [{"fName": "Arial-Bold", "fFamily": "Arial", "fStyle": "Bold", "ascent": 71.6}]}, "layers": layers + [bar, solid]}
+    return {
+        "v": "5.12.0",
+        "fr": fps,
+        "ip": 0,
+        "op": frames,
+        "w": w,
+        "h": h,
+        "nm": title,
+        "ddd": 0,
+        "assets": [],
+        "fonts": {"list": [{"fName": "Arial-Bold", "fFamily": "Arial", "fStyle": "Bold", "ascent": 71.6}]},
+        "layers": layers + [bar, solid],
+    }
 
 
 def jsx(title, subtitle="", bg="blue", seconds=4, fps=30, size=(1920, 1080), accent="gold"):
@@ -124,11 +218,14 @@ def make(title, out, subtitle="", bg="blue", seconds=4, accent="gold"):
     (out / f"{stem}.jsx").write_text(jsx(title, subtitle, bg, seconds, accent=accent), encoding="utf-8")
     shutil.copyfile(LOTTIE_JS, out / "lottie.min.js")
     page = out / f"{stem}.preview.html"
-    page.write_text("<!doctype html><html><head><meta charset='utf-8'><style>html,body{margin:0;background:#000}#a{width:100vw;height:100vh}</style>"
-                    "<script src='lottie.min.js'></script></head><body><div id='a'></div><script>"
-                    f"var anim=lottie.loadAnimation({{container:document.getElementById('a'),renderer:'svg',loop:true,autoplay:!location.hash,animationData:{json.dumps(data)}}});"
-                    "if(location.hash){anim.addEventListener('DOMLoaded',function(){anim.goToAndStop(parseInt(location.hash.slice(1)),true);});}"
-                    "</script></body></html>", encoding="utf-8")
+    page.write_text(
+        "<!doctype html><html><head><meta charset='utf-8'><style>html,body{margin:0;background:#000}#a{width:100vw;height:100vh}</style>"
+        "<script src='lottie.min.js'></script></head><body><div id='a'></div><script>"
+        f"var anim=lottie.loadAnimation({{container:document.getElementById('a'),renderer:'svg',loop:true,autoplay:!location.hash,animationData:{json.dumps(data)}}});"
+        "if(location.hash){anim.addEventListener('DOMLoaded',function(){anim.goToAndStop(parseInt(location.hash.slice(1)),true);});}"
+        "</script></body></html>",
+        encoding="utf-8",
+    )
     return data, {"lottie": out / f"{stem}.json", "jsx": out / f"{stem}.jsx", "preview": page}
 
 
@@ -136,6 +233,7 @@ def check(data, files):
     from PIL import Image, ImageChops, ImageStat
 
     from ai_pc.core import headless
+
     shots = []
     for f in (0, data["op"] - 1):
         p = files["preview"].with_name(files["preview"].stem + f".f{f}.png")
@@ -165,14 +263,22 @@ def parse(text, ctx):
     s = re.search(r"\bsubtitle\s*:?\s*['\"]([^'\"]+)['\"]", text, re.I)
     bg = re.search(r"\b(" + "|".join(COLORS) + r")\s+background\b|\bbackground\s+(" + "|".join(COLORS) + r")\b", c)
     secs = re.search(r"\b(\d{1,2}(?:\.\d)?)\s*(?:seconds?|secs?|s)\b", c)
-    return {"op": "title", "title": t.group(1), "subtitle": s.group(1) if s else "", "bg": (bg.group(1) or bg.group(2)) if bg else "blue",
-            "seconds": float(secs.group(1)) if secs else 4}
+    return {
+        "op": "title",
+        "title": t.group(1),
+        "subtitle": s.group(1) if s else "",
+        "bg": (bg.group(1) or bg.group(2)) if bg else "blue",
+        "seconds": float(secs.group(1)) if secs else 4,
+    }
 
 
 def run(op, ctx):
     data, files = make(op["title"], Path(ctx["out"]) / "aftereffects", op.get("subtitle", ""), op.get("bg", "blue"), op.get("seconds", 4))
     checks = check(data, files)
     bad = [w for w, ok in checks if not ok]
-    return (f"Title animation '{op['title']}' ({op.get('seconds', 4):g} s at 30 fps): Lottie {files['lottie']} (websites and apps play it; preview "
-            f"{files['preview'].name}), After Effects script {files['jsx'].name} (File > Scripts > Run Script File builds the composition). " +
-            ("Checked: " + "; ".join(w for w, _ in checks) if not bad else "NOT right: " + "; ".join(bad)) + ".")
+    return (
+        f"Title animation '{op['title']}' ({op.get('seconds', 4):g} s at 30 fps): Lottie {files['lottie']} (websites and apps play it; preview "
+        f"{files['preview'].name}), After Effects script {files['jsx'].name} (File > Scripts > Run Script File builds the composition). "
+        + ("Checked: " + "; ".join(w for w, _ in checks) if not bad else "NOT right: " + "; ".join(bad))
+        + "."
+    )

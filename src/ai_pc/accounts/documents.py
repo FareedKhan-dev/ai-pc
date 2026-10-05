@@ -8,6 +8,7 @@ When FBR's digital invoicing has given the invoice its number, that number and i
 
   make(books, doc, folder) -> {"pdf", "html", "checks": [...]}
 """
+
 import base64
 import html
 import io
@@ -17,8 +18,15 @@ from ai_pc.accounts.money import rs, words
 from ai_pc.core.config import STATE
 
 OUT = STATE / "accounts" / "documents"
-TITLE = {"invoice": "INVOICE", "quote": "QUOTATION", "receipt": "PAYMENT RECEIPT", "credit_note": "CREDIT NOTE", "bill": "PURCHASE BILL",
-         "payment": "PAYMENT VOUCHER", "statement": "STATEMENT OF ACCOUNT"}
+TITLE = {
+    "invoice": "INVOICE",
+    "quote": "QUOTATION",
+    "receipt": "PAYMENT RECEIPT",
+    "credit_note": "CREDIT NOTE",
+    "bill": "PURCHASE BILL",
+    "payment": "PAYMENT VOUCHER",
+    "statement": "STATEMENT OF ACCOUNT",
+}
 
 CSS = """
 @page { size: A4; margin: 14mm 13mm 16mm 13mm; }
@@ -63,6 +71,7 @@ def _e(s):
 def day(s):
     """'2026-07-10' -> '10 Jul 2026' (as people write dates on invoices)."""
     import datetime as dt
+
     try:
         return dt.date.fromisoformat(str(s)).strftime("%d %b %Y").lstrip("0")
     except ValueError:
@@ -72,6 +81,7 @@ def day(s):
 def _qr_svg(text, version=None):
     """A QR code as an inline SVG; FBR's digital invoice code is version 2 (25 x 25 modules), printed 1 x 1 inch."""
     import segno
+
     buf = io.BytesIO()
     segno.make(text, error="l" if version else "m", version=version).save(buf, kind="svg", scale=2, border=1)
     return "data:image/svg+xml;base64," + base64.b64encode(buf.getvalue()).decode()
@@ -135,8 +145,15 @@ def html_for(b, d):
     meta_html = "".join(f'<tr><td class="muted">{_e(k)}</td><td><b>{_e(v)}</b></td></tr>' for k, v in meta)
     head = f"""<div class="top"><div class="biz">{_biz(c)}</div>
 <div class="doc"><h2>{_e(title)}</h2><table>{meta_html}</table><div style="margin-top:6px">{stamp}</div></div></div>"""
-    party_label = {"invoice": "BILL TO", "quote": "PREPARED FOR", "receipt": "RECEIVED FROM", "credit_note": "CREDIT TO", "bill": "SUPPLIER",
-                   "payment": "PAID TO", "statement": "ACCOUNT"}.get(kind, "TO")
+    party_label = {
+        "invoice": "BILL TO",
+        "quote": "PREPARED FOR",
+        "receipt": "RECEIVED FROM",
+        "credit_note": "CREDIT TO",
+        "bill": "SUPPLIER",
+        "payment": "PAID TO",
+        "statement": "ACCOUNT",
+    }.get(kind, "TO")
     body = f'<div class="parties">{_party(d.get("party"), party_label)}</div>'
     if kind in ("invoice", "quote", "credit_note", "bill"):
         t = d["totals"]
@@ -147,8 +164,15 @@ def html_for(b, d):
         for i, ln in enumerate(d["lines"], 1):
             desc = _e(ln["description"]) + (f'<div class="muted small">HS code {_e(ln["hs_code"])}</div>' if ln.get("hs_code") else "")
             q = ln["qty"].rstrip("0").rstrip(".") if "." in ln["qty"] else ln["qty"]
-            cells = [f'<td class="l">{i}</td>', f'<td class="l">{desc}</td>', f"<td>{_e(q)} {_e(ln.get('unit') or '')}</td>", f"<td>{rs(ln['rate'], '')}</td>",
-                     f"<td>{rs(ln['amount'], '')}</td>", f"<td>{_e(ln['tax_rate'] + '%') if ln.get('tax_rate') else '-'}</td>", f"<td>{rs(ln['tax'], '')}</td>"]
+            cells = [
+                f'<td class="l">{i}</td>',
+                f'<td class="l">{desc}</td>',
+                f"<td>{_e(q)} {_e(ln.get('unit') or '')}</td>",
+                f"<td>{rs(ln['rate'], '')}</td>",
+                f"<td>{rs(ln['amount'], '')}</td>",
+                f"<td>{_e(ln['tax_rate'] + '%') if ln.get('tax_rate') else '-'}</td>",
+                f"<td>{rs(ln['tax'], '')}</td>",
+            ]
             if further:
                 cells.append(f"<td>{rs(ln.get('further_tax') or 0, '')}</td>")
             cells.append(f"<td>{rs(ln['amount'] + ln['tax'] + (ln.get('further_tax') or 0), '')}</td>")
@@ -162,10 +186,10 @@ def html_for(b, d):
         if kind in ("invoice", "bill") and d.get("paid"):
             cred = d.get("credited") or 0
             if d["paid"] - cred:
-                tot_html += f'<tr><td>Paid</td><td>{rs(d["paid"] - cred)}</td></tr>'
+                tot_html += f"<tr><td>Paid</td><td>{rs(d['paid'] - cred)}</td></tr>"
             if cred:
-                tot_html += f'<tr><td>Credited (returns)</td><td>{rs(cred)}</td></tr>'
-            tot_html += f'<tr><td><b>Balance due</b></td><td><b>{rs(d["balance"])}</b></td></tr>'
+                tot_html += f"<tr><td>Credited (returns)</td><td>{rs(cred)}</td></tr>"
+            tot_html += f"<tr><td><b>Balance due</b></td><td><b>{rs(d['balance'])}</b></td></tr>"
         body += f'<div class="sum"><div class="words">{_e(words(t["total"]))}</div><table class="totals">{tot_html}</table></div>'
     elif kind in ("receipt", "payment"):
         amt, wht = d.get("amount", 0), d.get("withheld", 0)
@@ -178,22 +202,28 @@ def html_for(b, d):
     fbr = fbr_number(d)
     if fbr:  # the FBR Digital Invoicing logo (FBR gives it to integrated businesses: put it in state/accounts/fbr_di_logo.png) and the QR code
         logo = _logo(c.get("fbr_logo") or STATE / "accounts" / "fbr_di_logo.png")
-        body += f'<div class="fbr">{logo}<img src="{_qr_svg(fbr, version=2)}" style="width:1in;height:1in"><div><b>FBR Digital Invoicing System</b><br>' \
-                f'FBR invoice number: <b>{_e(fbr)}</b></div></div>'
+        body += (
+            f'<div class="fbr">{logo}<img src="{_qr_svg(fbr, version=2)}" style="width:1in;height:1in"><div><b>FBR Digital Invoicing System</b><br>'
+            f"FBR invoice number: <b>{_e(fbr)}</b></div></div>"
+        )
     if d.get("notes"):
         body += f'<div class="note"><b>Notes:</b> {_e(d["notes"])}</div>'
     bank = c.get("bank")
-    foot = '<div class="foot"><div class="bank small">' + (f"<b>Pay to:</b> {_e(bank)}<br>" if bank and kind in ("invoice", "quote") else "") + \
-        ("Prices are valid until the date above.<br>" if kind == "quote" else "") + \
-        '<span class="muted">This document was made by computer and needs no signature.</span></div>' \
+    foot = (
+        '<div class="foot"><div class="bank small">'
+        + (f"<b>Pay to:</b> {_e(bank)}<br>" if bank and kind in ("invoice", "quote") else "")
+        + ("Prices are valid until the date above.<br>" if kind == "quote" else "")
+        + '<span class="muted">This document was made by computer and needs no signature.</span></div>'
         '<div class="sign">Authorised signature</div></div>'
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{_e(title)} {_e(d['number'])}</title><style>{CSS}</style></head>
+    )
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{_e(title)} {_e(d["number"])}</title><style>{CSS}</style></head>
 <body>{head}{body}{foot}</body></html>"""
 
 
 def make(b, d, folder=None):
     """The document as PDF (and its HTML), then checked by reading the PDF's text back."""
     from ai_pc.core import headless
+
     folder = Path(folder or OUT)
     folder.mkdir(parents=True, exist_ok=True)
     if d["kind"] == "receipt":
@@ -208,19 +238,26 @@ def make(b, d, folder=None):
 
 def check_pdf(pdf, b, d):
     from pypdf import PdfReader
+
     r = PdfReader(str(pdf))
     text = " ".join((p.extract_text() or "") for p in r.pages)
     flat = " ".join(text.split())
     c = b.company()
-    out = [{"ok": d["number"] in flat, "what": f"the number {d['number']} is on it"},
-           {"ok": not d.get("party") or d["party"]["name"] in flat, "what": "the customer's or supplier's name is on it"},
-           {"ok": len(r.pages) <= max(1, (len(d.get("lines") or []) + 11) // 22 + 1), "what": f"{len(r.pages)} page(s)"}]
+    out = [
+        {"ok": d["number"] in flat, "what": f"the number {d['number']} is on it"},
+        {"ok": not d.get("party") or d["party"]["name"] in flat, "what": "the customer's or supplier's name is on it"},
+        {"ok": len(r.pages) <= max(1, (len(d.get("lines") or []) + 11) // 22 + 1), "what": f"{len(r.pages)} page(s)"},
+    ]
     if d.get("totals"):
         out.append({"ok": rs(d["totals"]["total"]) in flat, "what": f"the total {rs(d['totals']['total'])} is on it"})
         out.append({"ok": " ".join(words(d["totals"]["total"]).split()[:4]) in flat, "what": "the total in words is on it"})
     if d["kind"] == "invoice" and d.get("totals", {}).get("tax") and c.get("strn"):
-        out.append({"ok": "SALES TAX INVOICE" in flat and c["strn"] in flat and (not c.get("ntn") or c["ntn"] in flat),
-                    "what": "a sales tax invoice with the business's NTN and STRN"})
+        out.append(
+            {
+                "ok": "SALES TAX INVOICE" in flat and c["strn"] in flat and (not c.get("ntn") or c["ntn"] in flat),
+                "what": "a sales tax invoice with the business's NTN and STRN",
+            }
+        )
         p = d.get("party") or {}
         if p.get("strn"):
             out.append({"ok": p["strn"] in flat, "what": "the buyer's STRN is on it"})

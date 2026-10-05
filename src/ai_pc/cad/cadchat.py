@@ -7,6 +7,7 @@ every version drawn (DXF), printed (PDF, PNG) and checked.
   c.say("export the pdf")  /  c.say("undo")  /  c.say("go back to v1")
   c.say("a 200 x 100 x 10 plate with 4 holes of 12 mm 20 mm from the corners")  /  c.say("give me the laser cut file")
 """
+
 import datetime as dt
 import json
 import re
@@ -29,7 +30,9 @@ UNDO = re.compile(r"^\s*(?:undo|revert|go back|take (?:that|it) back)\b(?!.*\bv\
 REDO = re.compile(r"^\s*redo\b", re.I)
 GOTO = re.compile(r"\b(?:go back to|back to|use|show me|switch to)\s+(?:version\s*|v)(\d+)\b", re.I)
 HISTORY = re.compile(r"^\s*(?:history|versions|what (?:did you|have you) (?:do|done|change|changed))\b", re.I)
-SPLIT = re.compile(r"(?<=[.!?;])\s+|,?\s+(?:and then|then|also)\s+|,?\s+and\s+(?=(?:make|add|remove|put|move|export|save|give|use|round|chamfer|change)\b)", re.I)
+SPLIT = re.compile(
+    r"(?<=[.!?;])\s+|,?\s+(?:and then|then|also)\s+|,?\s+and\s+(?=(?:make|add|remove|put|move|export|save|give|use|round|chamfer|change)\b)", re.I
+)
 
 CAD_SYSTEM = """You turn a person's request about a drawing into changes for a drafting program. Reply with ONE JSON object:
 {"ops": [...]} or {"ask": "<short question back>"}. Operations:
@@ -115,7 +118,10 @@ class CadChat:
                     kind = o["op"] if o["op"] in ("house", "part") else kind
             if ops:
                 out.append(self._apply(ops, message))
-        reply = "\n".join(x for x in out if x).strip() or "Tell me what to draw, e.g. 'a 5 marla house with 3 bedrooms' or 'a 200 x 100 x 10 plate with 4 holes of 12 mm'."
+        reply = (
+            "\n".join(x for x in out if x).strip()
+            or "Tell me what to draw, e.g. 'a 5 marla house with 3 bedrooms' or 'a 200 x 100 x 10 plate with 4 holes of 12 mm'."
+        )
         turn.update(reply=reply, seconds=round(time.perf_counter() - t0, 2), v_to=self.state["cur"])
         self.state["turns"].append(turn)
         self.last_turn = turn
@@ -124,17 +130,25 @@ class CadChat:
 
     def _llm(self, clause, message):
         if self.planner is None:
-            return {"ops": [], "ask": f"I could not read '{clause}'. Try e.g. 'a 10 marla house with 3 bedrooms', 'make the kitchen bigger', 'export the pdf'."}
+            return {
+                "ops": [],
+                "ask": f"I could not read '{clause}'. Try e.g. 'a 10 marla house with 3 bedrooms', 'make the kitchen bigger', 'export the pdf'.",
+            }
         self._turn["llm"] = True
         cur = self.cur()
-        user = f"NOW DRAWING: {json.dumps(cur['spec']) if cur else 'nothing yet'} ({cur['kind'] if cur else '-'})\nMESSAGE: {message}\nREQUEST: {clause}"
+        user = (
+            f"NOW DRAWING: {json.dumps(cur['spec']) if cur else 'nothing yet'} ({cur['kind'] if cur else '-'})\nMESSAGE: {message}\nREQUEST: {clause}"
+        )
         try:
             r = self.planner._call("fast", [{"role": "system", "content": CAD_SYSTEM}, {"role": "user", "content": user}])
             d = parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return {"ops": [], "ask": f"I could not work that out ({type(e).__name__})."}
-        ops = [o for o in d.get("ops") or [] if isinstance(o, dict) and o.get("op") in ("house", "set", "grow", "size", "bedrooms", "part", "export", "paper",
-                                                                                       "scale", "ask")]
+        ops = [
+            o
+            for o in d.get("ops") or []
+            if isinstance(o, dict) and o.get("op") in ("house", "set", "grow", "size", "bedrooms", "part", "export", "paper", "scale", "ask")
+        ]
         return {"ops": ops, "ask": d.get("ask") if not ops else None}
 
     # ---------------------------------------------------------------- doing
@@ -212,8 +226,10 @@ class CadChat:
                 sized = [o for o in ops if o["op"] == "size"]
                 if sized and isinstance(e, F.PlanError):
                     o = sized[-1]
-                    lines.append(f"{o['room'].replace('bed', 'Bed Room ').title() if o['room'].startswith('bed') else o['room'].title()} can't be "
-                                 f"{o['w']:g}' x {o['d']:g}' on this plot: the rooms beside it are already at their smallest. The plan stays as it is.")
+                    lines.append(
+                        f"{o['room'].replace('bed', 'Bed Room ').title() if o['room'].startswith('bed') else o['room'].title()} can't be "
+                        f"{o['w']:g}' x {o['d']:g}' on this plot: the rooms beside it are already at their smallest. The plan stays as it is."
+                    )
                 else:
                     lines.append(f"Couldn't draw that: {e}.")
         for a in asks:
@@ -229,19 +245,27 @@ class CadChat:
             return None
         new = _house_info(lay)
         dropped = [d for d in lay.get("dropped", []) if (spec.get(d) and not cur["spec"].get(d)) or d not in cur["info"].get("dropped", [])]
-        same_sheet = sheet == (cur.get("sheet_opts") or {}) and all(spec.get(k) == cur["spec"].get(k) for k in ("name", "client", "facing", "furniture"))
+        same_sheet = sheet == (cur.get("sheet_opts") or {}) and all(
+            spec.get(k) == cur["spec"].get(k) for k in ("name", "client", "facing", "furniture")
+        )
         if new["sig"] == cur["info"].get("sig") and same_sheet:
             return ((new["notes"][0][0].upper() + new["notes"][0][1:] + ". ") if dropped else "") + f"The plan stays as v{cur['v']}."
         old_ids, new_ids = set(cur["info"]["rects"]["ground"]), set(new["rects"]["ground"])
-        meant = {k for k in ("porch", "drawing", "dining", "store", "powder", "servant", "guest") if cur["spec"].get(k, k in ("porch", "drawing")) and not spec.get(k, True)}
+        meant = {
+            k
+            for k in ("porch", "drawing", "dining", "store", "powder", "servant", "guest")
+            if cur["spec"].get(k, k in ("porch", "drawing")) and not spec.get(k, True)
+        }
         meant |= {i for i in old_ids if i.startswith("bed") and i[3:].isdigit() and int(i[3:]) > int(spec.get("bedrooms", 2))}
         lost = [cur["info"]["labels"].get(i, i).title() for i in sorted(old_ids - new_ids - meant) if i != "passage"]
         if lost:  # never a room the person did not ask to lose
             sized = [o for o in ops if o["op"] == "size"]
             if sized:
                 o = sized[-1]
-                return (f"{_room_words(o['room'])} can't be {o['w']:g}' x {o['d']:g}' on this plot without losing {', '.join(lost)}. "
-                        f"The plan stays as v{cur['v']}.")
+                return (
+                    f"{_room_words(o['room'])} can't be {o['w']:g}' x {o['d']:g}' on this plot without losing {', '.join(lost)}. "
+                    f"The plan stays as v{cur['v']}."
+                )
             return f"That would leave no room for {', '.join(lost)}, so I kept v{cur['v']}."
         was_ok = not any(c for c in cur["checks"] if not c["ok"] and c["level"] == "fail")
         bad = [c["what"] for c in CK.design(lay) if not c["ok"] and c["level"] == "fail"]
@@ -255,15 +279,25 @@ class CadChat:
         rects = info["rects"]["ground"]
         ids = _ids_for(room, info)
         if not ids:
-            return None, None, f"There is no {room.replace('bed', 'bedroom ')} in this plan" + (f"; say 'add a {room}'" if room in ("dining", "store", "powder", "servant", "guest") else "") + "."
+            return (
+                None,
+                None,
+                f"There is no {room.replace('bed', 'bedroom ')} in this plan"
+                + (f"; say 'add a {room}'" if room in ("dining", "store", "powder", "servant", "guest") else "")
+                + ".",
+            )
         if "stairs" in ids:
-            return None, None, "The stairs are sized by their flights (a dog-leg 6'-6\" x 10', a straight flight 3'-6\" x 12'-6\"); say 'straight stairs' or 'dog-leg stairs'."
+            return (
+                None,
+                None,
+                "The stairs are sized by their flights (a dog-leg 6'-6\" x 10', a straight flight 3'-6\" x 12'-6\"); say 'straight stairs' or 'dog-leg stairs'.",
+            )
         key = "bedroom" if room == "bedroom" and len(ids) > 1 else ids[0]
         label = "bedrooms" if key == "bedroom" else info["labels"][ids[0]].lower()
         lim_key, other, sign = ("min", "max", 1) if by > 0 else ("max", "min", -1)
         base = [min(rects[i][2] - rects[i][0] for i in ids), min(rects[i][3] - rects[i][1] for i in ids)]
         why, found = {}, []
-        for step in ((24, 12, 6) if abs(by) > 1 else (12, 6)):
+        for step in (24, 12, 6) if abs(by) > 1 else (12, 6):
             for ax in (0, 1):
                 s2 = json.loads(json.dumps(spec))
                 lim = dict(s2.get(lim_key) or {})
@@ -294,15 +328,27 @@ class CadChat:
                 elif gain < 3:
                     why[ax] = "nothing around it can give way"
                 else:
-                    moved = sum(abs((g[i][2] - g[i][0]) - (rects[i][2] - rects[i][0])) + abs((g[i][3] - g[i][1]) - (rects[i][3] - rects[i][1]))
-                                for i in rects if i in g and i not in ids) / 12  # feet the other rooms change by
+                    moved = (
+                        sum(
+                            abs((g[i][2] - g[i][0]) - (rects[i][2] - rects[i][0])) + abs((g[i][3] - g[i][1]) - (rects[i][3] - rects[i][1]))
+                            for i in rects
+                            if i in g and i not in ids
+                        )
+                        / 12
+                    )  # feet the other rooms change by
                     found.append((lay["score"] + 0.5 * moved, -gain, ax, s2, lay))
             if found:
                 break
         if not found:
             w = "bigger" if by > 0 else "smaller"
-            return None, None, (f"The {label} can't get {w} on this plot: in width, {why.get(0, 'no change')}; in depth, {why.get(1, 'no change')}. "
-                                f"The plan stays as it is.")
+            return (
+                None,
+                None,
+                (
+                    f"The {label} can't get {w} on this plot: in width, {why.get(0, 'no change')}; in depth, {why.get(1, 'no change')}. "
+                    f"The plan stays as it is."
+                ),
+            )
         _, _, _, s2, lay = min(found, key=lambda f: (round(f[0], 1), f[1]))
         return s2, lay, None
 
@@ -329,8 +375,19 @@ class CadChat:
         files["dxf"] = str(stem.with_suffix(".dxf"))
         if kind == "part":
             files["cut"] = str(stem.with_name(stem.name + "_cut.dxf"))
-        v = {"v": n, "kind": kind, "spec": spec, "sheet_opts": sheet, "said": said, "files": files, "checks": checks, "info": info, "when": _when(),
-             "seconds": round(time.perf_counter() - t0, 2), "parent": self.state["cur"]}
+        v = {
+            "v": n,
+            "kind": kind,
+            "spec": spec,
+            "sheet_opts": sheet,
+            "said": said,
+            "files": files,
+            "checks": checks,
+            "info": info,
+            "when": _when(),
+            "seconds": round(time.perf_counter() - t0, 2),
+            "parent": self.state["cur"],
+        }
         self.state["versions"].append(v)
         self.state["cur"] = n
         self.state["redo"] = []
@@ -341,23 +398,35 @@ class CadChat:
         ck = CK.text_of(checks)
         if v["kind"] == "part":
             s = v["spec"]
-            what = (f"{s['w']:g} x {s['h']:g} x {s['t']:g} mm plate" if s["kind"] == "plate" else
-                    f"flange OD {s['od']:g}, bore {s['id']:g}, {s['n']} x Ø{s['hole_d']:g} on {s['pcd']:g} PCD, {s['t']:g} thick")
-            return (f"v{v['v']}: {what}, {info['holes']} hole(s), scale {info['scale']} on {info['paper']}. Files: {Path(v['files']['dxf']).name} (drawing), "
-                    f"{Path(v['files']['cut']).name} (1:1 cut file for a laser), {Path(v['files']['pdf']).name}. ({ck})")
+            what = (
+                f"{s['w']:g} x {s['h']:g} x {s['t']:g} mm plate"
+                if s["kind"] == "plate"
+                else f"flange OD {s['od']:g}, bore {s['id']:g}, {s['n']} x Ø{s['hole_d']:g} on {s['pcd']:g} PCD, {s['t']:g} thick"
+            )
+            return (
+                f"v{v['v']}: {what}, {info['holes']} hole(s), scale {info['scale']} on {info['paper']}. Files: {Path(v['files']['dxf']).name} (drawing), "
+                f"{Path(v['files']['cut']).name} (1:1 cut file for a laser), {Path(v['files']['pdf']).name}. ({ck})"
+            )
         W, D = info["plot"]
         rooms = info["summary"]["rooms"]
-        head = (f"v{v['v']}: {'ground and first floor plans' if info['floors'] > 1 else 'ground floor plan'} for a {W:g}' x {D:g}' plot "
-                f"({marla_of(W, D):.1f} marla), 1:{info['scale']} on {info['paper']}. Covered {info['summary']['covered_sqft']:,} sq ft"
-                + (f" + {info['upper']['covered_sqft']:,} upstairs" if info.get("upper") else "") + ".")
+        head = (
+            f"v{v['v']}: {'ground and first floor plans' if info['floors'] > 1 else 'ground floor plan'} for a {W:g}' x {D:g}' plot "
+            f"({marla_of(W, D):.1f} marla), 1:{info['scale']} on {info['paper']}. Covered {info['summary']['covered_sqft']:,} sq ft"
+            + (f" + {info['upper']['covered_sqft']:,} upstairs" if info.get("upper") else "")
+            + "."
+        )
         if before and before["kind"] == "house":
             old = {r["id"]: r for r in before["info"]["summary"]["rooms"]}
             new = {r["id"]: r for r in rooms}
             diffs = [f"{r['label'].title()} {old[i]['size']} -> {r['size']}" for i, r in new.items() if i in old and old[i]["size"] != r["size"]]
             added = [r["label"].title() for i, r in new.items() if i not in old]
             gone = [old[i]["label"].title() for i in old if i not in new]
-            change = "; ".join(([f"added {', '.join(added)}"] if added else []) + ([f"removed {', '.join(gone)}"] if gone else []) + diffs[:6]
-                               + ([f"{len(diffs) - 6} more"] if len(diffs) > 6 else []))
+            change = "; ".join(
+                ([f"added {', '.join(added)}"] if added else [])
+                + ([f"removed {', '.join(gone)}"] if gone else [])
+                + diffs[:6]
+                + ([f"{len(diffs) - 6} more"] if len(diffs) > 6 else [])
+            )
             if info.get("upper") and not before["info"].get("upper"):
                 ups = [r["label"].title() for r in info["upper"]["rooms"] if not r["label"].startswith("BATH") and r["id"] != "stairs"]
                 change = "; ".join(x for x in (change, f"first floor added: {', '.join(ups)}") if x)
@@ -365,8 +434,11 @@ class CadChat:
                 change = "; ".join(x for x in (change, "first floor removed") if x)
             body = f"Changed: {change}." if change else "No room changed size."
         else:
-            body = "Rooms: " + "; ".join(f"{r['label'].title()} {r['size']}" for r in rooms if not r["label"].startswith("BATH")) + \
-                f"; {sum(1 for r in rooms if r['label'].startswith('BATH'))} attached bath(s)."
+            body = (
+                "Rooms: "
+                + "; ".join(f"{r['label'].title()} {r['size']}" for r in rooms if not r["label"].startswith("BATH"))
+                + f"; {sum(1 for r in rooms if r['label'].startswith('BATH'))} attached bath(s)."
+            )
         notes = ("Notes: " + "; ".join(info["notes"][:4]) + ".") if info["notes"] else ""
         return f"{head} {body} {notes} Files: {Path(v['files']['dxf']).name} (AutoCAD), {Path(v['files']['pdf']).name}, {Path(v['files']['png']).name}. ({ck})"
 
@@ -378,24 +450,31 @@ class CadChat:
         w = a["what"]
         if w == "checks":
             bad = [c for c in v["checks"] if not c["ok"]]
-            return ("All checks pass: " + CK.text_of(v["checks"]) + "." if not bad else "To look at: " + "; ".join(c["what"] for c in bad) + ".") + \
-                (" Notes: " + "; ".join(v["info"].get("notes", [])) + "." if v["info"].get("notes") else "")
+            return ("All checks pass: " + CK.text_of(v["checks"]) + "." if not bad else "To look at: " + "; ".join(c["what"] for c in bad) + ".") + (
+                " Notes: " + "; ".join(v["info"].get("notes", [])) + "." if v["info"].get("notes") else ""
+            )
         if v["kind"] != "house":
             return "That question is for house plans."
         info = v["info"]
         if w == "area":
             W, D = info["plot"]
             cov = info["summary"]["covered_sqft"] + (info["upper"]["covered_sqft"] if info.get("upper") else 0)
-            return (f"Plot {W:g}' x {D:g}' = {W * D:,.0f} sq ft ({marla_of(W, D):.1f} marla of 225 sq ft). Covered {cov:,} sq ft"
-                    + (f" on 2 floors ({info['summary']['covered_sqft']:,} on the ground floor, {info['summary']['covered_sqft'] / (W * D):.0%} of the plot)." if info.get("upper")
-                       else f" ({info['summary']['covered_sqft'] / (W * D):.0%} of the plot)."))
+            return f"Plot {W:g}' x {D:g}' = {W * D:,.0f} sq ft ({marla_of(W, D):.1f} marla of 225 sq ft). Covered {cov:,} sq ft" + (
+                f" on 2 floors ({info['summary']['covered_sqft']:,} on the ground floor, {info['summary']['covered_sqft'] / (W * D):.0%} of the plot)."
+                if info.get("upper")
+                else f" ({info['summary']['covered_sqft'] / (W * D):.0%} of the plot)."
+            )
         if w == "rooms":
             parts = [f"{r['label'].title()} {r['size']} ({r['area_sqft']:.0f} sq ft)" for r in info["summary"]["rooms"]]
             up = [f"{r['label'].title()} {r['size']}" for r in (info.get("upper") or {}).get("rooms", [])]
             return "Ground floor: " + "; ".join(parts) + "." + (" First floor: " + "; ".join(up) + "." if up else "")
         if w == "room":
             rid = a.get("room")
-            hits = [r for r in info["summary"]["rooms"] if r["id"] == rid or r["id"].startswith(rid or "~") or (rid == "bedroom" and r["id"].startswith("bed") and "_" not in r["id"])]
+            hits = [
+                r
+                for r in info["summary"]["rooms"]
+                if r["id"] == rid or r["id"].startswith(rid or "~") or (rid == "bedroom" and r["id"].startswith("bed") and "_" not in r["id"])
+            ]
             if not hits:
                 return f"There is no {rid} in this plan."
             return "; ".join(f"{r['label'].title()}: {r['size']} clear, {r['area_sqft']:.0f} sq ft" for r in hits) + "."
@@ -406,6 +485,7 @@ class CadChat:
             def beds(lay):
                 down = sum(1 for r in lay["rooms"] if r["kind"] == "bedroom")
                 return down, (sum(1 for r in lay["upper"]["rooms"] if r["kind"] == "bedroom") if lay.get("upper") else 0)
+
             try:
                 lay = F.plan(dict(v["spec"], bedrooms=n), budget_s=1.5)
                 down, up = beds(lay)
@@ -421,8 +501,9 @@ class CadChat:
                 d2, u2 = beds(two)
             except F.PlanError:
                 d2 = u2 = 0
-            return (f"Not on one floor: only {down} bedroom(s) with baths fit on the ground floor of a {W:g}' x {v['info']['plot'][1]:g}' plot." +
-                    (f" Double story gives {d2 + u2} ({d2} down, {u2} up): say 'make it double story'." if d2 + u2 >= n else ""))
+            return f"Not on one floor: only {down} bedroom(s) with baths fit on the ground floor of a {W:g}' x {v['info']['plot'][1]:g}' plot." + (
+                f" Double story gives {d2 + u2} ({d2} down, {u2} up): say 'make it double story'." if d2 + u2 >= n else ""
+            )
         return ""
 
     def export(self, fmt="pdf", paper=None):
@@ -434,8 +515,10 @@ class CadChat:
         out_dir = self.folder / "exports"
         out_dir.mkdir(exist_ok=True)
         if fmt == "dwg":
-            return ("A DWG needs the free ODA File Converter (a separate install I have not set up here). AutoCAD, BricsCAD and DraftSight open "
-                    "the DXF directly: " + self.export("dxf"))
+            return (
+                "A DWG needs the free ODA File Converter (a separate install I have not set up here). AutoCAD, BricsCAD and DraftSight open "
+                "the DXF directly: " + self.export("dxf")
+            )
         if fmt == "cut" and v["kind"] != "part":
             return "A cut file is for parts (plates, flanges); for a plan, the DXF is the CAD file: " + self.export("dxf")
         src = Path(v["files"]["cut" if fmt == "cut" else fmt])
@@ -448,8 +531,12 @@ class CadChat:
         dst = out_dir / re.sub(r'[<>:"/\\|?*]+', "-", name)
         shutil.copy2(src, dst)
         self.state["exports"].append({"path": str(dst), "v": v["v"], "fmt": fmt})
-        extra = {"pdf": f" ({v['info']['paper']}, true to scale)", "dxf": " (opens in AutoCAD, BricsCAD, LibreCAD, DraftSight)", "cut": " (outline and holes only, 1:1 mm, layer CUT)",
-                 "png": ""}.get(fmt, "")
+        extra = {
+            "pdf": f" ({v['info']['paper']}, true to scale)",
+            "dxf": " (opens in AutoCAD, BricsCAD, LibreCAD, DraftSight)",
+            "cut": " (outline and holes only, 1:1 mm, layer CUT)",
+            "png": "",
+        }.get(fmt, "")
         return f"Saved {dst}{extra}."
 
     # ---------------------------------------------------------------- history
@@ -475,7 +562,12 @@ class CadChat:
         return f"Now at v{n} ({self.cur()['said'][:60]})."
 
     def history(self):
-        return "\n".join(f"v{v['v']} {v['kind']}: '{v['said'][:60]}'" + (" <- now" if v["v"] == self.state["cur"] else "") for v in self.state["versions"]) or "Nothing yet."
+        return (
+            "\n".join(
+                f"v{v['v']} {v['kind']}: '{v['said'][:60]}'" + (" <- now" if v["v"] == self.state["cur"] else "") for v in self.state["versions"]
+            )
+            or "Nothing yet."
+        )
 
 
 def _house_info(lay):
@@ -487,9 +579,17 @@ def _house_info(lay):
     for fl in reversed(list(floors.values())):
         labels.update({r["id"]: r["label"] for r in fl["rooms"]})
     sig = json.dumps({k: sorted((i, [round(x, 1) for x in v]) for i, v in r.items()) for k, r in rects.items()})
-    return {"summary": F.summary(lay), "upper": F.summary(lay["upper"]) if lay.get("upper") else None,
-            "notes": lay["notes"] + (lay["upper"]["notes"] if lay.get("upper") else []), "plot": [v / 12 for v in lay["plot"]],
-            "floors": 2 if lay.get("upper") else 1, "rects": rects, "labels": labels, "sig": sig, "dropped": lay.get("dropped", [])}
+    return {
+        "summary": F.summary(lay),
+        "upper": F.summary(lay["upper"]) if lay.get("upper") else None,
+        "notes": lay["notes"] + (lay["upper"]["notes"] if lay.get("upper") else []),
+        "plot": [v / 12 for v in lay["plot"]],
+        "floors": 2 if lay.get("upper") else 1,
+        "rects": rects,
+        "labels": labels,
+        "sig": sig,
+        "dropped": lay.get("dropped", []),
+    }
 
 
 def _ids_for(room, info):
@@ -589,9 +689,12 @@ def _part_edit(spec, ps):
 def _part_file_checks(path, spec):
     """The part's DXF read back: it audits clean and holds every hole."""
     import ezdxf
+
     doc = ezdxf.readfile(str(path))
     aud = doc.audit()
     circles = len(doc.modelspace().query("CIRCLE[layer=='CUT']"))
     want = len(P.holes_of(spec)) + (2 if spec["kind"] == "flange" else 0)
-    return [{"ok": not aud.has_errors, "what": "the DXF opens and audits clean", "level": "fail"},
-            {"ok": circles == want, "what": f"{circles} circle(s) drawn for {want} hole(s) and bore", "level": "fail"}]
+    return [
+        {"ok": not aud.has_errors, "what": "the DXF opens and audits clean", "level": "fail"},
+        {"ok": circles == want, "what": f"{circles} circle(s) drawn for {want} hole(s) and bore", "level": "fail"},
+    ]

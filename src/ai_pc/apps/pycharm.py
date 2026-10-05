@@ -5,6 +5,7 @@ and line.
 
   "pycharm python project called 'Shop'"   'python app called Stock'   'pycharm test C:\\code\\tool\\pyproject.toml'
 """
+
 import re
 import shutil
 from pathlib import Path
@@ -75,7 +76,7 @@ class Inventory:
         """The products with fewer than below in stock, scarcest first."""
         return sorted((p for p in self._items.values() if p.quantity < below), key=lambda p: p.quantity)
 '''
-MAIN = '''from .inventory import Inventory, Product
+MAIN = """from .inventory import Inventory, Product
 
 
 def main() -> None:
@@ -91,8 +92,8 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-'''
-TESTS = '''import unittest
+"""
+TESTS = """import unittest
 
 from {pkg}.inventory import Inventory, Product
 
@@ -131,13 +132,14 @@ class InventoryTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-'''
+"""
 
 
 def run_py(python, *args, cwd, timeout=600):
     import os
 
     from ai_pc.core import hidden_desktop
+
     env = {k: v for k, v in os.environ.items() if k.upper() not in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV")}
     env.update(PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
     rc, out, err, timed_out = hidden_desktop.run([str(python), *map(str, args)], timeout=timeout, cwd=str(cwd), env=env)
@@ -155,7 +157,9 @@ def venv_python(folder):
 def failures(text):
     """'test_x: file.py:12 message' for each failed test, from unittest's or pytest's report."""
     out = []
-    for m in re.finditer(r'^(?:FAIL|ERROR): (\w+).*?\n(?:.*\n)*?\s*File "([^"]+)", line (\d+).*\n(?:.*\n)*?(\w+(?:Error|Exception)?: .+)$', text, re.M):
+    for m in re.finditer(
+        r'^(?:FAIL|ERROR): (\w+).*?\n(?:.*\n)*?\s*File "([^"]+)", line (\d+).*\n(?:.*\n)*?(\w+(?:Error|Exception)?: .+)$', text, re.M
+    ):
         out.append(f"{m.group(1)}: {Path(m.group(2)).name}:{m.group(3)} {m.group(4).strip()}")
     for m in re.finditer(r"^([^\s:]+\.py):(\d+): (\w+(?:Error|Exception))", text, re.M):  # pytest's short form
         out.append(f"{Path(m.group(1)).name}:{m.group(2)} {m.group(3)}")
@@ -166,6 +170,7 @@ def failures(text):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bpycharm\b|\bpython\s+(?:project|app|program|package|cli)\b|\bpyproject\.toml\b", c):
         return None
@@ -197,9 +202,15 @@ def run(op, ctx):
     out = (Path(ctx["out"]) / "pycharm" / name).resolve()
     if out.exists():
         shutil.rmtree(out, ignore_errors=True)
-    files = {"pyproject.toml": PYPROJECT.format(pkg=pkg), f"{pkg}/__init__.py": '"""Shop inventory."""\n', f"{pkg}/inventory.py": INVENTORY,
-             f"{pkg}/__main__.py": MAIN, "tests/__init__.py": "", "tests/test_inventory.py": TESTS.format(pkg=pkg),
-             ".gitignore": ".venv/\n__pycache__/\n.idea/\n*.egg-info/\n"}
+    files = {
+        "pyproject.toml": PYPROJECT.format(pkg=pkg),
+        f"{pkg}/__init__.py": '"""Shop inventory."""\n',
+        f"{pkg}/inventory.py": INVENTORY,
+        f"{pkg}/__main__.py": MAIN,
+        "tests/__init__.py": "",
+        "tests/test_inventory.py": TESTS.format(pkg=pkg),
+        ".gitignore": ".venv/\n__pycache__/\n.idea/\n*.egg-info/\n",
+    }
     for rel, text in files.items():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         (out / rel).write_text(text, encoding="utf-8")
@@ -209,12 +220,16 @@ def run(op, ctx):
     ok_r, ran = run_py(py, "-m", pkg, cwd=out) if py.exists() else (False, "")
     ok_c, comp = run_py(py, "-m", "compileall", "-q", pkg, "tests", cwd=out) if py.exists() else (False, "")
     count = int((re.search(r"Ran (\d+) tests?", tests) or [0, 0])[1])
-    checks = [("its own .venv was made (Python 3.11, from tools/python)", ok_v and py.exists()),
-              (f"unittest: {count if ok_t else 0} of 5 tests passed", ok_t and count == 5),
-              (f"python -m {pkg} runs and prints the stock's value (Rs 22,000)", ok_r and "Total value: Rs 22,000" in ran),
-              ("every file compiles", ok_c)]
+    checks = [
+        ("its own .venv was made (Python 3.11, from tools/python)", ok_v and py.exists()),
+        (f"unittest: {count if ok_t else 0} of 5 tests passed", ok_t and count == 5),
+        (f"python -m {pkg} runs and prints the stock's value (Rs 22,000)", ok_r and "Total value: Rs 22,000" in ran),
+        ("every file compiles", ok_c),
+    ]
     ctx.setdefault("memo", {})["project"] = str(out)  # for VS Code and the other tools
     bad = [w for w, good in checks if not good]
-    return (f"Python project {out} ({pkg}/ package, tests/, pyproject.toml, .venv; open the folder in PyCharm or VS Code). " +
-            (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else "") +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(failures(tests)[:5])))
+    return (
+        f"Python project {out} ({pkg}/ package, tests/, pyproject.toml, .venv; open the folder in PyCharm or VS Code). "
+        + (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else "")
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(failures(tests)[:5]))
+    )

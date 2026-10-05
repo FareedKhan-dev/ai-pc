@@ -5,6 +5,7 @@ the folder it is unzipped into).
 
   'back up D:\\Shop\\Accounts to E:\\Backups'   'verify E:\\Backups\\Accounts_2026-10-04.zip'   'unzip photos.zip'   'zip D:\\Shop\\Invoices'
 """
+
 import datetime as dt
 import hashlib
 import json
@@ -75,6 +76,7 @@ def safe_unzip(zpath, dest):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     m = re.match(r"^\s*back\s*up\s+(.+?)\s+(?:to|into|on)\s+(.+?)\s*$", text, re.I)
     if m:
         return {"op": "backup", "folder": m.group(1).strip(" '\""), "to": m.group(2).strip(" '\"")}
@@ -83,7 +85,11 @@ def parse(text, ctx):
         return {"op": "verify", "file": find_file(text, ctx, {".zip"}) or m.group(1).strip(" '\"")}
     m = re.match(r"^\s*(?:unzip|extract)\s+(.+?)(?:\s+(?:to|into)\s+(.+))?\s*$", text, re.I)
     if m and m.group(1).lower().endswith(".zip"):
-        return {"op": "unzip", "file": find_file(m.group(1), ctx, {".zip"}) or m.group(1).strip(" '\""), "to": (m.group(2) or "").strip(" '\"") or None}
+        return {
+            "op": "unzip",
+            "file": find_file(m.group(1), ctx, {".zip"}) or m.group(1).strip(" '\""),
+            "to": (m.group(2) or "").strip(" '\"") or None,
+        }
     m = re.match(r"^\s*zip\s+(?:up\s+)?(.+?)\s*$", text, re.I)
     if m and Path(m.group(1).strip(" '\"")).is_dir():
         return {"op": "zip", "folder": m.group(1).strip(" '\"")}
@@ -97,12 +103,16 @@ def run(op, ctx):
         res = verify(dest)
         bad = [f for f, ok in res if not ok]
         size = sum(v["bytes"] for v in man["files"].values())
-        return (f"{'Backed up' if op['op'] == 'backup' else 'Zipped'} {len(man['files'])} files ({size / 1e6:.1f} MB) into {dest} ({dest.stat().st_size / 1e6:.1f} MB); " +
-                ("read back and every file's SHA-256 matches." if not bad and len(res) == len(man["files"]) else f"NOT right: {bad[:5]}"))
+        return (
+            f"{'Backed up' if op['op'] == 'backup' else 'Zipped'} {len(man['files'])} files ({size / 1e6:.1f} MB) into {dest} ({dest.stat().st_size / 1e6:.1f} MB); "
+            + ("read back and every file's SHA-256 matches." if not bad and len(res) == len(man["files"]) else f"NOT right: {bad[:5]}")
+        )
     if op["op"] == "verify":
         res = verify(op["file"])
         bad = [f for f, ok in res if not ok]
-        return f"{Path(op['file']).name}: {len(res)} files, " + ("all match their SHA-256: the backup is good." if not bad else f"{len(bad)} DAMAGED or missing: {bad[:5]}")
+        return f"{Path(op['file']).name}: {len(res)} files, " + (
+            "all match their SHA-256: the backup is good." if not bad else f"{len(bad)} DAMAGED or missing: {bad[:5]}"
+        )
     dest = Path(op.get("to") or out / "unzipped" / Path(op["file"]).stem)
     files = safe_unzip(op["file"], dest)
     return f"Unzipped {len(files)} files into {dest}."

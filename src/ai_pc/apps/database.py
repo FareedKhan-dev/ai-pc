@@ -6,6 +6,7 @@ Checks: every table holds as many rows as its sheet.
   'make an access database from sales.xlsx'   'sqlite database from customers.csv'   'tables in sales.accdb'
   'query sales.accdb: SELECT Customer, SUM(Amount) AS Total FROM Sales GROUP BY Customer'
 """
+
 import csv
 import datetime as dt
 import re
@@ -27,6 +28,7 @@ def sheets_of(path):
         out[_name(p.stem)] = (rows[0], rows[1:]) if rows else ([], [])
         return out
     from openpyxl import load_workbook
+
     wb = load_workbook(p, data_only=True, read_only=True)
     for ws in wb.worksheets:
         rows = [list(r) for r in ws.iter_rows(values_only=True) if any(c not in (None, "") for c in r)]
@@ -71,9 +73,16 @@ def to_sqlite(src, dest):
         cols = [_name(h) for h in heads]
         cx.execute(f'DROP TABLE IF EXISTS "{t}"')
         cx.execute(f'CREATE TABLE "{t}" (' + ", ".join(f'"{c}" {dict(number="REAL", date="TEXT", text="TEXT")[k]}' for c, k in zip(cols, ks)) + ")")
-        cx.executemany(f'INSERT INTO "{t}" VALUES ({",".join("?" * len(cols))})',
-                       [[(_value(r[i], k).isoformat() if k == "date" and _value(r[i], k) else _value(r[i], k)) if i < len(r) else None
-                         for i, k in enumerate(ks)] for r in rows])
+        cx.executemany(
+            f'INSERT INTO "{t}" VALUES ({",".join("?" * len(cols))})',
+            [
+                [
+                    (_value(r[i], k).isoformat() if k == "date" and _value(r[i], k) else _value(r[i], k)) if i < len(r) else None
+                    for i, k in enumerate(ks)
+                ]
+                for r in rows
+            ],
+        )
     cx.commit()
     cx.close()
     return data
@@ -81,6 +90,7 @@ def to_sqlite(src, dest):
 
 def to_access(src, dest):
     import win32com.client
+
     data = sheets_of(src)
     dest = Path(dest)
     if dest.exists():
@@ -91,7 +101,11 @@ def to_access(src, dest):
         for t, (heads, rows) in data.items():
             ks = kinds(heads, rows)
             cols = [_name(h) for h in heads]
-            db.Execute(f"CREATE TABLE [{t}] (" + ", ".join(f"[{c}] {dict(number='DOUBLE', date='DATETIME', text='LONGTEXT')[k]}" for c, k in zip(cols, ks)) + ")")
+            db.Execute(
+                f"CREATE TABLE [{t}] ("
+                + ", ".join(f"[{c}] {dict(number='DOUBLE', date='DATETIME', text='LONGTEXT')[k]}" for c, k in zip(cols, ks))
+                + ")"
+            )
             rs = db.OpenRecordset(t, 2)  # dbOpenDynaset
             for r in rows:
                 rs.AddNew()
@@ -108,11 +122,16 @@ def to_access(src, dest):
 
 def query(path, sql, limit=1000):
     """(headers, rows) of a read-only question (SELECT only)."""
-    if not re.match(r"^\s*select\b", sql, re.I) or re.search(r";\s*\S", sql) or re.search(r"\b(?:insert|update|delete|drop|alter|create)\b", sql, re.I):
+    if (
+        not re.match(r"^\s*select\b", sql, re.I)
+        or re.search(r";\s*\S", sql)
+        or re.search(r"\b(?:insert|update|delete|drop|alter|create)\b", sql, re.I)
+    ):
         raise ValueError("only a single SELECT question is run here (nothing that changes the data)")
     p = Path(path)
     if p.suffix.lower() in (".accdb", ".mdb"):
         import win32com.client
+
         db = win32com.client.Dispatch("DAO.DBEngine.120").OpenDatabase(str(p), False, True)  # read only
         try:
             rs = db.OpenRecordset(sql, 4)  # dbOpenSnapshot
@@ -137,6 +156,7 @@ def tables(path):
     p = Path(path)
     if p.suffix.lower() in (".accdb", ".mdb"):
         import win32com.client
+
         db = win32com.client.Dispatch("DAO.DBEngine.120").OpenDatabase(str(p), False, True)
         try:
             names = [db.TableDefs(i).Name for i in range(db.TableDefs.Count) if not db.TableDefs(i).Name.startswith("MSys")]
@@ -150,13 +170,16 @@ def tables(path):
             db.Close()
     cx = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
     try:
-        return {n: cx.execute(f'SELECT COUNT(*) FROM "{n}"').fetchone()[0] for (n,) in cx.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        return {
+            n: cx.execute(f'SELECT COUNT(*) FROM "{n}"').fetchone()[0] for (n,) in cx.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
     finally:
         cx.close()
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     m = re.match(r"^\s*(?:query|ask|sql)\s+(.+?):\s*(select\b.+)$", text, re.I | re.S)
     if m:
@@ -180,12 +203,16 @@ def run(op, ctx):
         data = (to_access if op["kind"] == "access" else to_sqlite)(op["file"], dest)
         got = tables(dest)
         ok = all(got.get(t) == len(rows) for t, (_, rows) in data.items())
-        return (f"{'Access' if op['kind'] == 'access' else 'SQLite'} database: {dest} with " + ", ".join(f"{t} ({len(r)} rows)" for t, (_, r) in data.items()) +
-                (" (checked: every table holds every row)." if ok else f" NOT right: {got}."))
+        return (
+            f"{'Access' if op['kind'] == 'access' else 'SQLite'} database: {dest} with "
+            + ", ".join(f"{t} ({len(r)} rows)" for t, (_, r) in data.items())
+            + (" (checked: every table holds every row)." if ok else f" NOT right: {got}.")
+        )
     if op["op"] == "tables":
         return "Tables: " + ", ".join(f"{t} ({n} rows)" for t, n in tables(op["file"]).items()) + "."
     heads, rows = query(op["file"], op["sql"])
     from openpyxl import Workbook
+
     wb = Workbook()
     ws = wb.active
     ws.append(heads)

@@ -7,10 +7,28 @@ Sources: developers.facebook.com (Instagram content publishing, ig-user/media, R
 Threads posts), developers.google.com/youtube (videos, videos.insert, thumbnails.set), developers.tiktok.com (content
 posting API, media transfer guide), learn.microsoft.com/linkedin (posts, images, videos APIs), docs.x.com (media, posts).
 """
+
 NAMES = ["facebook", "instagram", "threads", "youtube", "tiktok", "linkedin", "x"]
-LABEL = {"facebook": "Facebook", "instagram": "Instagram", "threads": "Threads", "youtube": "YouTube", "tiktok": "TikTok", "linkedin": "LinkedIn", "x": "X"}
-FORMAT_WORDS = {"post": "post", "photo": "photo", "image": "post", "carousel": "carousel", "video": "video", "reel": "reel", "story": "story",
-                "short": "Short", "text": "post"}
+LABEL = {
+    "facebook": "Facebook",
+    "instagram": "Instagram",
+    "threads": "Threads",
+    "youtube": "YouTube",
+    "tiktok": "TikTok",
+    "linkedin": "LinkedIn",
+    "x": "X",
+}
+FORMAT_WORDS = {
+    "post": "post",
+    "photo": "photo",
+    "image": "post",
+    "carousel": "carousel",
+    "video": "video",
+    "reel": "reel",
+    "story": "story",
+    "short": "Short",
+    "text": "post",
+}
 
 ANY = (0.01, 100.0)
 
@@ -20,7 +38,14 @@ IG_CAROUSEL_IMAGE = dict(IG_IMAGE, aspect=(0.8, 0.8), prefer=("4:5",))  # every 
 STORY_IMAGE = {"formats": ("jpeg",), "max_mb": 8, "aspect": (0.5625, 0.5625), "max_w": 1080, "prefer": ("9:16",), "fill": "fit"}
 FB_IMAGE = {"formats": ("jpeg", "png"), "max_mb": 10, "aspect": (0.33, 3.0), "max_w": 2048, "prefer": ("1:1", "4:5", "16:9", "9:16")}
 THREADS_IMAGE = {"formats": ("jpeg", "png"), "max_mb": 8, "aspect": (0.1, 10.0), "min_w": 320, "max_w": 1440}
-LINKEDIN_IMAGE = {"formats": ("jpeg", "png"), "max_mb": 5, "aspect": (0.8, 3.0), "min_w": 552, "max_w": 2048, "prefer": ("1:1", "4:5", "1.91:1", "16:9")}
+LINKEDIN_IMAGE = {
+    "formats": ("jpeg", "png"),
+    "max_mb": 5,
+    "aspect": (0.8, 3.0),
+    "min_w": 552,
+    "max_w": 2048,
+    "prefer": ("1:1", "4:5", "1.91:1", "16:9"),
+}
 X_IMAGE = {"formats": ("jpeg", "png"), "max_mb": 5, "aspect": (0.33, 3.0), "max_w": 2048, "prefer": ("16:9", "1:1", "4:5")}
 YT_COVER = {"formats": ("jpeg",), "max_mb": 2, "aspect": (1.7778, 1.7778), "min_w": 640, "max_w": 1920, "prefer": ("16:9",)}
 
@@ -69,21 +94,36 @@ TEXT = {
     "facebook": {"chars": 60000, "how": "chars", "links": "live"},
     "instagram": {"chars": 2200, "how": "utf16", "hashtags": 30, "mentions": 20, "links": "dead"},
     "threads": {"chars": 500, "how": "threads", "hashtags": 1, "max_links": 5, "links": "live"},
-    "youtube": {"chars": 5000, "how": "bytes", "needs_title": True, "title_chars": 100, "tags_chars": 500, "hashtags": 60, "links": "live",
-                "link_in_text": True},
+    "youtube": {
+        "chars": 5000,
+        "how": "bytes",
+        "needs_title": True,
+        "title_chars": 100,
+        "tags_chars": 500,
+        "hashtags": 60,
+        "links": "live",
+        "link_in_text": True,
+    },
     "tiktok": {"chars": 2200, "how": "utf16", "links": "dead"},
     "linkedin": {"chars": 3000, "how": "chars", "escape": "linkedin", "links": "live"},
     "x": {"chars": 280, "how": "x", "thread": True, "links": "live"},
 }
-TEXT_BY_FORMAT = {("instagram", "story"): {"chars": 0, "how": "chars", "note": "Instagram stories take no caption through the API"},
-                  ("facebook", "story"): {"chars": 0, "how": "chars", "note": "Facebook stories take no text through the API"},
-                  ("youtube", "short"): {"links": "dead"}}
+TEXT_BY_FORMAT = {
+    ("instagram", "story"): {"chars": 0, "how": "chars", "note": "Instagram stories take no caption through the API"},
+    ("facebook", "story"): {"chars": 0, "how": "chars", "note": "Facebook stories take no text through the API"},
+    ("youtube", "short"): {"links": "dead"},
+}
 
 # ---------------------------------------------------------------- limits worth knowing before posting
-DAILY = {"instagram": "50 posts in 24 hours (the API's own publishing limit)", "facebook": "30 reels a day per Page",
-         "threads": "250 posts in 24 hours", "youtube": "100 uploads a day (the project's upload quota) and 10,000 other units",
-         "tiktok": "about 15 posts a day per account; 5 drafts waiting at most", "linkedin": "about 150 posts a day per member",
-         "x": "100 posts in 15 minutes; each post is paid ($0.015, or $0.20 when it has a link)"}
+DAILY = {
+    "instagram": "50 posts in 24 hours (the API's own publishing limit)",
+    "facebook": "30 reels a day per Page",
+    "threads": "250 posts in 24 hours",
+    "youtube": "100 uploads a day (the project's upload quota) and 10,000 other units",
+    "tiktok": "about 15 posts a day per account; 5 drafts waiting at most",
+    "linkedin": "about 150 posts a day per member",
+    "x": "100 posts in 15 minutes; each post is paid ($0.015, or $0.20 when it has a link)",
+}
 
 
 def media(platform, fmt):

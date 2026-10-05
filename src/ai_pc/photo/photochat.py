@@ -8,6 +8,7 @@
   c.say("add beach.jpg and city.jpg")  then  c.say("make a collage")      several photos
 Location (GPS) is taken out of every saved photo unless asked otherwise; 'remove all metadata' takes out the rest too.
 """
+
 import datetime as dt
 import io
 import json
@@ -24,18 +25,42 @@ from ai_pc.photo import ops as O
 from ai_pc.photo.photoparse import parse
 
 CHATS = ROOT / "out" / "photo" / "chats"
-UNDO = re.compile(r"^\s*(?:undo|revert|go back|take (?:that|it) back|reverse (?:that|it)|undo (?:that|it|the last (?:change|one|edit)))\b(?!.*\bv\d)", re.I)
+UNDO = re.compile(
+    r"^\s*(?:undo|revert|go back|take (?:that|it) back|reverse (?:that|it)|undo (?:that|it|the last (?:change|one|edit)))\b(?!.*\bv\d)", re.I
+)
 REDO = re.compile(r"^\s*redo\b|\bdo it again\b", re.I)
 GOTO = re.compile(r"\b(?:go back to|back to|restore|use|show me|switch to)\s+(?:version\s*|v)(\d+)\b|\b(?:the )?original\b(?!.*\bcompare)", re.I)
-HISTORY = re.compile(r"^\s*(?:history|versions|show (?:me )?(?:the )?(?:history|versions)|what (?:did you|have you) (?:do|done|change|changed))\b", re.I)
+HISTORY = re.compile(
+    r"^\s*(?:history|versions|show (?:me )?(?:the )?(?:history|versions)|what (?:did you|have you) (?:do|done|change|changed))\b", re.I
+)
 COMPARE = re.compile(r"\bcompare\b|\bbefore and after\b|\bbefore/after\b|\bside by side with the original\b", re.I)
 ADD = re.compile(r"^\s*(?:add|use|include|bring in|load)\s+(.+\.(?:jpe?g|png|webp|bmp|gif|tiff?|heic)\b.*)$", re.I)
-SPLIT = re.compile(r"(?<=[.!?;])\s+|,?\s+(?:and then|then|and also|also|after that)\s+|,?\s+and\s+(?=(?:make|crop|add|put|write|remove|blur|turn|rotate|flip|straighten|resize|"
-                   r"sharpen|brighten|darken|increase|reduce|save|export|convert|change|replace|fix|give|apply|smooth|lift)\b)", re.I)
+SPLIT = re.compile(
+    r"(?<=[.!?;])\s+|,?\s+(?:and then|then|and also|also|after that)\s+|,?\s+and\s+(?=(?:make|crop|add|put|write|remove|blur|turn|rotate|flip|straighten|resize|"
+    r"sharpen|brighten|darken|increase|reduce|save|export|convert|change|replace|fix|give|apply|smooth|lift)\b)",
+    re.I,
+)
 IMAGE_OPS = set(O.OPS) | {"collage"}
-FAMILIES = [{"blur_faces"}, set(O.LOOKS), {"crop", "canvas", "trim"}, {"text"}, {"meme"}, {"watermark"}, {"replace_background", "remove_background", "blur_background"},
-            {"passport"}, {"border", "polaroid", "rounded"}, {"brightness"}, {"contrast"}, {"saturation", "vibrance"}, {"warmth"}, {"resize"},
-            {"rotate", "flip", "straighten"}, {"auto"}, {"vignette"}, {"sharpen", "blur"}]  # 'instead' swaps an edit for another of its kind
+FAMILIES = [
+    {"blur_faces"},
+    set(O.LOOKS),
+    {"crop", "canvas", "trim"},
+    {"text"},
+    {"meme"},
+    {"watermark"},
+    {"replace_background", "remove_background", "blur_background"},
+    {"passport"},
+    {"border", "polaroid", "rounded"},
+    {"brightness"},
+    {"contrast"},
+    {"saturation", "vibrance"},
+    {"warmth"},
+    {"resize"},
+    {"rotate", "flip", "straighten"},
+    {"auto"},
+    {"vignette"},
+    {"sharpen", "blur"},
+]  # 'instead' swaps an edit for another of its kind
 FRAMES = {"border", "polaroid", "rounded"}  # stay on the outside: a later crop or turn goes in before them
 GEOMETRY = {"crop", "trim", "canvas", "rotate", "flip", "straighten", "resize"}
 
@@ -84,9 +109,18 @@ class PhotoChat:
         keep.save(folder / "v0.png", compress_level=1)
         if exif:
             (folder / "exif.bin").write_bytes(exif.tobytes())
-        state = {"id": cid, "folder": str(folder), "src": str(src), "extra": [], "cur": 0, "redo": [], "exports": [], "turns": [],
-                 "gps": bool(exif.get_ifd(0x8825)) if exif else False,
-                 "versions": [{"v": 0, "file": "v0.png", "said": "(the original)", "ops": [], "checks": [], "size": list(im.size), "when": _when()}]}
+        state = {
+            "id": cid,
+            "folder": str(folder),
+            "src": str(src),
+            "extra": [],
+            "cur": 0,
+            "redo": [],
+            "exports": [],
+            "turns": [],
+            "gps": bool(exif.get_ifd(0x8825)) if exif else False,
+            "versions": [{"v": 0, "file": "v0.png", "said": "(the original)", "ops": [], "checks": [], "size": list(im.size), "when": _when()}],
+        }
         c = cls(state, planner=planner, log=log)
         for e in extra or []:
             c.add(e)
@@ -124,8 +158,11 @@ class PhotoChat:
         words = str(name).strip().strip("'\"").split()
         for i in range(len(words)):
             n = " ".join(words[i:])
-            cands = [Path(n), Path(self.state["src"]).parent / n] + [Path(e) for e in self.state["extra"] if Path(e).name.lower() == n.lower()] + \
-                [ROOT / "media" / n, ROOT / n]
+            cands = (
+                [Path(n), Path(self.state["src"]).parent / n]
+                + [Path(e) for e in self.state["extra"] if Path(e).name.lower() == n.lower()]
+                + [ROOT / "media" / n, ROOT / n]
+            )
             hit = next((c.resolve() for c in cands if c.is_file()), None)
             if hit is None and (ROOT / "media").is_dir():
                 hit = next((p.resolve() for p in (ROOT / "media").rglob("*") if p.is_file() and p.name.lower() == n.lower()), None)
@@ -156,7 +193,11 @@ class PhotoChat:
             vs = [int(x) for x in re.findall(r"\bv(?:ersion\s*)?(\d+)\b", low, re.I)]
             a, b = (vs[0], vs[1]) if len(vs) >= 2 else (0 if not vs else vs[0], self.state["cur"])
             out.append(self.compare(a, b))
-        elif m and re.search(r"\b(?:go back|back to|restore|use|show me|switch to|the original)\b", low, re.I) and not re.search(r"\bsave|export\b", low, re.I):
+        elif (
+            m
+            and re.search(r"\b(?:go back|back to|restore|use|show me|switch to|the original)\b", low, re.I)
+            and not re.search(r"\bsave|export\b", low, re.I)
+        ):
             turn["intents"].append("goto")
             out.append(self.goto(int(m.group(1)) if m.group(1) else 0))
         elif ADD.search(low):
@@ -169,8 +210,10 @@ class PhotoChat:
                     got.append(self.add(nm).name)
                 except FileNotFoundError:
                     miss.append(nm)
-            out.append((f"Added {', '.join(got)} ({len(self.state['extra']) + 1} photos in this chat; say 'make a collage')." if got else "") +
-                       (f" I can't find {', '.join(miss)}." if miss else ""))
+            out.append(
+                (f"Added {', '.join(got)} ({len(self.state['extra']) + 1} photos in this chat; say 'make a collage')." if got else "")
+                + (f" I can't find {', '.join(miss)}." if miss else "")
+            )
         else:
             clauses = [x.strip(" ,") for x in SPLIT.split(message) if x and x.strip(" ,")]
             ops = []
@@ -186,7 +229,10 @@ class PhotoChat:
                 ops += r["ops"]
             if ops:
                 out.append(self._apply(ops, message))
-        reply = "\n".join(x for x in out if x).strip() or "Tell me what to change, e.g. 'make it brighter', 'crop it square', 'remove the background', or 'help'."
+        reply = (
+            "\n".join(x for x in out if x).strip()
+            or "Tell me what to change, e.g. 'make it brighter', 'crop it square', 'remove the background', or 'help'."
+        )
         turn.update(reply=reply, seconds=round(time.perf_counter() - t0, 2), v_to=self.state["cur"])
         self.state["turns"].append(turn)
         self.last_turn = turn
@@ -198,14 +244,20 @@ class PhotoChat:
             return {"ops": [], "ask": f"I could not read '{clause}'. Try e.g. 'make it brighter', 'crop it square', 'blur the faces', or 'help'."}
         self._turn["llm"] = True
         im = self.image()
-        user = (f"PHOTO: {A.describe(im)}\nOTHER PHOTOS IN THIS CHAT: {json.dumps([Path(e).name for e in self.state['extra']])}\n"
-                f"MESSAGE: {message}\nREQUEST: {clause}")
+        user = (
+            f"PHOTO: {A.describe(im)}\nOTHER PHOTOS IN THIS CHAT: {json.dumps([Path(e).name for e in self.state['extra']])}\n"
+            f"MESSAGE: {message}\nREQUEST: {clause}"
+        )
         try:
             r = self.planner._call("fast", [{"role": "system", "content": PHOTO_SYSTEM}, {"role": "user", "content": user}])
             d = parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return {"ops": [], "ask": f"I could not work that out ({type(e).__name__})."}
-        ops = [o for o in d.get("ops") or [] if isinstance(o, dict) and (o.get("op") in IMAGE_OPS or o.get("op") in ("describe", "export", "help", "strip"))]
+        ops = [
+            o
+            for o in d.get("ops") or []
+            if isinstance(o, dict) and (o.get("op") in IMAGE_OPS or o.get("op") in ("describe", "export", "help", "strip"))
+        ]
         return {"ops": ops, "ask": d.get("ask") if not ops else None}
 
     # ---------------------------------------------------------------- doing
@@ -267,7 +319,7 @@ class PhotoChat:
         for j in range(vi, len(lin)):
             seq = list(lin[j]["ops"])
             if j == vi:
-                seq = seq[:oi] + [new] + seq[oi:] if insert else seq[:oi] + [new] + seq[oi + 1:]
+                seq = seq[:oi] + [new] + seq[oi:] if insert else seq[:oi] + [new] + seq[oi + 1 :]
             for o in seq:
                 use = o
                 if use.get("op") in ("describe", "help", "export", "strip", None):
@@ -293,16 +345,36 @@ class PhotoChat:
         v = len(self.state["versions"])
         f = f"v{v}.png"
         im.save(self.folder / f, compress_level=1)
-        self.state["versions"].append({"v": v, "file": f, "said": said, "ops": chain, "checks": checks, "size": list(im.size), "when": _when(), "parent": base,
-                                       "undo_to": self.state["cur"], "meta": {"replaced": {"v": lin[vi]["v"], "op": old.get("op")}}})
+        self.state["versions"].append(
+            {
+                "v": v,
+                "file": f,
+                "said": said,
+                "ops": chain,
+                "checks": checks,
+                "size": list(im.size),
+                "when": _when(),
+                "parent": base,
+                "undo_to": self.state["cur"],
+                "meta": {"replaced": {"v": lin[vi]["v"], "op": old.get("op")}},
+            }
+        )
         self.state["cur"] = v
         self.state["redo"] = []
         bad = [c for c in checks if not c["ok"]]
         if insert:
-            how = f"Done before the {old['op']} of v{lin[vi]['v']}, so it stays on the outside" + (f"; {after_n} edit(s) redone after it" if after_n else "")
+            how = f"Done before the {old['op']} of v{lin[vi]['v']}, so it stays on the outside" + (
+                f"; {after_n} edit(s) redone after it" if after_n else ""
+            )
         else:
-            how = f"{'Changed' if modify else 'Swapped'} the {old['op'].replace('_', ' ')} made in v{lin[vi]['v']}" + (f" and redid the {after_n} edit(s) after it" if after_n else "")
-        return (f"{words}\n{how}" + (f"; {'; '.join(notes)}" if notes else "") + f". (v{v}; checked {len(checks) - len(bad)}/{len(checks)}. 'undo' goes back.)")
+            how = f"{'Changed' if modify else 'Swapped'} the {old['op'].replace('_', ' ')} made in v{lin[vi]['v']}" + (
+                f" and redid the {after_n} edit(s) after it" if after_n else ""
+            )
+        return (
+            f"{words}\n{how}"
+            + (f"; {'; '.join(notes)}" if notes else "")
+            + f". (v{v}; checked {len(checks) - len(bad)}/{len(checks)}. 'undo' goes back.)"
+        )
 
     def _apply(self, ops, said):
         im = self.image()
@@ -335,7 +407,11 @@ class PhotoChat:
                 continue
             if k == "strip":
                 self.state["strip"] = args.get("what", "gps")
-                lines.append("Location data will be left out of saved files." if self.state["strip"] == "gps" else "All metadata (camera, date, location) will be left out of saved files.")
+                lines.append(
+                    "Location data will be left out of saved files."
+                    if self.state["strip"] == "gps"
+                    else "All metadata (camera, date, location) will be left out of saved files."
+                )
                 continue
             if k == "export":
                 if done_ops:  # the edits made in this message are kept first, then saved
@@ -367,8 +443,10 @@ class PhotoChat:
                             args["standard"] = prev.get("key")
                     new, info = O.run(k, im, args)
                     if k == "passport":
-                        self._meta = {"passport": {k2: v2 for k2, v2 in info.items() if k2 in ("standard", "px", "head_share", "range", "dpi", "copies")} |
-                                      {"key": args.get("standard") or "35x45"}}
+                        self._meta = {
+                            "passport": {k2: v2 for k2, v2 in info.items() if k2 in ("standard", "px", "head_share", "range", "dpi", "copies")}
+                            | {"key": args.get("standard") or "35x45"}
+                        }
                     chk = O.check(k, im, new, args, info)
                     if not all(c["ok"] for c in chk) and "amount" in args and isinstance(args["amount"], (int, float)):  # once more, firmer
                         args2 = dict(args, amount=args["amount"] * 1.7)
@@ -389,7 +467,11 @@ class PhotoChat:
         if done_ops:
             v = self._new_version(im, said, done_ops, checks)
             bad = [c for c in checks if not c["ok"]]
-            lines.append(f"(v{v}; checked {len(checks) - len(bad)}/{len(checks)}" + (f" - not right: {'; '.join(c['what'] for c in bad[:3])}" if bad else "") + ". 'undo' goes back.)")
+            lines.append(
+                f"(v{v}; checked {len(checks) - len(bad)}/{len(checks)}"
+                + (f" - not right: {'; '.join(c['what'] for c in bad[:3])}" if bad else "")
+                + ". 'undo' goes back.)"
+            )
         elif start is not im:
             pass
         return "\n".join(lines)
@@ -398,8 +480,19 @@ class PhotoChat:
         v = len(self.state["versions"])
         f = f"v{v}.png"
         im.save(self.folder / f, compress_level=1)
-        self.state["versions"].append({"v": v, "file": f, "said": said, "ops": ops, "checks": checks, "size": list(im.size), "when": _when(), "parent": self.state["cur"],
-                                       "meta": getattr(self, "_meta", {}) or {}})
+        self.state["versions"].append(
+            {
+                "v": v,
+                "file": f,
+                "said": said,
+                "ops": ops,
+                "checks": checks,
+                "size": list(im.size),
+                "when": _when(),
+                "parent": self.state["cur"],
+                "meta": getattr(self, "_meta", {}) or {},
+            }
+        )
         self.state["cur"] = v
         self.state["redo"] = []
         return v
@@ -416,8 +509,11 @@ class PhotoChat:
             return f"Cropped to {args.get('aspect')} ({size})" + ("; the face kept in frame." if info.get("faces") else ".")
         if k == "text":
             col = "auto colour" if args.get("color") in (None, "auto") else args["color"]
-            return f"Wrote '{args.get('text')}' at the {info['where']} ({col}, {info['font_px']} px" + (", outlined to read on what is behind" if info["stroke"] else "") + \
-                f"; contrast {info['contrast']}:1)."
+            return (
+                f"Wrote '{args.get('text')}' at the {info['where']} ({col}, {info['font_px']} px"
+                + (", outlined to read on what is behind" if info["stroke"] else "")
+                + f"; contrast {info['contrast']}:1)."
+            )
         if k == "blur_faces":
             return f"{'Pixelated' if str(args.get('style', '')).startswith('pix') else 'Blurred'} {len(info['boxes'])} face(s). ({what})"
         if k == "remove_background":
@@ -426,27 +522,68 @@ class PhotoChat:
             bg = info.get("background")
             return f"New background: {('a ' + str(args.get('color')) + ' one') if isinstance(bg, tuple) else bg} ({info.get('how')})."
         if k == "passport":
-            return f"Passport photo {info['standard']} ({info['px'][0]}x{info['px'][1]} px at {info['dpi']} dpi): head {info['head_share']:.0%} of the height " + \
-                f"({info['range'][0]:.0%}-{info['range'][1]:.0%} asked), plain {args.get('bg', 'white')} background" + \
-                (f"; {info['copies']} copies on a {info['sheet']} print ({info['sheet_px'][0]}x{info['sheet_px'][1]} px)." if info.get("copies") else ".")
+            return (
+                f"Passport photo {info['standard']} ({info['px'][0]}x{info['px'][1]} px at {info['dpi']} dpi): head {info['head_share']:.0%} of the height "
+                + f"({info['range'][0]:.0%}-{info['range'][1]:.0%} asked), plain {args.get('bg', 'white')} background"
+                + (
+                    f"; {info['copies']} copies on a {info['sheet']} print ({info['sheet_px'][0]}x{info['sheet_px'][1]} px)."
+                    if info.get("copies")
+                    else "."
+                )
+            )
         if k == "document":
             return f"Flattened the page into a clean scan ({size}). ({what})"
         if k == "canvas":
             return f"Fitted the whole photo into {args.get('aspect')} ({size}), the sides filled with {'a blurred copy' if args.get('fill', 'blur') == 'blur' else args.get('fill')}."
         if k == "collage":
             return f"Made a collage: {what}."
-        names = {"bw": "Black and white", "sepia": "Sepia", "vintage": "A vintage look", "cinematic": "A cinematic look (teal shadows, warm highlights)",
-                 "dramatic": "A dramatic look", "fade": "A faded, matte look", "soft": "A soft glow", "pop": "Colours that pop", "sketch": "A pencil sketch",
-                 "cartoon": "A cartoon look", "painting": "A painted look", "hdr": "An HDR look", "invert": "A negative"}
+        names = {
+            "bw": "Black and white",
+            "sepia": "Sepia",
+            "vintage": "A vintage look",
+            "cinematic": "A cinematic look (teal shadows, warm highlights)",
+            "dramatic": "A dramatic look",
+            "fade": "A faded, matte look",
+            "soft": "A soft glow",
+            "pop": "Colours that pop",
+            "sketch": "A pencil sketch",
+            "cartoon": "A cartoon look",
+            "painting": "A painted look",
+            "hdr": "An HDR look",
+            "invert": "A negative",
+        }
         if k in names:
             return f"{names[k]}. ({what})"
-        verbs = {"brightness": "Brighter" if float(args.get("amount", 0) or 0) >= 0 else "Darker", "contrast": "Contrast", "saturation": "Colour", "vibrance": "Vibrance",
-                 "warmth": "Warmer" if float(args.get("amount", 0) or 0) >= 0 else "Cooler", "shadows": "Shadows", "highlights": "Highlights",
-                 "white_balance": "Colours neutralised", "levels": "Levels", "clarity": "Clarity", "rotate": "Rotated", "flip": "Flipped", "straighten": "Straightened",
-                 "resize": f"Resized to {size}", "trim": f"Trimmed the edges ({size})", "border": "Border added", "rounded": "Rounded corners", "polaroid": "A photo frame",
-                 "vignette": "Darker edges", "denoise": "Less grain", "sharpen": "Sharper", "blur": "Blurred", "blur_background": "Background blurred",
-                 "smooth_skin": "Skin smoothed", "brighten_faces": "Faces lifted", "erase": "Removed what was in the corner", "meme": "Meme text added",
-                 "watermark": "Watermark added"}
+        verbs = {
+            "brightness": "Brighter" if float(args.get("amount", 0) or 0) >= 0 else "Darker",
+            "contrast": "Contrast",
+            "saturation": "Colour",
+            "vibrance": "Vibrance",
+            "warmth": "Warmer" if float(args.get("amount", 0) or 0) >= 0 else "Cooler",
+            "shadows": "Shadows",
+            "highlights": "Highlights",
+            "white_balance": "Colours neutralised",
+            "levels": "Levels",
+            "clarity": "Clarity",
+            "rotate": "Rotated",
+            "flip": "Flipped",
+            "straighten": "Straightened",
+            "resize": f"Resized to {size}",
+            "trim": f"Trimmed the edges ({size})",
+            "border": "Border added",
+            "rounded": "Rounded corners",
+            "polaroid": "A photo frame",
+            "vignette": "Darker edges",
+            "denoise": "Less grain",
+            "sharpen": "Sharper",
+            "blur": "Blurred",
+            "blur_background": "Background blurred",
+            "smooth_skin": "Skin smoothed",
+            "brighten_faces": "Faces lifted",
+            "erase": "Removed what was in the corner",
+            "meme": "Meme text added",
+            "watermark": "Watermark added",
+        }
         return f"{verbs.get(k, k)}: {what}."
 
     # ---------------------------------------------------------------- answers
@@ -484,22 +621,28 @@ class PhotoChat:
         if cam:
             parts.append(f"with a {cam}")
         if gps and 2 in gps and 4 in gps:
+
             def deg(v, ref):
                 d, m_, s = (float(x) for x in v)
                 return (d + m_ / 60 + s / 3600) * (-1 if str(ref).upper() in ("S", "W") else 1)
+
             lat, lon = deg(gps[2], gps.get(1, "N")), deg(gps[4], gps.get(3, "E"))
             parts.append(f"at {lat:.5f}, {lon:.5f} (its GPS position: anyone you send the original to can see where it was taken)")
             tail = " Say 'remove the location' and saved copies leave it out (they already do unless you ask otherwise)."
         else:
             tail = " It has no location in it."
-        return ("The original was " + " ".join(parts) + "." if len(parts) > 1 or when else "The photo has metadata but no date, camera or location.") + tail
+        return (
+            "The original was " + " ".join(parts) + "." if len(parts) > 1 or when else "The photo has metadata but no date, camera or location."
+        ) + tail
 
     def help(self, im=None):
-        return ("I edit photos by code and check each change: light ('brighter', 'fix it', 'warmer', 'more contrast'), looks ('black and white', 'vintage', "
-                "'cinematic', 'sketch'), shape ('crop it square', 'crop to the car', 'fit it in a story without cropping', 'straighten it'), people "
-                "('blur the faces', 'blur the background', 'remove the background', 'make the background white', 'passport photo'), words ('add \"SALE\" "
-                "at the top in red', 'meme \"...\" / \"...\"', 'watermark \"© Me\"'), pages ('scan this document'), several photos ('add a.jpg', 'make a "
-                "collage'), and saving ('save it for Instagram under 500 KB', 'as PNG'). 'undo', 'go back to v2', 'compare with the original'.")
+        return (
+            "I edit photos by code and check each change: light ('brighter', 'fix it', 'warmer', 'more contrast'), looks ('black and white', 'vintage', "
+            "'cinematic', 'sketch'), shape ('crop it square', 'crop to the car', 'fit it in a story without cropping', 'straighten it'), people "
+            "('blur the faces', 'blur the background', 'remove the background', 'make the background white', 'passport photo'), words ('add \"SALE\" "
+            "at the top in red', 'meme \"...\" / \"...\"', 'watermark \"© Me\"'), pages ('scan this document'), several photos ('add a.jpg', 'make a "
+            "collage'), and saving ('save it for Instagram under 500 KB', 'as PNG'). 'undo', 'go back to v2', 'compare with the original'."
+        )
 
     # ---------------------------------------------------------------- the history
     def undo(self, n=1):
@@ -544,12 +687,15 @@ class PhotoChat:
         n = len(self.state["versions"])
         if not (0 <= a < n and 0 <= b < n):
             return "Compare which versions? e.g. 'compare v1 and v3'."
-        img, _ = O.side_by_side(self.image(a), self.image(b), labels=(f"v{a}" if a else "Before", f"v{b}" if b != self.state["cur"] or a else "After"))
+        img, _ = O.side_by_side(
+            self.image(a), self.image(b), labels=(f"v{a}" if a else "Before", f"v{b}" if b != self.state["cur"] or a else "After")
+        )
         p = self.folder / f"compare_v{a}_v{b}.jpg"
         img.save(p, quality=88)
         sa, sb = A.stats(self.image(a)), A.stats(self.image(b))
-        diffs = [f"{k} {sa[k]:.0%} -> {sb[k]:.0%}" for k in ("brightness", "saturation") if abs(sa[k] - sb[k]) > 0.02] + \
-                ([f"contrast {sa['contrast']:.2f} -> {sb['contrast']:.2f}"] if abs(sa["contrast"] - sb["contrast"]) > 0.01 else [])
+        diffs = [f"{k} {sa[k]:.0%} -> {sb[k]:.0%}" for k in ("brightness", "saturation") if abs(sa[k] - sb[k]) > 0.02] + (
+            [f"contrast {sa['contrast']:.2f} -> {sb['contrast']:.2f}"] if abs(sa["contrast"] - sb["contrast"]) > 0.01 else []
+        )
         size = f"{sa['width']}x{sa['height']} -> {sb['width']}x{sb['height']}" if (sa["width"], sa["height"]) != (sb["width"], sb["height"]) else ""
         return f"Side by side: {p} (v{a} left, v{b} right)." + (" " + "; ".join([d for d in diffs + [size] if d]) + "." if diffs or size else "")
 
@@ -587,7 +733,7 @@ class PhotoChat:
         elif strip == "all":
             notes.append("all metadata removed")
         src = Path(self.state["src"])
-        base = (src.parent if beside else self.folder / "exports")
+        base = src.parent if beside else self.folder / "exports"
         base.mkdir(parents=True, exist_ok=True)
         name = f"{src.stem} (edited).{fmt}"
         p = base / name
@@ -612,6 +758,7 @@ class PhotoChat:
             else:
                 raise O.OpError(f"I can't save as {fmt}")
             return buf.getvalue()
+
         data = write(im, q)
         if max_kb and len(data) > max_kb * 1024:
             if fmt in ("jpg", "webp"):
@@ -655,5 +802,10 @@ class PhotoChat:
             checks.append(O._ok(kb <= max_kb, f"{kb:.0f} KB (under {max_kb:.0f} KB asked)"))
         self.state["exports"].append({"path": str(p), "v": self.state["cur"], "kb": round(kb, 1), "when": _when()})
         bad = [c for c in checks if not c["ok"]]
-        return f"Saved {p} ({kb:.0f} KB" + (", " + ", ".join(notes) if notes else "") + f"). Checked {len(checks) - len(bad)}/{len(checks)}" + \
-            (": " + "; ".join(c["what"] for c in bad) if bad else "") + "."
+        return (
+            f"Saved {p} ({kb:.0f} KB"
+            + (", " + ", ".join(notes) if notes else "")
+            + f"). Checked {len(checks) - len(bad)}/{len(checks)}"
+            + (": " + "; ".join(c["what"] for c in bad) if bad else "")
+            + "."
+        )

@@ -7,6 +7,7 @@ as mp3', 'the sound is half a second late', 'make a gif of 0:05 to 0:08', 'scree
   parse(clause, ctx) -> {"ops": [{"op": ..., "args": {...}}], "ask": None | "question back"}
 ctx: {"duration": s, "has_video": bool, "has_audio": bool, "files": {lower name: path}}
 """
+
 import re
 
 from ai_pc.sound.soundparse import WORDNUM
@@ -18,14 +19,25 @@ VIDEO_EXT = r"mp4|mov|mkv|webm|avi|m4v|wmv|flv|3gp|ts|mts|mpg|mpeg|gif"
 AUDIO_EXT = r"mp3|wav|m4a|aac|flac|ogg|opus|wma|amr"
 FILE = r"([A-Za-z]:\\[^\"'<>|]+?\.(?:{e})|\"[^\"]+?\.(?:{e})\"|'[^']+?\.(?:{e})'|[\w\-.()]+\.(?:{e}))\b"
 TARGETS = [
-    (r"\bwhats\s*app\b|\bwa status\b", "whatsapp"), (r"\b(?:e-?mail(?:ing)?|gmail|outlook|mail it|attach(?:ment)?)\b", "email"),
-    (r"\bdiscord\b", "discord"), (r"\btelegram\b", "telegram"), (r"\bslack\b", "slack"),
-    (r"\b(?:insta(?:gram)?|ig) (?:feed|post)\b", "instagram_post"), (r"\b(?:insta(?:gram)?|ig) stor(?:y|ies)\b", "instagram_story"),
-    (r"\binsta(?:gram)?\b|\breels?\b", "instagram"), (r"\btik ?tok\b", "tiktok"), (r"\b(?:youtube|yt) shorts?\b|\bshorts\b", "youtube_shorts"),
-    (r"\byoutube\b|\byt\b", "youtube"), (r"\bfacebook\b|\bfb\b", "facebook"), (r"\blinked ?in\b", "linkedin"), (r"\btwitter\b|\bfor x\b|\bon x\b", "x"),
+    (r"\bwhats\s*app\b|\bwa status\b", "whatsapp"),
+    (r"\b(?:e-?mail(?:ing)?|gmail|outlook|mail it|attach(?:ment)?)\b", "email"),
+    (r"\bdiscord\b", "discord"),
+    (r"\btelegram\b", "telegram"),
+    (r"\bslack\b", "slack"),
+    (r"\b(?:insta(?:gram)?|ig) (?:feed|post)\b", "instagram_post"),
+    (r"\b(?:insta(?:gram)?|ig) stor(?:y|ies)\b", "instagram_story"),
+    (r"\binsta(?:gram)?\b|\breels?\b", "instagram"),
+    (r"\btik ?tok\b", "tiktok"),
+    (r"\b(?:youtube|yt) shorts?\b|\bshorts\b", "youtube_shorts"),
+    (r"\byoutube\b|\byt\b", "youtube"),
+    (r"\bfacebook\b|\bfb\b", "facebook"),
+    (r"\blinked ?in\b", "linkedin"),
+    (r"\btwitter\b|\bfor x\b|\bon x\b", "x"),
     (r"\b(?:my |a |the )?(?:web ?site|web page|webpage|website|blog|html)\b|\bfor (?:the )?web\b", "web"),
-    (r"\bi ?phones?\b|\bipad\b|\bmac(?:book)?\b|\bapple\b", "iphone"), (r"\bandroid\b|\bsamsung\b", "android"),
-    (r"\b(?:smart ?)?tv\b|\btelevision\b|\busb\b|\bled\b|\blcd\b|\bdvd player\b", "tv"), (r"\bpower ?point\b|\bpresentation\b|\bslides?\b|\bppt\b", "powerpoint"),
+    (r"\bi ?phones?\b|\bipad\b|\bmac(?:book)?\b|\bapple\b", "iphone"),
+    (r"\bandroid\b|\bsamsung\b", "android"),
+    (r"\b(?:smart ?)?tv\b|\btelevision\b|\busb\b|\bled\b|\blcd\b|\bdvd player\b", "tv"),
+    (r"\bpower ?point\b|\bpresentation\b|\bslides?\b|\bppt\b", "powerpoint"),
     (r"\bediting\b|\bpremiere\b|\bdavinci\b|\bresolve\b|\bcapcut\b|\bto edit\b|\bvideo editor\b", "editing"),
     (r"\barchiv(?:e|ing)\b|\bkeep(?:ing)? (?:it )?for (?:later|years)\b|\bbackup\b|\bstorage\b|\bto store\b", "archive"),
     (r"\b(?:plays?|work|open)s? (?:everywhere|on (?:any|every|all) (?:device|phone|player|computer|pc)s?)\b|\bany device\b", "everywhere"),
@@ -83,8 +95,15 @@ def ranges(c):
 
 
 def size_mb(c):
-    m = re.search(r"(?:under|below|less than|max(?:imum)?|at most|smaller than|within|no (?:more|bigger) than|up to|to|fit (?:in|into)|<)\s*(?:about\s*)?" + SIZE, c) \
-        or re.search(SIZE + r"\s*(?:or less|max(?:imum)?|or smaller|limit|at most)\b", c) or re.search(r"\b(?:make it|be|is|as|only)\s*" + SIZE, c)
+    m = (
+        re.search(
+            r"(?:under|below|less than|max(?:imum)?|at most|smaller than|within|no (?:more|bigger) than|up to|to|fit (?:in|into)|<)\s*(?:about\s*)?"
+            + SIZE,
+            c,
+        )
+        or re.search(SIZE + r"\s*(?:or less|max(?:imum)?|or smaller|limit|at most)\b", c)
+        or re.search(r"\b(?:make it|be|is|as|only)\s*" + SIZE, c)
+    )
     if not m:
         return None
     n, u = float(m.group(1)), m.group(2)
@@ -126,48 +145,85 @@ def parse(clause, ctx=None):
 
     # ------------------------------------------------ questions
     tgt = next((name for rx, name in TARGETS if re.search(rx, c)), None)
-    if re.search(r"^\s*(?:will|would|does|do|can|could|is) (?:it|this|that|the (?:video|file))\b.*\b(?:play|work|open|send|go|be (?:ok|okay|fine))\b|"
-                 r"^\s*can i (?:send|share|post|upload|play|open) (?:it|this)\b|^\s*is (?:it|this) (?:ok|okay|fine|good|ready) (?:for|to)\b", c) or \
-            (tgt and re.search(r"^\s*(?:will|would|does|do|can|could|is|are)\b", c) and re.search(r"\b(?:play|watch|open|view|see|send|work|upload)\b", c)):
+    if re.search(
+        r"^\s*(?:will|would|does|do|can|could|is) (?:it|this|that|the (?:video|file))\b.*\b(?:play|work|open|send|go|be (?:ok|okay|fine))\b|"
+        r"^\s*can i (?:send|share|post|upload|play|open) (?:it|this)\b|^\s*is (?:it|this) (?:ok|okay|fine|good|ready) (?:for|to)\b",
+        c,
+    ) or (
+        tgt and re.search(r"^\s*(?:will|would|does|do|can|could|is|are)\b", c) and re.search(r"\b(?:play|watch|open|view|see|send|work|upload)\b", c)
+    ):
         return {"ops": [{"op": "ask", "args": {"what": "compat", "target": tgt or "everywhere"}}], "ask": None}
-    if re.search(r"^\s*(?:what(?:'s| is) (?:this|it|the file|in it)|(?:show|tell) me (?:about )?(?:it|the file|the details|the info)|details|info(?:rmation)?|"
-                 r"what (?:format|resolution|size|codec|quality|frame rate|fps) is (?:it|this)|how (?:big|large|long|heavy) is (?:it|this|the (?:file|video))|"
-                 r"what are the (?:details|specs)|describe it)\b", c):
+    if re.search(
+        r"^\s*(?:what(?:'s| is) (?:this|it|the file|in it)|(?:show|tell) me (?:about )?(?:it|the file|the details|the info)|details|info(?:rmation)?|"
+        r"what (?:format|resolution|size|codec|quality|frame rate|fps) is (?:it|this)|how (?:big|large|long|heavy) is (?:it|this|the (?:file|video))|"
+        r"what are the (?:details|specs)|describe it)\b",
+        c,
+    ):
         return {"ops": [{"op": "ask", "args": {"what": "info"}}], "ask": None}
-    if re.search(r"^\s*(?:how (?:good|bad) (?:is|does)|how does it look|is (?:it|this) (?:still )?(?:good|ok|okay|fine|bad|low|high) quality|is the quality (?:ok|good|fine|bad)|does it (?:still )?look (?:ok|good|the same|fine|bad)|"
-                 r"did (?:it|the quality) (?:get worse|drop)|quality check)\b", c):
+    if re.search(
+        r"^\s*(?:how (?:good|bad) (?:is|does)|how does it look|is (?:it|this) (?:still )?(?:good|ok|okay|fine|bad|low|high) quality|is the quality (?:ok|good|fine|bad)|does it (?:still )?look (?:ok|good|the same|fine|bad)|"
+        r"did (?:it|the quality) (?:get worse|drop)|quality check)\b",
+        c,
+    ):
         return {"ops": [{"op": "ask", "args": {"what": "quality"}}], "ask": None}
-    if re.search(r"^\s*(?:compare|how much (?:smaller|bigger|did it save)|what (?:changed|did you (?:do|change))|before and after)\b|"
-                 r"\bcompared? (?:to|with) the original\b|\bvs\.? (?:the )?original\b|\bagainst the original\b", c):
+    if re.search(
+        r"^\s*(?:compare|how much (?:smaller|bigger|did it save)|what (?:changed|did you (?:do|change))|before and after)\b|"
+        r"\bcompared? (?:to|with) the original\b|\bvs\.? (?:the )?original\b|\bagainst the original\b",
+        c,
+    ):
         return {"ops": [{"op": "ask", "args": {"what": "compare"}}], "ask": None}
     if re.search(r"^\s*where (?:is|are|did you (?:save|put))\b|^\s*(?:show|open) (?:me )?the (?:folder|file)s?\b", c):
         return {"ops": [{"op": "ask", "args": {"what": "where"}}], "ask": None}
     # ------------------------------------------------ recording the screen
-    if re.search(r"\b(?:record|capture) (?:my |the )?(?:screen|desktop|display|monitor)\b|\bscreen ?record", c) or re.search(r"^\s*start recording\b", c):
+    if re.search(r"\b(?:record|capture) (?:my |the )?(?:screen|desktop|display|monitor)\b|\bscreen ?record", c) or re.search(
+        r"^\s*start recording\b", c
+    ):
         m = re.search(r"\bfor\s+" + T1, c)
-        op("record", seconds=secs(m.group(1)) if m else None, mic=bool(re.search(r"\b(?:mic|microphone|voice|my sound|narrat)", c)),
-           screen=int(re.search(r"\b(?:screen|monitor|display) (\d)\b", c).group(1)) if re.search(r"\b(?:screen|monitor|display) (\d)\b", c) else 1)
+        op(
+            "record",
+            seconds=secs(m.group(1)) if m else None,
+            mic=bool(re.search(r"\b(?:mic|microphone|voice|my sound|narrat)", c)),
+            screen=int(re.search(r"\b(?:screen|monitor|display) (\d)\b", c).group(1)) if re.search(r"\b(?:screen|monitor|display) (\d)\b", c) else 1,
+        )
         return done()
     if re.search(r"^\s*(?:stop|end|finish) (?:the )?(?:recording|record)\b|^\s*stop\s*$", c):
         op("record_stop")
         return done()
     # ------------------------------------------------ saving
-    msave = re.search(r"\b(?:save|export|download)\b|\bgive me (?:the )?(?:file|video|result|copy)\b|"
-                      r"\b(?:put|copy|move|send) (?:it|this|that|them|the (?:file|video|result|parts|pictures|gif)) (?:to|on|in|into|onto) (?:my |the )?" + WHERE, c)
+    msave = re.search(
+        r"\b(?:save|export|download)\b|\bgive me (?:the )?(?:file|video|result|copy)\b|"
+        r"\b(?:put|copy|move|send) (?:it|this|that|them|the (?:file|video|result|parts|pictures|gif)) (?:to|on|in|into|onto) (?:my |the )?" + WHERE,
+        c,
+    )
     as_format = re.search(r"\b(?:save|export)\b(?: (?:it|this|that))? (?:as|in|to) (?:an? )?\.?" + FORMATS + r"\b", c)
     if msave and not as_format:
         mw = re.search(r"\b(?:to|on|in|into|onto) (?:my |the )?" + WHERE + r"\b", c)
-        where = mw.group(1).replace(" ", "") if mw else ("original" if re.search(r"\b(?:next to|beside|same folder as|where) the original\b", c) else None)
-        mname = re.search(r"\b(?:as|named|called)\s+[\"']?([\w\-. ()]+?\.(?:" + VIDEO_EXT + "|" + AUDIO_EXT + r"|png|jpg|jpeg|webp))[\"']?\s*$", raw, re.I)
+        where = (
+            mw.group(1).replace(" ", "")
+            if mw
+            else ("original" if re.search(r"\b(?:next to|beside|same folder as|where) the original\b", c) else None)
+        )
+        mname = re.search(
+            r"\b(?:as|named|called)\s+[\"']?([\w\-. ()]+?\.(?:" + VIDEO_EXT + "|" + AUDIO_EXT + r"|png|jpg|jpeg|webp))[\"']?\s*$", raw, re.I
+        )
         op("save", where=where, name=mname.group(1) if mname else None)
         return done()
     # ------------------------------------------------ where it is going
-    if tgt and (re.search(r"\b(?:for|to|on|onto|ready|send|post|upload|share|attach|mail|email|e-mail|play|plays|works?|open|in|into|with)\b", c)
-                or len(c.split()) <= 3) and not re.search(r"^\s*(?:will|would|does|can|is)\b", c):
+    if (
+        tgt
+        and (
+            re.search(r"\b(?:for|to|on|onto|ready|send|post|upload|share|attach|mail|email|e-mail|play|plays|works?|open|in|into|with)\b", c)
+            or len(c.split()) <= 3
+        )
+        and not re.search(r"^\s*(?:will|would|does|can|is)\b", c)
+    ):
         op("target", name=tgt)
     # ------------------------------------------------ the kind of file
-    m = re.search(r"\b(?:convert|change|turn|make|save|export|transcode|re-?encode|into|to|as|in)\b(?: (?:it|this|the (?:video|file|format)))?(?: (?:in)?to| as| in| into)?"
-                  r" (?:an? )?\.?" + FORMATS + r"\b(?! (?:file|video) (?:named|called))", c) or re.search(r"^\s*\.?" + FORMATS + r"\s*(?:please|pls|format|file)?\s*$", c)
+    m = re.search(
+        r"\b(?:convert|change|turn|make|save|export|transcode|re-?encode|into|to|as|in)\b(?: (?:it|this|the (?:video|file|format)))?(?: (?:in)?to| as| in| into)?"
+        r" (?:an? )?\.?" + FORMATS + r"\b(?! (?:file|video) (?:named|called))",
+        c,
+    ) or re.search(r"^\s*\.?" + FORMATS + r"\s*(?:please|pls|format|file)?\s*$", c)
     fmt = m.group(1) if m else None
     if not fmt:
         m = re.search(r"\b(?:an? )?\.?" + FORMATS + r" (?:of it|of this|version|copy|file)\b", c)
@@ -192,8 +248,11 @@ def parse(clause, ctx=None):
             op("trim", start=a, end=b)
         op("gif", fmt="webp", **({"max_mb": size_mb(c)} if size_mb(c) else {}))
         return done()
-    if re.search(r"\b(?:extract|rip|pull out|take out|get|save|keep|export|give me|separate)\b (?:only )?(?:the |its )?(?:audio|sound|music|song|voice)\b|"
-                 r"\b(?:audio|sound) only\b|\bjust the (?:audio|sound|music)\b|\bonly the (?:audio|sound)\b", c) and not re.search(r"\b(?:remove|delete|mute|without)\b", c):
+    if re.search(
+        r"\b(?:extract|rip|pull out|take out|get|save|keep|export|give me|separate)\b (?:only )?(?:the |its )?(?:audio|sound|music|song|voice)\b|"
+        r"\b(?:audio|sound) only\b|\bjust the (?:audio|sound|music)\b|\bonly the (?:audio|sound)\b",
+        c,
+    ) and not re.search(r"\b(?:remove|delete|mute|without)\b", c):
         op("extract_audio", fmt=fmt if fmt in ("mp3", "wav", "m4a", "aac", "flac", "ogg", "opus") else None)
     elif fmt:
         if fmt in ("mp3", "wav", "m4a", "aac", "flac", "ogg", "opus") or fmt != "gif":
@@ -202,8 +261,22 @@ def parse(clause, ctx=None):
         op("video")
     mc = re.search(r"\b(h\.?264|avc|x264|h\.?265|hevc|x265|av1|vp9|prores)\b", c)
     if mc:
-        op("codec", video={"h264": "h264", "h.264": "h264", "avc": "h264", "x264": "h264", "h265": "hevc", "h.265": "hevc", "hevc": "hevc", "x265": "hevc",
-                           "av1": "av1", "vp9": "vp9", "prores": "prores"}[mc.group(1)])
+        op(
+            "codec",
+            video={
+                "h264": "h264",
+                "h.264": "h264",
+                "avc": "h264",
+                "x264": "h264",
+                "h265": "hevc",
+                "h.265": "hevc",
+                "hevc": "hevc",
+                "x265": "hevc",
+                "av1": "av1",
+                "vp9": "vp9",
+                "prores": "prores",
+            }[mc.group(1)],
+        )
     # ------------------------------------------------ size and quality
     mb = size_mb(c)
     if mb and not any(o["op"] == "gif" for o in ops):
@@ -218,13 +291,17 @@ def parse(clause, ctx=None):
         op("compress", percent=max(1.0, 100 - float(m.group(1) or m.group(2))))
     elif re.search(r"(\d+)\s*(?:%|percent) of (?:the|its) (?:original )?size\b", c):
         op("compress", percent=float(re.search(r"(\d+)\s*(?:%|percent) of", c).group(1)))
-    elif re.search(r"\b(?:as small as (?:possible|it can)|smallest(?: possible)?|tiny|very small|super small)\b", c) and \
-            not re.search(r"\b(?:same|keep|without losing|no loss)\b", c):
+    elif re.search(r"\b(?:as small as (?:possible|it can)|smallest(?: possible)?|tiny|very small|super small)\b", c) and not re.search(
+        r"\b(?:same|keep|without losing|no loss)\b", c
+    ):
         op("compress", level="tiny")
     elif re.search(r"\b(?:much|a lot|way|far) smaller\b|\bsmaller still\b|\beven smaller\b", c):
         op("compress", level="small")
-    elif re.search(r"\b(?:compress|shrink|reduce(?: the)? (?:file )?size|make (?:it|the file|the video) (?:smaller|lighter)|smaller file|lighter|"
-                   r"(?:lower|reduce) (?:the )?(?:file )?size|too (?:big|large|heavy))\b|^\s*smaller\b", c):
+    elif re.search(
+        r"\b(?:compress|shrink|reduce(?: the)? (?:file )?size|make (?:it|the file|the video) (?:smaller|lighter)|smaller file|lighter|"
+        r"(?:lower|reduce) (?:the )?(?:file )?size|too (?:big|large|heavy))\b|^\s*smaller\b",
+        c,
+    ):
         op("compress")
     if re.search(r"\b(?:best|highest|maximum|max|top|full) quality\b|\bas good as possible\b", c):
         op("quality", level="best")
@@ -238,8 +315,13 @@ def parse(clause, ctx=None):
         else:
             m = re.search(r"\b(2160|1440|1080|720|576|540|480|360|240)\s*p\b|\b(4k|uhd|2k|qhd|full ?hd|fhd|hd|sd)\b", c)
             if m:
-                h = int(m.group(1)) if m.group(1) else {"4k": 2160, "uhd": 2160, "2k": 1440, "qhd": 1440, "full hd": 1080, "fullhd": 1080, "fhd": 1080, "hd": 720,
-                                                         "sd": 480}[m.group(2)]
+                h = (
+                    int(m.group(1))
+                    if m.group(1)
+                    else {"4k": 2160, "uhd": 2160, "2k": 1440, "qhd": 1440, "full hd": 1080, "fullhd": 1080, "fhd": 1080, "hd": 720, "sd": 480}[
+                        m.group(2)
+                    ]
+                )
                 op("resize", height=h)
             elif re.search(r"\bhalf (?:the )?(?:resolution|dimensions|width|frame size)\b|\bhalf as (?:wide|big on screen)\b", c):
                 op("resize", scale=0.5)
@@ -252,11 +334,29 @@ def parse(clause, ctx=None):
         op("fps", fps=float(m.group(1) or m.group(2)))
     # ------------------------------------------------ shape and turns
     m = re.search(r"\b(9:16|16:9|1:1|4:5|4:3|3:4|21:9|2:3|3:2)\b", c)
-    ratio = m.group(1) if m else ("9:16" if re.search(r"\bvertical\b|\bportrait\b|\bupright\b(?! it)|\bphone (?:shape|size|screen)\b", c) else
-                                  "1:1" if re.search(r"\bsquare\b", c) else "16:9" if re.search(r"\b(?:landscape|horizontal|widescreen|wide screen)\b", c) else None)
+    ratio = (
+        m.group(1)
+        if m
+        else (
+            "9:16"
+            if re.search(r"\bvertical\b|\bportrait\b|\bupright\b(?! it)|\bphone (?:shape|size|screen)\b", c)
+            else "1:1"
+            if re.search(r"\bsquare\b", c)
+            else "16:9"
+            if re.search(r"\b(?:landscape|horizontal|widescreen|wide screen)\b", c)
+            else None
+        )
+    )
     if ratio and not re.search(r"\b(?:rotate|turn (?:it )?(?:left|right|around|sideways))\b", c):
-        fit = "crop" if re.search(r"\bcrop|\bfill (?:the )?(?:screen|frame)|\bzoom (?:in|to fill)|\bcut (?:off )?the sides\b|\bno (?:bars|borders|blur)\b", c) else \
-            "bars" if re.search(r"\b(?:black )?(?:bars|borders|letterbox|pillarbox)\b", c) else "blur" if re.search(r"\bblur", c) else None
+        fit = (
+            "crop"
+            if re.search(r"\bcrop|\bfill (?:the )?(?:screen|frame)|\bzoom (?:in|to fill)|\bcut (?:off )?the sides\b|\bno (?:bars|borders|blur)\b", c)
+            else "bars"
+            if re.search(r"\b(?:black )?(?:bars|borders|letterbox|pillarbox)\b", c)
+            else "blur"
+            if re.search(r"\bblur", c)
+            else None
+        )
         args = {"ratio": ratio}
         if fit:
             args["fit"] = fit
@@ -274,8 +374,9 @@ def parse(clause, ctx=None):
         op("rotate", deg=90)
     if re.search(r"\b(?:flip|mirror)\b", c):
         op("flip", dir="v" if re.search(r"\bvertical(?:ly)?\b|\bupside\b|\btop to bottom\b", c) else "h")
-    if re.search(r"\b(?:remove|cut|crop|get rid of|delete|take off)\b.*\b(?:black )?(?:bars|borders|edges|letterbox(?:ing)?)\b|\bno (?:black )?bars\b", c) and \
-            not any(o["op"] == "aspect" for o in ops):
+    if re.search(
+        r"\b(?:remove|cut|crop|get rid of|delete|take off)\b.*\b(?:black )?(?:bars|borders|edges|letterbox(?:ing)?)\b|\bno (?:black )?bars\b", c
+    ) and not any(o["op"] == "aspect" for o in ops):
         op("bars")
     # ------------------------------------------------ cutting
     ctx.get("duration")
@@ -283,13 +384,18 @@ def parse(clause, ctx=None):
     if re.search(r"\b(?:remove|delete|cut out|take out|get rid of|drop|skip)\b", c) and ranges(c) and not re.search(r"\bkeep\b|\bonly\b", c):
         op("cut", ranges=[[a, b] for a, b in ranges(c)])
         found_range = True
-    elif ranges(c) and re.search(r"\b(?:keep|only|trim|cut|clip|just|from|between|part|section|portion)\b", c) and not any(o["op"] in ("gif",) for o in ops):
+    elif (
+        ranges(c)
+        and re.search(r"\b(?:keep|only|trim|cut|clip|just|from|between|part|section|portion)\b", c)
+        and not any(o["op"] in ("gif",) for o in ops)
+    ):
         a, b = ranges(c)[0]
         op("trim", start=a, end=b)
         found_range = True
     if not found_range:
-        m = re.search(r"\b(?:keep|only|just|trim (?:it )?to|cut (?:it )?to|use|want)\b (?:only )?(?:the )?first\s+(?:" + NUMW + r"\s*)?" + UNIT + r"\b", c) or \
-            re.search(r"^\s*(?:the )?first\s+" + NUMW + r"\s*" + UNIT + r"\b(?: only)?\s*$", c)
+        m = re.search(
+            r"\b(?:keep|only|just|trim (?:it )?to|cut (?:it )?to|use|want)\b (?:only )?(?:the )?first\s+(?:" + NUMW + r"\s*)?" + UNIT + r"\b", c
+        ) or re.search(r"^\s*(?:the )?first\s+" + NUMW + r"\s*" + UNIT + r"\b(?: only)?\s*$", c)
         if m:
             n = _num(m.group(1)) if m.group(1) else 1.0
             op("trim", first=n * _unit(m.group(0)))
@@ -297,11 +403,15 @@ def parse(clause, ctx=None):
         if m2:
             n = _num(m2.group(1)) if m2.group(1) else 1.0
             op("trim", last=n * _unit(m2.group(0)))
-        m3 = re.search(r"\b(?:cut|remove|delete|skip|drop|trim|chop|lose|get rid of)\b(?: off| out)? (?:the )?first\s+(?:" + NUMW + r"\s*)?" + UNIT + r"\b", c)
+        m3 = re.search(
+            r"\b(?:cut|remove|delete|skip|drop|trim|chop|lose|get rid of)\b(?: off| out)? (?:the )?first\s+(?:" + NUMW + r"\s*)?" + UNIT + r"\b", c
+        )
         if m3 and not m:
             n = _num(m3.group(1)) if m3.group(1) else 1.0
             op("trim", drop_start=n * _unit(m3.group(0)))
-        m4 = re.search(r"\b(?:cut|remove|delete|skip|drop|trim|chop|lose|get rid of)\b(?: off| out)? (?:the )?last\s+(?:" + NUMW + r"\s*)?" + UNIT + r"\b", c)
+        m4 = re.search(
+            r"\b(?:cut|remove|delete|skip|drop|trim|chop|lose|get rid of)\b(?: off| out)? (?:the )?last\s+(?:" + NUMW + r"\s*)?" + UNIT + r"\b", c
+        )
         if m4 and not m2:
             n = _num(m4.group(1)) if m4.group(1) else 1.0
             op("trim", drop_end=n * _unit(m4.group(0)))
@@ -330,38 +440,58 @@ def parse(clause, ctx=None):
     elif re.search(r"\b(?:slow (?:it )?down|slower)\b", c):
         op("speed", factor=0.75)
     # ------------------------------------------------ sound
-    if re.search(r"\b(?:remove|delete|mute|kill|cut|strip|take out|get rid of|no|without)\b (?:the |all |any )?(?:audio|sound|music|noise track|voice)\b|\bsilent\b|\bmute (?:it|the video)\b", c) \
-            and not re.search(r"\bbackground noise\b", c):
+    if re.search(
+        r"\b(?:remove|delete|mute|kill|cut|strip|take out|get rid of|no|without)\b (?:the |all |any )?(?:audio|sound|music|noise track|voice)\b|\bsilent\b|\bmute (?:it|the video)\b",
+        c,
+    ) and not re.search(r"\bbackground noise\b", c):
         op("mute")
     sounds = _files(raw, ctx, AUDIO_EXT)
-    if sounds and re.search(r"\b(?:replace|swap|change|use|put|add|with|as|under|behind|background|music|song|sound|audio)\b", c) and \
-            not any(o["op"] == "extract_audio" for o in ops):
-        mix = bool(re.search(r"\b(?:under|behind|background|beneath|low|softly|mix|on top|over)\b", c)) and not re.search(r"\breplace\b|\binstead of the (?:sound|audio)\b", c)
+    if (
+        sounds
+        and re.search(r"\b(?:replace|swap|change|use|put|add|with|as|under|behind|background|music|song|sound|audio)\b", c)
+        and not any(o["op"] == "extract_audio" for o in ops)
+    ):
+        mix = bool(re.search(r"\b(?:under|behind|background|beneath|low|softly|mix|on top|over)\b", c)) and not re.search(
+            r"\breplace\b|\binstead of the (?:sound|audio)\b", c
+        )
         a = {"file": sounds[0], "mode": "mix" if mix else "replace"}
         md = re.search(r"(-?\d+)\s*db\b", c)
         if md:
             a["db"] = float(md.group(1))
         op("audio", **a)
-    m = re.search(r"\b(?:louder|turn (?:it |the (?:sound|volume|audio) )?up|boost|raise|increase)\b.*?(\d+(?:\.\d+)?)\s*db\b|\b(?:\+|plus )(\d+(?:\.\d+)?)\s*db\b", c)
+    m = re.search(
+        r"\b(?:louder|turn (?:it |the (?:sound|volume|audio) )?up|boost|raise|increase)\b.*?(\d+(?:\.\d+)?)\s*db\b|\b(?:\+|plus )(\d+(?:\.\d+)?)\s*db\b",
+        c,
+    )
     if m:
         op("volume", db=float(m.group(1) or m.group(2)))
-    elif re.search(r"\b(?:quieter|softer|turn (?:it |the (?:sound|volume|audio) )?down|lower the (?:sound|volume|audio)|reduce the (?:sound|volume))\b", c):
+    elif re.search(
+        r"\b(?:quieter|softer|turn (?:it |the (?:sound|volume|audio) )?down|lower the (?:sound|volume|audio)|reduce the (?:sound|volume))\b", c
+    ):
         md = re.search(r"(\d+(?:\.\d+)?)\s*db\b", c)
         op("volume", db=-(float(md.group(1)) if md else 6.0))
-    elif re.search(r"\b(?:louder|turn (?:it |the (?:sound|volume|audio) )?up|raise the (?:sound|volume)|boost the (?:sound|volume|audio)|increase the volume|too quiet|can'?t hear)\b", c):
+    elif re.search(
+        r"\b(?:louder|turn (?:it |the (?:sound|volume|audio) )?up|raise the (?:sound|volume)|boost the (?:sound|volume|audio)|increase the volume|too quiet|can'?t hear)\b",
+        c,
+    ):
         op("volume", db=6.0)
     if re.search(r"\bnormali[sz]e\b|\beven out the (?:sound|volume|audio)\b|\blevel (?:out )?the (?:sound|audio|volume)\b|\bsame loudness\b", c):
         op("normalize", lufs=-16.0 if re.search(r"\bpodcast\b", c) else -14.0)
     if re.search(r"\bmono\b", c):
         op("mono")
-    m = re.search(r"\b(?:sound|audio|voice|lips?)\b.*\b(?:late|behind|lagging|delayed|after)\b|\b(?:late|behind|lagging|delayed)\b.*\b(?:sound|audio|voice)\b", c)
+    m = re.search(
+        r"\b(?:sound|audio|voice|lips?)\b.*\b(?:late|behind|lagging|delayed|after)\b|\b(?:late|behind|lagging|delayed)\b.*\b(?:sound|audio|voice)\b",
+        c,
+    )
     m2 = re.search(r"\b(?:sound|audio|voice)\b.*\b(?:early|ahead|before|too soon)\b|\b(?:early|ahead)\b.*\b(?:sound|audio|voice)\b", c)
     if m or m2:
-        md = re.search(r"(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|secs?|seconds?)\b", c) or \
-            re.search(r"\b(half|quarter|third|fifth|tenth) (?:a|of a) second\b", c)
+        md = re.search(r"(\d+(?:\.\d+)?)\s*(ms|milliseconds?|s|secs?|seconds?)\b", c) or re.search(
+            r"\b(half|quarter|third|fifth|tenth) (?:a|of a) second\b", c
+        )
         if md:
-            v = {"half": 0.5, "quarter": 0.25, "third": 0.333, "fifth": 0.2, "tenth": 0.1}.get(md.group(1)) or \
-                float(md.group(1)) / (1000 if md.group(2).startswith("m") else 1)
+            v = {"half": 0.5, "quarter": 0.25, "third": 0.333, "fifth": 0.2, "tenth": 0.1}.get(md.group(1)) or float(md.group(1)) / (
+                1000 if md.group(2).startswith("m") else 1
+            )
             op("sync", delay=-v if m else v)
         else:
             return {"ops": [], "ask": "By how much is the sound off? e.g. 'the sound is 0.3 seconds late'."}
@@ -370,7 +500,9 @@ def parse(clause, ctx=None):
         op("stabilize", strength="strong" if re.search(r"\b(?:very|really|a lot|strong)\b", c) else "medium")
     if re.search(r"\bde-?interlac|\binterlac|\bcomb(?:ing)? lines\b|\blines when (?:it )?moves?\b", c):
         op("deinterlace")
-    if re.search(r"\b(?:de-?noise|grain(?:y)?|noisy picture|remove (?:the )?(?:noise|grain)|dots|clean (?:up )?the picture)\b", c) and not re.search(r"\b(?:sound|audio)\b", c):
+    if re.search(r"\b(?:de-?noise|grain(?:y)?|noisy picture|remove (?:the )?(?:noise|grain)|dots|clean (?:up )?the picture)\b", c) and not re.search(
+        r"\b(?:sound|audio)\b", c
+    ):
         op("denoise", strength="strong" if re.search(r"\b(?:very|really|a lot|strong)\b", c) else "medium")
     if re.search(r"\bsharpen|\bsharper\b|\bcrisper\b", c):
         op("sharpen")
@@ -383,8 +515,17 @@ def parse(clause, ctx=None):
     # ------------------------------------------------ logo, subtitles
     pics = _files(raw, ctx, "png|jpg|jpeg|webp|svg")
     if pics and re.search(r"\b(?:logo|watermark|stamp|brand|overlay|corner|put|add)\b", c):
-        corner = "tl" if re.search(r"\btop[- ]left\b|\bupper left\b", c) else "tr" if re.search(r"\btop[- ]right\b|\bupper right\b|\btop corner\b", c) else \
-            "bl" if re.search(r"\bbottom[- ]left\b|\blower left\b", c) else "center" if re.search(r"\b(?:center|centre|middle)\b", c) else "br"
+        corner = (
+            "tl"
+            if re.search(r"\btop[- ]left\b|\bupper left\b", c)
+            else "tr"
+            if re.search(r"\btop[- ]right\b|\bupper right\b|\btop corner\b", c)
+            else "bl"
+            if re.search(r"\bbottom[- ]left\b|\blower left\b", c)
+            else "center"
+            if re.search(r"\b(?:center|centre|middle)\b", c)
+            else "br"
+        )
         a = {"file": pics[0], "corner": corner}
         ms = re.search(r"\b(small|tiny|big|large)\b", c)
         if ms:
@@ -394,11 +535,16 @@ def parse(clause, ctx=None):
     if subs:
         op("subtitles", file=subs[0], burn=not re.search(r"\b(?:soft|as a track|separate|switchable|turn (?:on|off)|can be turned)\b", c))
     # ------------------------------------------------ pictures from it
-    pics = (r"\b(?:screenshots?|snapshots?|screen ?grabs?|stills|a still|still (?:image|frame|picture|photo)s?|thumbnails?|cover(?: (?:picture|image|photo|frame))?|"
-            r"poster frame|contact sheet|storyboard|(?:pictures?|photos?|images?|frames?)(?= (?:of|from|at|every)\b)|"
-            r"(?:\d+|two|three|four|five|six|eight|ten|twelve|twenty) (?:pictures?|photos?|images?|frames?))\b")
-    if re.search(pics, c) and not re.search(r"\b(?:fps|frame ?rate|frames? (?:per|a) second)\b", c) and \
-            not (re.search(r"\bcover\b", c) and not re.search(r"\b(?:picture|image|photo|frame|thumbnail)\b", c)):
+    pics = (
+        r"\b(?:screenshots?|snapshots?|screen ?grabs?|stills|a still|still (?:image|frame|picture|photo)s?|thumbnails?|cover(?: (?:picture|image|photo|frame))?|"
+        r"poster frame|contact sheet|storyboard|(?:pictures?|photos?|images?|frames?)(?= (?:of|from|at|every)\b)|"
+        r"(?:\d+|two|three|four|five|six|eight|ten|twelve|twenty) (?:pictures?|photos?|images?|frames?))\b"
+    )
+    if (
+        re.search(pics, c)
+        and not re.search(r"\b(?:fps|frame ?rate|frames? (?:per|a) second)\b", c)
+        and not (re.search(r"\bcover\b", c) and not re.search(r"\b(?:picture|image|photo|frame|thumbnail)\b", c))
+    ):
         fmt_i = "png" if re.search(r"\bpng\b", c) else "jpg"
         if re.search(r"\b(?:contact sheet|storyboard|grid|overview|preview sheet|all in one)\b", c):
             mcount = re.search(r"\b(\d+)\s*(?:frames?|pictures?|shots?|screenshots?)\b", c)
@@ -408,16 +554,25 @@ def parse(clause, ctx=None):
         elif re.search(r"\b(?:at|from)\s+" + T1, c):
             times = [secs(x) for x in re.findall(r"(\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?|\d+(?:\.\d+)?\s*(?:s|secs?|seconds?)\b)", c)]
             op("frames", at=[t for t in times if t is not None], fmt=fmt_i)
-        elif re.search(r"\b(\d+|two|three|four|five|six|eight|ten|twelve|twenty)\s+(?:screenshots?|snapshots?|stills?|frames?|pictures?|thumbnails?)\b", c):
-            n = _num(re.search(r"\b(\d+|two|three|four|five|six|eight|ten|twelve|twenty)\s+(?:screenshots?|snapshots?|stills?|frames?|pictures?|thumbnails?)\b", c).group(1))
+        elif re.search(
+            r"\b(\d+|two|three|four|five|six|eight|ten|twelve|twenty)\s+(?:screenshots?|snapshots?|stills?|frames?|pictures?|thumbnails?)\b", c
+        ):
+            n = _num(
+                re.search(
+                    r"\b(\d+|two|three|four|five|six|eight|ten|twelve|twenty)\s+(?:screenshots?|snapshots?|stills?|frames?|pictures?|thumbnails?)\b",
+                    c,
+                ).group(1)
+            )
             op("frames", count=int(n), fmt=fmt_i)
         elif re.search(r"\b(?:thumbnail|cover|poster frame|best frame|good frame)\b", c):
             op("frames", best=True, fmt=fmt_i)
         else:
             return {"ops": [], "ask": "Which moment? e.g. 'a screenshot at 0:12', 'screenshots every 10 seconds', or 'a thumbnail'."}
     # ------------------------------------------------ split, join
-    if (re.search(r"\b(?:split|divide|break|chop|cut)\b.*\b(?:parts?|pieces?|clips?|chunks?|segments?|halves|in half|in two)\b", c)
-            or re.search(r"\b(?:split|divide|chop)\b(?: it| the video)? every\b", c)) and not any(o["op"] == "split" for o in ops):
+    if (
+        re.search(r"\b(?:split|divide|break|chop|cut)\b.*\b(?:parts?|pieces?|clips?|chunks?|segments?|halves|in half|in two)\b", c)
+        or re.search(r"\b(?:split|divide|chop)\b(?: it| the video)? every\b", c)
+    ) and not any(o["op"] == "split" for o in ops):
         m = re.search(r"\b(\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(?:equal )?(?:parts?|pieces?|clips?|chunks?|segments?)\b", c)
         me = re.search(r"\bevery\s+" + T1, c) or re.search(T1 + r"\s*(?:long )?(?:parts?|pieces?|clips?|chunks?|segments?)\b", c)
         if m:
@@ -429,8 +584,10 @@ def parse(clause, ctx=None):
         else:
             return {"ops": [], "ask": "Into how many parts, or how long each? e.g. 'split it into 3 parts' or 'split it every 60 seconds'."}
     vids = [f for f in _files(raw, ctx, VIDEO_EXT) if not str(f).lower().endswith(".gif")]
-    if vids and (re.search(r"\b(?:join|merge|combine|stitch|append|attach|glue|add)\b", c) or
-                 re.search(r"\b(?:put|place|stick|play)\b.*\b(?:after|before|at the end|at the start|at the beginning|in front)\b", c)):
+    if vids and (
+        re.search(r"\b(?:join|merge|combine|stitch|append|attach|glue|add)\b", c)
+        or re.search(r"\b(?:put|place|stick|play)\b.*\b(?:after|before|at the end|at the start|at the beginning|in front)\b", c)
+    ):
         op("join", files=vids, before=bool(re.search(r"\b(?:before|at the (?:start|beginning)|in front|first)\b", c)))
     elif re.search(r"^\s*(?:join|merge|combine|stitch) (?:them|these|all|the (?:videos|clips|files))\b", c):
         op("join", files="all")

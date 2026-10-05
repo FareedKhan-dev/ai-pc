@@ -7,6 +7,7 @@ Operations (registered in docx_ops.OPS):
   data_chart   {data: {header, rows, values}, link, chart, series: [columns], caption, anchor, where}
   data_refresh {link, data, chart}
 """
+
 import re
 
 from docx.oxml import OxmlElement
@@ -19,6 +20,7 @@ from ai_pc.office import docx_build as DB
 def _ops():
     """The Word edit engine, imported when used (it registers these operations when it loads)."""
     from ai_pc.office import docx_ops
+
     return docx_ops
 
 
@@ -74,7 +76,9 @@ def find_link(doc, name):
 
 
 def links(doc):
-    return sorted({bs.get(qn("w:name")) for bs in doc.element.body.iter(qn("w:bookmarkStart")) if str(bs.get(qn("w:name")) or "").startswith("aisrc_")})
+    return sorted(
+        {bs.get(qn("w:name")) for bs in doc.element.body.iter(qn("w:bookmarkStart")) if str(bs.get(qn("w:name")) or "").startswith("aisrc_")}
+    )
 
 
 def _place(op):
@@ -86,17 +90,33 @@ def chart_spec(data, op):
     header, vals = data["header"], data["values"]
     cats = [str(r[0]) for r in data["rows"]]
     names = op.get("series") or []
-    cols = [j for j in range(1, len(header)) if (header[j] in names if names else not re.search(r"\bgrand total\b|^total$|%|share|rank", header[j], re.I))
-            and sum(1 for r in vals if isinstance(r[j], (int, float)) and not isinstance(r[j], bool)) >= max(1, len(vals) // 2)]
+    cols = [
+        j
+        for j in range(1, len(header))
+        if (header[j] in names if names else not re.search(r"\bgrand total\b|^total$|%|share|rank", header[j], re.I))
+        and sum(1 for r in vals if isinstance(r[j], (int, float)) and not isinstance(r[j], bool)) >= max(1, len(vals) // 2)
+    ]
     if not cols:
         raise OpError("the data has no number column to chart")
-    kind = op.get("chart") or ("line" if re.search(r"month|date|year|quarter|week", header[0], re.I) and len(cats) > 2 else "bar" if len(cats) > 8 else "column")
+    kind = op.get("chart") or (
+        "line" if re.search(r"month|date|year|quarter|week", header[0], re.I) and len(cats) > 2 else "bar" if len(cats) > 8 else "column"
+    )
     if kind in ("pie", "doughnut"):
         cols = cols[:1]
-    series = [{"name": header[j], "values": [float(r[j]) if isinstance(r[j], (int, float)) and not isinstance(r[j], bool) else None for r in vals]} for j in cols[:6]]
-    return {"type": "chart", "chart": kind, "categories": cats, "series": series,
-            "title": op.get("title") or (series[0]["name"] if len(series) == 1 else ""), "caption": op.get("caption") or data.get("title") or
-            (f"{series[0]['name']} by {header[0]}" if len(series) == 1 else f"{header[0]}: {', '.join(s['name'] for s in series)}")}
+    series = [
+        {"name": header[j], "values": [float(r[j]) if isinstance(r[j], (int, float)) and not isinstance(r[j], bool) else None for r in vals]}
+        for j in cols[:6]
+    ]
+    return {
+        "type": "chart",
+        "chart": kind,
+        "categories": cats,
+        "series": series,
+        "title": op.get("title") or (series[0]["name"] if len(series) == 1 else ""),
+        "caption": op.get("caption")
+        or data.get("title")
+        or (f"{series[0]['name']} by {header[0]}" if len(series) == 1 else f"{header[0]}: {', '.join(s['name'] for s in series)}"),
+    }
 
 
 def _new_charts(doc, before):
@@ -108,16 +128,23 @@ def op_data_table(doc, op, ctx):
     if not data.get("header") or not data.get("rows"):
         raise OpError("no data to put in the table")
     before = set(doc.element.body.iter(qn("w:tbl")))
-    block = {"type": "table", "columns": data["header"], "rows": data["rows"], **({"total_row": data["total"]} if data.get("total") else {}),
-             "caption": op.get("caption") or data.get("title") or f"{data['header'][-1]} by {data['header'][0]}"}
+    block = {
+        "type": "table",
+        "columns": data["header"],
+        "rows": data["rows"],
+        **({"total_row": data["total"]} if data.get("total") else {}),
+        "caption": op.get("caption") or data.get("title") or f"{data['header'][-1]} by {data['header'][0]}",
+    }
     done = _ops().op_insert(doc, {"blocks": [block], **_place(op)}, ctx)
     new = [t for t in doc.element.body.iter(qn("w:tbl")) if t not in before]
     if not new:
         raise OpError("the table could not be written")
     mark(doc, next(new[0].iter(qn("w:p"))), op["link"])
     ctx.setdefault("info", {})["link"] = op["link"]
-    return f"table '{block['caption']}' ({len(data['rows'])} rows{' and a total' if data.get('total') else ''}, from {data.get('source') or 'the workbook'}) " + \
-        done.split(") ", 1)[-1]
+    return (
+        f"table '{block['caption']}' ({len(data['rows'])} rows{' and a total' if data.get('total') else ''}, from {data.get('source') or 'the workbook'}) "
+        + done.split(") ", 1)[-1]
+    )
 
 
 def op_data_chart(doc, op, ctx):
@@ -132,8 +159,10 @@ def op_data_chart(doc, op, ctx):
         raise OpError("the chart could not be written")
     mark(doc, new[0], op["link"])
     ctx.setdefault("info", {})["chart"] = spec
-    return f"{spec['chart']} chart '{spec['caption']}' ({len(spec['categories'])} {data['header'][0].lower()} values, from {data.get('source') or 'the workbook'}) " + \
-        done.split(") ", 1)[-1]
+    return (
+        f"{spec['chart']} chart '{spec['caption']}' ({len(spec['categories'])} {data['header'][0].lower()} values, from {data.get('source') or 'the workbook'}) "
+        + done.split(") ", 1)[-1]
+    )
 
 
 def _drop_new_captions(doc, new_els):
@@ -153,8 +182,14 @@ def op_data_refresh(doc, op, ctx):
     data = op.get("data") or {}
     th = ctx.get("th") or DB.theme_of(doc)
     if kind == "table":
-        new = DB.insert_blocks(doc, [{"type": "table", "columns": data["header"], "rows": data["rows"], **({"total_row": data["total"]} if data.get("total") else {})}],
-                               anchor=el, where="after", th=th, numbering=_ops()._counts(doc))
+        new = DB.insert_blocks(
+            doc,
+            [{"type": "table", "columns": data["header"], "rows": data["rows"], **({"total_row": data["total"]} if data.get("total") else {})}],
+            anchor=el,
+            where="after",
+            th=th,
+            numbering=_ops()._counts(doc),
+        )
         _drop_new_captions(doc, new)
         tbl = next(x for x in new if x.tag == qn("w:tbl"))
         el.getparent().remove(el)
@@ -205,7 +240,9 @@ def check(op, doc_after):
     spec = chart_spec(data, op)
     want_v = [[v for v in s["values"]] for s in spec["series"]]
     ok = [_norm(c) for c in cats] == [_norm(c) for c in spec["categories"]] and all(
-        len(a) == len([x for x in b if x is not None]) and all(abs(x - y) < 1e-6 for x, y in zip(a, [x for x in b if x is not None])) for a, b in zip(vals, want_v))
+        len(a) == len([x for x in b if x is not None]) and all(abs(x - y) < 1e-6 for x, y in zip(a, [x for x in b if x is not None]))
+        for a, b in zip(vals, want_v)
+    )
     return ok, f"{len(cats)} categories, {len(vals)} series: {'equal to' if ok else 'different from'} the workbook's values"
 
 

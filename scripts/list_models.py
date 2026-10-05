@@ -1,5 +1,6 @@
 """List the models available on the user's Nebius account. The key is read from the environment or my_nebius.txt
 and is never printed."""
+
 import json
 import os
 import sys

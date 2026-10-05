@@ -7,18 +7,30 @@ are never touched. Two ways to run:
       a worker that keeps Word / PowerPoint / Excel open and runs one JSON job per stdin line (render.Server): a render
       takes ~1-2 s instead of ~6-8 s. The parent stops it, and only the Office instances it started, if a job hangs.
 """
+
 import json
 import sys
 import time
 import traceback
 
-XL_ERRORS = {-2146826281: "#DIV/0!", -2146826246: "#N/A", -2146826259: "#NAME?", -2146826288: "#NULL!", -2146826252: "#NUM!",
-             -2146826265: "#REF!", -2146826273: "#VALUE!", -2146826245: "#GETTING_DATA", -2146826215: "#SPILL!", -2146826219: "#CALC!"}
+XL_ERRORS = {
+    -2146826281: "#DIV/0!",
+    -2146826246: "#N/A",
+    -2146826259: "#NAME?",
+    -2146826288: "#NULL!",
+    -2146826252: "#NUM!",
+    -2146826265: "#REF!",
+    -2146826273: "#VALUE!",
+    -2146826245: "#GETTING_DATA",
+    -2146826215: "#SPILL!",
+    -2146826219: "#CALC!",
+}
 PROGID = {"word": "Word.Application", "powerpoint": "PowerPoint.Application", "excel": "Excel.Application"}
 
 
 def _new_app(name):
     import win32com.client
+
     app = win32com.client.DispatchEx(PROGID[name])
     if name == "word":
         app.Visible = False
@@ -42,8 +54,9 @@ def _alive(app):
 
 def _word(job, app):
     out = {}
-    doc = app.Documents.Open(FileName=job["src"], ConfirmConversions=False, ReadOnly=not job.get("save"), AddToRecentFiles=False,
-                             Visible=False, NoEncodingDialog=True)
+    doc = app.Documents.Open(
+        FileName=job["src"], ConfirmConversions=False, ReadOnly=not job.get("save"), AddToRecentFiles=False, Visible=False, NoEncodingDialog=True
+    )
     try:
         out["compat"] = int(doc.CompatibilityMode)
         if job.get("save") and out["compat"] < 15:  # python-docx's template is older: lay out as current Word does
@@ -57,8 +70,15 @@ def _word(job, app):
         if job.get("save"):
             doc.Save()
         if job.get("pdf"):
-            doc.ExportAsFixedFormat(OutputFileName=job["pdf"], ExportFormat=17, OpenAfterExport=False, OptimizeFor=0,
-                                    CreateBookmarks=1, DocStructureTags=True, BitmapMissingFonts=True)
+            doc.ExportAsFixedFormat(
+                OutputFileName=job["pdf"],
+                ExportFormat=17,
+                OpenAfterExport=False,
+                OptimizeFor=0,
+                CreateBookmarks=1,
+                DocStructureTags=True,
+                BitmapMissingFonts=True,
+            )
         out["pages"] = int(doc.ComputeStatistics(2))  # wdStatisticPages
         out["words"] = int(doc.ComputeStatistics(0))
     finally:
@@ -83,10 +103,22 @@ def _powerpoint(job, app):
                         if not (sh.HasTextFrame and sh.TextFrame2.HasText):
                             continue
                         tr = sh.TextFrame2.TextRange
-                        shapes.append({"slide": int(s.SlideIndex), "name": str(sh.Name), "left": float(sh.Left), "top": float(sh.Top),
-                                       "width": float(sh.Width), "height": float(sh.Height), "text_left": float(tr.BoundLeft),
-                                       "text_top": float(tr.BoundTop), "text_width": float(tr.BoundWidth), "text_height": float(tr.BoundHeight),
-                                       "font_size": float(tr.Font.Size) if tr.Font.Size else None, "text": str(tr.Text)[:200]})
+                        shapes.append(
+                            {
+                                "slide": int(s.SlideIndex),
+                                "name": str(sh.Name),
+                                "left": float(sh.Left),
+                                "top": float(sh.Top),
+                                "width": float(sh.Width),
+                                "height": float(sh.Height),
+                                "text_left": float(tr.BoundLeft),
+                                "text_top": float(tr.BoundTop),
+                                "text_width": float(tr.BoundWidth),
+                                "text_height": float(tr.BoundHeight),
+                                "font_size": float(tr.Font.Size) if tr.Font.Size else None,
+                                "text": str(tr.Text)[:200],
+                            }
+                        )
                     except Exception:  # noqa: BLE001  (charts, tables: no text frame of their own)
                         continue
             out["shapes"] = shapes
@@ -152,6 +184,7 @@ def _excel(job, app):
     try:
         if job.get("ops"):  # edits done by Excel itself (it keeps charts, pivots and formats a file library would drop)
             from ai_pc.office.xlsx_com import run_ops
+
             before = _right_edges(wb)
             out["ops"] = run_ops(app, wb, job["ops"])
             out["print_fit"] = _fit_print(app, wb, before)
@@ -175,12 +208,15 @@ def _excel(job, app):
         for rd in job.get("read") or []:  # what Excel itself computed in chosen cells
             try:
                 v = wb.Worksheets(rd["sheet"]).Range(rd["cell"]).Value
-                vals[f"{rd['sheet']}!{rd['cell']}"] = XL_ERRORS.get(v, v) if isinstance(v, int) else (float(v) if isinstance(v, (int, float)) else str(v))
+                vals[f"{rd['sheet']}!{rd['cell']}"] = (
+                    XL_ERRORS.get(v, v) if isinstance(v, int) else (float(v) if isinstance(v, (int, float)) else str(v))
+                )
             except Exception as e:  # noqa: BLE001
                 vals[f"{rd['sheet']}!{rd['cell']}"] = f"read failed: {type(e).__name__}"
         out["values"] = vals
         if job.get("grab"):  # tables and pivots as Excel shows them, for a report or a deck
             from ai_pc.office.xlsx_com import OpError, grab
+
             got = []
             for spec in job["grab"]:
                 try:
@@ -230,6 +266,7 @@ def run_job(job, apps=None):
 
 def _serve():
     import pythoncom
+
     pythoncom.CoInitialize()
     apps = {}
     for line in sys.stdin:
@@ -264,6 +301,7 @@ if __name__ == "__main__":
     t0 = time.perf_counter()
     try:
         import pythoncom
+
         pythoncom.CoInitialize()
         res = run_job(json.loads(sys.argv[1]))
         res["ok"] = True

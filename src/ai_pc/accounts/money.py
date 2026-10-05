@@ -4,11 +4,32 @@ amounts in words the Pakistani way (lakh and crore).
   to_paisa("1,97,200.50") -> 19720050      rs(19720050) -> "Rs 197,200.50"      words(19720050) -> "Rupees One Lakh Ninety-Seven
   Thousand Two Hundred and Fifty Paisa Only"      pct(85000_00, "18") -> 15300_00
 """
+
 import re
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
-ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen",
-        "Sixteen", "Seventeen", "Eighteen", "Nineteen"]
+ONES = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+]
 TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
 
 
@@ -26,7 +47,15 @@ def to_paisa(v):
         return int((Decimal(repr(v)) * 100).quantize(Decimal("1"), ROUND_HALF_UP))
     s = str(v or "").strip().lower().replace("rs.", "").replace("rs", "").replace("pkr", "").replace(",", "").replace("/-", "").strip()
     mult = Decimal(1)
-    for word, k in (("crore", 10_000_000), ("lakh", 100_000), ("lac", 100_000), ("thousand", 1000), ("k", 1000), ("million", 1_000_000), ("m", 1_000_000)):
+    for word, k in (
+        ("crore", 10_000_000),
+        ("lakh", 100_000),
+        ("lac", 100_000),
+        ("thousand", 1000),
+        ("k", 1000),
+        ("million", 1_000_000),
+        ("m", 1_000_000),
+    ):
         if re.search(rf"\d\s*{word}$", s):
             s = re.sub(rf"\s*{word}$", "", s)
             mult = Decimal(k)

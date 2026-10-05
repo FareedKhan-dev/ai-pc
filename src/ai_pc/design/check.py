@@ -1,13 +1,14 @@
 """Checks on a rendered design, from what the page measured of itself and the pictures:
 
-  every word asked for is on it; no text overflows its box or shrank below a readable size; text, logos and QR codes
-  stay inside the safe area (3 mm in from the trim for print; the margins the apps keep for their own buttons);
-  nothing overlaps; each word stands out from what is actually behind it (WCAG contrast, measured on a render with
-  the words hidden); photos are sharp enough to print; the QR code scans; no words sit on a face; the fonts are on
-  this PC; the PDF is one page per side at the exact size with bleed; screen designs are their exact pixel size.
+every word asked for is on it; no text overflows its box or shrank below a readable size; text, logos and QR codes
+stay inside the safe area (3 mm in from the trim for print; the margins the apps keep for their own buttons);
+nothing overlaps; each word stands out from what is actually behind it (WCAG contrast, measured on a render with
+the words hidden); photos are sharp enough to print; the QR code scans; no words sit on a face; the fonts are on
+this PC; the PDF is one page per side at the exact size with bleed; screen designs are their exact pixel size.
 
-  checks(spec, result) -> [{"ok", "what", "level": "fail" | "warn"}]
+checks(spec, result) -> [{"ok", "what", "level": "fail" | "warn"}]
 """
+
 import re
 
 import numpy as np
@@ -16,14 +17,43 @@ from PIL import Image
 from ai_pc.design.kinds import KINDS, size_of
 from ai_pc.design.layouts import PX_PER_MM
 
-TEXT_FIELDS = ("name", "title", "company", "phone", "email", "web", "address", "tagline", "brand", "headline", "sub", "offer", "dates", "cta",
-               "recipient", "org", "reason", "date", "time", "event", "host", "rsvp", "note", "body", "heading")
+TEXT_FIELDS = (
+    "name",
+    "title",
+    "company",
+    "phone",
+    "email",
+    "web",
+    "address",
+    "tagline",
+    "brand",
+    "headline",
+    "sub",
+    "offer",
+    "dates",
+    "cta",
+    "recipient",
+    "org",
+    "reason",
+    "date",
+    "time",
+    "event",
+    "host",
+    "rsvp",
+    "note",
+    "body",
+    "heading",
+)
 
 
-KIND_FIELDS = {"card": ("name", "title", "company", "phone", "email", "web", "address", "tagline"),
-               "post": ("brand", "headline", "sub", "offer", "dates", "cta", "phone", "web"), "thumbnail": ("headline", "sub"),
-               "flyer": ("brand", "headline", "sub", "offer", "dates", "cta", "phone", "web", "address", "body", "date", "time"),
-               "certificate": ("org", "recipient", "reason", "date"), "invitation": ("heading", "host", "event", "date", "time", "address", "note", "rsvp")}
+KIND_FIELDS = {
+    "card": ("name", "title", "company", "phone", "email", "web", "address", "tagline"),
+    "post": ("brand", "headline", "sub", "offer", "dates", "cta", "phone", "web"),
+    "thumbnail": ("headline", "sub"),
+    "flyer": ("brand", "headline", "sub", "offer", "dates", "cta", "phone", "web", "address", "body", "date", "time"),
+    "certificate": ("org", "recipient", "reason", "date"),
+    "invitation": ("heading", "host", "event", "date", "time", "address", "note", "rsvp"),
+}
 KIND_FIELDS.update(portrait=KIND_FIELDS["post"], story=KIND_FIELDS["post"], poster=KIND_FIELDS["flyer"])
 
 
@@ -42,6 +72,7 @@ def lum(c):
     def ch(v):
         v = v / 255.0
         return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+
     return 0.2126 * ch(c[0]) + 0.7152 * ch(c[1]) + 0.0722 * ch(c[2])
 
 
@@ -85,7 +116,9 @@ def checks(spec, result, faces=None):
     out.append(_c(not missing, f"fonts on this PC: {', '.join(sorted(fonts))}" + (f" (missing: {', '.join(missing)})" if missing else "")))
     # every word asked for is on the design
     shown = " | ".join(_norm(i["text"]) for i in items_all if i.get("text_el"))
-    want = {k: v for k, v in (spec.get("fields") or {}).items() if k in KIND_FIELDS.get(spec["kind"], TEXT_FIELDS) and isinstance(v, str) and v.strip()}
+    want = {
+        k: v for k, v in (spec.get("fields") or {}).items() if k in KIND_FIELDS.get(spec["kind"], TEXT_FIELDS) and isinstance(v, str) and v.strip()
+    }
     if spec["kind"] == "certificate":
         want.pop("title", None)  # split over two lines
         for k in ("signer1", "signer2"):
@@ -103,9 +136,16 @@ def checks(spec, result, faces=None):
     out.append(_c(not over, "no text runs out of its box" + (f" (not: {', '.join(over[:4])})" if over else "")))
     w, h, unit, bleed, safe = size_of(spec)
     floor = 5.5 * 96 / 72 if unit == "mm" else (16 if spec["kind"] != "thumbnail" else 24)
-    small = [f"{i['role']} {i['size'] * (72 / 96 if unit == 'mm' else 1):.1f}{'pt' if unit == 'mm' else 'px'}" for i in texts if i["size"] < floor - 0.05]
-    out.append(_c(not small, f"all text big enough to read (at least {floor * (72 / 96 if unit == 'mm' else 1):.1f}{'pt' if unit == 'mm' else 'px'})"
-                  + (f" (not: {', '.join(small[:3])})" if small else "")))
+    small = [
+        f"{i['role']} {i['size'] * (72 / 96 if unit == 'mm' else 1):.1f}{'pt' if unit == 'mm' else 'px'}" for i in texts if i["size"] < floor - 0.05
+    ]
+    out.append(
+        _c(
+            not small,
+            f"all text big enough to read (at least {floor * (72 / 96 if unit == 'mm' else 1):.1f}{'pt' if unit == 'mm' else 'px'})"
+            + (f" (not: {', '.join(small[:3])})" if small else ""),
+        )
+    )
     for p in pages:
         meas = p["measure"]
         sx0, sy0, sx1, sy1 = safe_rect(spec, meas)
@@ -152,15 +192,26 @@ def checks(spec, result, faces=None):
                 need = 3.0 if (i["size"] >= 24 or (i["size"] >= 18.66 and bold)) else 4.5
                 if r < need:
                     low.append(f"{i['role']} {r:.1f}:1")
-            out.append(_c(not low, f"{p['name']}: every word stands out from what is behind it (WCAG contrast)" + (f" (not: {', '.join(low[:4])})" if low else ""),
-                          "fail" if any(float(x.split()[-1].split(':')[0]) < 2.5 for x in low) else "warn"))
+            out.append(
+                _c(
+                    not low,
+                    f"{p['name']}: every word stands out from what is behind it (WCAG contrast)" + (f" (not: {', '.join(low[:4])})" if low else ""),
+                    "fail" if any(float(x.split()[-1].split(":")[0]) < 2.5 for x in low) else "warn",
+                )
+            )
         imgs = [i for i in meas["items"] if i.get("img") and i["img"]["nw"]]
         if unit == "mm":
             for i in imgs:
-                dpi = min(i["img"]["nw"] / (i["w"] / 96), i["img"]["nh"] / (i["h"] / 96)) if i["img"]["fit"] != "cover" else \
-                    max(i["img"]["nw"] / (i["w"] / 96), i["img"]["nh"] / (i["h"] / 96)) * min(i["w"] / i["img"]["nw"], i["h"] / i["img"]["nh"]) / \
-                    max(i["w"] / i["img"]["nw"], i["h"] / i["img"]["nh"])
-                out.append(_c(dpi >= 150, f"{p['name']}: the photo prints at {dpi:.0f} dpi (150 at least, 300 best)", "warn" if dpi >= 100 else "fail"))
+                dpi = (
+                    min(i["img"]["nw"] / (i["w"] / 96), i["img"]["nh"] / (i["h"] / 96))
+                    if i["img"]["fit"] != "cover"
+                    else max(i["img"]["nw"] / (i["w"] / 96), i["img"]["nh"] / (i["h"] / 96))
+                    * min(i["w"] / i["img"]["nw"], i["h"] / i["img"]["nh"])
+                    / max(i["w"] / i["img"]["nw"], i["h"] / i["img"]["nh"])
+                )
+                out.append(
+                    _c(dpi >= 150, f"{p['name']}: the photo prints at {dpi:.0f} dpi (150 at least, 300 best)", "warn" if dpi >= 100 else "fail")
+                )
         for q in [i for i in meas["items"] if i["role"] == "qr" and i.get("qr")]:
             out.append(_qr(p["png"], meas, q))
         if faces and p.get("name") in faces:
@@ -176,12 +227,18 @@ def checks(spec, result, faces=None):
             out.append(_c(not covered, f"{p['name']}: no words over a face" + (f" (not: {', '.join(covered[:3])})" if covered else "")))
     if result.get("pdf"):
         from pypdf import PdfReader
+
         r = PdfReader(result["pdf"])
         want_w, want_h = w + 2 * bleed, h + 2 * bleed
         sizes = [(float(pg.mediabox.width) / 72 * 25.4, float(pg.mediabox.height) / 72 * 25.4) for pg in r.pages]
         okp = len(r.pages) == len(pages) and all(abs(a - want_w) < 0.6 and abs(b - want_h) < 0.6 for a, b in sizes)
-        out.append(_c(okp, f"PDF: {len(r.pages)} page(s) of {want_w:.1f} x {want_h:.1f} mm ({w:g} x {h:g} mm + {bleed:g} mm bleed)"
-                      + ("" if okp else f" (got {[(round(a, 1), round(b, 1)) for a, b in sizes]})")))
+        out.append(
+            _c(
+                okp,
+                f"PDF: {len(r.pages)} page(s) of {want_w:.1f} x {want_h:.1f} mm ({w:g} x {h:g} mm + {bleed:g} mm bleed)"
+                + ("" if okp else f" (got {[(round(a, 1), round(b, 1)) for a, b in sizes]})"),
+            )
+        )
     if unit == "px":
         sz = Image.open(pages[0]["png"]).size
         out.append(_c(sz == (w, h), f"picture is exactly {w} x {h} px" + ("" if sz == (w, h) else f" (got {sz[0]} x {sz[1]})")))
@@ -190,10 +247,16 @@ def checks(spec, result, faces=None):
 
 def _qr(png, meas, q):
     import cv2
+
     im = Image.open(png).convert("L")
     sc = im.width / meas["w"]
     pad = q["w"] * 0.15
-    box = (int(max(0, (q["x"] - pad) * sc)), int(max(0, (q["y"] - pad) * sc)), int(min(im.width, (q["x"] + q["w"] + pad) * sc)), int(min(im.height, (q["y"] + q["h"] + pad) * sc)))
+    box = (
+        int(max(0, (q["x"] - pad) * sc)),
+        int(max(0, (q["y"] - pad) * sc)),
+        int(min(im.width, (q["x"] + q["w"] + pad) * sc)),
+        int(min(im.height, (q["y"] + q["h"] + pad) * sc)),
+    )
     crop = im.crop(box)
     if crop.width < 300:
         crop = crop.resize((crop.width * 3, crop.height * 3), Image.NEAREST)

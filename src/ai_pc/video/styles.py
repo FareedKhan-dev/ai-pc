@@ -5,12 +5,14 @@ implies one); the recipes (recipes.py) and the cut engine (cutting.py) turn it i
 
 Item names are given as search phrases, resolved against the knowledge base at run time (only working items are used).
 """
+
 STYLES = {
     "hype": {
         "drop_by": 0.25,  # the first drop lands by this share of the length (code never grows the build-up past it)
         "label": {"position": "upper", "size": 12, "intro": "screen punch slam", "background": None},
         "about": "hype / velocity / boss / phonk / sports / car edits: fast cuts on the beat, speed ramps, punch zooms, flashes",
-        "music": "hype", "bpm": 140,
+        "music": "hype",
+        "bpm": 140,
         "beats_per_shot": {"intro": 4, "verse": 2, "build": 2, "drop": 2, "break": 4, "outro": 4},
         "speed": {"intro": "normal", "build": "normal", "drop": "velocity", "outro": "slow"},
         "recipes": [
@@ -29,7 +31,8 @@ STYLES = {
         "drop_by": 0.5,  # the first drop lands by this share of the length (code never grows the build-up past it)
         "label": {"position": "bottom_left", "size": 8, "intro": "fade in", "background": None},
         "about": "cinematic / travel / aesthetic film look: long shots, slow motion, slow push-ins, dissolves, letterbox",
-        "music": "cinematic", "bpm": 84,
+        "music": "cinematic",
+        "bpm": 84,
         "beats_per_shot": {"intro": 4, "verse": 4, "build": 4, "drop": 4, "break": 6, "outro": 6},
         "speed": {"intro": "slow", "build": "slow", "drop": "normal", "outro": "slow"},
         "recipes": [
@@ -45,7 +48,8 @@ STYLES = {
         "drop_by": 0.3,  # the first drop lands by this share of the length (code never grows the build-up past it)
         "label": {"position": "upper", "size": 10, "intro": "pop bounce", "background": "#000000"},
         "about": "upbeat montage / vlog recap / travel reel / photo slideshow: cuts every 2 beats, gentle zooms, light leaks",
-        "music": "pop", "bpm": 118,
+        "music": "pop",
+        "bpm": 118,
         "beats_per_shot": {"intro": 2, "verse": 2, "build": 2, "drop": 2, "break": 4, "outro": 4},
         "speed": {"intro": "normal", "build": "normal", "drop": "normal", "outro": "slow"},
         "recipes": [
@@ -62,8 +66,9 @@ STYLES = {
         "drop_by": 0.5,  # the first drop lands by this share of the length (code never grows the build-up past it)
         "label": {"position": "bottom_left", "size": 10, "intro": "fade in slide", "background": "#000000"},
         "about": "property / hotel / venue / product-space tour: bright clean airy look (no grain, no vignette), slow pans "
-                 "and push-ins, soft dissolves, elegant labels for each area, calm music",
-        "music": "cinematic", "bpm": 80,
+        "and push-ins, soft dissolves, elegant labels for each area, calm music",
+        "music": "cinematic",
+        "bpm": 80,
         "beats_per_shot": {"intro": 4, "verse": 4, "build": 4, "drop": 4, "break": 6, "outro": 6},
         "speed": {"intro": "normal", "build": "normal", "drop": "normal", "outro": "slow"},
         "recipes": [
@@ -78,7 +83,8 @@ STYLES = {
     "talking": {
         "label": {"position": "top", "size": 9, "intro": "pop in", "background": "#000000"},
         "about": "talking head / YouTube / podcast clip / storytime: pauses cut out, jump-cut zooms, captions, emphasis pops",
-        "music": None, "bpm": None,
+        "music": None,
+        "bpm": None,
         "beats_per_shot": None,
         "speed": {},
         "recipes": [
@@ -92,7 +98,8 @@ STYLES = {
     "meme": {
         "label": {"position": "top", "size": 14, "intro": "pop in", "background": None},
         "about": "meme / funny reaction: dramatic punch zooms on faces with a boom, freeze frames, shakes, big impact text",
-        "music": None, "bpm": None,
+        "music": None,
+        "bpm": None,
         "beats_per_shot": None,
         "speed": {},
         "recipes": [
@@ -106,7 +113,8 @@ STYLES = {
         "drop_by": 0.3,  # the first drop lands by this share of the length (code never grows the build-up past it)
         "label": {"position": "bottom_left", "size": 9, "intro": "slide up", "background": "#000000"},
         "about": "product showcase / ad: clean cuts on the beat, slow zooms on details, labels, bright grade",
-        "music": "pop", "bpm": 112,
+        "music": "pop",
+        "bpm": 112,
         "beats_per_shot": {"intro": 4, "verse": 2, "build": 2, "drop": 2, "break": 4, "outro": 4},
         "speed": {"intro": "slow", "build": "normal", "drop": "normal", "outro": "slow"},
         "recipes": [
@@ -124,26 +132,58 @@ TRIGGERS = {
     "hype": ("hype", "velocity", "boss", "phonk", "sigma", "beast", "car", "sports", "gym", "fight", "edit like", "aggressive", "intense", "arena"),
     "cinematic": ("cinematic", "film", "movie", "travel", "aesthetic", "dreamy", "emotional", "golden hour", "calm", "elegant"),
     "montage": ("montage", "recap", "slideshow", "photo dump", "vlog", "trip", "memories", "highlights", "upbeat"),
-    "tour": ("property", "real estate", "realestate", "house tour", "home tour", "apartment", "villa", "hotel", "airbnb",
-             "venue", "interior", "listing", "room tour", "book a viewing"),
-    "talking": ("talking", "podcast", "interview", "explain", "tutorial", "storytime", "youtube video", "remove silence", "pauses", "captions", "subtitles"),
+    "tour": (
+        "property",
+        "real estate",
+        "realestate",
+        "house tour",
+        "home tour",
+        "apartment",
+        "villa",
+        "hotel",
+        "airbnb",
+        "venue",
+        "interior",
+        "listing",
+        "room tour",
+        "book a viewing",
+    ),
+    "talking": (
+        "talking",
+        "podcast",
+        "interview",
+        "explain",
+        "tutorial",
+        "storytime",
+        "youtube video",
+        "remove silence",
+        "pauses",
+        "captions",
+        "subtitles",
+    ),
     "meme": ("meme", "funny", "vine boom", "reaction", "troll", "dramatic zoom"),
     "product": ("product", "ad ", "advert", "showcase", "unboxing", "brand"),
 }
 
 
 # words that say what the video IS (a tour, a product ad, a podcast): they outweigh mood words like "cinematic"
-GENRE_WORDS = {"tour": TRIGGERS["tour"], "product": ("product", "advert", "unboxing", "product ad", "app ad"),
-               "talking": ("talking head", "podcast", "interview", "storytime"), "meme": ("meme",)}
+GENRE_WORDS = {
+    "tour": TRIGGERS["tour"],
+    "product": ("product", "advert", "unboxing", "product ad", "app ad"),
+    "talking": ("talking head", "podcast", "interview", "storytime"),
+    "meme": ("meme",),
+}
 
 
 def guess(request, brief=None):
     """The style a request implies (the planner may override it)."""
     import re
+
     text = f"{request} {(brief or {}).get('mood', '')} {(brief or {}).get('pace', '')}".lower()
 
     def has(w):
         return re.search(r"(?<![a-z])" + re.escape(w.strip()) + r"(?![a-z])", text) is not None
+
     best, hits = "montage", 0
     for name, words in TRIGGERS.items():
         n = sum(1 for w in words if has(w)) + 2 * sum(1 for w in GENRE_WORDS.get(name, ()) if has(w))

@@ -4,6 +4,7 @@ for YOUR posts (from their own numbers only: with too few posts it says so inste
   excel(rows, db, path) -> path        rows: [(job, metrics)]
   best_times(db, platforms=None) -> words
 """
+
 import datetime as dt
 from collections import defaultdict
 from pathlib import Path
@@ -17,6 +18,7 @@ def excel(rows, db, path):
     from openpyxl import Workbook
     from openpyxl.chart import BarChart, Reference
     from openpyxl.styles import Alignment, Font, PatternFill
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Posts"
@@ -29,8 +31,16 @@ def excel(rows, db, path):
     for j, m in rows:
         p = db.post(j["post_id"]) or {}
         when = (j.get("published_at") or "")[:16].replace("T", " ")
-        ws.append([specs.LABEL.get(j["platform"], j["platform"]), specs.FORMAT_WORDS.get(j.get("format"), j.get("format")), when,
-                   (p.get("text") or "")[:120], (j.get("remote") or {}).get("permalink") or ""] + [m.get(k) for k in KEYS])
+        ws.append(
+            [
+                specs.LABEL.get(j["platform"], j["platform"]),
+                specs.FORMAT_WORDS.get(j.get("format"), j.get("format")),
+                when,
+                (p.get("text") or "")[:120],
+                (j.get("remote") or {}).get("permalink") or "",
+            ]
+            + [m.get(k) for k in KEYS]
+        )
     n = len(rows)
     if n:
         ws.append(["Total", "", "", "", ""] + [f"=SUM({chr(70 + i)}2:{chr(70 + i)}{n + 1})" for i in range(len(KEYS))])
@@ -71,7 +81,13 @@ def best_times(db, platforms=None, minimum=6):
         slots[(t.strftime("%A"), part)].append(eng)
         n += 1
     if n < minimum:
-        return (f"Not enough of your own posts with numbers yet ({n}; at least {minimum} are needed). Post at a few different times, ask "
-                f"'how did my posts do?' a day later, then ask again: the answer will come from your followers, not from general advice.")
+        return (
+            f"Not enough of your own posts with numbers yet ({n}; at least {minimum} are needed). Post at a few different times, ask "
+            f"'how did my posts do?' a day later, then ask again: the answer will come from your followers, not from general advice."
+        )
     best = sorted(((sum(v) / len(v), k, len(v)) for k, v in slots.items()), reverse=True)[:3]
-    return "Your posts did best on: " + "; ".join(f"{d} {p} (average {avg:.0f} likes, comments, shares and saves, {c} posts)" for avg, (d, p), c in best) + "."
+    return (
+        "Your posts did best on: "
+        + "; ".join(f"{d} {p} (average {avg:.0f} likes, comments, shares and saves, {c} posts)" for avg, (d, p), c in best)
+        + "."
+    )

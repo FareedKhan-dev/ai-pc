@@ -5,20 +5,41 @@ way, each failure with its file and line.
 
   "webstorm typescript project called 'Shop'"   'node app called Stock'   'node test package.json'
 """
+
 import json
 import os
 import re
 import shutil
 from pathlib import Path
 
-NAME, LABEL = "nodejs", "Node.js / TypeScript (WebStorm, VS Code): projects tested by Node's own runner and run, no npm downloads; test any package.json"
+NAME, LABEL = (
+    "nodejs",
+    "Node.js / TypeScript (WebStorm, VS Code): projects tested by Node's own runner and run, no npm downloads; test any package.json",
+)
 EXAMPLES = ["webstorm typescript project called 'Shop'", "node app called Stock", "node test package.json"]
 
-PACKAGE = {"name": "", "version": "1.0.0", "private": True, "type": "module",
-           "scripts": {"start": "node src/main.ts", "test": "node --test \"test/**/*.test.ts\""}, "engines": {"node": ">=22.18"}}
-TSCONFIG = {"compilerOptions": {"target": "es2024", "module": "nodenext", "moduleResolution": "nodenext", "allowImportingTsExtensions": True,
-                                "noEmit": True, "strict": True, "erasableSyntaxOnly": True, "verbatimModuleSyntax": True, "skipLibCheck": True},
-            "include": ["src", "test"]}
+PACKAGE = {
+    "name": "",
+    "version": "1.0.0",
+    "private": True,
+    "type": "module",
+    "scripts": {"start": "node src/main.ts", "test": 'node --test "test/**/*.test.ts"'},
+    "engines": {"node": ">=22.18"},
+}
+TSCONFIG = {
+    "compilerOptions": {
+        "target": "es2024",
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
+        "allowImportingTsExtensions": True,
+        "noEmit": True,
+        "strict": True,
+        "erasableSyntaxOnly": True,
+        "verbatimModuleSyntax": True,
+        "skipLibCheck": True,
+    },
+    "include": ["src", "test"],
+}
 INVENTORY = """/** A product line in stock. */
 export interface Product {
   name: string;
@@ -128,6 +149,7 @@ def node_exe():
 
 def node(*args, cwd, timeout=300):
     from ai_pc.core import hidden_desktop
+
     env = {k: v for k, v in os.environ.items() if k.upper() not in ("NODE_OPTIONS",)}
     env["NO_COLOR"] = "1"
     rc, out, err, timed_out = hidden_desktop.run([node_exe(), *map(str, args)], timeout=timeout, cwd=str(cwd), env=env)
@@ -154,8 +176,12 @@ def problems(text):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
-    if not re.search(r"\bnode(?:\.?js)?\s+(?:project|app|program|test|run|cli|api)\b|\bnodejs\b|\btypescript\b|\bwebstorm\b|\bjavascript\s+(?:project|app|program)\b|\bpackage\.json\b", c):
+    if not re.search(
+        r"\bnode(?:\.?js)?\s+(?:project|app|program|test|run|cli|api)\b|\bnodejs\b|\btypescript\b|\bwebstorm\b|\bjavascript\s+(?:project|app|program)\b|\bpackage\.json\b",
+        c,
+    ):
         return None
     f = find_file(text, ctx, {".json"})
     if f and Path(f).name.lower() == "package.json":
@@ -170,8 +196,12 @@ def run(op, ctx):
     if op["op"] == "test":
         folder = Path(op["file"]).resolve().parent
         pkg = json.loads(Path(op["file"]).read_text(encoding="utf-8"))
-        tests = sorted(str(p.relative_to(folder)) for pat in ("test/**/*.test.*", "tests/**/*.test.*", "src/**/*.test.*") for p in folder.glob(pat)
-                       if "node_modules" not in p.parts)
+        tests = sorted(
+            str(p.relative_to(folder))
+            for pat in ("test/**/*.test.*", "tests/**/*.test.*", "src/**/*.test.*")
+            for p in folder.glob(pat)
+            if "node_modules" not in p.parts
+        )
         ok, out = node("--test", *tests, cwd=folder) if tests else node("--test", cwd=folder)
         passed, failed = results(out)
         if not ok:
@@ -182,8 +212,14 @@ def run(op, ctx):
     out = (Path(ctx["out"]) / "nodejs" / name).resolve()
     if out.exists():
         shutil.rmtree(out, ignore_errors=True)
-    files = {"package.json": json.dumps(dict(PACKAGE, name=slug), indent=2) + "\n", "tsconfig.json": json.dumps(TSCONFIG, indent=2) + "\n",
-             "src/inventory.ts": INVENTORY, "src/main.ts": MAIN, "test/inventory.test.ts": TESTS, ".gitignore": "node_modules/\n.idea/\n"}
+    files = {
+        "package.json": json.dumps(dict(PACKAGE, name=slug), indent=2) + "\n",
+        "tsconfig.json": json.dumps(TSCONFIG, indent=2) + "\n",
+        "src/inventory.ts": INVENTORY,
+        "src/main.ts": MAIN,
+        "test/inventory.test.ts": TESTS,
+        ".gitignore": "node_modules/\n.idea/\n",
+    }
     for rel, text in files.items():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         (out / rel).write_text(text, encoding="utf-8", newline="\n")
@@ -191,11 +227,19 @@ def run(op, ctx):
     ok_t, tests = node("--test", "test/inventory.test.ts", cwd=out)
     ok_r, ran = node("src/main.ts", cwd=out)
     passed, failed = results(tests)
-    checks = [(f"Node.js {version.strip()} runs the TypeScript itself (no build step, nothing downloaded)", ok_v and ok_r),
-              (f"node --test: {passed} of 5 tests passed", ok_t and passed == 5 and failed == 0),
-              ("src/main.ts prints the stock's value (Rs 22,000)", "Total value: Rs 22,000" in ran)]
+    checks = [
+        (f"Node.js {version.strip()} runs the TypeScript itself (no build step, nothing downloaded)", ok_v and ok_r),
+        (f"node --test: {passed} of 5 tests passed", ok_t and passed == 5 and failed == 0),
+        ("src/main.ts prints the stock's value (Rs 22,000)", "Total value: Rs 22,000" in ran),
+    ]
     ctx.setdefault("memo", {})["project"] = str(out)  # for VS Code and the other tools
     bad = [w for w, good in checks if not good]
-    return (f"TypeScript project {out} (package.json, tsconfig.json, src/, test/; open the folder in WebStorm or VS Code; npm test / npm start). " +
-            (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines() if ln.startswith(('Total', 'Low')))}. " if ran else "") +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(problems(tests + ran)[:5])))
+    return (
+        f"TypeScript project {out} (package.json, tsconfig.json, src/, test/; open the folder in WebStorm or VS Code; npm test / npm start). "
+        + (f"Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines() if ln.startswith(('Total', 'Low')))}. " if ran else "")
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + ". " + "; ".join(problems(tests + ran)[:5])
+        )
+    )

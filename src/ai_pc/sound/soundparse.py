@@ -6,13 +6,30 @@ under 5 MB', 'export the video', 'how loud is it?'.
   parse(clause, ctx) -> {"ops": [{"op": ..., "args": {...}}], "ask": None | "question back"}
 ctx: {"has_video": bool, "has_captions": bool, "files": {name: path} for files the person mentioned}
 """
+
 import re
 
 from ai_pc.sound.ops import TARGETS
 
 NUM = r"(\d+(?:\.\d+)?)"
-WORDNUM = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "fifteen": 15, "twenty": 20,
-           "thirty": 30, "half": 0.5, "a": 1, "an": 1}
+WORDNUM = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "fifteen": 15,
+    "twenty": 20,
+    "thirty": 30,
+    "half": 0.5,
+    "a": 1,
+    "an": 1,
+}
 TIME = r"(\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?|\d+(?:\.\d+)?\s*(?:s|sec|secs|seconds?|m|min|mins|minutes?)(?:\s*(?:and\s*)?\d+(?:\.\d+)?\s*(?:s|sec|secs|seconds?))?)"
 COLOR_WORDS = r"(white|yellow|green|red|blue|orange|pink|cyan|black|purple|gold)"
 
@@ -63,23 +80,34 @@ def parse(clause, ctx=None):
     # ------------------------------------------------ questions
     if re.search(r"^\s*(?:how loud|what(?:'s| is) the (?:loudness|volume|level)|is it (?:loud|quiet) enough|is it too (?:loud|quiet))\b", c):
         return done(op("ask", what="loudness"))
-    if re.search(r"^\s*(?:is (?:it|there|the (?:audio|recording|sound)) (?:noisy|clean|any (?:noise|hum|hiss|buzz))|how (?:clean|noisy|good) is|any (?:noise|hum|problems)|"
-                 r"check (?:it|the audio|the sound|the recording)|what(?:'s| is) wrong with (?:it|the audio))", c):
+    if re.search(
+        r"^\s*(?:is (?:it|there|the (?:audio|recording|sound)) (?:noisy|clean|any (?:noise|hum|hiss|buzz))|how (?:clean|noisy|good) is|any (?:noise|hum|problems)|"
+        r"check (?:it|the audio|the sound|the recording)|what(?:'s| is) wrong with (?:it|the audio))",
+        c,
+    ):
         return done(op("ask", what="quality"))
     if re.search(r"^\s*(?:how long is|what(?:'s| is) the (?:length|duration))\b", c):
         return done(op("ask", what="length"))
-    if re.search(r"^\s*(?:what (?:does (?:it|he|she) say|did (?:he|she|they|i) say|is said)|transcri(?:be|pt)(?: it| this)?\s*$|what are the words|show (?:me )?the transcript)", c):
+    if re.search(
+        r"^\s*(?:what (?:does (?:it|he|she) say|did (?:he|she|they|i) say|is said)|transcri(?:be|pt)(?: it| this)?\s*$|what are the words|show (?:me )?the transcript)",
+        c,
+    ):
         return done(op("ask", what="transcript"))
     if re.search(r"^\s*what language\b", c):
         return done(op("ask", what="language"))
     if re.search(r"^\s*(?:compare|before and after|what changed|what did you (?:do|change))\b", c):
         return done(op("ask", what="compare"))
     # ------------------------------------------------ saving
-    m = re.search(r"\b(?:save|export|give me|download|convert|send|make it an?)\b.*?\b(mp3|wav|m4a|aac|ogg|opus|flac|mp4|video|srt|vtt|ass|subtitles? file|transcript|"
-                  r"text|txt|word|docx)\b|^\s*(?:as |in )?(mp3|wav|m4a|ogg|flac|mp4)\s*(?:please)?\s*$|\bfor whatsapp\b|\bunder \d+(?:\.\d+)?\s*mb\b", c)
+    m = re.search(
+        r"\b(?:save|export|give me|download|convert|send|make it an?)\b.*?\b(mp3|wav|m4a|aac|ogg|opus|flac|mp4|video|srt|vtt|ass|subtitles? file|transcript|"
+        r"text|txt|word|docx)\b|^\s*(?:as |in )?(mp3|wav|m4a|ogg|flac|mp4)\s*(?:please)?\s*$|\bfor whatsapp\b|\bunder \d+(?:\.\d+)?\s*mb\b",
+        c,
+    )
     if m and not re.search(r"\b(?:add|make|create|generate)\b.*\b(?:captions|subtitles)\b(?!.*\bfile\b)", c):
         fmt = (m.group(1) or m.group(2) or "").replace(" ", "") if m.lastindex else ""
-        fmt = {"video": "mp4", "subtitlesfile": "srt", "subtitlefile": "srt", "text": "txt", "word": "docx", "transcript": "txt", "aac": "m4a"}.get(fmt, fmt)
+        fmt = {"video": "mp4", "subtitlesfile": "srt", "subtitlefile": "srt", "text": "txt", "word": "docx", "transcript": "txt", "aac": "m4a"}.get(
+            fmt, fmt
+        )
         if not fmt:
             fmt = "ogg" if "whatsapp" in c and not ctx.get("has_video") else ("mp4" if ctx.get("has_video") and "video" in c else "mp3")
         if fmt == "txt" and re.search(r"\bword\b|\bdocx\b", c):
@@ -139,15 +167,29 @@ def parse(clause, ctx=None):
     platform = next((p for p in TARGETS if re.search(rf"\b{p}\b", c)), None)
     m = re.search(r"(-\d+(?:\.\d+)?)\s*lufs\b", c)
     lufs = float(m.group(1)) if m else None
-    if re.search(r"\bclean (?:it|this|the (?:audio|sound|recording|voice)|my (?:voice|audio|recording))?\s*(?:up)?\b|\bfix (?:the |my |this )?(?:audio|sound|voice|recording|it)\b"
-                 r"|\bmake (?:it|my voice|the voice|the audio) (?:sound )?(?:clear|clearer|better|professional|crisp)\b|\b(?:studio|podcast|professional) (?:quality|sound)\b"
-                 r"|\benhance (?:it|the (?:audio|voice|sound))\b|\bimprove (?:the )?(?:audio|sound|voice)\b", c):
+    if re.search(
+        r"\bclean (?:it|this|the (?:audio|sound|recording|voice)|my (?:voice|audio|recording))?\s*(?:up)?\b|\bfix (?:the |my |this )?(?:audio|sound|voice|recording|it)\b"
+        r"|\bmake (?:it|my voice|the voice|the audio) (?:sound )?(?:clear|clearer|better|professional|crisp)\b|\b(?:studio|podcast|professional) (?:quality|sound)\b"
+        r"|\benhance (?:it|the (?:audio|voice|sound))\b|\bimprove (?:the )?(?:audio|sound|voice)\b",
+        c,
+    ):
         return done(op("clean", **({"platform": platform} if platform else {}), **({"lufs": lufs} if lufs else {})))
     ops = []
-    strength = "light" if re.search(r"\b(?:a (?:little|bit)|slightly|light(?:ly)?|gently)\b", c) else "strong" if re.search(r"\b(?:completely|all (?:of )?the|strong(?:ly)?|a lot|totally|heav(?:y|ily))\b", c) else "medium"
+    strength = (
+        "light"
+        if re.search(r"\b(?:a (?:little|bit)|slightly|light(?:ly)?|gently)\b", c)
+        else "strong"
+        if re.search(r"\b(?:completely|all (?:of )?the|strong(?:ly)?|a lot|totally|heav(?:y|ily))\b", c)
+        else "medium"
+    )
     if re.search(r"\b(?:hum|humming|buzz(?:ing)?|electric(?:al)? (?:noise|sound|hum)|mains)\b", c):
         ops.append(op("dehum", **({"hz": 60} if re.search(r"\b60\b", c) else {})))
-    if re.search(r"\b(?:background )?noise\b|\bhiss(?:ing)?\b|\bstatic\b|\b(?:fan|ac|a\.c\.|generator|traffic|crowd) (?:noise|sound)s?\b|\bdenoise\b", c) and not ops:
+    if (
+        re.search(
+            r"\b(?:background )?noise\b|\bhiss(?:ing)?\b|\bstatic\b|\b(?:fan|ac|a\.c\.|generator|traffic|crowd) (?:noise|sound)s?\b|\bdenoise\b", c
+        )
+        and not ops
+    ):
         ops.append(op("denoise", strength=strength))
     if re.search(r"\brumble\b|\blow (?:end|frequenc\w*) (?:noise|rumble)\b|\bwind noise\b|\bboomy\b|\bthumps?\b", c):
         ops.append(op("highpass"))
@@ -157,18 +199,28 @@ def parse(clause, ctx=None):
         ops.append(op("declick"))
     if re.search(r"\bclipp(?:ed|ing)\b|\bdistort(?:ed|ion)\b|\bcrunchy\b", c):
         ops.append(op("declip"))
-    if re.search(r"\beven (?:out|up)\b|\b(?:consistent|same|steady) (?:volume|level)\b|\bcompress\w*\b|\bsome parts (?:are )?(?:too )?(?:quiet|loud)\b", c):
+    if re.search(
+        r"\beven (?:out|up)\b|\b(?:consistent|same|steady) (?:volume|level)\b|\bcompress\w*\b|\bsome parts (?:are )?(?:too )?(?:quiet|loud)\b", c
+    ):
         ops.append(op("compress", amount=strength))
     if re.search(r"\bnormali[sz]e\b|\bloudness\b", c) or (platform and re.search(r"\b(?:for|ready for|standard)\b", c) and not ops) or lufs:
         ops.append(op("normalize", **({"platform": platform} if platform else {}), **({"lufs": lufs} if lufs else {})))
-    m = re.search(r"\b(louder|quieter|softer|lower the volume|raise the volume|volume (?:up|down)|boost (?:it|the volume)|turn (?:it )?(?:up|down))\b", c)
+    m = re.search(
+        r"\b(louder|quieter|softer|lower the volume|raise the volume|volume (?:up|down)|boost (?:it|the volume)|turn (?:it )?(?:up|down))\b", c
+    )
     if m and not re.search(r"\bmusic|\bsong\b|\bbgm\b", c):
         up = m.group(1) in ("louder", "raise the volume", "volume up", "boost it", "boost the volume", "turn up", "turn it up")
         mm = re.search(r"\bby\s*(\d+(?:\.\d+)?)\s*db\b", c)
         db = float(mm.group(1)) if mm else (3 if strength == "light" else 10 if strength == "strong" else 6)
         ops.append(op("volume", db=db if up else -db))
     # ------------------------------------------------ time
-    m = re.search(r"\b(?:cut|remove|delete|trim|drop|chop)(?: off)? the (first|last) " + r"(\d+(?:\.\d+)?|" + "|".join(WORDNUM) + r")\s*(?:s|sec|secs|seconds?|(m|min|mins|minutes?))\b", c)
+    m = re.search(
+        r"\b(?:cut|remove|delete|trim|drop|chop)(?: off)? the (first|last) "
+        + r"(\d+(?:\.\d+)?|"
+        + "|".join(WORDNUM)
+        + r")\s*(?:s|sec|secs|seconds?|(m|min|mins|minutes?))\b",
+        c,
+    )
     if m:
         v = _n(m.group(2)) * (60 if m.group(3) else 1)
         ops.append(op("trim", **({"start": v} if m.group(1) == "first" else {"drop_end": v})))
@@ -193,12 +245,24 @@ def parse(clause, ctx=None):
         ops.append(op("fade", **{"in": v, "out": v}))
     elif m or m2:
         ops.append(op("fade", **{"in": float(m.group(1) or 2) if m else 0, "out": float(m2.group(1) or 3) if m2 else 0}))
-    if re.search(r"\b(?:remove|cut|shorten|tighten|trim|delete|take out|get rid of)\b.*\b(?:pauses?|silences?|gaps?|dead air|breaks)\b|\btighten (?:it )?up\b|\bjump ?cuts?\b", c):
+    if re.search(
+        r"\b(?:remove|cut|shorten|tighten|trim|delete|take out|get rid of)\b.*\b(?:pauses?|silences?|gaps?|dead air|breaks)\b|\btighten (?:it )?up\b|\bjump ?cuts?\b",
+        c,
+    ):
         mm = re.search(r"\b(?:longer than|over|more than)\s*" + NUM + r"\s*(?:s|sec|seconds?)", c)
         ops.append(op("tighten", max_pause=float(mm.group(1)) if mm else (0.3 if re.search(r"\ball\b|\bevery\b", c) else 0.5)))
     if re.search(r"\b(?:ums?|uhs?|umms?|uhms?|errs?|filler(?: words?)?|hesitations?)\b", c):
         ops.append(op("fillers"))
-    m = re.search(r"\b" + NUM + r"\s*x\b|\b" + NUM + r"\s*times (?:faster|slower|speed)\b|\bspeed\s*(?:it\s*)?(?:to|at)\s*" + NUM + r"(?:\s*x)?\b|\b(\d+)\s*% (faster|slower)\b", c)
+    m = re.search(
+        r"\b"
+        + NUM
+        + r"\s*x\b|\b"
+        + NUM
+        + r"\s*times (?:faster|slower|speed)\b|\bspeed\s*(?:it\s*)?(?:to|at)\s*"
+        + NUM
+        + r"(?:\s*x)?\b|\b(\d+)\s*% (faster|slower)\b",
+        c,
+    )
     if m and re.search(r"\bspeed|faster|slower|\d\s*x\b", c):
         if m.group(5):  # '20% slower'
             f = 1 + float(m.group(4)) / 100 * (1 if m.group(5) == "faster" else -1)
@@ -224,25 +288,44 @@ def parse(clause, ctx=None):
     # ------------------------------------------------ mixing and effects
     f = _file(c, raw, ctx)
     musicish = re.search(r"\bmusic|\bsong\b|\bbgm\b|\bbackground (?:track|tune)\b|\bunder (?:my|the|his|her) voice\b|\bbehind (?:my|the) voice\b", c)
-    if musicish and (f or re.search(r"\b(?:add|put|with|use|play)\b", c)) and not re.search(r"\b(?:remove|no|without|take out)\b.*\bmusic\b", c) \
-            and not re.search(r"\bmusic\b.*\b(?:quieter|louder|lower|higher|softer|down|up)\b|\b(?:quieter|louder|lower|softer)\b.*\bmusic\b", c):
+    if (
+        musicish
+        and (f or re.search(r"\b(?:add|put|with|use|play)\b", c))
+        and not re.search(r"\b(?:remove|no|without|take out)\b.*\bmusic\b", c)
+        and not re.search(r"\bmusic\b.*\b(?:quieter|louder|lower|higher|softer|down|up)\b|\b(?:quieter|louder|lower|softer)\b.*\bmusic\b", c)
+    ):
         if not f:
             out["ask"] = "Which music file? Name it (e.g. 'add music.mp3 under my voice') or give its full path."
             return out
         mm = re.search(r"\b(?:quiet|soft|low)(?:er)?\b", c)
-        ops.append(op("music", file=f, below=24 if mm else (12 if re.search(r"\b(?:loud|louder)\b", c) else 18), duck=not re.search(r"\bno duck|\bwithout duck|\bconstant\b", c)))
+        ops.append(
+            op(
+                "music",
+                file=f,
+                below=24 if mm else (12 if re.search(r"\b(?:loud|louder)\b", c) else 18),
+                duck=not re.search(r"\bno duck|\bwithout duck|\bconstant\b", c),
+            )
+        )
     elif musicish and re.search(r"\b(?:quieter|lower|softer|down)\b", c):
         ops.append(op("music_level", by=-6 if not re.search(r"\b(?:much|a lot)\b", c) else -10))
     elif musicish and re.search(r"\b(?:louder|higher|up)\b", c):
         ops.append(op("music_level", by=6 if not re.search(r"\b(?:much|a lot)\b", c) else 10))
     elif f and re.search(r"\b(?:add|append|join|attach|put|stick|combine|merge)\b|\b(?:intro|outro)\b", c):
-        ops.append(op("join", file=f, before=bool(re.search(r"\bintro\b|\bat the (?:start|beginning)\b|\bbefore\b", c)),
-                      crossfade=1.0 if re.search(r"\bcross-?fade\b|\bsmooth(?:ly)?\b|\bblend\b", c) else 0))
+        ops.append(
+            op(
+                "join",
+                file=f,
+                before=bool(re.search(r"\bintro\b|\bat the (?:start|beginning)\b|\bbefore\b", c)),
+                crossfade=1.0 if re.search(r"\bcross-?fade\b|\bsmooth(?:ly)?\b|\bblend\b", c) else 0,
+            )
+        )
     if re.search(r"\becho\b", c):
         ops.append(op("echo"))
     if re.search(r"\breverb\b|\b(?:hall|room|church|cathedral) (?:sound|effect)\b|\bspacious\b", c):
         ops.append(op("reverb"))
-    if re.search(r"\b(?:tele)?phone (?:call )?(?:effect|voice|sound)\b|\bradio (?:effect|voice)\b|\bwalkie[- ]talkie\b|\bover the phone\b|\bold radio\b", c):
+    if re.search(
+        r"\b(?:tele)?phone (?:call )?(?:effect|voice|sound)\b|\bradio (?:effect|voice)\b|\bwalkie[- ]talkie\b|\bover the phone\b|\bold radio\b", c
+    ):
         ops.append(op("telephone"))
     if re.search(r"\b(?:make it |to |convert to )?mono\b", c) and not re.search(r"\bstereo\b", c):
         ops.append(op("mono"))

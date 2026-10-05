@@ -7,6 +7,7 @@ X is paid per use since February 2026 (no free tier): $0.015 a post, $0.20 when 
 $0.001 per own-post read. The cost is shown before posting. X has no way to make a repeated post safe, so a post whose
 answer was lost is looked for among your latest posts before anything is sent again.
 """
+
 import re
 from pathlib import Path
 
@@ -31,6 +32,7 @@ class X(Platform):
     def token(self):
         self.need("access_token")
         from ai_pc.social import auth
+
         return auth.fresh_token(self) if not self.transport else self.creds["access_token"]
 
     def xapi(self, timeout=60):
@@ -50,8 +52,11 @@ class X(Platform):
 
     def warnings(self, post, target):
         parts = (target.get("prepared") or {}).get("parts") or [(target.get("prepared") or {}).get("text") or post.get("text") or ""]
-        return [f"X charges ${cost(parts):.3f} for this ({len(parts)} post{'s' if len(parts) > 1 else ''}"
-                + (", a link makes a post cost $0.20" if any(URL.search(p) for p in parts) else "") + ")"]
+        return [
+            f"X charges ${cost(parts):.3f} for this ({len(parts)} post{'s' if len(parts) > 1 else ''}"
+            + (", a link makes a post cost $0.20" if any(URL.search(p) for p in parts) else "")
+            + ")"
+        ]
 
     # ---------------------------------------------------------------- media
     def _image(self, path):
@@ -61,11 +66,13 @@ class X(Platform):
 
     def _video(self, path, job, budget):
         import time
+
         r = job.get("remote") or {}
         size = Path(path).stat().st_size
         if not r.get("media_id"):
-            js = self.call(self.xapi().post, "2/media/upload/initialize",
-                           json={"media_type": "video/mp4", "total_bytes": size, "media_category": "tweet_video"})
+            js = self.call(
+                self.xapi().post, "2/media/upload/initialize", json={"media_type": "video/mp4", "total_bytes": size, "media_category": "tweet_video"}
+            )
             self.checkpoint(job, media_id=(js.get("data") or {})["id"], segments=0)
             r = job["remote"]
         n = (size + SEG - 1) // SEG
@@ -142,8 +149,13 @@ class X(Platform):
             self.checkpoint(job, ids=ids, posting=None)
             r = job["remote"]
         user = self.creds.get("username") or "i"
-        return {"status": "published", "id": ids[0], "permalink": f"https://x.com/{user}/status/{ids[0]}", "verified": bool(ids[0]),
-                "notes": [f"a thread of {len(ids)}"] if len(ids) > 1 else []}
+        return {
+            "status": "published",
+            "id": ids[0],
+            "permalink": f"https://x.com/{user}/status/{ids[0]}",
+            "verified": bool(ids[0]),
+            "notes": [f"a thread of {len(ids)}"] if len(ids) > 1 else [],
+        }
 
     def status(self, job):
         return {"status": "published"}
@@ -161,18 +173,35 @@ class X(Platform):
         js = self.call(self.xapi().get, f"2/tweets/{tid}", params={"tweet.fields": "public_metrics,non_public_metrics,organic_metrics"})
         d = js.get("data") or {}
         pm, npm = d.get("public_metrics") or {}, d.get("non_public_metrics") or {}
-        return {"views": npm.get("impression_count", pm.get("impression_count")), "likes": pm.get("like_count"), "comments": pm.get("reply_count"),
-                "shares": (pm.get("retweet_count") or 0) + (pm.get("quote_count") or 0), "saves": pm.get("bookmark_count"),
-                "clicks": npm.get("url_link_clicks")}
+        return {
+            "views": npm.get("impression_count", pm.get("impression_count")),
+            "likes": pm.get("like_count"),
+            "comments": pm.get("reply_count"),
+            "shares": (pm.get("retweet_count") or 0) + (pm.get("quote_count") or 0),
+            "saves": pm.get("bookmark_count"),
+            "clicks": npm.get("url_link_clicks"),
+        }
 
     def comments(self, job, since=None):
         tid = (job.get("remote") or {}).get("ids", [None])[0]
-        js = self.call(self.xapi().get, "2/tweets/search/recent", params={"query": f"conversation_id:{tid}", "tweet.fields": "author_id,created_at",
-                                                                          "expansions": "author_id", "user.fields": "username", "max_results": 25})
+        js = self.call(
+            self.xapi().get,
+            "2/tweets/search/recent",
+            params={
+                "query": f"conversation_id:{tid}",
+                "tweet.fields": "author_id,created_at",
+                "expansions": "author_id",
+                "user.fields": "username",
+                "max_results": 25,
+            },
+        )
         users = {u["id"]: u.get("username") for u in (js.get("includes") or {}).get("users") or []}
         mine = set((job.get("remote") or {}).get("ids") or [])
-        return [{"id": t["id"], "author": "@" + (users.get(t.get("author_id")) or "someone"), "text": t.get("text", ""), "created": t.get("created_at")}
-                for t in js.get("data") or [] if t["id"] not in mine]
+        return [
+            {"id": t["id"], "author": "@" + (users.get(t.get("author_id")) or "someone"), "text": t.get("text", ""), "created": t.get("created_at")}
+            for t in js.get("data") or []
+            if t["id"] not in mine
+        ]
 
     def reply(self, job, comment_id, text):
         js = self.call(self.xapi().post, "2/tweets", json={"text": text, "reply": {"in_reply_to_tweet_id": comment_id}}, retries=0)

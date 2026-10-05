@@ -1,17 +1,18 @@
 """The document studio: a request in, a checked .docx and .pdf out (the video studio's recipe for Word).
 
-  s = DocStudio(planner).new("a 5 page report on rooftop solar in Pakistan with a cost table and a chart",
-                             files=["data/costs.xlsx"])
-  -> out/docs/<name>/<name>.docx + .pdf + pages.jpg + report.md + session.json
+s = DocStudio(planner).new("a 5 page report on rooftop solar in Pakistan with a cost table and a chart",
+                           files=["data/costs.xlsx"])
+-> out/docs/<name>/<name>.docx + .pdf + pages.jpg + report.md + session.json
 
-  1 write    designer: an outline, then every section in parallel (or one call for a short document)
-  2 build    docplan.resolve + docx_build: real styles, tables, native charts, cover, contents, page numbers
-  3 render   Word in the background: fields and contents updated, saved, exported to PDF
-  4 check    verify: every element on the rendered pages; the client's own data looked for on the pages
-  5 fix      what the checks can fix (length, a heading alone at a page's foot, a blank page, a table too wide),
-             rebuilt and checked again; then one vision look at the final pages
-  6 report   asked vs delivered, checks, time and cost
+1 write    designer: an outline, then every section in parallel (or one call for a short document)
+2 build    docplan.resolve + docx_build: real styles, tables, native charts, cover, contents, page numbers
+3 render   Word in the background: fields and contents updated, saved, exported to PDF
+4 check    verify: every element on the rendered pages; the client's own data looked for on the pages
+5 fix      what the checks can fix (length, a heading alone at a page's foot, a blank page, a table too wide),
+           rebuilt and checked again; then one vision look at the final pages
+6 report   asked vs delivered, checks, time and cost
 """
+
 import json
 import re
 import time
@@ -32,6 +33,7 @@ class DocStudio:
     def __init__(self, planner=None, log=print, look=True, fix_rounds=2):
         if planner is None:
             from ai_pc.llm.planner import ChatPlanner
+
             planner = ChatPlanner()
         self.planner, self.log, self.look, self.fix_rounds = planner, log, look, fix_rounds
 
@@ -63,9 +65,19 @@ class DocStudio:
             tb = time.perf_counter() - t
             rendered = RN.to_pdf(docx_path, update_fields=True, save=True)
             rep = VF.check(rp, built, rendered, planner=None)
-            rounds.append({"round": rnd, "build_s": round(tb, 2), "render_s": rendered.get("seconds"), "pages": rep["facts"].get("pages"),
-                           "counts": rep["counts"], "problems": [f"{r['id']}: {r['why']}" for r in rep["results"] if r["status"] in ("warn", "fail")][:8]})
-            self.log(f"round {rnd}: {rep['facts'].get('pages')} page(s), checks {rep['counts']} (build {tb:.2f} s, render {rendered.get('seconds')} s)")
+            rounds.append(
+                {
+                    "round": rnd,
+                    "build_s": round(tb, 2),
+                    "render_s": rendered.get("seconds"),
+                    "pages": rep["facts"].get("pages"),
+                    "counts": rep["counts"],
+                    "problems": [f"{r['id']}: {r['why']}" for r in rep["results"] if r["status"] in ("warn", "fail")][:8],
+                }
+            )
+            self.log(
+                f"round {rnd}: {rep['facts'].get('pages')} page(s), checks {rep['counts']} (build {tb:.2f} s, render {rendered.get('seconds')} s)"
+            )
             fixes = [r["fix"] for r in rep["results"] if r.get("fix") and r["status"] in ("warn", "fail")]
             if not fixes or rnd == self.fix_rounds or not rendered.get("ok"):
                 break
@@ -84,11 +96,27 @@ class DocStudio:
             timings["look_s"] = round(time.perf_counter() - t, 1)
         data = self.client_data(request, dinfo, rendered)
         timings["total_s"] = round(time.perf_counter() - t0, 1)
-        sess = {"request": request, "files": files, "folder": str(folder), "docx": str(docx_path), "pdf": rendered.get("pdf"),
-                "doctype": rp["doctype"], "theme": rp["theme"], "title": rp["title"], "pages": rep["facts"].get("pages"),
-                "body_pages": rep["facts"].get("body_pages"),
-                "target_pages": rp.get("target_pages"), "words": rendered.get("words"), "design": {k: v for k, v in dinfo.items() if k != "outline"},
-                "outline": dinfo.get("outline"), "plan": plan, "checks": rep, "rounds": rounds, "client_data": data, "timings": timings}
+        sess = {
+            "request": request,
+            "files": files,
+            "folder": str(folder),
+            "docx": str(docx_path),
+            "pdf": rendered.get("pdf"),
+            "doctype": rp["doctype"],
+            "theme": rp["theme"],
+            "title": rp["title"],
+            "pages": rep["facts"].get("pages"),
+            "body_pages": rep["facts"].get("body_pages"),
+            "target_pages": rp.get("target_pages"),
+            "words": rendered.get("words"),
+            "design": {k: v for k, v in dinfo.items() if k != "outline"},
+            "outline": dinfo.get("outline"),
+            "plan": plan,
+            "checks": rep,
+            "rounds": rounds,
+            "client_data": data,
+            "timings": timings,
+        }
         sess["ai_usage"], sess["ai_usd"] = self.planner.cost()
         if rendered.get("ok"):
             imgs = RN.pages(rendered["pdf"], scale=0.9)
@@ -102,6 +130,7 @@ class DocStudio:
         """A PowerPoint deck: written in one call, drawn by pptx_build, rendered by PowerPoint in the background (PDF,
         slide images, and the measured size of every text), checked slide by slide, fixed, looked at once."""
         from ai_pc.office import pptx_build as PB
+
         t0 = time.perf_counter()
         timings = {}
         files = [str(Path(f)) for f in files or []]
@@ -126,8 +155,16 @@ class DocStudio:
                 f.unlink()
             rendered = RN.to_pdf(path, measure=True, png_dir=str(png_dir), png_width=1280)
             rep = VF.check_deck(rd, built, rendered)
-            rounds.append({"round": rnd, "build_s": round(tb, 2), "render_s": rendered.get("seconds"), "slides": rendered.get("slides"),
-                           "counts": rep["counts"], "problems": [f"{r['id']}: {r['why']}" for r in rep["results"] if r["status"] in ("warn", "fail")][:8]})
+            rounds.append(
+                {
+                    "round": rnd,
+                    "build_s": round(tb, 2),
+                    "render_s": rendered.get("seconds"),
+                    "slides": rendered.get("slides"),
+                    "counts": rep["counts"],
+                    "problems": [f"{r['id']}: {r['why']}" for r in rep["results"] if r["status"] in ("warn", "fail")][:8],
+                }
+            )
             self.log(f"round {rnd}: {rendered.get('slides')} slides, checks {rep['counts']} (build {tb:.2f} s, render {rendered.get('seconds')} s)")
             fixes = [r["fix"] for r in rep["results"] if r.get("fix") and r["status"] in ("warn", "fail")]
             if not fixes or rnd == self.fix_rounds or not rendered.get("ok"):
@@ -155,14 +192,31 @@ class DocStudio:
                 rep["counts"] = {k: sum(1 for r in rep["results"] if r["status"] == k) for k in ("pass", "warn", "fail", "skip")}
             timings["look_s"] = round(time.perf_counter() - t, 1)
         timings["total_s"] = round(time.perf_counter() - t0, 1)
-        sess = {"request": request, "files": files, "folder": str(folder), "pptx": str(path), "docx": str(path), "pdf": rendered.get("pdf"),
-                "doctype": "presentation", "theme": rd["theme"], "title": rd["title"], "slides": rendered.get("slides"),
-                "target_pages": rd.get("target_slides"), "pages": rendered.get("slides"), "body_pages": rendered.get("slides"),
-                "design": dinfo, "plan": deck, "checks": rep, "rounds": rounds, "client_data": self.client_data(request, {}, rendered),
-                "timings": timings}
+        sess = {
+            "request": request,
+            "files": files,
+            "folder": str(folder),
+            "pptx": str(path),
+            "docx": str(path),
+            "pdf": rendered.get("pdf"),
+            "doctype": "presentation",
+            "theme": rd["theme"],
+            "title": rd["title"],
+            "slides": rendered.get("slides"),
+            "target_pages": rd.get("target_slides"),
+            "pages": rendered.get("slides"),
+            "body_pages": rendered.get("slides"),
+            "design": dinfo,
+            "plan": deck,
+            "checks": rep,
+            "rounds": rounds,
+            "client_data": self.client_data(request, {}, rendered),
+            "timings": timings,
+        }
         sess["ai_usage"], sess["ai_usd"] = self.planner.cost()
         if rendered.get("ok"):
             from PIL import Image
+
             imgs = [Image.open(p_).convert("RGB") for p_ in sorted(png_dir.glob("*.png"))]
             if imgs:
                 (folder / "slides.jpg").write_bytes(RN.sheet(imgs, [f"s{i + 1}" for i in range(len(imgs))], cols=4, cell_w=420))
@@ -175,6 +229,7 @@ class DocStudio:
         """An Excel workbook: designed in one call (columns, computed columns by name, totals, summaries), written with
         live formulas by xlsx_build, recalculated by Excel in the background, every total checked against Python's."""
         from ai_pc.office import xlsx_build as XB
+
         t0 = time.perf_counter()
         timings = {}
         files = [str(Path(f)) for f in files or []]
@@ -197,25 +252,47 @@ class DocStudio:
         if self.look and rendered.get("ok"):
             t = time.perf_counter()
             import threading
+
             box = {}
 
             def go():
                 try:
                     imgs = RN.pages(rendered["pdf"], scale=1.0, last=5)
-                    box["r"] = VF.look_images(imgs, f"an Excel workbook printed as {len(imgs)} page(s): '{rb.get('title') or ''}'", self.planner,
-                                              VF.LOOK_SYSTEM)
+                    box["r"] = VF.look_images(
+                        imgs, f"an Excel workbook printed as {len(imgs)} page(s): '{rb.get('title') or ''}'", self.planner, VF.LOOK_SYSTEM
+                    )
                 except Exception as e:  # noqa: BLE001
                     box["r"] = {"id": "look", "type": "look", "status": "skip", "why": f"visual check failed: {type(e).__name__}"}
+
             th_ = threading.Thread(target=go, daemon=True)
             th_.start()
             th_.join(timeout=25)  # a slow model never holds up the run
-            rep["results"].append(box.get("r") or {"id": "look", "type": "look", "status": "skip", "why": "visual check skipped: no answer within 25 s"})
+            rep["results"].append(
+                box.get("r") or {"id": "look", "type": "look", "status": "skip", "why": "visual check skipped: no answer within 25 s"}
+            )
             rep["counts"] = {k: sum(1 for r in rep["results"] if r["status"] == k) for k in ("pass", "warn", "fail", "skip")}
             timings["look_s"] = round(time.perf_counter() - t, 1)
         timings["total_s"] = round(time.perf_counter() - t0, 1)
-        sess = {"request": request, "files": files, "folder": str(folder), "xlsx": str(path), "docx": str(path), "pdf": rendered.get("pdf"),
-                "doctype": "workbook", "theme": rb["th"]["name"], "title": rb.get("title"), "pages": None, "body_pages": None,
-                "sheets": built["sheets"], "design": dinfo, "plan": book, "checks": rep, "rounds": [], "client_data": None, "timings": timings}
+        sess = {
+            "request": request,
+            "files": files,
+            "folder": str(folder),
+            "xlsx": str(path),
+            "docx": str(path),
+            "pdf": rendered.get("pdf"),
+            "doctype": "workbook",
+            "theme": rb["th"]["name"],
+            "title": rb.get("title"),
+            "pages": None,
+            "body_pages": None,
+            "sheets": built["sheets"],
+            "design": dinfo,
+            "plan": book,
+            "checks": rep,
+            "rounds": [],
+            "client_data": None,
+            "timings": timings,
+        }
         sess["ai_usage"], sess["ai_usd"] = self.planner.cost()
         if rendered.get("ok"):
             imgs = RN.pages(rendered["pdf"], scale=0.9)
@@ -229,6 +306,7 @@ class DocStudio:
     def apply(self, plan, rp, fixes, request):
         """The plan changed as the checks suggest. Returns (plan, [what was done])."""
         import copy
+
         plan = copy.deepcopy(plan)
         done = []
         src = {i: b.get("src") for i, b in enumerate(rp["blocks"])}
@@ -263,6 +341,7 @@ class DocStudio:
 
         def nums(s):
             return re.sub(r"(?<=\d),(?=\d)", "", s)
+
         full = nums(VF._norm(" ".join(RN.text(rendered["pdf"]))))
         NUMS = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?%?|\d+(?:\.\d+)?%?"
         facts = [re.sub(r"^[A-Za-z /()]{2,30}:\s*", "", str(d)) for d in dinfo.get("data") or []]  # "Instructor: Dr. X" -> "Dr. X"
@@ -292,13 +371,20 @@ def kind_of(request):
 
 def report_md(s):
     c = s["checks"]["counts"]
-    lines = [f"# {s.get('title') or 'Document'}", "", f"**Request:** {s['request']}", "",
-             f"- Document: {s['doctype']}, theme {s['theme']}" + (f", {s.get('pages')} page(s)" if s.get("pages") else "")
-             + (f" for {s['target_pages']} asked" if s.get("target_pages") else "")
-             + (f", {s['words']} words" if s.get("words") else ""),
-             f"- Files: `{s['docx']}` and `{s.get('pdf')}`",
-             f"- Checks: {c.get('pass', 0)} pass, {c.get('warn', 0)} warn, {c.get('fail', 0)} fail" + (f", {c['skip']} skipped" if c.get("skip") else ""),
-             f"- Time: {s['timings'].get('total_s')} s (writing {s['timings'].get('write_s')} s); AI ${s.get('ai_usd', 0):.4f}", ""]
+    lines = [
+        f"# {s.get('title') or 'Document'}",
+        "",
+        f"**Request:** {s['request']}",
+        "",
+        f"- Document: {s['doctype']}, theme {s['theme']}"
+        + (f", {s.get('pages')} page(s)" if s.get("pages") else "")
+        + (f" for {s['target_pages']} asked" if s.get("target_pages") else "")
+        + (f", {s['words']} words" if s.get("words") else ""),
+        f"- Files: `{s['docx']}` and `{s.get('pdf')}`",
+        f"- Checks: {c.get('pass', 0)} pass, {c.get('warn', 0)} warn, {c.get('fail', 0)} fail" + (f", {c['skip']} skipped" if c.get("skip") else ""),
+        f"- Time: {s['timings'].get('total_s')} s (writing {s['timings'].get('write_s')} s); AI ${s.get('ai_usd', 0):.4f}",
+        "",
+    ]
     if s.get("client_data"):
         cd = s["client_data"]
         lines.append(f"- Client data on the pages: {cd['found']}/{cd['checked']}")
@@ -306,7 +392,11 @@ def report_md(s):
     for r in s["checks"]["results"]:
         lines.append(f"| {r['id']} ({r['type']}) | {r['status']} | {r['why'][:140].replace('|', '/')} |")
     if len(s["rounds"]) > 1:
-        lines += ["", "## Fix rounds", ""] + [f"- round {r['round']}: " + (f"{r['pages']} pages" if r.get("pages") is not None else f"{r.get('slides')} slides") +
-                                            f", {r['counts']}" + (f"; fixed: {'; '.join(r['fixed'])}" if r.get("fixed") else "")
-                                            for r in s["rounds"]]
+        lines += ["", "## Fix rounds", ""] + [
+            f"- round {r['round']}: "
+            + (f"{r['pages']} pages" if r.get("pages") is not None else f"{r.get('slides')} slides")
+            + f", {r['counts']}"
+            + (f"; fixed: {'; '.join(r['fixed'])}" if r.get("fixed") else "")
+            for r in s["rounds"]
+        ]
     return "\n".join(lines) + "\n"

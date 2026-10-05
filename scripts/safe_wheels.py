@@ -13,6 +13,7 @@ scan   each wheel unpacked into unpacked/<name>/: every file checked against the
        licence; Python lines that run programs, open the network, decode or execute code are listed for reading.
 Nothing is installed by this tool.
 """
+
 import base64
 import csv
 import hashlib
@@ -69,7 +70,9 @@ def fetch(folder, specs, pure=False):
         info = json.loads(_get(f"https://pypi.org/pypi/{name}/{ver}/json"))
         files = [u for u in info["urls"] if u["packagetype"] == "bdist_wheel" and _fits(u["filename"])]
         if not files:
-            print(f"REFUSED {spec}: no wheel for Python {sys.version_info[0]}.{sys.version_info[1]} / Windows x64 (a source build would run setup code)")
+            print(
+                f"REFUSED {spec}: no wheel for Python {sys.version_info[0]}.{sys.version_info[1]} / Windows x64 (a source build would run setup code)"
+            )
             ok = False
             continue
         if pure:
@@ -88,10 +91,17 @@ def fetch(folder, specs, pure=False):
             continue
         (wheels / u["filename"]).write_bytes(data)
         meta = info["info"]
-        manifest[name.lower()] = {"version": ver, "file": u["filename"], "sha256": got, "size": len(data), "url": u["url"],
-                                  "uploaded": u.get("upload_time_iso_8601"), "author": meta.get("author") or meta.get("author_email"),
-                                  "home": meta.get("home_page") or (meta.get("project_urls") or {}).get("Homepage")
-                                  or (meta.get("project_urls") or {}).get("Source"), "license": meta.get("license_expression") or meta.get("license")}
+        manifest[name.lower()] = {
+            "version": ver,
+            "file": u["filename"],
+            "sha256": got,
+            "size": len(data),
+            "url": u["url"],
+            "uploaded": u.get("upload_time_iso_8601"),
+            "author": meta.get("author") or meta.get("author_email"),
+            "home": meta.get("home_page") or (meta.get("project_urls") or {}).get("Homepage") or (meta.get("project_urls") or {}).get("Source"),
+            "license": meta.get("license_expression") or meta.get("license"),
+        }
         print(f"ok      {u['filename']}  {len(data) / 1e6:.2f} MB  sha256 {got[:16]}... matches PyPI")
     manifest_p.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     return ok
@@ -135,13 +145,16 @@ def scan(folder):
 
             def field(k):
                 return [ln.split(":", 1)[1].strip() for ln in meta.splitlines() if ln.lower().startswith(k.lower() + ":")]
+
             kinds = {}
             for n in names:
                 ext = Path(n).suffix.lower() or "(none)"
                 kinds[ext] = kinds.get(ext, 0) + 1
-            flags = {"pth": [n for n in names if n.lower().endswith(".pth")],
-                     "executables": [n for n in names if Path(n).suffix.lower() in (".exe", ".bat", ".cmd", ".ps1", ".vbs", ".scr")],
-                     "native": [n for n in names if Path(n).suffix.lower() in (".dll", ".pyd", ".so")]}
+            flags = {
+                "pth": [n for n in names if n.lower().endswith(".pth")],
+                "executables": [n for n in names if Path(n).suffix.lower() in (".exe", ".bat", ".cmd", ".ps1", ".vbs", ".scr")],
+                "native": [n for n in names if Path(n).suffix.lower() in (".dll", ".pyd", ".so")],
+            }
             hits = {k: [] for k in RISKY}
             for n in names:
                 if not n.endswith(".py"):
@@ -153,17 +166,29 @@ def scan(folder):
                     for k, rx in RISKY.items():
                         if re.search(rx, line):
                             hits[k].append(f"{n}:{i}: {s[:110]}")
-        row = {"wheel": whl.name, "record_ok": rec_ok, "record_problems": rec_bad[:5], "files": len(names), "kinds": kinds,
-               "author": field("Author") + field("Author-email") + field("Maintainer-email"), "home": field("Home-page") + field("Project-URL"),
-               "license": field("License-Expression") + field("License")[:1], "requires": field("Requires-Dist"), "entry_points": entry,
-               "flags": flags, "risky_lines": {k: v for k, v in hits.items() if v}}
+        row = {
+            "wheel": whl.name,
+            "record_ok": rec_ok,
+            "record_problems": rec_bad[:5],
+            "files": len(names),
+            "kinds": kinds,
+            "author": field("Author") + field("Author-email") + field("Maintainer-email"),
+            "home": field("Home-page") + field("Project-URL"),
+            "license": field("License-Expression") + field("License")[:1],
+            "requires": field("Requires-Dist"),
+            "entry_points": entry,
+            "flags": flags,
+            "risky_lines": {k: v for k, v in hits.items() if v},
+        }
         out.append(row)
         print(f"\n== {whl.name}: {len(names)} files, RECORD {'ok' if rec_ok else 'PROBLEM ' + str(rec_bad[:3])}")
         print(f"   by {', '.join(row['author'])[:120] or '?'} | licence {', '.join(row['license'])[:60] or '?'}")
         print(f"   home {'; '.join(row['home'])[:200] or '?'}")
         print(f"   needs {', '.join(row['requires'])[:200] or 'nothing'}")
-        print(f"   .pth {flags['pth'] or 'none'} | executables {flags['executables'] or 'none'} | native libs {len(flags['native'])}"
-              + (f" ({', '.join(Path(x).name for x in flags['native'][:6])})" if flags["native"] else ""))
+        print(
+            f"   .pth {flags['pth'] or 'none'} | executables {flags['executables'] or 'none'} | native libs {len(flags['native'])}"
+            + (f" ({', '.join(Path(x).name for x in flags['native'][:6])})" if flags["native"] else "")
+        )
         if entry:
             print("   entry points: " + entry.replace("\n", " | ")[:200])
         for k, v in row["risky_lines"].items():

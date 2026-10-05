@@ -6,6 +6,7 @@ melody note's pitch measured by FFT in a render with the drums muted. 'lmms it' 
 
   'lmms song: A4 B4 C5 D5 E5/2 D5/2 at 120 bpm with drums'   'lmms it as mp3'   'lmms render C:\\music\\track.mmp to mp3'
 """
+
 import math
 import re
 import shutil
@@ -28,8 +29,11 @@ def config():
     (home / "work").mkdir(parents=True, exist_ok=True)
     cfg = home / "lmmsrc.xml"
     if not cfg.exists():
-        cfg.write_text(f'<?xml version="1.0"?>\n<!DOCTYPE lmms-config-file>\n<lmms version="1.3.0-alpha.2">\n'
-                       f'  <paths workingdir="{(home / "work").as_posix()}/"/>\n</lmms>\n', encoding="utf-8")
+        cfg.write_text(
+            f'<?xml version="1.0"?>\n<!DOCTYPE lmms-config-file>\n<lmms version="1.3.0-alpha.2">\n'
+            f'  <paths workingdir="{(home / "work").as_posix()}/"/>\n</lmms>\n',
+            encoding="utf-8",
+        )
     return cfg
 
 
@@ -43,19 +47,25 @@ def project(notes, bpm, drums, mute_drums=False):
         pos += ticks
     bars = max(1, math.ceil(pos / (4 * TICKS)))
     kicks = "".join(f'<note pan="0" key="57" vol="100" pos="{p}" len="12"/>' for p in range(0, bars * 4 * TICKS, TICKS))
-    drum_track = (f'<track type="0" name="Kick" muted="{1 if mute_drums else 0}" solo="0"><instrumenttrack vol="70" pan="0" fxch="0" pitch="0" basenote="57" pitchrange="1">'
-                  f'<instrument name="kicker"><kicker/></instrument></instrumenttrack><pattern pos="0" muted="0" steps="16" name="Kick" type="1">{kicks}</pattern></track>'
-                  if drums else "")
-    return (f'<?xml version="1.0"?>\n<!DOCTYPE lmms-project>\n<lmms-project version="1.0" creator="LMMS" creatorversion="1.2.2" type="song">\n'
-            f'<head bpm="{bpm}" timesig_numerator="4" timesig_denominator="4" mastervol="80" masterpitch="0"/>\n<song><trackcontainer type="song">'
-            f'<track type="0" name="Melody" muted="0" solo="0"><instrumenttrack vol="45" pan="0" fxch="0" pitch="0" basenote="57" pitchrange="1">'
-            f'<instrument name="tripleoscillator"><tripleoscillator/></instrument></instrumenttrack>'
-            f'<pattern pos="0" muted="0" steps="16" name="Melody" type="1">{"".join(melody)}</pattern></track>{drum_track}'
-            f'</trackcontainer><timeline lp0pos="0" lp1pos="{bars * 4 * TICKS}" lpstate="0"/></song>\n</lmms-project>\n'), bars
+    drum_track = (
+        f'<track type="0" name="Kick" muted="{1 if mute_drums else 0}" solo="0"><instrumenttrack vol="70" pan="0" fxch="0" pitch="0" basenote="57" pitchrange="1">'
+        f'<instrument name="kicker"><kicker/></instrument></instrumenttrack><pattern pos="0" muted="0" steps="16" name="Kick" type="1">{kicks}</pattern></track>'
+        if drums
+        else ""
+    )
+    return (
+        f'<?xml version="1.0"?>\n<!DOCTYPE lmms-project>\n<lmms-project version="1.0" creator="LMMS" creatorversion="1.2.2" type="song">\n'
+        f'<head bpm="{bpm}" timesig_numerator="4" timesig_denominator="4" mastervol="80" masterpitch="0"/>\n<song><trackcontainer type="song">'
+        f'<track type="0" name="Melody" muted="0" solo="0"><instrumenttrack vol="45" pan="0" fxch="0" pitch="0" basenote="57" pitchrange="1">'
+        f'<instrument name="tripleoscillator"><tripleoscillator/></instrument></instrumenttrack>'
+        f'<pattern pos="0" muted="0" steps="16" name="Melody" type="1">{"".join(melody)}</pattern></track>{drum_track}'
+        f'</trackcontainer><timeline lp0pos="0" lp1pos="{bars * 4 * TICKS}" lpstate="0"/></song>\n</lmms-project>\n'
+    ), bars
 
 
 def render(mmp, dest, fmt):
     from ai_pc.core import hidden_desktop
+
     dest.unlink(missing_ok=True)
     rc, out, err, timed_out = hidden_desktop.run([str(EXE), "-c", str(config()), "render", str(mmp), "-o", str(dest), "-f", fmt], timeout=600)
     return dest.exists() and dest.stat().st_size > 1000, out + err
@@ -64,13 +74,16 @@ def render(mmp, dest, fmt):
 def note_pitches(wav, notes, bpm, work):
     """[(wanted Hz, measured Hz)] for each melody note, measured in the middle of the note."""
     from ai_pc.apps.audacity import pitch
+
     out, t = [], 0.0
     for n, q in notes:
         dur = q * 60 / bpm
         if n is not None and dur >= 0.2:
             seg = work / "_seg.wav"
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{t + min(0.05, dur / 4):.3f}", "-i", str(wav), "-t", f"{min(0.4, dur * 0.7):.3f}", str(seg)],
-                           creationflags=NOWIN)
+            subprocess.run(
+                ["ffmpeg", "-v", "error", "-y", "-ss", f"{t + min(0.05, dur / 4):.3f}", "-i", str(wav), "-t", f"{min(0.4, dur * 0.7):.3f}", str(seg)],
+                creationflags=NOWIN,
+            )
             out.append((440 * 2 ** ((n - 69) / 12), pitch(seg) or 0.0))
         t += dur
     (work / "_seg.wav").unlink(missing_ok=True)
@@ -87,6 +100,7 @@ def same_note(want, got):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\blmms\b", c):
         return None
@@ -107,6 +121,7 @@ def run(op, ctx):
     if not EXE.exists():
         return "LMMS is not in tools/lmms."
     from ai_pc.apps.audacity import measure
+
     out = (Path(ctx["out"]) / "lmms").resolve()
     out.mkdir(parents=True, exist_ok=True)
     if op["op"] == "render":
@@ -114,10 +129,13 @@ def run(op, ctx):
         dest = out / f"{src.stem}.{op['format']}"
         ok, log = render(src, dest, op["format"])
         info = measure(dest) if ok else {}
-        return (f"LMMS rendered {src.name} to {dest} ({info.get('seconds', 0):.1f} s). " +
-                ("Checked: it has sound (loudness " + f"{info.get('lufs')} LUFS, peak {info.get('peak')} dB)." if ok and info.get("lufs") is not None and info["lufs"] > -60
-                 else "NOT right: " + log.strip()[-300:]))
+        return f"LMMS rendered {src.name} to {dest} ({info.get('seconds', 0):.1f} s). " + (
+            "Checked: it has sound (loudness " + f"{info.get('lufs')} LUFS, peak {info.get('peak')} dB)."
+            if ok and info.get("lufs") is not None and info["lufs"] > -60
+            else "NOT right: " + log.strip()[-300:]
+        )
     from ai_pc.apps import music
+
     if op.get("from_memo"):
         memo = ctx["memo"]["music"]
         notes = music.read_midi(Path(memo["midi"]).read_bytes())
@@ -141,11 +159,25 @@ def run(op, ctx):
     right = sum(1 for w, g in pitches if same_note(w, g))
     shutil.rmtree(check_dir, ignore_errors=True)
     song_secs = bars * 4 * 60 / bpm
-    checks = [(f"LMMS rendered it ({info.get('seconds', 0):.1f} s for {bars} bar(s) at {bpm} bpm)", ok and song_secs - 0.5 <= info.get("seconds", 0) <= song_secs + 4),
-              (f"it has sound and does not clip (loudness {info.get('lufs')} LUFS, peak {info.get('peak')} dB)",
-               ok and info.get("lufs") is not None and info["lufs"] > -40 and (info.get("peak") is not None and info["peak"] < -0.1)),
-              (f"every melody note plays at its pitch ({right} of {len(pitches)} measured by FFT)", bool(pitches) and right == len(pitches))]
+    checks = [
+        (
+            f"LMMS rendered it ({info.get('seconds', 0):.1f} s for {bars} bar(s) at {bpm} bpm)",
+            ok and song_secs - 0.5 <= info.get("seconds", 0) <= song_secs + 4,
+        ),
+        (
+            f"it has sound and does not clip (loudness {info.get('lufs')} LUFS, peak {info.get('peak')} dB)",
+            ok and info.get("lufs") is not None and info["lufs"] > -40 and (info.get("peak") is not None and info["peak"] < -0.1),
+        ),
+        (f"every melody note plays at its pitch ({right} of {len(pitches)} measured by FFT)", bool(pitches) and right == len(pitches)),
+    ]
     bad = [w for w, good in checks if not good]
-    return (f"LMMS song: {mmp} (opens in LMMS to edit: a TripleOscillator melody" + (" and a kick drum on every beat" if op["drums"] else "") +
-            f") rendered by LMMS to {dest}. " + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else
-                                                 "NOT right: " + "; ".join(bad) + ". " + (log.strip()[-200:] if not ok else "")))
+    return (
+        f"LMMS song: {mmp} (opens in LMMS to edit: a TripleOscillator melody"
+        + (" and a kick drum on every beat" if op["drums"] else "")
+        + f") rendered by LMMS to {dest}. "
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + ". " + (log.strip()[-200:] if not ok else "")
+        )
+    )

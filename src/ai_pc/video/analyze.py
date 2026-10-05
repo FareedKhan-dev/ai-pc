@@ -10,6 +10,7 @@ Audio  audio.analyze: tempo and beat grid, strong hits, the drop, pauses, speech
 Results go to state/media/<name>_<key>.json (key = name, size, modification time, analyzer version).
 describe() turns an analysis into the compact text the planner reads.
 """
+
 import hashlib
 import json
 import statistics
@@ -81,15 +82,19 @@ def _shot_stats(idx, times, faces, diffs, shifts, cols, cut_at):
     centres = [(f[0]["box"][0] + f[0]["box"][2] / 2, f[0]["box"][1] + f[0]["box"][3] / 2) for f in with_face]
     out = {"face_share": round(len(with_face) / max(1, len(fs)), 2), "max_faces": max((len(f) for f in fs), default=0)}
     if with_face:
-        out.update(face_size=round(_median(areas), 4), face_x=round(_median([c[0] for c in centres]), 3),
-                   face_y=round(_median([c[1] for c in centres]), 3),
-                   eyes_visible=round(sum(1 for f in with_face if f[0]["score"] > 0.75 and f[0]["box"][2] > 0.04) / max(1, len(fs)), 2))
+        out.update(
+            face_size=round(_median(areas), 4),
+            face_x=round(_median([c[0] for c in centres]), 3),
+            face_y=round(_median([c[1] for c in centres]), 3),
+            eyes_visible=round(sum(1 for f in with_face if f[0]["score"] > 0.75 and f[0]["box"][2] > 0.04) / max(1, len(fs)), 2),
+        )
         if len(areas) >= 4:
             k = max(1, len(areas) // 4)
             grow = _median(areas[-k:]) / max(1e-6, _median(areas[:k]))
             dx = _median([c[0] for c in centres[-k:]]) - _median([c[0] for c in centres[:k]])
-            out["subject_motion"] = ("approaching the camera" if grow > 1.6 else "moving away" if grow < 0.6 else "") + \
-                                    (" moving right" if dx > 0.15 else " moving left" if dx < -0.15 else "")
+            out["subject_motion"] = ("approaching the camera" if grow > 1.6 else "moving away" if grow < 0.6 else "") + (
+                " moving right" if dx > 0.15 else " moving left" if dx < -0.15 else ""
+            )
             out["subject_motion"] = out["subject_motion"].strip() or "staying in place"
     d = [diffs[i] for i in idx[1:] if i not in cut_at]
     m = _median(d)
@@ -179,18 +184,33 @@ def _video(path, info, planner, log):
         m = {"t": round(times[i], 2)}
         c = caps.get(k)
         if c:
-            m.update({x: c.get(x) for x in ("shot", "subject", "action", "setting", "camera", "mood", "highlight", "notes") if c.get(x) not in (None, "")})
+            m.update(
+                {x: c.get(x) for x in ("shot", "subject", "action", "setting", "camera", "mood", "highlight", "notes") if c.get(x) not in (None, "")}
+            )
         if faces[i]:
             m["face"] = faces[i][0]
         moments.append(m)
     for s in shots:
         s.pop("_idx")
-    track = [{"t": round(t, 2), "faces": [{"box": f["box"], "right_eye": f["right_eye"], "left_eye": f["left_eye"], "score": f["score"]} for f in fs[:3]]}
-             for t, fs in zip(times, faces) if fs]
-    log(f"  {Path(path).name}: {len(times)} frames read in {t_dec:.1f} s, measured in {t_meas - t_dec:.1f} s, "
-        f"{len(shots)} shot(s), {len(picks)} moments captioned in {vlm_s:.1f} s")
-    return {"shots": shots, "moments": moments, "summary": summary, "screen": screen, "sound": snd, "faces": track,
-            "motion": [round(x, 4) for x in diffs], "times": [round(t, 2) for t in times]}
+    track = [
+        {"t": round(t, 2), "faces": [{"box": f["box"], "right_eye": f["right_eye"], "left_eye": f["left_eye"], "score": f["score"]} for f in fs[:3]]}
+        for t, fs in zip(times, faces)
+        if fs
+    ]
+    log(
+        f"  {Path(path).name}: {len(times)} frames read in {t_dec:.1f} s, measured in {t_meas - t_dec:.1f} s, "
+        f"{len(shots)} shot(s), {len(picks)} moments captioned in {vlm_s:.1f} s"
+    )
+    return {
+        "shots": shots,
+        "moments": moments,
+        "summary": summary,
+        "screen": screen,
+        "sound": snd,
+        "faces": track,
+        "motion": [round(x, 4) for x in diffs],
+        "times": [round(t, 2) for t in times],
+    }
 
 
 # ------------------------------------------------------------------------------------------------ photos
@@ -201,19 +221,26 @@ def _photos(paths, planner, log):
         fr = F.image(p, width=960)
         frs[p] = fr
         fc = F.faces(fr)
-        out[p] = {"faces": [{"box": f["box"], "right_eye": f["right_eye"], "left_eye": f["left_eye"], "score": f["score"]} for f in fc[:3]],
-                  "look": F.colour(fr), "screen": (lambda s: {"kind": s[0], "color": s[1]} if s else None)(F.screen_colour(fr))}
+        out[p] = {
+            "faces": [{"box": f["box"], "right_eye": f["right_eye"], "left_eye": f["left_eye"], "score": f["score"]} for f in fc[:3]],
+            "look": F.colour(fr),
+            "screen": (lambda s: {"kind": s[0], "color": s[1]} if s else None)(F.screen_colour(fr)),
+        }
     if planner is not None and paths:
         for i in range(0, len(paths), 9):
-            group = paths[i:i + 9]
+            group = paths[i : i + 9]
             img = F.sheet([frs[p] for p in group], [f"#{k + 1}" for k in range(len(group))], cols=3, cell_w=320)
-            d, s = ask(planner, CAPTION_SYSTEM, f"{len(group)} separate photos: " + ", ".join(f"#{k + 1} {Path(p).name}" for k, p in enumerate(group)), [img])
+            d, s = ask(
+                planner, CAPTION_SYSTEM, f"{len(group)} separate photos: " + ", ".join(f"#{k + 1} {Path(p).name}" for k, p in enumerate(group)), [img]
+            )
             for c in (d or {}).get("frames", []) if isinstance(d, dict) else []:
                 try:
                     p = group[int(c.get("i")) - 1]
                 except (TypeError, ValueError, IndexError):
                     continue
-                out[p]["caption"] = {x: c.get(x) for x in ("shot", "subject", "action", "setting", "mood", "highlight", "notes") if c.get(x) not in (None, "")}
+                out[p]["caption"] = {
+                    x: c.get(x) for x in ("shot", "subject", "action", "setting", "mood", "highlight", "notes") if c.get(x) not in (None, "")
+                }
             log(f"  {len(group)} photo(s) captioned in {s:.1f} s")
     return out
 
@@ -243,6 +270,7 @@ def analyze(paths, planner=None, log=print, use_cache=True):
             info = F.probe(p)
             base.update(seconds=round(info["seconds"], 2), sound=A.analyze(p))
         return base
+
     with ThreadPoolExecutor(4) as ex:
         futs = {p: ex.submit(one, p) for p in todo if kind_of(p) in ("video", "audio")}
         ph = ex.submit(_photos, photos, planner, log) if photos else None
@@ -251,8 +279,7 @@ def analyze(paths, planner=None, log=print, use_cache=True):
         if ph:
             for p, d in ph.result().items():
                 info = F.probe(p)
-                results[p.name] = {"file": p.name, "path": str(p), "kind": "image", "width": info.get("width"),
-                                   "height": info.get("height"), **d}
+                results[p.name] = {"file": p.name, "path": str(p), "kind": "image", "width": info.get("width"), "height": info.get("height"), **d}
     for p in todo:
         if p.name in results:
             _cache_path(p).write_text(json.dumps(results[p.name], ensure_ascii=False), encoding="utf-8")
@@ -294,11 +321,19 @@ def describe(a):
     if k == "image":
         c = a.get("caption") or {}
         f = a.get("faces") or []
-        face = f"; face at x {f[0]['box'][0] + f[0]['box'][2] / 2:.2f} y {f[0]['box'][1] + f[0]['box'][3] / 2:.2f}, {100 * f[0]['box'][2] * f[0]['box'][3]:.1f}% of the picture" if f else "; no face"
-        return (f"{a['file']}: photo {a.get('width')}x{a.get('height')} ({_aspect(a.get('width'), a.get('height'))})"
-                f" - {c.get('shot', '')} {c.get('subject', '')}, {c.get('setting', '')}; mood {c.get('mood', '?')}{face}")
-    lines = [f"{a['file']}: video {a['seconds']:.1f} s, {a['width']}x{a['height']} ({_aspect(a['width'], a['height'])}), "
-             f"{a['fps']:.0f} fps; sound: {_sound_line(a.get('sound'))}" + (f'. "{a["summary"]}"' if a.get("summary") else "")]
+        face = (
+            f"; face at x {f[0]['box'][0] + f[0]['box'][2] / 2:.2f} y {f[0]['box'][1] + f[0]['box'][3] / 2:.2f}, {100 * f[0]['box'][2] * f[0]['box'][3]:.1f}% of the picture"
+            if f
+            else "; no face"
+        )
+        return (
+            f"{a['file']}: photo {a.get('width')}x{a.get('height')} ({_aspect(a.get('width'), a.get('height'))})"
+            f" - {c.get('shot', '')} {c.get('subject', '')}, {c.get('setting', '')}; mood {c.get('mood', '?')}{face}"
+        )
+    lines = [
+        f"{a['file']}: video {a['seconds']:.1f} s, {a['width']}x{a['height']} ({_aspect(a['width'], a['height'])}), "
+        f"{a['fps']:.0f} fps; sound: {_sound_line(a.get('sound'))}" + (f'. "{a["summary"]}"' if a.get("summary") else "")
+    ]
     if a.get("screen"):
         lines.append(f"  {a['screen']['kind']} screen behind the subject ({a['screen']['color']}): can be keyed out with chroma")
     for i, s in enumerate(a.get("shots", [])):
@@ -306,8 +341,11 @@ def describe(a):
         if s.get("camera"):
             bits.append(f"camera {s['camera']}")
         if s.get("face_share"):
-            bits.append(f"face in {s['face_share'] * 100:.0f}% (at x {s['face_x']:.2f} y {s['face_y']:.2f}, {100 * s['face_size']:.1f}% of the frame"
-                        + (", eyes visible" if s.get("eyes_visible", 0) > 0.5 else "") + ")")
+            bits.append(
+                f"face in {s['face_share'] * 100:.0f}% (at x {s['face_x']:.2f} y {s['face_y']:.2f}, {100 * s['face_size']:.1f}% of the frame"
+                + (", eyes visible" if s.get("eyes_visible", 0) > 0.5 else "")
+                + ")"
+            )
             if s.get("subject_motion"):
                 bits.append(f"subject {s['subject_motion']}")
         else:
@@ -315,6 +353,7 @@ def describe(a):
         lines.append("; ".join(bits))
     try:
         from ai_pc.media.speech import cached
+
         tr = cached(a["path"]) if a.get("path") else None
     except Exception:  # noqa: BLE001
         tr = None
@@ -322,8 +361,10 @@ def describe(a):
         lines.append("  said: " + " ".join(f"[{s['start']:.1f}s] {s['text']}" for s in tr["segments"])[:900])
     for m in a.get("moments", []):
         if m.get("subject"):
-            lines.append(f"    {m['t']:.1f}s [{m.get('shot', '?')}, highlight {m.get('highlight', '?')}] {m.get('subject', '')} - {m.get('action', '')}"
-                         f"; {m.get('setting', '')}; {m.get('camera', '')}; {m.get('mood', '')}" + (f"; {m['notes']}" if m.get("notes") else ""))
+            lines.append(
+                f"    {m['t']:.1f}s [{m.get('shot', '?')}, highlight {m.get('highlight', '?')}] {m.get('subject', '')} - {m.get('action', '')}"
+                f"; {m.get('setting', '')}; {m.get('camera', '')}; {m.get('mood', '')}" + (f"; {m['notes']}" if m.get("notes") else "")
+            )
     return "\n".join(lines)
 
 

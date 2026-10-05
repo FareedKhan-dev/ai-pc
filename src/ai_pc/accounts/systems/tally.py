@@ -14,6 +14,7 @@ negative amount, and a voucher is sent only if it sums to zero. A write counts o
 our number in its narration) and its total compared. A document cancelled here is cancelled in Tally (ACTION Cancel
 keeps the voucher and its number, as here).
 """
+
 import datetime as dt
 import re
 import urllib.error
@@ -28,23 +29,48 @@ from ai_pc.hub.http import TRANSPORT
 APP = {
     "label": "TallyPrime",
     "fields": [("company", "Your company's name exactly as TallyPrime shows it", False), ("port?", "Gateway port (Enter for 9000)", False)],
-    "steps": ["Open TallyPrime on this PC and open (load) your company.",
-              "Turn its gateway on: F1 (Help) > Settings > Connectivity > Client/Server configuration (TallyPrime 7: Alt+Z Exchange > Configure > "
-              "Data Synchronisation): 'TallyPrime is acting as' = Both, Port = 9000; save and restart TallyPrime.",
-              "Optional: set the Sales, Purchase, Credit Note, Receipt and Payment voucher types' numbering to Manual, so Tally keeps our numbers "
-              "(Alt+G > Alter > Voucher Type).",
-              "Run 'ai-pc accounts connect tally' and type the company's name. No key is needed; keep port 9000 closed to other computers in Windows Firewall."],
+    "steps": [
+        "Open TallyPrime on this PC and open (load) your company.",
+        "Turn its gateway on: F1 (Help) > Settings > Connectivity > Client/Server configuration (TallyPrime 7: Alt+Z Exchange > Configure > "
+        "Data Synchronisation): 'TallyPrime is acting as' = Both, Port = 9000; save and restart TallyPrime.",
+        "Optional: set the Sales, Purchase, Credit Note, Receipt and Payment voucher types' numbering to Manual, so Tally keeps our numbers "
+        "(Alt+G > Alter > Voucher Type).",
+        "Run 'ai-pc accounts connect tally' and type the company's name. No key is needed; keep port 9000 closed to other computers in Windows Firewall.",
+    ],
     "notes": "TallyPrime has no Pakistan tax module: sales tax goes to 'Output Sales Tax 18%' and 'Input Sales Tax 18%' ledgers under Duties & Taxes. "
-             "Without a licence (Educational mode) Tally accepts only dates on the 1st, 2nd and 31st of a month.",
+    "Without a licence (Educational mode) Tally accepts only dates on the 1st, 2nd and 31st of a month.",
 }
-UNITS = {"pcs": ("Nos", "Numbers", 0), "piece": ("Nos", "Numbers", 0), "pieces": ("Nos", "Numbers", 0), "unit": ("Nos", "Numbers", 0),
-         "units": ("Nos", "Numbers", 0), "nos": ("Nos", "Numbers", 0), "kg": ("Kg", "Kilograms", 3), "g": ("g", "Grams", 0),
-         "m": ("m", "Metres", 2), "ft": ("ft", "Feet", 2), "box": ("Box", "Boxes", 0), "boxes": ("Box", "Boxes", 0), "set": ("Set", "Sets", 0),
-         "job": ("Job", "Jobs", 0), "hour": ("Hrs", "Hours", 2), "hours": ("Hrs", "Hours", 2), "l": ("Ltr", "Litres", 2), "litre": ("Ltr", "Litres", 2)}
+UNITS = {
+    "pcs": ("Nos", "Numbers", 0),
+    "piece": ("Nos", "Numbers", 0),
+    "pieces": ("Nos", "Numbers", 0),
+    "unit": ("Nos", "Numbers", 0),
+    "units": ("Nos", "Numbers", 0),
+    "nos": ("Nos", "Numbers", 0),
+    "kg": ("Kg", "Kilograms", 3),
+    "g": ("g", "Grams", 0),
+    "m": ("m", "Metres", 2),
+    "ft": ("ft", "Feet", 2),
+    "box": ("Box", "Boxes", 0),
+    "boxes": ("Box", "Boxes", 0),
+    "set": ("Set", "Sets", 0),
+    "job": ("Job", "Jobs", 0),
+    "hour": ("Hrs", "Hours", 2),
+    "hours": ("Hrs", "Hours", 2),
+    "l": ("Ltr", "Litres", 2),
+    "litre": ("Ltr", "Litres", 2),
+}
 # ledgers made when missing: role -> (name, group)
-LEDGERS = {"sales": ("Sales", "Sales Accounts"), "services": ("Service Income", "Sales Accounts"), "purchases": ("Purchase", "Purchase Accounts"),
-           "further_tax": ("Further Tax Payable", "Duties & Taxes"), "wht": ("Income Tax Deducted by Customers", "Loans & Advances (Asset)"),
-           "wht_payable": ("Income Tax Withheld from Suppliers", "Duties & Taxes"), "bank": ("Bank Account", "Bank Accounts"), "cash": ("Cash", "Cash-in-Hand")}
+LEDGERS = {
+    "sales": ("Sales", "Sales Accounts"),
+    "services": ("Service Income", "Sales Accounts"),
+    "purchases": ("Purchase", "Purchase Accounts"),
+    "further_tax": ("Further Tax Payable", "Duties & Taxes"),
+    "wht": ("Income Tax Deducted by Customers", "Loans & Advances (Asset)"),
+    "wht_payable": ("Income Tax Withheld from Suppliers", "Duties & Taxes"),
+    "bank": ("Bank Account", "Bank Accounts"),
+    "cash": ("Cash", "Cash-in-Hand"),
+}
 OWN = {"sales": "Sales Accounts", "purchases": "Purchase Accounts", "bank": "Bank Accounts", "cash": "Cash-in-Hand"}  # their own ledger, by group
 VTYPE = {"invoice": "Sales", "bill": "Purchase", "credit_note": "Credit Note", "receipt": "Receipt", "payment": "Payment", "expense": "Payment"}
 ENTRY_TAGS = ("LEDGERENTRIES.LIST", "ALLLEDGERENTRIES.LIST", "ALLINVENTORYENTRIES.LIST")
@@ -86,8 +112,11 @@ def connect(values, transport=None, store=None):
     loaded = System(dict(creds), transport).companies()
     hit = next((c for c in loaded if c.lower() == creds["company"].lower()), None)
     if not hit:
-        raise SyncError(f"'{creds['company']}' is not open in TallyPrime" + (f" (open: {', '.join(loaded)})" if loaded else "") +
-                        ": open it there (F3, Select Company) and connect again")
+        raise SyncError(
+            f"'{creds['company']}' is not open in TallyPrime"
+            + (f" (open: {', '.join(loaded)})" if loaded else "")
+            + ": open it there (F3, Select Company) and connect again"
+        )
     creds["company"] = hit
     (store or (lambda c: vault.put("tally", c)))(creds)
     return {"who": hit, "where": f"TallyPrime on this PC, port {creds['port']}"}
@@ -116,10 +145,15 @@ class System(Connector):
     def post(self, xml):
         self.calls += 1
         try:
-            status, _, content = (self.transport or TRANSPORT).send("POST", self.url, {"Content-Type": "text/xml; charset=utf-16"}, xml.encode("utf-16"), 180)
+            status, _, content = (self.transport or TRANSPORT).send(
+                "POST", self.url, {"Content-Type": "text/xml; charset=utf-16"}, xml.encode("utf-16"), 180
+            )
         except (OSError, urllib.error.URLError) as e:
-            raise SyncError(f"TallyPrime is not answering on port {self.creds.get('port') or 9000} ({type(e).__name__}): open TallyPrime with "
-                            "your company and turn its gateway on (F1 > Settings > Connectivity); if a message is showing in Tally, close it", "offline") from e
+            raise SyncError(
+                f"TallyPrime is not answering on port {self.creds.get('port') or 9000} ({type(e).__name__}): open TallyPrime with "
+                "your company and turn its gateway on (F1 > Settings > Connectivity); if a message is showing in Tally, close it",
+                "offline",
+            ) from e
         text = _clean(_decode(content))
         if status >= 400 or "Unknown Request" in text:
             raise SyncError(f"TallyPrime could not read the request ({status}): {text[:200]}")
@@ -132,27 +166,40 @@ class System(Connector):
         return f"<SVCURRENTCOMPANY>{escape(self.creds['company'])}</SVCURRENTCOMPANY>" if self.creds.get("company") else ""
 
     def _import(self, body, what):
-        root = self.post(f"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Import</TALLYREQUEST><TYPE>Data</TYPE><ID>{what}</ID></HEADER>"
-                         f"<BODY><DESC><STATICVARIABLES>{self._company()}</STATICVARIABLES></DESC><DATA><TALLYMESSAGE>{body}</TALLYMESSAGE></DATA>"
-                         "</BODY></ENVELOPE>")
-        got = {k: int((root.findtext(f".//{k}") or "0").strip() or 0) for k in ("CREATED", "ALTERED", "DELETED", "CANCELLED", "LASTVCHID", "ERRORS",
-                                                                                   "EXCEPTIONS", "IGNORED", "COMBINED")}
+        root = self.post(
+            f"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Import</TALLYREQUEST><TYPE>Data</TYPE><ID>{what}</ID></HEADER>"
+            f"<BODY><DESC><STATICVARIABLES>{self._company()}</STATICVARIABLES></DESC><DATA><TALLYMESSAGE>{body}</TALLYMESSAGE></DATA>"
+            "</BODY></ENVELOPE>"
+        )
+        got = {
+            k: int((root.findtext(f".//{k}") or "0").strip() or 0)
+            for k in ("CREATED", "ALTERED", "DELETED", "CANCELLED", "LASTVCHID", "ERRORS", "EXCEPTIONS", "IGNORED", "COMBINED")
+        }
         got["LINEERROR"] = (root.findtext(".//LINEERROR") or "").strip()
         if "SVCurrentCompany" in got["LINEERROR"]:
             raise SyncError(f"'{self.creds['company']}' is not open in TallyPrime: open it there and sync again", "offline")
         if got["ERRORS"] or got["EXCEPTIONS"] or got["LINEERROR"] or not (got["CREATED"] or got["ALTERED"] or got["CANCELLED"] or got["DELETED"]):
-            raise SyncError("TallyPrime refused it: " + (got["LINEERROR"] or f"{got['ERRORS']} error(s), {got['EXCEPTIONS']} exception(s) "
-                                                                             "(Tally.imp in TallyPrime's folder says why)"))
+            raise SyncError(
+                "TallyPrime refused it: "
+                + (got["LINEERROR"] or f"{got['ERRORS']} error(s), {got['EXCEPTIONS']} exception(s) (Tally.imp in TallyPrime's folder says why)")
+            )
         return got
 
     def _export(self, kind, ident, statics="", tdl="", company=True):
-        return self.post(f"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>{kind}</TYPE><ID>{ident}</ID></HEADER>"
-                         f"<BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>{self._company() if company else ''}{statics}"
-                         f"</STATICVARIABLES>{tdl}</DESC></BODY></ENVELOPE>")
+        return self.post(
+            f"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>{kind}</TYPE><ID>{ident}</ID></HEADER>"
+            f"<BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>{self._company() if company else ''}{statics}"
+            f"</STATICVARIABLES>{tdl}</DESC></BODY></ENVELOPE>"
+        )
 
     def _collection(self, name, type_, fetch, company=True):
-        return self._export("Collection", name, tdl=f'<TDL><TDLMESSAGE><COLLECTION NAME="{name}" ISMODIFY="No"><TYPE>{type_}</TYPE>'
-                                                    f"<FETCH>{fetch}</FETCH></COLLECTION></TDLMESSAGE></TDL>", company=company)
+        return self._export(
+            "Collection",
+            name,
+            tdl=f'<TDL><TDLMESSAGE><COLLECTION NAME="{name}" ISMODIFY="No"><TYPE>{type_}</TYPE>'
+            f"<FETCH>{fetch}</FETCH></COLLECTION></TDLMESSAGE></TDL>",
+            company=company,
+        )
 
     def companies(self):
         """The companies open in TallyPrime (asked without naming one: a company that is not open would answer nothing)."""
@@ -182,6 +229,7 @@ class System(Connector):
             if p.get("address"):
                 extra += f'<ADDRESS.LIST TYPE="String">{_tag("ADDRESS", p["address"])}</ADDRESS.LIST><COUNTRYNAME>Pakistan</COUNTRYNAME>'
             return self._make_ledger(p["name"], "Sundry Creditors" if kind == "supplier" else "Sundry Debtors", extra)
+
         return once(b, self.name, "party", p["id"], make)
 
     def ledger(self, b, role):
@@ -201,6 +249,7 @@ class System(Connector):
                 return self._make_ledger(f"{side.title()} Sales Tax {rate}%", "Duties & Taxes")
             name, group = LEDGERS[role]
             return self._make_ledger(name, group)
+
         return once(b, self.name, "ledger", role, make)
 
     def unit(self, b, unit):
@@ -210,9 +259,13 @@ class System(Connector):
             hit = next((u for u in _names(self._collection("AIPCUnits", "Unit", "Name"), "UNIT") if u.lower() == name.lower()), None)
             if hit:
                 return hit
-            self._import(f'<UNIT NAME={quoteattr(name)} ACTION="Create">{_tag("NAME", name)}<ISSIMPLEUNIT>Yes</ISSIMPLEUNIT>'
-                         f"{_tag('ORIGINALNAME', formal)}<DECIMALPLACES>{places}</DECIMALPLACES></UNIT>", "All Masters")
+            self._import(
+                f'<UNIT NAME={quoteattr(name)} ACTION="Create">{_tag("NAME", name)}<ISSIMPLEUNIT>Yes</ISSIMPLEUNIT>'
+                f"{_tag('ORIGINALNAME', formal)}<DECIMALPLACES>{places}</DECIMALPLACES></UNIT>",
+                "All Masters",
+            )
             return name
+
         return once(b, self.name, "unit", name, make)
 
     def stock_item(self, b, ln):
@@ -223,9 +276,13 @@ class System(Connector):
             hit = next((x for x in have if x.lower() == ln["description"].lower()), None)
             if hit:
                 return hit
-            self._import(f'<STOCKITEM NAME={quoteattr(ln["description"])} ACTION="Create">{_tag("NAME", ln["description"])}{_tag("BASEUNITS", unit)}'
-                         "</STOCKITEM>", "All Masters")
+            self._import(
+                f'<STOCKITEM NAME={quoteattr(ln["description"])} ACTION="Create">{_tag("NAME", ln["description"])}{_tag("BASEUNITS", unit)}'
+                "</STOCKITEM>",
+                "All Masters",
+            )
             return ln["description"]
+
         return once(b, self.name, "item", ln["item_id"], make), unit
 
     # ---------------------------------------------------------------- vouchers
@@ -245,11 +302,13 @@ class System(Connector):
         q = escape(f"{Decimal(ln['qty']).normalize():f} {unit}")
         flag = "No" if paisa > 0 else "Yes"
         disc = f"<DISCOUNT>{str(ln['discount']).rstrip('%').strip()}</DISCOUNT>" if str(ln.get("discount") or "").endswith("%") else ""
-        return (f"<ALLINVENTORYENTRIES.LIST>{_tag('STOCKITEMNAME', item)}<ISDEEMEDPOSITIVE>{flag}</ISDEEMEDPOSITIVE>"
-                f"<RATE>{_amt(ln['rate'])}/{escape(unit)}</RATE>{disc}<ACTUALQTY>{q}</ACTUALQTY><BILLEDQTY>{q}</BILLEDQTY><AMOUNT>{_amt(paisa)}</AMOUNT>"
-                f"<BATCHALLOCATIONS.LIST><GODOWNNAME>Main Location</GODOWNNAME><BATCHNAME>Primary Batch</BATCHNAME><ACTUALQTY>{q}</ACTUALQTY>"
-                f"<BILLEDQTY>{q}</BILLEDQTY><AMOUNT>{_amt(paisa)}</AMOUNT></BATCHALLOCATIONS.LIST><ACCOUNTINGALLOCATIONS.LIST>{_tag('LEDGERNAME', ledger)}"
-                f"<ISDEEMEDPOSITIVE>{flag}</ISDEEMEDPOSITIVE><AMOUNT>{_amt(paisa)}</AMOUNT></ACCOUNTINGALLOCATIONS.LIST></ALLINVENTORYENTRIES.LIST>")
+        return (
+            f"<ALLINVENTORYENTRIES.LIST>{_tag('STOCKITEMNAME', item)}<ISDEEMEDPOSITIVE>{flag}</ISDEEMEDPOSITIVE>"
+            f"<RATE>{_amt(ln['rate'])}/{escape(unit)}</RATE>{disc}<ACTUALQTY>{q}</ACTUALQTY><BILLEDQTY>{q}</BILLEDQTY><AMOUNT>{_amt(paisa)}</AMOUNT>"
+            f"<BATCHALLOCATIONS.LIST><GODOWNNAME>Main Location</GODOWNNAME><BATCHNAME>Primary Batch</BATCHNAME><ACTUALQTY>{q}</ACTUALQTY>"
+            f"<BILLEDQTY>{q}</BILLEDQTY><AMOUNT>{_amt(paisa)}</AMOUNT></BATCHALLOCATIONS.LIST><ACCOUNTINGALLOCATIONS.LIST>{_tag('LEDGERNAME', ledger)}"
+            f"<ISDEEMEDPOSITIVE>{flag}</ISDEEMEDPOSITIVE><AMOUNT>{_amt(paisa)}</AMOUNT></ACCOUNTINGALLOCATIONS.LIST></ALLINVENTORYENTRIES.LIST>"
+        )
 
     @staticmethod
     def bill_name(doc):
@@ -265,8 +324,9 @@ class System(Connector):
         led, inv = {}, []
         for ln in doc["lines"]:
             code = bill_account(b, ln) if purchase else None
-            ledger = self.ledger(b, ("purchases" if code == "5000" else f"expense:{code}") if purchase else
-                                 ("services" if ln.get("kind") == "service" else "sales"))
+            ledger = self.ledger(
+                b, ("purchases" if code == "5000" else f"expense:{code}") if purchase else ("services" if ln.get("kind") == "service" else "sales")
+            )
             if ln.get("stock") and ln.get("item_id"):
                 inv.append(self.stock(b, ln, ledger, sign * ln["amount"]))
             else:
@@ -284,10 +344,12 @@ class System(Connector):
         n = doc["number"]
         vtype = VTYPE[doc["kind"]]
         rid = "aipc:" + self.creds["company"] + ":" + doc["kind"] + ":" + n  # the same voucher every time it is sent
-        x = (f'<VOUCHER REMOTEID={quoteattr(rid)} VCHTYPE={quoteattr(vtype)} ACTION="Create" '
-             f"OBJVIEW={quoteattr(view)}><DATE>{_day(doc['date'])}</DATE><EFFECTIVEDATE>{_day(doc['date'])}</EFFECTIVEDATE>{_tag('VOUCHERTYPENAME', vtype)}"
-             f"{_tag('VOUCHERNUMBER', n)}{_tag('REFERENCE', doc.get('ref') if doc['kind'] == 'bill' and doc.get('ref') else n)}"
-             f"{_tag('NARRATION', f'{narration} (AI PC {n})')}")
+        x = (
+            f'<VOUCHER REMOTEID={quoteattr(rid)} VCHTYPE={quoteattr(vtype)} ACTION="Create" '
+            f"OBJVIEW={quoteattr(view)}><DATE>{_day(doc['date'])}</DATE><EFFECTIVEDATE>{_day(doc['date'])}</EFFECTIVEDATE>{_tag('VOUCHERTYPENAME', vtype)}"
+            f"{_tag('VOUCHERNUMBER', n)}{_tag('REFERENCE', doc.get('ref') if doc['kind'] == 'bill' and doc.get('ref') else n)}"
+            f"{_tag('NARRATION', f'{narration} (AI PC {n})')}"
+        )
         if party:
             x += _tag("PARTYLEDGERNAME", party)
         x += _tag("PERSISTEDVIEW", view) + ("<ISINVOICE>Yes</ISINVOICE>" if view == "Invoice Voucher View" else "")
@@ -305,7 +367,11 @@ class System(Connector):
             else:
                 bills = [(doc["invoice"], "Agst Ref", -doc["total"], "")]
             body, view = self._goods(b, doc, party, bills)
-            what = {"invoice": "Sale", "bill": f"Purchase, their bill {doc.get('ref') or '-'}", "credit_note": f"Goods returned against {doc.get('invoice')}"}[k]
+            what = {
+                "invoice": "Sale",
+                "bill": f"Purchase, their bill {doc.get('ref') or '-'}",
+                "credit_note": f"Goods returned against {doc.get('invoice')}",
+            }[k]
             xml = self._voucher(doc, party, view, body, what)
         elif k in ("receipt", "payment"):
             rec = k == "receipt"
@@ -339,8 +405,12 @@ class System(Connector):
 
     # ---------------------------------------------------------------- reading back, cancelling
     def _find(self, doc):
-        root = self._export("Data", "Day Book", statics=f'<SVFROMDATE TYPE="Date">{_day(doc["date"])}</SVFROMDATE>'
-                                                       f'<SVTODATE TYPE="Date">{_day(doc["date"])}</SVTODATE><EXPLODEFLAG>Yes</EXPLODEFLAG>')
+        root = self._export(
+            "Data",
+            "Day Book",
+            statics=f'<SVFROMDATE TYPE="Date">{_day(doc["date"])}</SVFROMDATE>'
+            f'<SVTODATE TYPE="Date">{_day(doc["date"])}</SVTODATE><EXPLODEFLAG>Yes</EXPLODEFLAG>',
+        )
         for v in root.iter("VOUCHER"):
             if f"(AI PC {doc['number']})" in (v.findtext("NARRATION") or "") and (v.findtext("ISCANCELLED") or "No").strip() != "Yes":
                 return v
@@ -364,5 +434,8 @@ class System(Connector):
         d = dt.date.fromisoformat(doc["date"])
         day = f"{d.day:02d}-{MONTHS[d.month - 1]}-{d.year}"  # Tally's own date form here, in English whatever the PC's language
         note = f"Cancelled (AI PC {doc['number']})"
-        self._import(f'<VOUCHER DATE="{day}" TAGNAME="Voucher Number" TAGVALUE={quoteattr(vch)} VCHTYPE={quoteattr(VTYPE[doc["kind"]])} '
-                     f'ACTION="Cancel">{_tag("NARRATION", note)}</VOUCHER>', "Vouchers")
+        self._import(
+            f'<VOUCHER DATE="{day}" TAGNAME="Voucher Number" TAGVALUE={quoteattr(vch)} VCHTYPE={quoteattr(VTYPE[doc["kind"]])} '
+            f'ACTION="Cancel">{_tag("NARRATION", note)}</VOUCHER>',
+            "Vouchers",
+        )

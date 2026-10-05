@@ -6,6 +6,7 @@ together.
   rc, out, err, timed_out = run([exe, "-o", "score.pdf", "score.mscz"], timeout=120)
   where_am_i()   # the name of the desktop a program started here really runs on (a self-check that shows nothing)
 """
+
 import ctypes
 import msvcrt
 import os
@@ -25,11 +26,26 @@ JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000
 
 
 class STARTUPINFOW(ctypes.Structure):
-    _fields_ = [("cb", wintypes.DWORD), ("lpReserved", wintypes.LPWSTR), ("lpDesktop", wintypes.LPWSTR), ("lpTitle", wintypes.LPWSTR),
-                ("dwX", wintypes.DWORD), ("dwY", wintypes.DWORD), ("dwXSize", wintypes.DWORD), ("dwYSize", wintypes.DWORD),
-                ("dwXCountChars", wintypes.DWORD), ("dwYCountChars", wintypes.DWORD), ("dwFillAttribute", wintypes.DWORD),
-                ("dwFlags", wintypes.DWORD), ("wShowWindow", wintypes.WORD), ("cbReserved2", wintypes.WORD), ("lpReserved2", ctypes.c_void_p),
-                ("hStdInput", wintypes.HANDLE), ("hStdOutput", wintypes.HANDLE), ("hStdError", wintypes.HANDLE)]
+    _fields_ = [
+        ("cb", wintypes.DWORD),
+        ("lpReserved", wintypes.LPWSTR),
+        ("lpDesktop", wintypes.LPWSTR),
+        ("lpTitle", wintypes.LPWSTR),
+        ("dwX", wintypes.DWORD),
+        ("dwY", wintypes.DWORD),
+        ("dwXSize", wintypes.DWORD),
+        ("dwYSize", wintypes.DWORD),
+        ("dwXCountChars", wintypes.DWORD),
+        ("dwYCountChars", wintypes.DWORD),
+        ("dwFillAttribute", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("wShowWindow", wintypes.WORD),
+        ("cbReserved2", wintypes.WORD),
+        ("lpReserved2", ctypes.c_void_p),
+        ("hStdInput", wintypes.HANDLE),
+        ("hStdOutput", wintypes.HANDLE),
+        ("hStdError", wintypes.HANDLE),
+    ]
 
 
 class PROCESS_INFORMATION(ctypes.Structure):
@@ -37,25 +53,48 @@ class PROCESS_INFORMATION(ctypes.Structure):
 
 
 class IO_COUNTERS(ctypes.Structure):
-    _fields_ = [(n, ctypes.c_ulonglong) for n in ("ReadOperationCount", "WriteOperationCount", "OtherOperationCount", "ReadTransferCount",
-                                                  "WriteTransferCount", "OtherTransferCount")]
+    _fields_ = [
+        (n, ctypes.c_ulonglong)
+        for n in ("ReadOperationCount", "WriteOperationCount", "OtherOperationCount", "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")
+    ]
 
 
 class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
-    _fields_ = [("PerProcessUserTimeLimit", ctypes.c_longlong), ("PerJobUserTimeLimit", ctypes.c_longlong), ("LimitFlags", wintypes.DWORD),
-                ("MinimumWorkingSetSize", ctypes.c_size_t), ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
-                ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD)]
+    _fields_ = [
+        ("PerProcessUserTimeLimit", ctypes.c_longlong),
+        ("PerJobUserTimeLimit", ctypes.c_longlong),
+        ("LimitFlags", wintypes.DWORD),
+        ("MinimumWorkingSetSize", ctypes.c_size_t),
+        ("MaximumWorkingSetSize", ctypes.c_size_t),
+        ("ActiveProcessLimit", wintypes.DWORD),
+        ("Affinity", ctypes.c_size_t),
+        ("PriorityClass", wintypes.DWORD),
+        ("SchedulingClass", wintypes.DWORD),
+    ]
 
 
 class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
-    _fields_ = [("BasicLimitInformation", JOBOBJECT_BASIC_LIMIT_INFORMATION), ("IoInfo", IO_COUNTERS), ("ProcessMemoryLimit", ctypes.c_size_t),
-                ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+    _fields_ = [
+        ("BasicLimitInformation", JOBOBJECT_BASIC_LIMIT_INFORMATION),
+        ("IoInfo", IO_COUNTERS),
+        ("ProcessMemoryLimit", ctypes.c_size_t),
+        ("JobMemoryLimit", ctypes.c_size_t),
+        ("PeakProcessMemoryUsed", ctypes.c_size_t),
+        ("PeakJobMemoryUsed", ctypes.c_size_t),
+    ]
 
 
 class JOBOBJECT_BASIC_ACCOUNTING_INFORMATION(ctypes.Structure):
-    _fields_ = [("TotalUserTime", ctypes.c_longlong), ("TotalKernelTime", ctypes.c_longlong), ("ThisPeriodTotalUserTime", ctypes.c_longlong),
-                ("ThisPeriodTotalKernelTime", ctypes.c_longlong), ("TotalPageFaultCount", wintypes.DWORD), ("TotalProcesses", wintypes.DWORD),
-                ("ActiveProcesses", wintypes.DWORD), ("TotalTerminatedProcesses", wintypes.DWORD)]
+    _fields_ = [
+        ("TotalUserTime", ctypes.c_longlong),
+        ("TotalKernelTime", ctypes.c_longlong),
+        ("ThisPeriodTotalUserTime", ctypes.c_longlong),
+        ("ThisPeriodTotalKernelTime", ctypes.c_longlong),
+        ("TotalPageFaultCount", wintypes.DWORD),
+        ("TotalProcesses", wintypes.DWORD),
+        ("ActiveProcesses", wintypes.DWORD),
+        ("TotalTerminatedProcesses", wintypes.DWORD),
+    ]
 
 
 user32.CreateDesktopW.restype = wintypes.HANDLE
@@ -65,8 +104,18 @@ user32.OpenDesktopW.restype = wintypes.HANDLE
 user32.OpenDesktopW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
 user32.EnumDesktopWindows.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.LPARAM]
 user32.EnumChildWindows.argtypes = [wintypes.HWND, ctypes.c_void_p, wintypes.LPARAM]
-kernel32.CreateProcessW.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, ctypes.c_void_p, ctypes.c_void_p, wintypes.BOOL, wintypes.DWORD,
-                                    ctypes.c_void_p, wintypes.LPCWSTR, ctypes.POINTER(STARTUPINFOW), ctypes.POINTER(PROCESS_INFORMATION)]
+kernel32.CreateProcessW.argtypes = [
+    wintypes.LPCWSTR,
+    wintypes.LPWSTR,
+    ctypes.c_void_p,
+    ctypes.c_void_p,
+    wintypes.BOOL,
+    wintypes.DWORD,
+    ctypes.c_void_p,
+    wintypes.LPCWSTR,
+    ctypes.POINTER(STARTUPINFOW),
+    ctypes.POINTER(PROCESS_INFORMATION),
+]
 kernel32.CreateJobObjectW.restype = wintypes.HANDLE
 kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
 kernel32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
@@ -89,6 +138,7 @@ def _active(job):
 def _settle(job, grace=3.0):
     """Let helpers the program started (crash reporters and the like) finish, then end any still running; wait until all are gone."""
     import time
+
     end = time.monotonic() + grace
     while _active(job) and time.monotonic() < end:
         time.sleep(0.1)
@@ -131,8 +181,21 @@ class Proc:
             block = ctypes.create_unicode_buffer(text, len(text))
         line = ctypes.create_unicode_buffer(subprocess.list2cmdline([str(c) for c in cmd]))
         try:
-            _check(kernel32.CreateProcessW(None, line, None, None, True, CREATE_SUSPENDED | CREATE_NO_WINDOW | (CREATE_UNICODE_ENVIRONMENT if block else 0),
-                                           block, str(cwd) if cwd else None, ctypes.byref(si), ctypes.byref(self.pi)), "CreateProcess")
+            _check(
+                kernel32.CreateProcessW(
+                    None,
+                    line,
+                    None,
+                    None,
+                    True,
+                    CREATE_SUSPENDED | CREATE_NO_WINDOW | (CREATE_UNICODE_ENVIRONMENT if block else 0),
+                    block,
+                    str(cwd) if cwd else None,
+                    ctypes.byref(si),
+                    ctypes.byref(self.pi),
+                ),
+                "CreateProcess",
+            )
             _check(kernel32.AssignProcessToJobObject(self.job, self.pi.hProcess), "AssignProcessToJobObject")
         except OSError:
             self.stop()
@@ -168,6 +231,7 @@ class Proc:
         out = (self.tmp / "out.txt").read_bytes().decode("utf-8", "replace")
         err = (self.tmp / "err.txt").read_bytes().decode("utf-8", "replace")
         import shutil
+
         shutil.rmtree(self.tmp, ignore_errors=True)
         self.done, self.result = True, (code.value, out, err)
         return self.result
@@ -209,9 +273,11 @@ def windows(pid=None):
                     if b.value.strip():
                         texts.append(b.value.strip())
                     return True
+
                 user32.EnumChildWindows(hwnd, proc(child), 0)
                 found.append((title.value, cls.value, owner.value, texts))
         return True
+
     user32.EnumDesktopWindows(desk, proc(each), 0)
     user32.CloseDesktop(desk)
     return found
@@ -220,8 +286,11 @@ def windows(pid=None):
 def where_am_i():
     """Start a small program on the hidden desktop that only prints the name of the desktop it is on (it shows nothing)."""
     import sys
-    probe = ("import ctypes; from ctypes import wintypes; u = ctypes.windll.user32; "
-             "h = u.GetThreadDesktop(ctypes.windll.kernel32.GetCurrentThreadId()); b = ctypes.create_unicode_buffer(256); "
-             "n = wintypes.DWORD(); u.GetUserObjectInformationW(h, 2, b, 512, ctypes.byref(n)); print(b.value)")
+
+    probe = (
+        "import ctypes; from ctypes import wintypes; u = ctypes.windll.user32; "
+        "h = u.GetThreadDesktop(ctypes.windll.kernel32.GetCurrentThreadId()); b = ctypes.create_unicode_buffer(256); "
+        "n = wintypes.DWORD(); u.GetUserObjectInformationW(h, 2, b, 512, ctypes.byref(n)); print(b.value)"
+    )
     rc, out, err, _ = run([sys.executable, "-c", probe], timeout=30)
     return out.strip()

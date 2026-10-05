@@ -7,6 +7,7 @@ The page measures itself (MEASURE): text in a box with data-fit shrinks until it
 every element with data-role reports its box, type size, colour, outline, whether it still overflows, and whether
 the fonts it asks for are on this PC.
 """
+
 import json
 import re
 import time
@@ -75,6 +76,7 @@ def prepare(spec, folder):
 
     from ai_pc.photo import analyze as A
     from ai_pc.photo import ops as PO
+
     im = ImageOps.exif_transpose(Image.open(img))
     im.load()
     info = {"faces": [(f["box"][0] / im.width, f["box"][1] / im.height, f["box"][2] / im.width, f["box"][3] / im.height) for f in A.faces(im)]}
@@ -134,6 +136,7 @@ def render(spec, folder, stem, pdf=True, bg=True):
     from concurrent.futures import ThreadPoolExecutor
 
     from PIL import Image
+
     t0 = time.perf_counter()
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
@@ -148,8 +151,10 @@ def render(spec, folder, stem, pdf=True, bg=True):
     sc = _scale(spec)
     all_png, all_bg = folder / f"{stem}_all.png", folder / f"{stem}_all_bg.png"
     pdf_path = folder / f"{stem}.pdf" if pdf and KINDS[spec["kind"]]["unit"] == "mm" else None
-    jobs = {"dom": lambda: headless.dom(hp, wait_ms=2500, lane="measure"),
-            "png": lambda: headless.png(hp, all_png, win, scale=sc, wait_ms=2500, lane="picture")}
+    jobs = {
+        "dom": lambda: headless.dom(hp, wait_ms=2500, lane="measure"),
+        "png": lambda: headless.png(hp, all_png, win, scale=sc, wait_ms=2500, lane="picture"),
+    }
     if bg:
         jobs["bg"] = lambda: headless.png(bp, all_bg, win, scale=1, wait_ms=2500, lane="ground")
     if pdf_path:
@@ -208,7 +213,10 @@ def _join(pages):
             if sel.startswith(":root") or sel in ("html,body", "body", "*"):
                 scoped.append(f"{sel}{{{decl}}}" if i == 0 else "")
             else:
-                scoped.append(",".join(f".p{i} {s.strip()}" if not s.strip().startswith(".page") else f".p{i}{s.strip()}" for s in sel.split(",")) + f"{{{decl}}}")
+                scoped.append(
+                    ",".join(f".p{i} {s.strip()}" if not s.strip().startswith(".page") else f".p{i}{s.strip()}" for s in sel.split(","))
+                    + f"{{{decl}}}"
+                )
         page_rule = re.search(r"@page\{[^}]*\}", css).group(0)
         heads.append(("" if i else page_rule) + "".join(scoped))
         bodies.append(body.replace("<div class='page'", f"<div class='page p{i}'", 1))

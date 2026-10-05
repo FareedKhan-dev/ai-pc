@@ -9,6 +9,7 @@
   model(params, folder, name)            someone's 3D file measured, pictured, converted and opened again
 Each returns {"outputs": {...}, "checks": [...], "notes": [...], "seconds", "engine", ...}.
 """
+
 import shutil
 import time
 from pathlib import Path
@@ -56,8 +57,21 @@ def _frames_dir(folder, name):
 
 
 # ---------------------------------------------------------------- houses
-def house(lay, folder, name, views=("plan3d", "front"), style="modern", storey="ground", furniture=True, labels=True, quality="normal",
-          colors=None, log=print, seconds=6, big=False):
+def house(
+    lay,
+    folder,
+    name,
+    views=("plan3d", "front"),
+    style="modern",
+    storey="ground",
+    furniture=True,
+    labels=True,
+    quality="normal",
+    colors=None,
+    log=print,
+    seconds=6,
+    big=False,
+):
     t0 = time.time()
     folder = Path(folder).resolve()
     folder.mkdir(parents=True, exist_ok=True)
@@ -90,8 +104,16 @@ def house(lay, folder, name, views=("plan3d", "front"), style="modern", storey="
             outputs[v["kind"]] = v["path"]
     _tidy(folder, name, [v["mask"] for v in vs])
     eng = sorted({e.get("engine", "") for e in res["views"].values()})
-    return {"outputs": outputs, "checks": checks, "notes": [], "seconds": round(time.time() - t0, 1), "engine": ", ".join(eng),
-            "blend": spec["blend"], "storey": storey, "render_s": {k: v.get("render_s") for k, v in res["views"].items()}}
+    return {
+        "outputs": outputs,
+        "checks": checks,
+        "notes": [],
+        "seconds": round(time.time() - t0, 1),
+        "engine": ", ".join(eng),
+        "blend": spec["blend"],
+        "storey": storey,
+        "render_s": {k: v.get("render_s") for k, v in res["views"].items()},
+    }
 
 
 def model_checks(spec, lay, res):
@@ -101,6 +123,7 @@ def model_checks(spec, lay, res):
 
     def ck(what, ok, detail="", level="fail"):
         out.append({"what": what, "ok": bool(ok), "level": "info" if ok else level, "detail": detail})
+
     storeys = [("ground", lay)] + ([("first", lay["upper"])] if lay.get("upper") else [])
     for nm, fl in storeys:
         floors = {b["n"] for b in boxes if b["c"] == f"out_{nm}_floors" and "_bath" not in b["n"]}
@@ -123,27 +146,73 @@ def text(p, folder, name, log=print):
     folder = Path(folder).resolve()
     folder.mkdir(parents=True, exist_ok=True)
     big = p.get("big")
-    spec = {"text": p["text"], "sub": p.get("sub"), "material": p.get("material", "gold"), "background": p.get("background", "dark"),
-            "anim": p.get("anim", "dolly"), "seconds": float(p.get("seconds", 5)), "fps": 30, "w": 2560 if big else 1920, "h": 1440 if big else 1080,
-            "logo": p.get("logo"), "frames_dir": str(_frames_dir(folder, name)), "still": str(folder / f"{name}_title.png"),
-            "mask": str(folder / f"{name}_title_mask.png"), "samples": 64 if p.get("quality") == "high" else 24}
+    spec = {
+        "text": p["text"],
+        "sub": p.get("sub"),
+        "material": p.get("material", "gold"),
+        "background": p.get("background", "dark"),
+        "anim": p.get("anim", "dolly"),
+        "seconds": float(p.get("seconds", 5)),
+        "fps": 30,
+        "w": 2560 if big else 1920,
+        "h": 1440 if big else 1080,
+        "logo": p.get("logo"),
+        "frames_dir": str(_frames_dir(folder, name)),
+        "still": str(folder / f"{name}_title.png"),
+        "mask": str(folder / f"{name}_title_mask.png"),
+        "samples": 64 if p.get("quality") == "high" else 24,
+    }
     res = B.run("text_scene.py", spec, folder, log=log, name=name)
     mp4 = folder / f"{name}_intro.mp4"
-    checks = _video_from(spec["frames_dir"], mp4, res["frames"], res["fps"], dark_ok=spec["background"] in ("dark", "black", "navy", "blue", "red",
-                                                                                                             "green", "purple", "gradient"))
-    checks += [c for c in K.view_checks("last frame", res, spec["still"], spec["mask"]) if not (c["what"].endswith("exposure") and spec["background"] != "white")]
+    checks = _video_from(
+        spec["frames_dir"],
+        mp4,
+        res["frames"],
+        res["fps"],
+        dark_ok=spec["background"] in ("dark", "black", "navy", "blue", "red", "green", "purple", "gradient"),
+    )
+    checks += [
+        c
+        for c in K.view_checks("last frame", res, spec["still"], spec["mask"])
+        if not (c["what"].endswith("exposure") and spec["background"] != "white")
+    ]
     pc = K.picture(spec["still"])
-    checks.append({"what": "the title is lit", "ok": pc["clip_hi"] + pc["std"] > 0.06, "level": "info" if pc["clip_hi"] + pc["std"] > 0.06 else "warn",
-                   "detail": f"contrast {pc['std']:.2f}"})
+    checks.append(
+        {
+            "what": "the title is lit",
+            "ok": pc["clip_hi"] + pc["std"] > 0.06,
+            "level": "info" if pc["clip_hi"] + pc["std"] > 0.06 else "warn",
+            "detail": f"contrast {pc['std']:.2f}",
+        }
+    )
     s = K.silhouette(spec["mask"])
     if s["bbox"]:
         cx, wide = (s["bbox"][0] + s["bbox"][2]) / 2, s["bbox"][2] - s["bbox"][0]
-        checks.append({"what": "the title is in the middle", "ok": abs(cx - 0.5) < 0.08, "level": "info" if abs(cx - 0.5) < 0.08 else "warn",
-                       "detail": f"its centre {cx:.2f} across"})
-        checks.append({"what": "the title is big enough to read", "ok": wide > 0.35, "level": "info" if wide > 0.35 else "warn", "detail": f"{wide:.0%} of the width"})
+        checks.append(
+            {
+                "what": "the title is in the middle",
+                "ok": abs(cx - 0.5) < 0.08,
+                "level": "info" if abs(cx - 0.5) < 0.08 else "warn",
+                "detail": f"its centre {cx:.2f} across",
+            }
+        )
+        checks.append(
+            {
+                "what": "the title is big enough to read",
+                "ok": wide > 0.35,
+                "level": "info" if wide > 0.35 else "warn",
+                "detail": f"{wide:.0%} of the width",
+            }
+        )
     _tidy(folder, name, [spec["mask"]])
-    return {"outputs": {"video": str(mp4), "still": spec["still"]}, "checks": checks, "notes": [], "seconds": round(time.time() - t0, 1),
-            "engine": "EEVEE", "font": res.get("font")}
+    return {
+        "outputs": {"video": str(mp4), "still": spec["still"]},
+        "checks": checks,
+        "notes": [],
+        "seconds": round(time.time() - t0, 1),
+        "engine": "EEVEE",
+        "font": res.get("font"),
+    }
 
 
 # ---------------------------------------------------------------- mockups
@@ -151,6 +220,7 @@ def _region_colour(png, quad):
     """The mean colour, its spread and the share of the frame inside a quad (0-1 frame coordinates, y up)."""
     import numpy as np
     from PIL import Image, ImageDraw
+
     im = Image.open(png).convert("RGB")
     w, h = im.size
     m = Image.new("L", (w, h), 0)
@@ -169,13 +239,16 @@ def picture_match(render_png, quad, source_png, u_range=(0.0, 1.0), v_range=(0.0
     -> (match, match_if_mirrored); None when the picture is too plain to tell."""
     import cv2
     import numpy as np
+
     src = cv2.imread(str(source_png), cv2.IMREAD_GRAYSCALE)
     img = cv2.imread(str(render_png), cv2.IMREAD_GRAYSCALE)
     if src is None or img is None:
         return None
     h0, w0 = src.shape  # the part of the picture the face shows (v runs up, image rows down)
-    src = src[int(h0 * (1 - v_range[1])):max(int(h0 * (1 - v_range[1])) + 2, int(h0 * (1 - v_range[0]))),
-              int(w0 * u_range[0]):max(int(w0 * u_range[0]) + 2, int(w0 * u_range[1]))]
+    src = src[
+        int(h0 * (1 - v_range[1])) : max(int(h0 * (1 - v_range[1])) + 2, int(h0 * (1 - v_range[0]))),
+        int(w0 * u_range[0]) : max(int(w0 * u_range[0]) + 2, int(w0 * u_range[1])),
+    ]
     w, h = 192, max(16, int(192 * src.shape[0] / max(src.shape[1], 1)))
     src = cv2.resize(src, (w, h), interpolation=cv2.INTER_AREA)
     H, W = img.shape
@@ -191,6 +264,7 @@ def picture_match(render_png, quad, source_png, u_range=(0.0, 1.0), v_range=(0.0
         a, b = a - a.mean(), b - b.mean()
         d = float(np.sqrt((a * a).sum() * (b * b).sum()))
         return float((a * b).sum() / d) if d > 1e-6 else 0.0
+
     es = edges(src)
     if es.std() < 2.0:
         return None
@@ -203,13 +277,22 @@ def mockup(p, folder, name, log=print):
     balance seen there is the picture's (light changes brightness, not balance)."""
     import numpy as np
     from PIL import Image
+
     t0 = time.time()
     folder = Path(folder).resolve()
     folder.mkdir(parents=True, exist_ok=True)
     big = p.get("big")
-    spec = {"kind": p["kind"], "images": [str(Path(x).resolve()) for x in p.get("images") or []], "size": p.get("size"),
-            "still": str(folder / f"{name}_{p['kind']}.png"), "mask": str(folder / f"{name}_{p['kind']}_mask.png"), "w": 2400 if big else 1600,
-            "h": 1800 if big else 1200, "engine": "cycles" if p.get("quality") == "high" else "eevee", "samples": 128 if p.get("quality") == "high" else 64}
+    spec = {
+        "kind": p["kind"],
+        "images": [str(Path(x).resolve()) for x in p.get("images") or []],
+        "size": p.get("size"),
+        "still": str(folder / f"{name}_{p['kind']}.png"),
+        "mask": str(folder / f"{name}_{p['kind']}_mask.png"),
+        "w": 2400 if big else 1600,
+        "h": 1800 if big else 1200,
+        "engine": "cycles" if p.get("quality") == "high" else "eevee",
+        "samples": 128 if p.get("quality") == "high" else 64,
+    }
     if p.get("turn"):
         spec["az"] = MOCK_ANGLE[p["kind"]] + p["turn"]
     res = B.run("mockup_scene.py", spec, folder, log=log, name=name)
@@ -217,33 +300,64 @@ def mockup(p, folder, name, log=print):
     quad = res.get("picture_quad")
     if spec["images"] and quad:
         facing = res.get("facing") or 0
-        checks.append({"what": "the picture faces the camera", "ok": facing > 0.15, "level": "info" if facing > 0.15 else "fail", "detail": f"{facing:.2f}"})
+        checks.append(
+            {"what": "the picture faces the camera", "ok": facing > 0.15, "level": "info" if facing > 0.15 else "fail", "detail": f"{facing:.2f}"}
+        )
         mean, spread, share = _region_colour(spec["still"], quad)
         if mean is not None:  # the print keeps its own tones: compared with the same part of the picture, not with a fixed range
             lum = float(mean @ np.array([0.2126, 0.7152, 0.0722]))
             ur, vr = res.get("u_range", (0.0, 1.0)), res.get("v_range", (0.0, 1.0))
             sim = np.asarray(Image.open(spec["images"][0]).convert("RGB")).astype(np.float32) / 255
             hh_, ww_ = sim.shape[:2]
-            part = sim[int(hh_ * (1 - vr[1])):max(int(hh_ * (1 - vr[1])) + 1, int(hh_ * (1 - vr[0]))), int(ww_ * ur[0]):max(int(ww_ * ur[0]) + 1, int(ww_ * ur[1]))]
+            part = sim[
+                int(hh_ * (1 - vr[1])) : max(int(hh_ * (1 - vr[1])) + 1, int(hh_ * (1 - vr[0]))),
+                int(ww_ * ur[0]) : max(int(ww_ * ur[0]) + 1, int(ww_ * ur[1])),
+            ]
             own = float(part.reshape(-1, 3).mean(axis=0) @ np.array([0.2126, 0.7152, 0.0722]))
             fine = abs(lum - own) < 0.22 or (own > 0.85 and lum > 0.75)
-            checks.append({"what": "the picture is well lit", "ok": fine, "level": "info" if fine else "warn",
-                           "detail": f"brightness {lum:.2f} on it (the picture itself {own:.2f})"})
+            checks.append(
+                {
+                    "what": "the picture is well lit",
+                    "ok": fine,
+                    "level": "info" if fine else "warn",
+                    "detail": f"brightness {lum:.2f} on it (the picture itself {own:.2f})",
+                }
+            )
             src = np.asarray(Image.open(spec["images"][0]).convert("RGB").resize((64, 64))).astype(np.float32) / 255
             want = src.reshape(-1, 3).mean(axis=0)
             gap = float(np.abs(mean / max(float(mean.mean()), 1e-3) - want / max(float(want.mean()), 1e-3)).max())
             ok = share >= 0.03 and gap < 0.6 and (spread > 0.02 or float(src.std()) < 0.03)
-            checks.append({"what": "the picture shows on it", "ok": ok, "level": "info" if ok else "fail",
-                           "detail": f"{share:.0%} of the frame, colour balance off by {gap:.2f}"})
+            checks.append(
+                {
+                    "what": "the picture shows on it",
+                    "ok": ok,
+                    "level": "info" if ok else "fail",
+                    "detail": f"{share:.0%} of the frame, colour balance off by {gap:.2f}",
+                }
+            )
         m = picture_match(spec["still"], quad, spec["images"][0], res.get("u_range", (0.0, 1.0)), res.get("v_range", (0.0, 1.0)))
         if m:
             same, mirrored = m
             good = same >= 0.3 and same > mirrored + 0.03
-            checks.append({"what": "the picture is the right way round and matches", "ok": good, "level": "info" if good else "fail",
-                           "detail": f"match {same:.2f}, mirrored {mirrored:.2f}"})
+            checks.append(
+                {
+                    "what": "the picture is the right way round and matches",
+                    "ok": good,
+                    "level": "info" if good else "fail",
+                    "detail": f"match {same:.2f}, mirrored {mirrored:.2f}",
+                }
+            )
     _tidy(folder, name, [spec["mask"]])
-    return {"outputs": {p["kind"]: spec["still"]}, "checks": checks, "notes": [], "seconds": round(time.time() - t0, 1),
-            "engine": "Cycles" if spec["engine"] == "cycles" else "EEVEE", "quad": quad, "u_range": res.get("u_range"), "v_range": res.get("v_range")}
+    return {
+        "outputs": {p["kind"]: spec["still"]},
+        "checks": checks,
+        "notes": [],
+        "seconds": round(time.time() - t0, 1),
+        "engine": "Cycles" if spec["engine"] == "cycles" else "EEVEE",
+        "quad": quad,
+        "u_range": res.get("u_range"),
+        "v_range": res.get("v_range"),
+    }
 
 
 # ---------------------------------------------------------------- 3D files
@@ -253,7 +367,14 @@ def model(p, folder, name, log=print):
     folder.mkdir(parents=True, exist_ok=True)
     views = []
     for kind in p.get("views") or ["three_quarter"]:
-        v = {"name": kind, "kind": kind, "w": 1600, "h": 1200, "path": str(folder / f"{name}_{kind}.png"), "mask": str(folder / f"{name}_{kind}_mask.png")}
+        v = {
+            "name": kind,
+            "kind": kind,
+            "w": 1600,
+            "h": 1200,
+            "path": str(folder / f"{name}_{kind}.png"),
+            "mask": str(folder / f"{name}_{kind}_mask.png"),
+        }
         if kind == "orbit":
             v.update(w=1280, h=960, frames=int(float(p.get("seconds", 5)) * 30), fps=30, frames_dir=str(_frames_dir(folder, name)), samples=24)
         views.append(v)
@@ -276,10 +397,22 @@ def model(p, folder, name, log=print):
         st2 = res["export"]["stats"]
         same = abs(st2["triangles"] - st["triangles"]) <= max(2, st["triangles"] * 0.01)
         ratio = max(st2["size_m"]) / max(max(st["size_m"]), 1e-9)
-        checks.append({"what": f"saved as {p['export'].upper()} and opened again: same shape", "ok": same, "level": "info" if same else "fail",
-                       "detail": f"{st2['triangles']:,} triangles (was {st['triangles']:,})"})
-        checks.append({"what": f"saved as {p['export'].upper()}: same size", "ok": 0.98 < ratio < 1.02, "level": "info" if 0.98 < ratio < 1.02 else "warn",
-                       "detail": f"x{ratio:.3g}"})
+        checks.append(
+            {
+                "what": f"saved as {p['export'].upper()} and opened again: same shape",
+                "ok": same,
+                "level": "info" if same else "fail",
+                "detail": f"{st2['triangles']:,} triangles (was {st['triangles']:,})",
+            }
+        )
+        checks.append(
+            {
+                "what": f"saved as {p['export'].upper()}: same size",
+                "ok": 0.98 < ratio < 1.02,
+                "level": "info" if 0.98 < ratio < 1.02 else "warn",
+                "detail": f"x{ratio:.3g}",
+            }
+        )
         outputs["export"] = res["export"]["path"]
     _tidy(folder, name, [v["mask"] for v in spec["views"]])
     return {"outputs": outputs, "checks": checks, "stats": st, "notes": [], "seconds": round(time.time() - t0, 1), "engine": "EEVEE"}

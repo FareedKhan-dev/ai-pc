@@ -9,6 +9,7 @@ versions / compare / export, questions, the cheap model for what the rules canno
 Every version is rendered by PowerPoint in the background; the slides that changed are measured (text taller than its box
 is an overflow) and the reply says so.
 """
+
 import json
 import re
 import shutil
@@ -23,9 +24,15 @@ from ai_pc.office import pptx_ops as PO
 from ai_pc.office import render as RN
 from ai_pc.office.docchat import CHATS, QUESTION, DocChat
 
-LAYOUT_WORDS = [("chart", r"\bchart|graph\b"), ("agenda", r"\bagenda\b"), ("quote", r"\bquote\b"), ("closing", r"\b(?:thank you|thanks|closing|q ?& ?a|questions)\b"),
-                ("comparison", r"\b(?:comparison|compare|vs\.?|versus|pros and cons|before and after)\b"), ("process", r"\b(?:steps|process|timeline|how to|roadmap)\b"),
-                ("stats", r"\b(?:stats|statistics|numbers|kpis?|key figures|at a glance)\b")]
+LAYOUT_WORDS = [
+    ("chart", r"\bchart|graph\b"),
+    ("agenda", r"\bagenda\b"),
+    ("quote", r"\bquote\b"),
+    ("closing", r"\b(?:thank you|thanks|closing|q ?& ?a|questions)\b"),
+    ("comparison", r"\b(?:comparison|compare|vs\.?|versus|pros and cons|before and after)\b"),
+    ("process", r"\b(?:steps|process|timeline|how to|roadmap)\b"),
+    ("stats", r"\b(?:stats|statistics|numbers|kpis?|key figures|at a glance)\b"),
+]
 DECK_SYSTEM = """You turn a client's request about their PowerPoint deck into edit operations for a program. Reply with ONE JSON
 object: {"ops": [...], "ask": "<short question back, only if it cannot be done as asked>", "answer": "<only if it was a question>"}.
 Operations (slides are numbered from 1; T = {"kind": "slide", "n": 3} | {"kind": "slides", "ns": [2, 5]} | {"kind": "all"} |
@@ -58,8 +65,9 @@ def slides_in(c, m):
         k = m["count"] if w == "last" else P.ORD.get(w) or int(re.sub(r"\D", "", w) or 1)
         return ([k] if 1 <= k <= m["count"] else []), "slides"
     if re.search(r"\b(?:title|cover|opening) slide\b", c):
-        ks = [s["n"] for s in m["slides"] if s.get("cover")] or \
-             [s["n"] for s in m["slides"] if m["title"] and s["title"].strip().lower() == m["title"].strip().lower()]
+        ks = [s["n"] for s in m["slides"] if s.get("cover")] or [
+            s["n"] for s in m["slides"] if m["title"] and s["title"].strip().lower() == m["title"].strip().lower()
+        ]
         return ks[:1] or [1], "slides"
     if re.search(r"\b(?:thank you|thanks|closing|final|end|last) slide\b", c):
         ks = [s["n"] for s in m["slides"] if re.search(r"\bthank|\bquestions?\b|q ?& ?a|شکریہ", s["title"], re.I)]
@@ -83,11 +91,20 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
     q = P.quoted(raw)
     cm = P.QUOTE.sub(" QQ ", c)
     ns, how = slides_in(cm, m)
-    named = [int(x) for x in re.findall(r"\bslides?\s+(\d+)", cm)] + [int(x) for x in re.findall(r"\bslides?\s+\d+\s*(?:-|to|through|,|and|&)\s*(\d+)", cm)]
+    named = [int(x) for x in re.findall(r"\bslides?\s+(\d+)", cm)] + [
+        int(x) for x in re.findall(r"\bslides?\s+\d+\s*(?:-|to|through|,|and|&)\s*(\d+)", cm)
+    ]
     gone = [k for k in named if not 1 <= k <= m["count"]]
     if gone:
         return {"ops": [], "focus": focus, "ask": f"The deck has {m['count']} slides; there is no slide {gone[0]}."}
-    if not ns and re.search(r"\b(?:it|its|this|them|their|these|those)\b|\bthe (?:copy|duplicate|new (?:one|slide))\b|\bthat\b(?!\s+(?:is|are|was|were|does|do|doesn'?t|don'?t|did|didn'?t|has|have|had|can|can'?t|could|will|won'?t|would|should|not|fits?|says?|shows?|i|you|we|they|the|a|an)\b)", cm) and focus:
+    if (
+        not ns
+        and re.search(
+            r"\b(?:it|its|this|them|their|these|those)\b|\bthe (?:copy|duplicate|new (?:one|slide))\b|\bthat\b(?!\s+(?:is|are|was|were|does|do|doesn'?t|don'?t|did|didn'?t|has|have|had|can|can'?t|could|will|won'?t|would|should|not|fits?|says?|shows?|i|you|we|they|the|a|an)\b)",
+            cm,
+        )
+        and focus
+    ):
         ns, how = list(focus.get("ns") or []), "slides"
     # "and make the titles blue" after "delete slide 4": every title, not slide 4's
     if not ns and carry and focus and not re.search(r"\b(?:titles|headings|subtitles|all (?:the )?(?:text|bullets)|every\w*|background)\b", cm):
@@ -100,14 +117,18 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
     def done(*ops):
         out["ops"] = [dict(o, _fresh=True) for o in ops] if fresh else list(ops)
         return out
+
     # slides: delete, move, swap, duplicate, add
     if remove and re.search(r"\bslides?\b", c) and ns and not re.search(r"\bbullet|notes?\b|\bbackground\b|\btitle\b(?! slide)", c):
         return done({"op": "slide_delete", "target": target})
     mm = re.search(r"\bswap\s+slides?\s+(\d+)\s+(?:and|with)\s+(\d+)", c)
     if mm:
         return done({"op": "slide_swap", "a": int(mm.group(1)), "b": int(mm.group(2))})
-    mm = re.search(r"\bmove\s+(?:the\s+)?(?:slide\s+(\d+)|(\w+(?: you)?) slide|(it|this|that))\s+(?:back\s+)?(?:to\s+)?(?:(the end|the start|the beginning|the top|the front|the back)|(?:position|place)\s+(\d+)|"
-                   r"(after|before)\s+slide\s+(\d+))", c)
+    mm = re.search(
+        r"\bmove\s+(?:the\s+)?(?:slide\s+(\d+)|(\w+(?: you)?) slide|(it|this|that))\s+(?:back\s+)?(?:to\s+)?(?:(the end|the start|the beginning|the top|the front|the back)|(?:position|place)\s+(\d+)|"
+        r"(after|before)\s+slide\s+(\d+))",
+        c,
+    )
     if mm:
         n = int(mm.group(1)) if mm.group(1) else (ns[0] if ns else None)
         if n:
@@ -120,8 +141,11 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
     if re.search(r"\b(?:duplicate|copy|clone)\b", c) and ns and not re.search(r"\bthe (?:copy|duplicate)\b", c):
         out["focus"] = {"ns": [ns[0] + 1], "fresh": True}  # "...and make it red": the copy
         return done(*[{"op": "slide_duplicate", "slide": k} for k in ns[:1]])
-    mm = re.search(r"\b(?:add|insert|create|make|put)\b.*?\b(?:a |an |one |another )?(?:new )?(\w+ )?slide\b(?:\s+(?:about|on|with|showing|for|explaining|covering|listing|comparing)\s+(.+?))?"
-                   r"(?=\s+(?:after|before|at the end|at the start|at the beginning|as slide)\b|$)", c)
+    mm = re.search(
+        r"\b(?:add|insert|create|make|put)\b.*?\b(?:a |an |one |another )?(?:new )?(\w+ )?slide\b(?:\s+(?:about|on|with|showing|for|explaining|covering|listing|comparing)\s+(.+?))?"
+        r"(?=\s+(?:after|before|at the end|at the start|at the beginning|as slide)\b|$)",
+        c,
+    )
     if mm and not re.search(r"\bnotes?\b|\bbullet\b", c):
         about = (mm.group(2) or "").strip(" .")
         kind_word = (mm.group(1) or "").strip()
@@ -129,8 +153,19 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
         pos = "end"
         mp = re.search(r"\b(after|before)\s+slide\s+(\d+)|\bas slide\s+(\d+)|\bat the (start|beginning)\b", c)
         if mp:
-            pos = int(mp.group(2)) if mp.group(1) == "after" else int(mp.group(2)) - 1 if mp.group(1) == "before" else int(mp.group(3)) - 1 if mp.group(3) else "start"
-        out["focus"] = {"ns": [m["count"] + 1 if pos == "end" else 1 if pos == "start" else int(pos) + 1], "fresh": True}  # "...and make it shorter": the new slide
+            pos = (
+                int(mp.group(2))
+                if mp.group(1) == "after"
+                else int(mp.group(2)) - 1
+                if mp.group(1) == "before"
+                else int(mp.group(3)) - 1
+                if mp.group(3)
+                else "start"
+            )
+        out["focus"] = {
+            "ns": [m["count"] + 1 if pos == "end" else 1 if pos == "start" else int(pos) + 1],
+            "fresh": True,
+        }  # "...and make it shorter": the new slide
         if lay == "closing" and not about:
             return done({"op": "slide_add", "after": pos, "layout": "closing", "title": "Thank you", "subtitle": "Questions?"})
         if lay == "agenda" and not about:
@@ -144,7 +179,9 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
     mm = re.search(r"\b(?:change|rename|set|make)\b.*?\btitle of (?:slide\s+)?(\d+)\b|\bslide\s+(\d+)(?:'s)? title\b", c)
     if mm and q:
         return done({"op": "title_set", "slide": int(mm.group(1) or mm.group(2)), "text": q[-1]})
-    mm = re.search(r"\b(?:replace|change|rename)\s+(.+?)\s+(?:with|to|into|by)\s+(.+?)(?:\s+(?:everywhere|throughout|in the deck|on all slides))?$", raw, re.I)
+    mm = re.search(
+        r"\b(?:replace|change|rename)\s+(.+?)\s+(?:with|to|into|by)\s+(.+?)(?:\s+(?:everywhere|throughout|in the deck|on all slides))?$", raw, re.I
+    )
     if mm and not re.search(r"\b(?:font|size|colou?r|title|background|theme|text)\b", mm.group(1).lower()):
         a, b = (q[0], q[1]) if len(q) >= 2 else (mm.group(1).strip(" '\"."), mm.group(2).strip(" '\"."))
         deck_text = " ".join(t["text"] for s in m["slides"] for t in s["texts"]).lower()
@@ -153,13 +190,24 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
     mm = re.search(r"\btranslate\b.*?\b(?:in|into|to)\s+(" + P.LANGS + r")\b|\b(?:in|into)\s+(" + P.LANGS + r")\b", c)
     if mm and re.search(r"\btranslat|convert|write\b", c):
         return done({"op": "translate", "target": target or {"kind": "all"}, "language": mm.group(1) or mm.group(2)})
-    mm = re.search(r"\b(shorter|simpler|punchier|clearer|more formal|more persuasive|fewer words|less text|more concise|catchier|friendlier|stronger)\b|"
-                   r"\b(rewrite|rephrase|reword|shorten|simplify|tighten|improve)\b", c)
+    mm = re.search(
+        r"\b(shorter|simpler|punchier|clearer|more formal|more persuasive|fewer words|less text|more concise|catchier|friendlier|stronger)\b|"
+        r"\b(rewrite|rephrase|reword|shorten|simplify|tighten|improve)\b",
+        c,
+    )
     if mm and (target or re.search(r"\b(?:deck|presentation|slides|text)\b", c)) and not re.search(r"\bnotes?\b|\bfont|size\b|\bbigger|smaller\b", c):
         how = mm.group(1) or mm.group(2)
-        ins = {"fewer words": "fewer words: short bullet phrases", "less text": "less text: short bullet phrases", "shorten": "shorter",
-               "rewrite": "rewrite it better", "rephrase": "rephrase in fresh words", "reword": "rephrase in fresh words", "simplify": "simpler words",
-               "tighten": "tighter, fewer words", "improve": "clearer and stronger"}.get(how, f"make it {how}")
+        ins = {
+            "fewer words": "fewer words: short bullet phrases",
+            "less text": "less text: short bullet phrases",
+            "shorten": "shorter",
+            "rewrite": "rewrite it better",
+            "rephrase": "rephrase in fresh words",
+            "reword": "rephrase in fresh words",
+            "simplify": "simpler words",
+            "tighten": "tighter, fewer words",
+            "improve": "clearer and stronger",
+        }.get(how, f"make it {how}")
         part = "titles" if re.search(r"\btitles?\b|\bheadings?\b", c) else "all" if re.search(r"\beverything\b|\ball (?:the )?text\b", c) else "body"
         return done({"op": "rewrite", "target": target or {"kind": "all"}, "instruction": ins, "part": part})
     if re.search(r"\b(?:speaker )?notes?\b", c) and re.search(r"\b(?:add|write|create|give|make|generate|put)\b", c):
@@ -170,7 +218,9 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
             if not empty:
                 out["ask"] = "Every slide already has speaker notes. Say 'rewrite the notes on slide N' or 'write new notes for every slide'."
                 return out
-            return done({"op": "notes", "target": {"kind": "slides", "ns": empty} if len(empty) > 1 else {"kind": "slide", "n": empty[0]}, "write": True})
+            return done(
+                {"op": "notes", "target": {"kind": "slides", "ns": empty} if len(empty) > 1 else {"kind": "slide", "n": empty[0]}, "write": True}
+            )
         return done({"op": "notes", "target": target or {"kind": "all"}, "write": True})
     if re.search(r"\b(?:overflow\w*|doesn'?t fit|does not fit|fit (?:on|in|the box)|too much text|spilling|cut off|shrink)\b", c):
         return done({"op": "shrink", "target": target or {"kind": "all"}})
@@ -189,7 +239,7 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
         cols = list(P.COLOUR_RX.finditer(c))
         if cols:
             ops = [{"op": "background", "target": target or {"kind": "all"}, "color": cols[0].group(1)}]
-            more = re.search(r"\band\b.*?\b(titles?|headings?|text|body|bullets?)\b", c[cols[0].end():])
+            more = re.search(r"\band\b.*?\b(titles?|headings?|text|body|bullets?)\b", c[cols[0].end() :])
             if more and len(cols) > 1:
                 part = "titles" if more.group(1).startswith(("title", "heading")) else "body"
                 ops.append({"op": "style", "target": target or {"kind": "all"}, "part": part, "set": {"color": cols[1].group(1)}})
@@ -197,8 +247,15 @@ def parse_deck(clause, m, focus=None, raw=None, carry=False):
     s = P.style_set(c)
     s = {k: v for k, v in s.items() if k in ("font", "size", "color", "bold", "italic")}
     if s:
-        part = "titles" if re.search(r"\btitles?\b|\bheadings?\b", c) else "table" if re.search(r"\btables?\b", c) else \
-            "body" if re.search(r"\b(?:body|bullets?|text|content)\b", c) and not re.search(r"\ball text\b|\bevery ?thing\b", c) else "all"
+        part = (
+            "titles"
+            if re.search(r"\btitles?\b|\bheadings?\b", c)
+            else "table"
+            if re.search(r"\btables?\b", c)
+            else "body"
+            if re.search(r"\b(?:body|bullets?|text|content)\b", c) and not re.search(r"\ball text\b|\bevery ?thing\b", c)
+            else "all"
+        )
         if part == "table" and not ns:
             ks = [s_["n"] for s_ in m["slides"] if s_["table"]]
             target = {"kind": "slides", "ns": ks} if len(ks) > 1 else {"kind": "slide", "n": ks[0]} if ks else None
@@ -221,9 +278,29 @@ class DeckChat(DocChat):
         folder.mkdir(parents=True, exist_ok=True)
         v0 = folder / "v0.pptx"
         shutil.copy(src, v0)
-        state = {"id": cid, "kind": "pptx", "base": str(src), "folder": str(folder), "cur": 0, "turns": [], "focus": None, "pending": None,
-                 "versions": [{"v": 0, "parent": None, "file": str(v0), "said": None, "done": ["the original file"], "failed": [], "checks": [],
-                               "pages": None, "pdf": None}]}
+        state = {
+            "id": cid,
+            "kind": "pptx",
+            "base": str(src),
+            "folder": str(folder),
+            "cur": 0,
+            "turns": [],
+            "focus": None,
+            "pending": None,
+            "versions": [
+                {
+                    "v": 0,
+                    "parent": None,
+                    "file": str(v0),
+                    "said": None,
+                    "done": ["the original file"],
+                    "failed": [],
+                    "checks": [],
+                    "pages": None,
+                    "pdf": None,
+                }
+            ],
+        }
         c = cls(state, **kw)
         if c.render:
             c._render(0)
@@ -241,10 +318,14 @@ class DeckChat(DocChat):
         extra = {"measure": True, **({"measure_slides": slides} if slides else {})}
         r = RN.to_pdf(ver["file"], pdf=str(Path(ver["file"]).with_suffix(".pdf")), server=self.server, **extra)
         ver["pages"], ver["pdf"], ver["render_ok"] = r.get("slides"), r.get("pdf") if r.get("ok") else None, bool(r.get("ok"))
-        over = [x for x in r.get("shapes") or [] if x["name"] not in PO.DECO and (x["text_height"] > x["height"] + 3 or x["text_width"] > x["width"] + 3)]
+        over = [
+            x for x in r.get("shapes") or [] if x["name"] not in PO.DECO and (x["text_height"] > x["height"] + 3 or x["text_width"] > x["width"] + 3)
+        ]
         ver["overflow"] = sorted({x["slide"] for x in over})
-        ver["overflow_fit"] = {f"{x['slide']}:{x['name']}": [round(x["text_height"] / max(1.0, x["height"]), 3), round(x["text_width"] / max(1.0, x["width"]), 3)]
-                               for x in over}
+        ver["overflow_fit"] = {
+            f"{x['slide']}:{x['name']}": [round(x["text_height"] / max(1.0, x["height"]), 3), round(x["text_width"] / max(1.0, x["width"]), 3)]
+            for x in over
+        }
         return r
 
     def say(self, message, files=()):
@@ -260,12 +341,22 @@ class DeckChat(DocChat):
         m = self.map()
         ns, _ = slides_in(P.normalize(q), m)
         ss = [m["slides"][k - 1] for k in ns] if ns else m["slides"]
-        body = "\n".join(f"SLIDE {s['n']}: " + " | ".join(t["text"].replace("\n", " / ") for t in s["texts"]) + (f"\n  NOTES: {s['notes']}" if s["notes"] else "")
-                         for s in ss)[:9000]
+        body = "\n".join(
+            f"SLIDE {s['n']}: " + " | ".join(t["text"].replace("\n", " / ") for t in s["texts"]) + (f"\n  NOTES: {s['notes']}" if s["notes"] else "")
+            for s in ss
+        )[:9000]
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": "You answer a client's question about their slide deck in 1-4 short sentences, only from "
-                                                                         "the slides given. If the slides do not say, say so."},
-                                            {"role": "user", "content": f"DECK: {m['title']} ({m['count']} slides)\n{body}\n\nQUESTION: {q}"}])
+            r = self.planner._call(
+                "fast",
+                [
+                    {
+                        "role": "system",
+                        "content": "You answer a client's question about their slide deck in 1-4 short sentences, only from "
+                        "the slides given. If the slides do not say, say so.",
+                    },
+                    {"role": "user", "content": f"DECK: {m['title']} ({m['count']} slides)\n{body}\n\nQUESTION: {q}"},
+                ],
+            )
             return re.sub(r"<think>.*?</think>", "", r.text or "", flags=re.S).strip()[:700] or "I could not find that in the deck."
         except Exception as e:  # noqa: BLE001
             return f"I could not answer that just now ({type(e).__name__})."
@@ -297,8 +388,10 @@ class DeckChat(DocChat):
             return {"ask": "I could not read: " + "; ".join(f"'{c}'" for c in clauses) + ". Try e.g. 'delete slide 3' or 'make the titles blue'."}
         self._turn["llm"] = True
         m = self.map()
-        outline = "\n".join(f"{s['n']}. [{s['layout']}] {s['title'][:70]}" + (" (chart)" if s["chart"] else "") + (" (table)" if s["table"] else "")
-                            for s in m["slides"])
+        outline = "\n".join(
+            f"{s['n']}. [{s['layout']}] {s['title'][:70]}" + (" (chart)" if s["chart"] else "") + (" (table)" if s["table"] else "")
+            for s in m["slides"]
+        )
         user = f"DECK: {m['title']}\nSLIDES:\n{outline}\nLAST SLIDES TALKED ABOUT: {json.dumps(focus) if focus else 'none'}\nWHOLE MESSAGE: {message}\nREQUESTS: {clauses}"
         try:
             r = self.planner._call("docs", [{"role": "system", "content": DECK_SYSTEM}, {"role": "user", "content": user}])
@@ -347,14 +440,20 @@ class DeckChat(DocChat):
         n = len(self.state["versions"])
         dst = self.folder / f"v{n}.pptx"
         prs.save(str(dst))
-        self.state["versions"].append({"v": n, "parent": v0, "file": str(dst), "said": said, "done": done, "failed": failed, "checks": checks,
-                                       "pages": None, "pdf": None})
+        self.state["versions"].append(
+            {"v": n, "parent": v0, "file": str(dst), "said": said, "done": done, "failed": failed, "checks": checks, "pages": None, "pdf": None}
+        )
         self.state["cur"] = n
         note = ""
         if self.render:
             r = self._render(n, sorted(touched) if touched and len(touched) < 8 else None)
             over = self.state["versions"][n].get("overflow") or []
-            grew = [o for o in turn["ops"] if o.get("op") in GROWS or (o.get("op") == "style" and ((o.get("set") or {}).get("size") is not None or (o.get("set") or {}).get("font")))]
+            grew = [
+                o
+                for o in turn["ops"]
+                if o.get("op") in GROWS
+                or (o.get("op") == "style" and ((o.get("set") or {}).get("size") is not None or (o.get("set") or {}).get("font")))
+            ]
             fitting = any(o.get("op") == "shrink" and o.get("fit") for o in turn["ops"])
             rounds = 0
             # text still too big for its box after this edit: shrink by PowerPoint's own measure and measure again, a few
@@ -363,7 +462,11 @@ class DeckChat(DocChat):
                 rounds += 1
                 prs2 = Presentation(str(dst))
                 try:
-                    d2 = PO.apply(prs2, {"op": "shrink", "target": {"kind": "slides", "ns": over}, "fit": self.state["versions"][n].get("overflow_fit") or {}}, ctx)
+                    d2 = PO.apply(
+                        prs2,
+                        {"op": "shrink", "target": {"kind": "slides", "ns": over}, "fit": self.state["versions"][n].get("overflow_fit") or {}},
+                        ctx,
+                    )
                 except PO.OpError:
                     break
                 prs2.save(str(dst))
@@ -382,7 +485,11 @@ class DeckChat(DocChat):
         msg = f"v{n}: " + "; ".join(done) + "."
         if failed:
             msg += " Couldn't: " + "; ".join(failed) + "."
-        msg += f" Checked: {len(checks) - len(bad)}/{len(checks)} OK" + (" (" + "; ".join(f"{c['op']}: {c['what']}" for c in bad[:3]) + ")" if bad else "") + "."
+        msg += (
+            f" Checked: {len(checks) - len(bad)}/{len(checks)} OK"
+            + (" (" + "; ".join(f"{c['op']}: {c['what']}" for c in bad[:3]) + ")" if bad else "")
+            + "."
+        )
         return msg + note
 
     @staticmethod
@@ -403,6 +510,7 @@ class DeckChat(DocChat):
             if sid not in ids:
                 raise PO.OpError(f"slide {n} was removed earlier in this message")
             return ids.index(sid) + 1
+
         op = json.loads(json.dumps(op))
         t = op.get("target")
         if isinstance(t, dict):
@@ -419,7 +527,11 @@ class DeckChat(DocChat):
         return op
 
     def answer(self, q):
-        parts = [p.strip() for p in re.split(r"\?\s*|\s+and\s+(?=(?:what|which|how|is|are|does|do|who|where|when)\b)|,\s*(?=(?:what|which|how)\b)", q) if p and p.strip()]
+        parts = [
+            p.strip()
+            for p in re.split(r"\?\s*|\s+and\s+(?=(?:what|which|how|is|are|does|do|who|where|when)\b)|,\s*(?=(?:what|which|how)\b)", q)
+            if p and p.strip()
+        ]
         outs = []
         for p in parts or [q]:
             a = self._answer_one(p)
@@ -434,8 +546,12 @@ class DeckChat(DocChat):
         mm = re.search(r"\b(?:what(?:'s| is)? on|show me|what does) slide (\d+)", q)
         if mm and 1 <= int(mm.group(1)) <= m["count"]:
             s = m["slides"][int(mm.group(1)) - 1]
-            return f"Slide {s['n']} ('{s['title']}'): " + " | ".join(t["text"].replace("\n", " / ") for t in s["texts"][1:4])[:400] + \
-                (" [chart]" if s["chart"] else "") + (" [table]" if s["table"] else "")
+            return (
+                f"Slide {s['n']} ('{s['title']}'): "
+                + " | ".join(t["text"].replace("\n", " / ") for t in s["texts"][1:4])[:400]
+                + (" [chart]" if s["chart"] else "")
+                + (" [table]" if s["table"] else "")
+            )
         if re.search(r"\b(?:titles|list (?:the )?slides|slide titles|outline|structure|what are the slides)\b", q):
             return "; ".join(f"{s['n']}. {s['title']}" for s in m["slides"])
         if re.search(r"\bnotes?\b", q):
@@ -454,9 +570,12 @@ class DeckChat(DocChat):
         b = nums[1] if len(nums) > 1 else self.state["cur"]
         ma, mb = self.map(a), self.map(b)
         ta, tb = [s["title"] for s in ma["slides"]], [s["title"] for s in mb["slides"]]
-        return (f"v{a} -> v{b}: slides {ma['count']} -> {mb['count']}; words {ma['words']} -> {mb['words']}"
-                + (f"; new: {', '.join(t[:30] for t in tb if t not in ta)[:200]}" if any(t not in ta for t in tb) else "")
-                + (f"; gone: {', '.join(t[:30] for t in ta if t not in tb)[:200]}" if any(t not in tb for t in ta) else "") + ".")
+        return (
+            f"v{a} -> v{b}: slides {ma['count']} -> {mb['count']}; words {ma['words']} -> {mb['words']}"
+            + (f"; new: {', '.join(t[:30] for t in tb if t not in ta)[:200]}" if any(t not in ta for t in tb) else "")
+            + (f"; gone: {', '.join(t[:30] for t in ta if t not in tb)[:200]}" if any(t not in tb for t in ta) else "")
+            + "."
+        )
 
     def export(self):
         v = self.version

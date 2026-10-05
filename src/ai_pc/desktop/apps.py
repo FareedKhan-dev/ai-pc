@@ -1,4 +1,5 @@
 """Discover installed apps at runtime (so brand-new software is found without any setup), launch them, find windows."""
+
 import difflib
 import json
 import subprocess
@@ -14,8 +15,9 @@ def installed_apps(refresh=False, max_age_s=86400):
     cache = STATE / "apps.json"
     if not refresh and cache.exists() and time.time() - cache.stat().st_mtime < max_age_s:
         return json.loads(cache.read_text(encoding="utf-8"))
-    out = subprocess.run(["powershell", "-NoProfile", "-Command", "Get-StartApps | ConvertTo-Json -Compress"],
-                         capture_output=True, text=True, timeout=60).stdout
+    out = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", "Get-StartApps | ConvertTo-Json -Compress"], capture_output=True, text=True, timeout=60
+    ).stdout
     data = json.loads(out)
     apps = [{"name": a["Name"], "appid": a["AppID"]} for a in (data if isinstance(data, list) else [data])]
     STATE.mkdir(exist_ok=True)

@@ -8,6 +8,7 @@ weight in the chosen material.
   'solidworks plate 100x60x5 mm with 4 holes 6 mm, rounded corners 5 mm, aluminium'
   'fusion flange 80 mm diameter 10 mm thick, 6 holes 8 mm on 60 mm circle, centre hole 30 mm'   'make the holes 8 mm'
 """
+
 import json
 import os
 import re
@@ -18,15 +19,23 @@ from pathlib import Path
 from ai_pc.core.config import ROOT
 
 NAME, LABEL = "freecad", "SolidWorks / Fusion / Inventor / FreeCAD: parametric parts as FreeCAD + STEP + STL"
-EXAMPLES = ["solidworks plate 100x60x5 mm with 4 holes 6 mm, rounded corners 5 mm, aluminium",
-            "fusion flange 80 mm diameter 10 mm thick, 6 holes 8 mm on 60 mm circle, centre hole 30 mm", "make the holes 8 mm"]
+EXAMPLES = [
+    "solidworks plate 100x60x5 mm with 4 holes 6 mm, rounded corners 5 mm, aluminium",
+    "fusion flange 80 mm diameter 10 mm thick, 6 holes 8 mm on 60 mm circle, centre hole 30 mm",
+    "make the holes 8 mm",
+]
 HOME = ROOT / "tools" / "freecad"
 DENSITY = {"steel": 7.85, "aluminium": 2.70, "brass": 8.50, "pla": 1.24, "abs": 1.04, "petg": 1.27, "wood": 0.60, "nylon": 1.14}
-KINDS = {"bracket": r"l[- ]?bracket|bracket|angle", "flange": r"flange|disc|disk", "spacer": r"spacer|bushing|bush|sleeve|tube|standoff",
-         "enclosure": r"enclosure|housing|case|box", "plate": r"plate|block|base|mount"}
+KINDS = {
+    "bracket": r"l[- ]?bracket|bracket|angle",
+    "flange": r"flange|disc|disk",
+    "spacer": r"spacer|bushing|bush|sleeve|tube|standoff",
+    "enclosure": r"enclosure|housing|case|box",
+    "plate": r"plate|block|base|mount",
+}
 TRIGGER = r"\b(?:solid\s*works|fusion(?:\s*360)?|inventor|freecad|catia|creo|step\s+file|cad\s+part|\.step|\.stp)\b"
 
-JOB = r'''
+JOB = r"""
 import json, os, sys, traceback
 import FreeCAD as App, Part
 job = json.load(open(os.environ["AIPC_JOB"], encoding="utf-8"))
@@ -130,7 +139,7 @@ try:
 except Exception:
     report = {"error": traceback.format_exc()[-1500:]}
 print("AIPC_REPORT " + json.dumps(report))
-'''
+"""
 
 
 def cmd():
@@ -158,10 +167,16 @@ def read(c, last=None):
     m = re.search(r"\b(?:centre|center|middle)\s+hole\s+(?:of\s+)?" + num + r"|\bhole\s+" + num + r"\s*mm\s+in\s+the\s+(?:middle|centre|center)", c)
     if m:
         s["centre"] = float(m.group(1) or m.group(2))
-    for key, pat in (("thick", num + r"\s*mm\s+thick"), ("wall", num + r"\s*mm\s+walls?"), ("diameter", num + r"\s*mm\s+(?:diameter|across|wide)"),
-                     ("outside", num + r"\s*mm\s+(?:outside|outer|od)\b"), ("inside", num + r"\s*mm\s+(?:inside|inner|id|bore)\b"),
-                     ("length", num + r"\s*mm\s+(?:long|length|tall|high)"), ("circle", r"on\s+(?:a\s+)?" + num + r"\s*mm\s+(?:circle|pcd|pitch)"),
-                     ("fillet", r"(?:rounded\s+corners?|fillets?|radius)\s+(?:of\s+)?" + num)):
+    for key, pat in (
+        ("thick", num + r"\s*mm\s+thick"),
+        ("wall", num + r"\s*mm\s+walls?"),
+        ("diameter", num + r"\s*mm\s+(?:diameter|across|wide)"),
+        ("outside", num + r"\s*mm\s+(?:outside|outer|od)\b"),
+        ("inside", num + r"\s*mm\s+(?:inside|inner|id|bore)\b"),
+        ("length", num + r"\s*mm\s+(?:long|length|tall|high)"),
+        ("circle", r"on\s+(?:a\s+)?" + num + r"\s*mm\s+(?:circle|pcd|pitch)"),
+        ("fillet", r"(?:rounded\s+corners?|fillets?|radius)\s+(?:of\s+)?" + num),
+    ):
         m = re.search(pat, c)
         if m:
             s[key] = float(m.group(1))
@@ -199,7 +214,9 @@ def describe(s):
         if k == "enclosure":
             d += f", {s.get('wall') or 2:g} mm walls, open top"
     if s.get("holes"):
-        d += f", {s['holes']} holes {s.get('hole') or (5 if k == 'bracket' else 8):g} mm" + (f" on a {s['circle']:g} mm circle" if s.get("circle") else "")
+        d += f", {s['holes']} holes {s.get('hole') or (5 if k == 'bracket' else 8):g} mm" + (
+            f" on a {s['circle']:g} mm circle" if s.get("circle") else ""
+        )
     if s.get("centre"):
         d += f", centre hole {s['centre']:g} mm"
     if s.get("fillet") and k in ("plate", "enclosure"):
@@ -233,13 +250,15 @@ def holes_expected(s):
 def preview(stl_path, png):
     """A shaded picture of the part from the STL (matplotlib, no window)."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     import numpy as np
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
     data = Path(stl_path).read_bytes()
     n = struct.unpack("<I", data[80:84])[0]
-    arr = np.frombuffer(data[84:84 + n * 50], dtype=np.dtype([("n", "<3f4"), ("v", "<3f4", (3,)), ("a", "<u2")]))
+    arr = np.frombuffer(data[84 : 84 + n * 50], dtype=np.dtype([("n", "<3f4"), ("v", "<3f4", (3,)), ("a", "<u2")]))
     tris = arr["v"]
     normals = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
     normals /= np.linalg.norm(normals, axis=1, keepdims=True) + 1e-9
@@ -265,8 +284,11 @@ def parse(text, ctx):
     kind = next((k for k, p in KINDS.items() if re.search(r"\b(?:" + p + r")\b", c)), None)
     if named and kind:
         return {"op": "part", "spec": read(c)}
-    if last and re.search(r"\b(?:make|change|set)\b.*\b(?:holes?|thick|walls?|corners?|diameter|long|bore|material|aluminium|steel|pla|\d+\s*x\s*\d+)", c) \
-            and not re.search(r"\b(?:godot|unity|arduino|lightroom|photo|player|coin|led)\b", c):
+    if (
+        last
+        and re.search(r"\b(?:make|change|set)\b.*\b(?:holes?|thick|walls?|corners?|diameter|long|bore|material|aluminium|steel|pla|\d+\s*x\s*\d+)", c)
+        and not re.search(r"\b(?:godot|unity|arduino|lightroom|photo|player|coin|led)\b", c)
+    ):
         return {"op": "part", "spec": read(c, last["spec"]), "edit": True}
     return None
 
@@ -279,16 +301,34 @@ def run(op, ctx):
     out = Path(ctx["out"]) / "freecad"
     out.mkdir(parents=True, exist_ok=True)
     name = re.sub(r"[^\w-]+", "_", describe(s).split(",")[0]).strip("_")
-    job = {"spec": s, "name": name, "fcstd": str((out / f"{name}.FCStd").resolve()), "step": str((out / f"{name}.step").resolve()),
-           "stl": str((out / f"{name}.stl").resolve())}
+    job = {
+        "spec": s,
+        "name": name,
+        "fcstd": str((out / f"{name}.FCStd").resolve()),
+        "step": str((out / f"{name}.step").resolve()),
+        "stl": str((out / f"{name}.stl").resolve()),
+    }
     jf = out / f"{name}.job.json"
     jf.write_text(json.dumps(job), encoding="utf-8")
     script = out / "aipc_freecad_job.py"
     script.write_text(JOB, encoding="utf-8")
     home = HOME / "home"
     home.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, AIPC_JOB=str(jf.resolve()), FREECAD_USER_HOME=str(home), FREECAD_USER_DATA=str(home / "data"), FREECAD_USER_TEMP=str(home / "temp"))
-    r = subprocess.run([str(exe), str(script.resolve())], capture_output=True, text=True, timeout=300, env=env, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    env = dict(
+        os.environ,
+        AIPC_JOB=str(jf.resolve()),
+        FREECAD_USER_HOME=str(home),
+        FREECAD_USER_DATA=str(home / "data"),
+        FREECAD_USER_TEMP=str(home / "temp"),
+    )
+    r = subprocess.run(
+        [str(exe), str(script.resolve())],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        env=env,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
     m = re.search(r"AIPC_REPORT (\{.*\})", r.stdout + r.stderr)
     rep = json.loads(m.group(1)) if m else {"error": (r.stderr or r.stdout)[-800:]}
     if rep.get("error"):
@@ -298,17 +338,29 @@ def run(op, ctx):
     size, want = rep["size"], expected_size(s)
     got_holes = {round(float(k), 3): v for k, v in rep["holes"].items()}
     want_holes = holes_expected(s)
-    checks = [("a valid single solid, every feature rebuilt", rep["valid"] and not rep["errors"]),
-              (f"the size asked ({' x '.join(f'{v:g}' for v in want)} mm)", all(abs(a - b) < 0.01 for a, b in zip(sorted(size), sorted(want)))),
-              ("the holes asked (" + (", ".join(f"{v} x {k:g} mm" for k, v in want_holes.items()) or "none") + ")",
-               all(got_holes.get(k, 0) == v for k, v in want_holes.items())),
-              ("the STEP read back: same volume and size", abs(rep["step_volume"] - rep["volume"]) <= rep["volume"] * 1e-4 and
-               all(abs(a - b) < 0.01 for a, b in zip(rep["step_size"], size)))]
+    checks = [
+        ("a valid single solid, every feature rebuilt", rep["valid"] and not rep["errors"]),
+        (f"the size asked ({' x '.join(f'{v:g}' for v in want)} mm)", all(abs(a - b) < 0.01 for a, b in zip(sorted(size), sorted(want)))),
+        (
+            "the holes asked (" + (", ".join(f"{v} x {k:g} mm" for k, v in want_holes.items()) or "none") + ")",
+            all(got_holes.get(k, 0) == v for k, v in want_holes.items()),
+        ),
+        (
+            "the STEP read back: same volume and size",
+            abs(rep["step_volume"] - rep["volume"]) <= rep["volume"] * 1e-4 and all(abs(a - b) < 0.01 for a, b in zip(rep["step_size"], size)),
+        ),
+    ]
     bad = [w for w, ok in checks if not ok]
     grams = rep["volume"] / 1000 * DENSITY[s["material"]]
     ctx.setdefault("memo", {})["freecad"] = {"spec": s, "stl": job["stl"]}
     ctx["memo"]["model3d"] = job["stl"]
-    return (f"{'Changed' if op.get('edit') else 'Made'} the part: {describe(s)}; {s['material']} {grams:,.1f} g ({rep['volume'] / 1000:,.1f} cm3). "
-            f"Files: {out / (name + '.step')} (SolidWorks, Fusion 360, Inventor, CATIA, Creo: File > Open), {name}.FCStd (FreeCAD, editable: "
-            f"{', '.join(dict.fromkeys(rep['objects']))}), {name}.stl (3D printing: say 'slice it for ender 3'), {name}.png. " +
-            ("Checked in FreeCAD: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f" (got {rep['holes']}, size {size})."))
+    return (
+        f"{'Changed' if op.get('edit') else 'Made'} the part: {describe(s)}; {s['material']} {grams:,.1f} g ({rep['volume'] / 1000:,.1f} cm3). "
+        f"Files: {out / (name + '.step')} (SolidWorks, Fusion 360, Inventor, CATIA, Creo: File > Open), {name}.FCStd (FreeCAD, editable: "
+        f"{', '.join(dict.fromkeys(rep['objects']))}), {name}.stl (3D printing: say 'slice it for ender 3'), {name}.png. "
+        + (
+            "Checked in FreeCAD: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + f" (got {rep['holes']}, size {size})."
+        )
+    )

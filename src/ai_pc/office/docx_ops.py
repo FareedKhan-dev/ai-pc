@@ -25,6 +25,7 @@ Operations ({"op": ..., "target": a docmap target descriptor where it applies}):
   table_total  {target, columns}      chart {target (a table), chart, categories: column, values: [columns], title}
   image        {path, anchor, where, width_cm, caption}
 """
+
 import copy
 import re
 from pathlib import Path
@@ -43,10 +44,23 @@ from ai_pc.office import themes
 from ai_pc.office.docplan import fmt as num_fmt
 from ai_pc.office.docplan import number
 
-ALIGN = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "centre": WD_ALIGN_PARAGRAPH.CENTER,
-         "right": WD_ALIGN_PARAGRAPH.RIGHT, "justify": WD_ALIGN_PARAGRAPH.JUSTIFY, "justified": WD_ALIGN_PARAGRAPH.JUSTIFY}
-HIGHLIGHT = {"yellow": WD_COLOR_INDEX.YELLOW, "green": WD_COLOR_INDEX.BRIGHT_GREEN, "blue": WD_COLOR_INDEX.TURQUOISE, "pink": WD_COLOR_INDEX.PINK,
-             "red": WD_COLOR_INDEX.RED, "grey": WD_COLOR_INDEX.GRAY_25, "gray": WD_COLOR_INDEX.GRAY_25}
+ALIGN = {
+    "left": WD_ALIGN_PARAGRAPH.LEFT,
+    "center": WD_ALIGN_PARAGRAPH.CENTER,
+    "centre": WD_ALIGN_PARAGRAPH.CENTER,
+    "right": WD_ALIGN_PARAGRAPH.RIGHT,
+    "justify": WD_ALIGN_PARAGRAPH.JUSTIFY,
+    "justified": WD_ALIGN_PARAGRAPH.JUSTIFY,
+}
+HIGHLIGHT = {
+    "yellow": WD_COLOR_INDEX.YELLOW,
+    "green": WD_COLOR_INDEX.BRIGHT_GREEN,
+    "blue": WD_COLOR_INDEX.TURQUOISE,
+    "pink": WD_COLOR_INDEX.PINK,
+    "red": WD_COLOR_INDEX.RED,
+    "grey": WD_COLOR_INDEX.GRAY_25,
+    "gray": WD_COLOR_INDEX.GRAY_25,
+}
 PAGE_SIZES = {"a4": (21.0, 29.7), "letter": (21.59, 27.94), "legal": (21.59, 35.56), "a5": (14.8, 21.0)}
 SKIP_NUMBER = re.compile(r"^(?:references|bibliography|works cited|acknowledg\w*|abstract|appendix|contents|table of contents|glossary)\b", re.I)
 
@@ -84,8 +98,16 @@ def _paras(objs):
 
 def colour(v):
     v = str(v or "").strip().lower()
-    hx = themes.COLOUR_WORDS.get(v) or {"white": "FFFFFF", "dark blue": "1F3864", "light blue": "5B9BD5", "dark red": "8B0000",
-                                         "violet": "6A1B9A", "yellow": "C9A000", "dark grey": "404040", "dark gray": "404040"}.get(v)
+    hx = themes.COLOUR_WORDS.get(v) or {
+        "white": "FFFFFF",
+        "dark blue": "1F3864",
+        "light blue": "5B9BD5",
+        "dark red": "8B0000",
+        "violet": "6A1B9A",
+        "yellow": "C9A000",
+        "dark grey": "404040",
+        "dark gray": "404040",
+    }.get(v)
     if not hx and re.fullmatch(r"#?[0-9a-f]{6}", v):
         hx = v.lstrip("#")
     if not hx:
@@ -101,8 +123,15 @@ def _clear_run(r, props):
     rpr = r._r.rPr
     if rpr is None:
         return
-    tags = {"font": ["w:rFonts"], "size": ["w:sz", "w:szCs"], "color": ["w:color"], "bold": ["w:b", "w:bCs"], "italic": ["w:i", "w:iCs"],
-            "underline": ["w:u"], "highlight": ["w:highlight"]}
+    tags = {
+        "font": ["w:rFonts"],
+        "size": ["w:sz", "w:szCs"],
+        "color": ["w:color"],
+        "bold": ["w:b", "w:bCs"],
+        "italic": ["w:i", "w:iCs"],
+        "underline": ["w:u"],
+        "highlight": ["w:highlight"],
+    }
     for p_ in props:
         for t in tags.get(p_, []):
             for el in rpr.findall(qn(t)):
@@ -135,7 +164,9 @@ def _new_size(cur, v):
 
 def _line_spacing(v):
     t = str(v).strip().lower()
-    return {"single": 1.0, "1": 1.0, "1.0": 1.0, "1.15": 1.15, "1.5": 1.5, "one and a half": 1.5, "double": 2.0, "2": 2.0, "2.0": 2.0}.get(t) or float(t)
+    return {"single": 1.0, "1": 1.0, "1.0": 1.0, "1.15": 1.15, "1.5": 1.5, "one and a half": 1.5, "double": 2.0, "2": 2.0, "2.0": 2.0}.get(
+        t
+    ) or float(t)
 
 
 def _case(text, how):
@@ -146,7 +177,9 @@ def _case(text, how):
     if how == "title":
         small = {"a", "an", "the", "and", "or", "of", "in", "on", "at", "to", "for", "by", "with", "vs"}
         ws = text.split(" ")
-        return " ".join(w if (w.isupper() and len(w) > 1) else (w.capitalize() if i == 0 or w.lower() not in small else w.lower()) for i, w in enumerate(ws))
+        return " ".join(
+            w if (w.isupper() and len(w) > 1) else (w.capitalize() if i == 0 or w.lower() not in small else w.lower()) for i, w in enumerate(ws)
+        )
     if how == "sentence":
         t = text.lower()
         return t[:1].upper() + t[1:]
@@ -233,6 +266,7 @@ def split_runs_at(p, start, end):
             r._r.addnext(tail)
             Paragraph(p._p, p._parent).runs  # noqa: B018
             from docx.text.run import Run
+
             Run(tail, p).text = t[cut_b:]
             r.text = t[:cut_b]
             t = r.text
@@ -240,6 +274,7 @@ def split_runs_at(p, start, end):
             head = copy.deepcopy(r._r)
             r._r.addprevious(head)
             from docx.text.run import Run
+
             Run(head, p).text = t[:cut_a]
             r.text = t[cut_a:]
         out.append(r)
@@ -249,6 +284,7 @@ def split_runs_at(p, start, end):
 def all_runs(p):
     """The paragraph's runs in order, those inside hyperlinks included (python-docx's p.runs leaves them out)."""
     from docx.text.run import Run
+
     return [Run(r, p) for r in p._p.xpath("./w:r | ./w:hyperlink/w:r | ./w:ins/w:r | ./w:smartTag/w:r")]
 
 
@@ -271,16 +307,20 @@ def replace_in_paragraph(p, find, repl, case=False, whole=True):
     for m in reversed(ms):
         s, e = m.span()
         got = m.group(0)
-        new = repl.upper() if got.isupper() and len(got) > 1 and not repl.isupper() else (repl[:1].upper() + repl[1:] if got[:1].isupper() and repl[:1].islower() else repl)
+        new = (
+            repl.upper()
+            if got.isupper() and len(got) > 1 and not repl.isupper()
+            else (repl[:1].upper() + repl[1:] if got[:1].isupper() and repl[:1].islower() else repl)
+        )
         idx = [i for i, (a, b) in enumerate(bounds) if a < e and b > s] or [i for i, (a, b) in enumerate(bounds) if a <= s < b]
         if not idx:
             continue
         f = idx[0]
         a, b = bounds[f]
-        texts[f] = texts[f][:s - a] + new + (texts[f][e - a:] if e <= b else "")
+        texts[f] = texts[f][: s - a] + new + (texts[f][e - a :] if e <= b else "")
         for i in idx[1:]:
             a2, b2 = bounds[i]
-            texts[i] = texts[i][e - a2:] if e < b2 else ""
+            texts[i] = texts[i][e - a2 :] if e < b2 else ""
     for r, t in zip(runs, texts):
         if r.text != t:
             r.text = t
@@ -503,7 +543,13 @@ def op_page_numbers(doc, op, ctx):
     for sec in doc.sections:
         for part in (sec.footer, sec.header):
             for p in part.paragraphs:  # an old page number goes (only paragraphs that hold one)
-                if "PAGE" in (" ".join(x.text or "" for x in p._p.iter(qn("w:instrText"))) + " ".join(x.get(qn("w:instr")) or "" for x in p._p.iter(qn("w:fldSimple")))).upper():
+                if (
+                    "PAGE"
+                    in (
+                        " ".join(x.text or "" for x in p._p.iter(qn("w:instrText")))
+                        + " ".join(x.get(qn("w:instr")) or "" for x in p._p.iter(qn("w:fldSimple")))
+                    ).upper()
+                ):
                     for child in list(p._p):
                         if child.tag != qn("w:pPr"):
                             p._p.remove(child)
@@ -622,7 +668,7 @@ def op_cover(doc, op, ctx):
         brk = next((it["k"] for it in m["items"][:15] if it.get("page_break")), None)
         if brk is None:
             raise OpError("no cover page found (no page break near the start)")
-        _delete(e[:brk + 1])
+        _delete(e[: brk + 1])
         return "cover page removed"
     th = ctx.get("th") or DB.theme_of(doc)
     m = DM.docx_map(doc)
@@ -673,7 +719,9 @@ def op_theme(doc, op, ctx):
                 p.paragraph_format.space_after = None
     n = _style_tables(doc, th, [x for x in e if isinstance(x, Table)])
     ctx["th"] = th
-    return f"restyled as '{th['name']}' ({th['body']} {th['size']} pt, line spacing {th['line']}{', justified' if th['justify'] else ''}; {n} table(s))"
+    return (
+        f"restyled as '{th['name']}' ({th['body']} {th['size']} pt, line spacing {th['line']}{', justified' if th['justify'] else ''}; {n} table(s))"
+    )
 
 
 def _style_tables(doc, th, tables):
@@ -684,9 +732,18 @@ def _style_tables(doc, th, tables):
         if len(rows) < 2 or len(t.columns) < 2:
             continue
         n += 1
-        DB._borders(t._tbl.tblPr, "w:tblBorders", {"top": (8, tt["header_fill"], "single"), "bottom": (8, tt["header_fill"], "single"),
-                                                   "insideH": (4, tt["border"], "single"), "left": (0, "", ""), "right": (0, "", ""),
-                                                   "insideV": (0, "", "")})
+        DB._borders(
+            t._tbl.tblPr,
+            "w:tblBorders",
+            {
+                "top": (8, tt["header_fill"], "single"),
+                "bottom": (8, tt["header_fill"], "single"),
+                "insideH": (4, tt["border"], "single"),
+                "left": (0, "", ""),
+                "right": (0, "", ""),
+                "insideV": (0, "", ""),
+            },
+        )
         for j, c in enumerate(rows[0].cells):
             DB._shade(c, tt["header_fill"])
             for p in c.paragraphs:
@@ -842,6 +899,7 @@ def op_emphasis(doc, op, ctx):
     terms = [str(x) for x in (op.get("terms") or ([op["find"]] if op.get("find") else [])) if str(x).strip()]
     if not terms and op.get("auto"):
         from ai_pc.office import edit_llm as EL
+
         if ctx.get("planner") is None:
             raise OpError("choosing key terms needs the model")
         terms = EL.key_terms(ctx["planner"], "\n".join(p.text for p in ps), int(op.get("auto") or 8))
@@ -912,6 +970,7 @@ def op_insert(doc, op, ctx):
             blocks.insert(0, {"type": "heading", "text": op["heading"], "level": int(op.get("level") or 1)})
     if not blocks and op.get("about"):
         from ai_pc.office import edit_llm as EL
+
         if ctx.get("planner") is None:
             raise OpError("writing new text needs the model")
         blocks = EL.write_blocks(ctx["planner"], op["about"], _context(doc, ctx), op.get("words") or 180, op.get("heading"), op.get("kinds"))
@@ -931,8 +990,15 @@ def op_insert(doc, op, ctx):
         start = next((it["k"] for it in m["items"] if it.get("level")), 0)
         anchor, where = (_el(e[start]), "before") if e else (None, "end")
     elif where == "end":  # before a references / bibliography section when there is one
-        refs = next((s for s in m["sections"] if SKIP_NUMBER.match(re.sub(r"^\d+(\.\d+)*\.?\s+", "", s["title"])) and
-                     re.search(r"reference|bibliograph|works cited", s["title"], re.I)), None)
+        refs = next(
+            (
+                s
+                for s in m["sections"]
+                if SKIP_NUMBER.match(re.sub(r"^\d+(\.\d+)*\.?\s+", "", s["title"]))
+                and re.search(r"reference|bibliograph|works cited", s["title"], re.I)
+            ),
+            None,
+        )
         if refs:
             anchor, where = _el(els(doc)[refs["h"]]), "before"
     new = DB.insert_blocks(doc, blocks, anchor, where, th, numbering=_counts(doc))
@@ -940,17 +1006,29 @@ def op_insert(doc, op, ctx):
     words = sum(len(str(b.get("text") or "").split()) + sum(len(str(x).split()) for x in b.get("items") or []) for b in blocks)
     ctx.setdefault("info", {})["inserted"] = [b for b in blocks]
     w = op.get("where") or "end"
-    place = f"{w} {DM.describe_target(m, op.get('anchor'))}" if w in ("after", "before") and op.get("anchor") else ("at the start" if w == "start" else "at the end")
+    place = (
+        f"{w} {DM.describe_target(m, op.get('anchor'))}"
+        if w in ("after", "before") and op.get("anchor")
+        else ("at the start" if w == "start" else "at the end")
+    )
     return (f"section '{heads[0]}' added" if heads else f"{len(blocks)} block(s) added") + f" ({words} words, {len(new)} part(s)) {place}"
 
 
 def _body_paragraphs(objs):
-    return [o for o in objs if isinstance(o, Paragraph) and o.text.strip() and not DM.heading_level(o) and not (o.style is not None and o.style.name in ("Title", "Caption"))
-            and "TOC" not in " ".join(x.text or "" for x in o._p.iter(qn("w:instrText")))]
+    return [
+        o
+        for o in objs
+        if isinstance(o, Paragraph)
+        and o.text.strip()
+        and not DM.heading_level(o)
+        and not (o.style is not None and o.style.name in ("Title", "Caption"))
+        and "TOC" not in " ".join(x.text or "" for x in o._p.iter(qn("w:instrText")))
+    ]
 
 
 def op_rewrite(doc, op, ctx, translate_to=None):
     from ai_pc.office import edit_llm as EL
+
     if ctx.get("planner") is None:
         raise OpError("rewriting needs the model")
     m, objs = _targets(doc, op.get("target") or {"kind": "body"})
@@ -969,8 +1047,14 @@ def op_rewrite(doc, op, ctx, translate_to=None):
     if translate_to:
         new = EL.translate(ctx["planner"], old, translate_to, title=m["title"])
     else:
-        new = EL.rewrite(ctx["planner"], old, str(op.get("instruction") or "improve it"), keep_count=keep, title=m["title"],
-                         context="OUTLINE:\n" + DM.outline_text(m, 30))
+        new = EL.rewrite(
+            ctx["planner"],
+            old,
+            str(op.get("instruction") or "improve it"),
+            keep_count=keep,
+            title=m["title"],
+            context="OUTLINE:\n" + DM.outline_text(m, 30),
+        )
     if keep and len(new) != len(old):
         raise OpError("the rewrite came back in a different shape; nothing changed")
     if new == old:
@@ -981,13 +1065,13 @@ def op_rewrite(doc, op, ctx, translate_to=None):
         DM.set_paragraph_md(p, md)
     if len(new) > len(ps):  # more paragraphs than before: the extra ones follow the last, in its style
         last = ps[-1]
-        for md in new[len(ps):]:
+        for md in new[len(ps) :]:
             q = copy.deepcopy(last._p)
             last._p.addnext(q)
             last = Paragraph(q, last._parent)
             DM.set_paragraph_md(last, md)
     elif len(new) < len(ps):
-        _delete(ps[len(new):])
+        _delete(ps[len(new) :])
     if translate_to and str(translate_to).lower() in ("ur", "urdu", "ar", "arabic"):
         _, objs2 = _targets(doc, op.get("target") or {"kind": "body"}, need=False)
         for p in _paras(objs2):
@@ -1000,17 +1084,30 @@ def op_rewrite(doc, op, ctx, translate_to=None):
 
 def op_summarize(doc, op, ctx):
     from ai_pc.office import edit_llm as EL
+
     if ctx.get("planner") is None:
         raise OpError("summarising needs the model")
     m, objs = _targets(doc, op.get("target") or {"kind": "all"})
     text = "\n".join(o.text for o in objs if isinstance(o, Paragraph) and o.text.strip())[:14000]
     kind = str(op.get("kind") or "executive summary")
-    heading = op.get("heading") if op.get("heading") is not None else kind.title() if kind in ("executive summary", "abstract", "summary", "key takeaways",
-                                                                                                    "conclusion", "key points") else None
-    blocks = EL.write_blocks(ctx["planner"], f"a {kind} of the text below" + (" as 3-6 bullet points" if "point" in kind or "bullet" in kind else ""),
-                             _context(doc, ctx) + "\n\nTEXT TO SUMMARISE:\n" + text, op.get("words") or 150, heading)
+    heading = (
+        op.get("heading")
+        if op.get("heading") is not None
+        else kind.title()
+        if kind in ("executive summary", "abstract", "summary", "key takeaways", "conclusion", "key points")
+        else None
+    )
+    blocks = EL.write_blocks(
+        ctx["planner"],
+        f"a {kind} of the text below" + (" as 3-6 bullet points" if "point" in kind or "bullet" in kind else ""),
+        _context(doc, ctx) + "\n\nTEXT TO SUMMARISE:\n" + text,
+        op.get("words") or 150,
+        heading,
+    )
     where = op.get("where") or ("start" if kind in ("executive summary", "abstract", "summary") else "end")
-    return op_insert(doc, {"op": "insert", "blocks": blocks, "where": where, "anchor": op.get("anchor")}, ctx).replace("block(s) added", f"{kind} added")
+    return op_insert(doc, {"op": "insert", "blocks": blocks, "where": where, "anchor": op.get("anchor")}, ctx).replace(
+        "block(s) added", f"{kind} added"
+    )
 
 
 # ---- tables
@@ -1073,6 +1170,7 @@ def op_table_sort(doc, op, ctx):
         v = r.cells[j].text.strip()
         n = number(v)
         return (0, n[0]) if n else (1, v.lower())
+
     nums = sum(1 for r in data if number(r.cells[j].text.strip()))
     ordered = sorted(data, key=key, reverse=bool(op.get("desc")))
     rows[0]._tr.getprevious()
@@ -1083,8 +1181,11 @@ def op_table_sort(doc, op, ctx):
         ref.addnext(r._tr)
         ref = r._tr
     ctx.setdefault("info", {})["sorted"] = {"col": j, "desc": bool(op.get("desc")), "numeric": nums >= len(data) * 0.7}
-    return f"table sorted by '{head[j]}' ({'largest' if op.get('desc') else 'smallest'} first)" if nums else \
-        f"table sorted by '{head[j]}' ({'Z-A' if op.get('desc') else 'A-Z'})"
+    return (
+        f"table sorted by '{head[j]}' ({'largest' if op.get('desc') else 'smallest'} first)"
+        if nums
+        else f"table sorted by '{head[j]}' ({'Z-A' if op.get('desc') else 'A-Z'})"
+    )
 
 
 def op_table_add_row(doc, op, ctx):
@@ -1098,6 +1199,7 @@ def op_table_add_row(doc, op, ctx):
     new = copy.deepcopy(model._tr)
     (total._tr.addprevious(new) if total is not None else model._tr.addnext(new))
     from docx.table import _Row
+
     row = _Row(new, t)
     for k, c in enumerate(row.cells):
         _set_cell(c, vals[k] if k < len(vals) else "")
@@ -1155,6 +1257,7 @@ def op_table_add_column(doc, op, ctx):
         vals = [str(v) for v in op["values"]]
     elif op.get("formula"):
         from ai_pc.office.xlsx_build import py_value
+
         fmt_from = None
         for r in data:
             named = {}
@@ -1191,8 +1294,11 @@ def op_table_add_column(doc, op, ctx):
         _set_cell(total.cells[-1], "", like=total.cells[-2].paragraphs[0])
         _retotal(t)
     ctx.setdefault("info", {})["column_values"] = vals
-    return f"column '{name}' added ({len(vals)} values" + (f", computed as {op.get('formula')}" if op.get("formula") else
-                                                            f", share of {op.get('percent_of')}" if op.get("percent_of") else "") + ")"
+    return (
+        f"column '{name}' added ({len(vals)} values"
+        + (f", computed as {op.get('formula')}" if op.get("formula") else f", share of {op.get('percent_of')}" if op.get("percent_of") else "")
+        + ")"
+    )
 
 
 def op_table_delete_column(doc, op, ctx):
@@ -1219,6 +1325,7 @@ def op_table_total(doc, op, ctx):
     new = copy.deepcopy(rows[-1]._tr)
     rows[-1]._tr.addnext(new)
     from docx.table import _Row
+
     row = _Row(new, t)
     _set_cell(row.cells[0], "Total")
     for c in row.cells[1:]:
@@ -1234,17 +1341,30 @@ def op_table_total(doc, op, ctx):
 
 def op_chart(doc, op, ctx):
     from ai_pc.office import charts as CH
+
     m, t = _table(doc, op)
     head = [c.text.strip() for c in t.rows[0].cells]
     rows = [r for r in list(t.rows)[1:] if not _is_total(r)]
-    cj = _col(t, op["categories"])[0] if op.get("categories") else next((j for j in range(len(head)) if sum(1 for r in rows if number(r.cells[j].text.strip())) < len(rows) / 2), 0)
-    vcols = [_col(t, v)[0] for v in op.get("values") or []] or [j for j in range(len(head)) if j != cj and sum(1 for r in rows if number(r.cells[j].text.strip())) >= len(rows) * 0.7
-                                                                 and not re.search(r"%|share|rate|percent", head[j], re.I)][:3]
+    cj = (
+        _col(t, op["categories"])[0]
+        if op.get("categories")
+        else next((j for j in range(len(head)) if sum(1 for r in rows if number(r.cells[j].text.strip())) < len(rows) / 2), 0)
+    )
+    vcols = [_col(t, v)[0] for v in op.get("values") or []] or [
+        j
+        for j in range(len(head))
+        if j != cj
+        and sum(1 for r in rows if number(r.cells[j].text.strip())) >= len(rows) * 0.7
+        and not re.search(r"%|share|rate|percent", head[j], re.I)
+    ][:3]
     if not vcols:
         raise OpError("the table has no number columns to chart")
-    spec = {"chart": op.get("chart") or ("bar" if len(rows) > 8 else "column"), "title": op.get("title") or (head[vcols[0]] if len(vcols) == 1 else ""),
-            "categories": [r.cells[cj].text.strip() for r in rows],
-            "series": [{"name": head[j], "values": [(number(r.cells[j].text.strip()) or [None])[0] for r in rows]} for j in vcols]}
+    spec = {
+        "chart": op.get("chart") or ("bar" if len(rows) > 8 else "column"),
+        "title": op.get("title") or (head[vcols[0]] if len(vcols) == 1 else ""),
+        "categories": [r.cells[cj].text.strip() for r in rows],
+        "series": [{"name": head[j], "values": [(number(r.cells[j].text.strip()) or [None])[0] for r in rows]} for j in vcols],
+    }
     if spec["chart"] in ("pie", "doughnut"):
         spec["series"] = spec["series"][:1]
     th = ctx.get("th") or DB.theme_of(doc)
@@ -1286,19 +1406,42 @@ def op_image(doc, op, ctx):
         if ks:
             e = els(doc)
             ref = _el(e[ks[-1] if (op.get("where") or "after") == "after" else ks[0]])
-            for el in (reversed(new) if (op.get("where") or "after") == "after" else new):
+            for el in reversed(new) if (op.get("where") or "after") == "after" else new:
                 ref.addnext(el) if (op.get("where") or "after") == "after" else ref.addprevious(el)
     return f"image {path.name} added ({w:.1f} cm wide)"
 
 
-OPS = {"style": op_style, "page": op_page, "page_numbers": op_page_numbers, "header": op_header_footer, "footer": op_header_footer,
-       "toc": op_toc, "cover": op_cover, "theme": op_theme, "table_style": op_table_style, "structure": op_structure,
-       "heading_numbers": op_heading_numbers, "list": op_list, "page_breaks": op_page_breaks, "replace": op_replace, "emphasis": op_emphasis,
-       "delete": op_delete, "move": op_move, "insert": op_insert, "rewrite": op_rewrite,
-       "translate": lambda d, o, c: op_rewrite(d, o, c, translate_to=o.get("language") or "Urdu"),
-       "summarize": op_summarize, "table_sort": op_table_sort, "table_add_row": op_table_add_row, "table_delete_row": op_table_delete_row,
-       "table_add_column": op_table_add_column, "table_delete_column": op_table_delete_column, "table_total": op_table_total,
-       "chart": op_chart, "image": op_image}
+OPS = {
+    "style": op_style,
+    "page": op_page,
+    "page_numbers": op_page_numbers,
+    "header": op_header_footer,
+    "footer": op_header_footer,
+    "toc": op_toc,
+    "cover": op_cover,
+    "theme": op_theme,
+    "table_style": op_table_style,
+    "structure": op_structure,
+    "heading_numbers": op_heading_numbers,
+    "list": op_list,
+    "page_breaks": op_page_breaks,
+    "replace": op_replace,
+    "emphasis": op_emphasis,
+    "delete": op_delete,
+    "move": op_move,
+    "insert": op_insert,
+    "rewrite": op_rewrite,
+    "translate": lambda d, o, c: op_rewrite(d, o, c, translate_to=o.get("language") or "Urdu"),
+    "summarize": op_summarize,
+    "table_sort": op_table_sort,
+    "table_add_row": op_table_add_row,
+    "table_delete_row": op_table_delete_row,
+    "table_add_column": op_table_add_column,
+    "table_delete_column": op_table_delete_column,
+    "table_total": op_table_total,
+    "chart": op_chart,
+    "image": op_image,
+}
 NEEDS_MODEL = {"rewrite", "translate", "summarize"}
 
 
@@ -1315,7 +1458,7 @@ def renumber(doc):
             continue
         n[m.group(1)] += 1
         if int(m.group(2)) != n[m.group(1)]:
-            runs[0].text = f"{m.group(1)} {n[m.group(1)]}" + runs[0].text[m.end():]
+            runs[0].text = f"{m.group(1)} {n[m.group(1)]}" + runs[0].text[m.end() :]
             changed += 1
     return changed
 
@@ -1344,6 +1487,7 @@ def check(op, before, after, info=None, doc_after=None, pdf_text=None):
     info = info or {}
     if k in ("data_table", "data_chart", "data_refresh") and doc_after is not None:
         from ai_pc.office import docx_data as DD
+
         return DD.check(op, doc_after)
     b_text = " ".join(it["text"] for it in before["items"] if not it.get("toc"))
     a_text = " ".join(it["text"] for it in after["items"] if not it.get("toc"))
@@ -1371,8 +1515,9 @@ def check(op, before, after, info=None, doc_after=None, pdf_text=None):
             return w1 >= w0 * 1.1, f"{w0} -> {w1} words"
         return a_text != b_text, f"{w0} -> {w1} words"
     if k == "move":
-        return [it["text"] for it in after["headings"]] != [it["text"] for it in before["headings"]] or a_text != b_text, \
-            "order now: " + " / ".join(it["text"][:20] for it in after["headings"][:6])
+        return [it["text"] for it in after["headings"]] != [it["text"] for it in before["headings"]] or a_text != b_text, "order now: " + " / ".join(
+            it["text"][:20] for it in after["headings"][:6]
+        )
     if k == "toc":
         return (after["toc"] != before["toc"]) or (after["toc"] and not op.get("remove")), f"contents page {'present' if after['toc'] else 'absent'}"
     if k == "page_numbers":
@@ -1410,11 +1555,15 @@ def check(op, before, after, info=None, doc_after=None, pdf_text=None):
         if k == "table_delete_row":
             return t1["rows"] < t0["rows"], f"{t0['rows']} -> {t1['rows']} rows"
         if k == "table_add_column":
-            return t1["cols"] == t0["cols"] + 1 and str(op.get("name", "")).lower() in [h.lower() for h in t1["header"]], f"{t0['cols']} -> {t1['cols']} columns"
+            return t1["cols"] == t0["cols"] + 1 and str(op.get("name", "")).lower() in [
+                h.lower() for h in t1["header"]
+            ], f"{t0['cols']} -> {t1['cols']} columns"
         if k == "table_delete_column":
             return t1["cols"] == t0["cols"] - 1, f"{t0['cols']} -> {t1['cols']} columns"
         if k == "table_total":
-            return bool(t1["data"]) and t1["data"][-1][0].lower().startswith("total"), "total row " + ("present" if t1["data"] and t1["data"][-1][0].lower().startswith("total") else "missing")
+            return bool(t1["data"]) and t1["data"][-1][0].lower().startswith("total"), "total row " + (
+                "present" if t1["data"] and t1["data"][-1][0].lower().startswith("total") else "missing"
+            )
         if k == "table_sort":
             srt = info.get("sorted") or {}
             j = srt.get("col", 0)
@@ -1430,14 +1579,16 @@ def check(op, before, after, info=None, doc_after=None, pdf_text=None):
     if k == "cover":
         return after["stats"]["words"] != before["stats"]["words"], "cover " + ("removed" if op.get("remove") else "added")
     if k == "structure":
-        return sum(1 for h in after["headings"] if not h.get("visual")) > sum(1 for h in before["headings"] if not h.get("visual")), \
-            f"{sum(1 for h in after['headings'] if not h.get('visual'))} real heading(s)"
+        return sum(1 for h in after["headings"] if not h.get("visual")) > sum(
+            1 for h in before["headings"] if not h.get("visual")
+        ), f"{sum(1 for h in after['headings'] if not h.get('visual'))} real heading(s)"
     if k == "heading_numbers":
         numbered = sum(1 for h in after["headings"] if re.match(r"^\d+(\.\d+)*\s", h["text"]))
         return (numbered == 0) if op.get("remove") else numbered > 0, f"{numbered} numbered heading(s)"
     if k == "list":
-        return sum(1 for it in after["items"] if it.get("list")) != sum(1 for it in before["items"] if it.get("list")) or op.get("kind") == "numbered", \
-            f"{sum(1 for it in after['items'] if it.get('list'))} list item(s)"
+        return sum(1 for it in after["items"] if it.get("list")) != sum(1 for it in before["items"] if it.get("list")) or op.get(
+            "kind"
+        ) == "numbered", f"{sum(1 for it in after['items'] if it.get('list'))} list item(s)"
     return True, "applied"
 
 

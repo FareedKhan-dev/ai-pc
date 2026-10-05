@@ -7,6 +7,7 @@ Cost on the Arc 140T: ~1.6-2.5 s to read a NEW screenshot (~870 image tokens), t
 Same interface as grounder.Grounder (alive / ensure / prefetch / load / find / ground). Points are in the pixels of
 the image that was passed in. Weights are CC BY-NC-SA 4.0: non-commercial use only.
 """
+
 import base64
 import functools
 import io
@@ -28,6 +29,8 @@ SYSTEM_FILE = ROOT / "models" / "vocaela" / "system_prompt.txt"  # the exact tra
 @functools.cache
 def system_prompt():
     return SYSTEM_FILE.read_text(encoding="utf-8")
+
+
 _VERB = re.compile(r"(?i)^(click|double[- ]click|right[- ]click|tap|press|select|open|choose)\b")
 _ACTIONS = re.compile(r"\[\s*\{.*\}\s*\]", re.S)
 
@@ -39,9 +42,9 @@ class VocaelaGrounder:
         self.url = url.rstrip("/")
         self.autostart = autostart
         self.max_side = max_side  # the model reads at most 1024 px on the long side; 1280 is what was measured
-        self.marker = None        # llama-server's per-process media marker (from /props)
-        self._pre = None          # (image object, thread, holder) of a background prefetch
-        self._cur = None          # (base64 jpeg, (width, height)) of the screenshot questions refer to
+        self.marker = None  # llama-server's per-process media marker (from /props)
+        self._pre = None  # (image object, thread, holder) of a background prefetch
+        self._cur = None  # (base64 jpeg, (width, height)) of the screenshot questions refer to
 
     # ------------------------------------------------------------------ server
     def _get(self, path, timeout=3):
@@ -49,8 +52,7 @@ class VocaelaGrounder:
             return json.loads(r.read())
 
     def _post(self, payload, timeout=90):
-        req = urllib.request.Request(self.url + "/completion", data=json.dumps(payload).encode(),
-                                     headers={"Content-Type": "application/json"})
+        req = urllib.request.Request(self.url + "/completion", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read())
 
@@ -70,8 +72,9 @@ class VocaelaGrounder:
         if not self.autostart:
             raise GrounderError("Vocaela server is not running (see config.VOCAELA_CMD)")
         log = open(ROOT / "runs" / "vocaela_server.log", "ab")
-        subprocess.Popen(VOCAELA_CMD, cwd=str(ROOT), stdout=log, stderr=log,
-                         creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        subprocess.Popen(
+            VOCAELA_CMD, cwd=str(ROOT), stdout=log, stderr=log, creationflags=0x00000008 | 0x00000200
+        )  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
         t0 = time.time()
         while time.time() - t0 < timeout:
             if self.alive():
@@ -104,8 +107,9 @@ class VocaelaGrounder:
             try:
                 holder["enc"] = enc = self._encode(img)
                 if self.alive():
-                    self._post({"prompt": {"prompt_string": self._prompt(), "multimodal_data": [enc[0]]},
-                                "n_predict": 0, "cache_prompt": True, "id_slot": 0})
+                    self._post(
+                        {"prompt": {"prompt_string": self._prompt(), "multimodal_data": [enc[0]]}, "n_predict": 0, "cache_prompt": True, "id_slot": 0}
+                    )
             except Exception as e:  # noqa: BLE001
                 holder["error"] = e
 
@@ -137,8 +141,16 @@ class VocaelaGrounder:
         cmd = cmd[0].upper() + cmd[1:]
         b64, (w, h) = self._cur
         t = time.perf_counter()
-        r = self._post({"prompt": {"prompt_string": self._prompt(cmd), "multimodal_data": [b64]},
-                        "temperature": 0.0, "n_predict": 64, "stop": ["</Action>"], "cache_prompt": True, "id_slot": slot})
+        r = self._post(
+            {
+                "prompt": {"prompt_string": self._prompt(cmd), "multimodal_data": [b64]},
+                "temperature": 0.0,
+                "n_predict": 64,
+                "stop": ["</Action>"],
+                "cache_prompt": True,
+                "id_slot": slot,
+            }
+        )
         text = str(r.get("content", ""))
         m = _ACTIONS.search(text)
         try:

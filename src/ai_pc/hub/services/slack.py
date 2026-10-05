@@ -1,5 +1,6 @@
 """Slack through its Web API with a bot token: post (also in a thread, or later), read a channel, direct messages, edit,
 delete, upload a file, react. Every post is read back from the channel's history."""
+
 import re
 import time
 from pathlib import Path
@@ -31,15 +32,26 @@ class Slack(Base):
         out, cursor = [], None
         while True:
             js = self.call("conversations.list", "GET", types="public_channel,private_channel", exclude_archived="true", limit=200, cursor=cursor)
-            out += [{"id": c["id"], "name": c["name"], "member": c.get("is_member", False), "private": c.get("is_private", False)} for c in js["channels"]]
+            out += [
+                {"id": c["id"], "name": c["name"], "member": c.get("is_member", False), "private": c.get("is_private", False)} for c in js["channels"]
+            ]
             cursor = (js.get("response_metadata") or {}).get("next_cursor")
             if not cursor:
                 return out
 
     def users(self):
         js = self.call("users.list", "GET", limit=500)
-        return [{"id": u["id"], "name": u.get("name"), "real_name": u.get("real_name") or (u.get("profile") or {}).get("real_name"),
-                 "email": (u.get("profile") or {}).get("email"), "bot": u.get("is_bot", False)} for u in js["members"] if not u.get("deleted")]
+        return [
+            {
+                "id": u["id"],
+                "name": u.get("name"),
+                "real_name": u.get("real_name") or (u.get("profile") or {}).get("real_name"),
+                "email": (u.get("profile") or {}).get("email"),
+                "bot": u.get("is_bot", False),
+            }
+            for u in js["members"]
+            if not u.get("deleted")
+        ]
 
     def target(self, where):
         """'#general', 'general', 'C0123', '@ali', 'ali@x.com' -> (channel id, label)."""
@@ -65,14 +77,25 @@ class Slack(Base):
         ts = js["ts"]
         link = self.call("chat.getPermalink", "GET", channel=js["channel"], message_ts=ts).get("permalink")
         back = self.call("conversations.history", "GET", channel=js["channel"], latest=ts, inclusive="true", limit=1).get("messages", [])
-        return {"id": ts, "channel": js["channel"], "where": label, "link": link, "verified": bool(back) and back[0].get("text") == text,
-                "undo": {"service": "slack", "op": "delete", "channel": js["channel"], "ts": ts}}
+        return {
+            "id": ts,
+            "channel": js["channel"],
+            "where": label,
+            "link": link,
+            "verified": bool(back) and back[0].get("text") == text,
+            "undo": {"service": "slack", "op": "delete", "channel": js["channel"], "ts": ts},
+        }
 
     def schedule(self, where, text, at_unix):
         ch, label = self.target(where)
         js = self.call("chat.scheduleMessage", channel=ch, text=text, post_at=int(at_unix))
-        return {"id": js["scheduled_message_id"], "channel": ch, "where": label, "at": int(at_unix),
-                "undo": {"service": "slack", "op": "unschedule", "channel": ch, "id": js["scheduled_message_id"]}}
+        return {
+            "id": js["scheduled_message_id"],
+            "channel": ch,
+            "where": label,
+            "at": int(at_unix),
+            "undo": {"service": "slack", "op": "unschedule", "channel": ch, "id": js["scheduled_message_id"]},
+        }
 
     def read(self, where, hours=24, limit=100):
         ch, label = self.target(where)
@@ -84,8 +107,17 @@ class Slack(Base):
             t = re.sub(r"<@(\w+)>", lambda m: "@" + names.get(m.group(1), m.group(1)), t or "")
             t = re.sub(r"<#\w+\|([^>]+)>", r"#\1", t)
             return re.sub(r"<(https?://[^|>]+)(?:\|[^>]+)?>", r"\1", t)
-        msgs = [{"ts": m["ts"], "who": names.get(m.get("user"), m.get("username") or m.get("bot_id") or "?"), "text": words(m.get("text", "")),
-                 "replies": m.get("reply_count", 0)} for m in js.get("messages", []) if m.get("type") == "message" and m.get("subtype") not in skip]
+
+        msgs = [
+            {
+                "ts": m["ts"],
+                "who": names.get(m.get("user"), m.get("username") or m.get("bot_id") or "?"),
+                "text": words(m.get("text", "")),
+                "replies": m.get("reply_count", 0),
+            }
+            for m in js.get("messages", [])
+            if m.get("type") == "message" and m.get("subtype") not in skip
+        ]
         return {"where": label, "messages": list(reversed(msgs))}
 
     def update(self, channel, ts, text):
@@ -115,11 +147,21 @@ class Slack(Base):
         status, _, _ = a.request("POST", up["upload_url"], data=data, headers={"Content-Type": "application/octet-stream"}, raw=True)
         if status >= 400:
             raise HubError(f"slack: the upload was refused ({status})")
-        done = self.call("files.completeUploadExternal", files=[{"id": up["file_id"], "title": p.name}], channel_id=ch,
-                         **({"initial_comment": comment} if comment else {}))
+        done = self.call(
+            "files.completeUploadExternal",
+            files=[{"id": up["file_id"], "title": p.name}],
+            channel_id=ch,
+            **({"initial_comment": comment} if comment else {}),
+        )
         f = (done.get("files") or [{}])[0]
-        return {"id": up["file_id"], "where": label, "name": p.name, "link": f.get("permalink"), "verified": f.get("id") == up["file_id"],
-                "undo": {"service": "slack", "op": "delete_file", "id": up["file_id"]}}
+        return {
+            "id": up["file_id"],
+            "where": label,
+            "name": p.name,
+            "link": f.get("permalink"),
+            "verified": f.get("id") == up["file_id"],
+            "undo": {"service": "slack", "op": "delete_file", "id": up["file_id"]},
+        }
 
     def delete_file(self, id):  # noqa: A002
         self.call("files.delete", file=id)

@@ -7,6 +7,7 @@ certificates and invitations, one version per change, every version rendered (PN
   c.say("an instagram post for our summer sale 'Mega Summer Sale' 30% off 1-15 June, shop now")  /  c.say("make it a story")
   c.say("certificates of participation for Ali Raza, Sara Khan and Hamza Ali")  /  c.say("export the pdf for printing")  /  c.say("undo")
 """
+
 import datetime as dt
 import json
 import re
@@ -26,7 +27,10 @@ UNDO = re.compile(r"^\s*(?:undo|revert|go back|take (?:that|it) back)\b(?!.*\bv\
 REDO = re.compile(r"^\s*redo\b", re.I)
 GOTO = re.compile(r"\b(?:go back to|back to|use|show me|switch to)\s+(?:version\s*|v)(\d+)\b", re.I)
 HISTORY = re.compile(r"^\s*(?:history|versions)\b", re.I)
-SPLIT = re.compile(r"(?<!\bMr\.)(?<!\bMs\.)(?<!\bDr\.)(?<!\bMrs\.)(?<!\bSt\.)(?<=[.!?;])\s+(?=[A-Z])|,?\s+(?:and then|then|also)\s+|,?\s+and\s+(?=(?:make|change|add|remove|use|put|export|save|give|turn|set|try)\b)", re.I)
+SPLIT = re.compile(
+    r"(?<!\bMr\.)(?<!\bMs\.)(?<!\bDr\.)(?<!\bMrs\.)(?<!\bSt\.)(?<=[.!?;])\s+(?=[A-Z])|,?\s+(?:and then|then|also)\s+|,?\s+and\s+(?=(?:make|change|add|remove|use|put|export|save|give|turn|set|try)\b)",
+    re.I,
+)
 DESIGN_SYSTEM = """You turn a person's request about a design into changes for a program. Reply with ONE JSON object: {"ops": [...]} or {"ask": "<short question>"}.
 Ops:
  {"op": "new", "kind": "card|post|portrait|story|thumbnail|flyer|poster|certificate|invitation", "style": "...", "palette": "navy|emerald|maroon|charcoal|blue|green|black|purple|red|orange|teal|cream|white|pink|gold",
@@ -66,8 +70,20 @@ class DesignChat:
             folder = Path(chats_dir or CHATS) / f"{cid}_{k}"
             k += 1
         folder.mkdir(parents=True)
-        c = cls({"id": folder.name, "folder": str(folder), "versions": [], "cur": -1, "redo": [], "turns": [], "exports": [],
-                 "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in (files or [])}}, planner=planner, log=log)
+        c = cls(
+            {
+                "id": folder.name,
+                "folder": str(folder),
+                "versions": [],
+                "cur": -1,
+                "redo": [],
+                "turns": [],
+                "exports": [],
+                "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in (files or [])},
+            },
+            planner=planner,
+            log=log,
+        )
         c.save()
         return c
 
@@ -121,7 +137,9 @@ class DesignChat:
             else:
                 ops = r["ops"]
                 new = ops[0]
-                if new["op"] == "new" and self._thin(new) and self.planner is not None:  # the rules found the kind but few details: the model reads the rest
+                if (
+                    new["op"] == "new" and self._thin(new) and self.planner is not None
+                ):  # the rules found the kind but few details: the model reads the rest
                     r2 = self._llm(message, message)
                     llm_new = next((o for o in r2["ops"] if o.get("op") == "new"), None)
                     if llm_new:
@@ -131,7 +149,10 @@ class DesignChat:
                         ops = [new] + ops[1:]
             if ops:
                 out.append(self._apply(ops, message))
-        reply = "\n".join(x for x in out if x).strip() or "Tell me what to design, e.g. 'a visiting card for Ahmed Khan, Sales Manager at Khan Electronics, 0300-1234567'."
+        reply = (
+            "\n".join(x for x in out if x).strip()
+            or "Tell me what to design, e.g. 'a visiting card for Ahmed Khan, Sales Manager at Khan Electronics, 0300-1234567'."
+        )
         turn.update(reply=reply, seconds=round(time.perf_counter() - t0, 2), v_to=self.state["cur"])
         self.state["turns"].append(turn)
         self.last_turn = turn
@@ -140,23 +161,45 @@ class DesignChat:
 
     @staticmethod
     def _thin(new):
-        need = {"card": ("name",), "post": ("headline",), "portrait": ("headline",), "story": ("headline",), "thumbnail": ("headline",), "flyer": ("headline",),
-                "poster": ("headline",), "certificate": ("recipient",), "invitation": ("event",)}[new["kind"]]
+        need = {
+            "card": ("name",),
+            "post": ("headline",),
+            "portrait": ("headline",),
+            "story": ("headline",),
+            "thumbnail": ("headline",),
+            "flyer": ("headline",),
+            "poster": ("headline",),
+            "certificate": ("recipient",),
+            "invitation": ("event",),
+        }[new["kind"]]
         return any(not new["fields"].get(k) for k in need)
 
     def _llm(self, clause, message):
         if self.planner is None:
-            return {"ops": [], "ask": f"I could not read '{clause[:80]}'. Try e.g. 'a visiting card for Ahmed Khan, Sales Manager at Khan Electronics, 0300-1234567' "
-                                      f"or 'make the name bigger'."}
+            return {
+                "ops": [],
+                "ask": f"I could not read '{clause[:80]}'. Try e.g. 'a visiting card for Ahmed Khan, Sales Manager at Khan Electronics, 0300-1234567' "
+                f"or 'make the name bigger'.",
+            }
         self._turn["llm"] = True
         v = self.cur()
-        ctx = f"ON SCREEN: {json.dumps({k: v['spec'].get(k) for k in ('kind', 'style', 'palette', 'fields')}, ensure_ascii=False)}" if v else "ON SCREEN: nothing yet"
+        ctx = (
+            f"ON SCREEN: {json.dumps({k: v['spec'].get(k) for k in ('kind', 'style', 'palette', 'fields')}, ensure_ascii=False)}"
+            if v
+            else "ON SCREEN: nothing yet"
+        )
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": DESIGN_SYSTEM}, {"role": "user", "content": f"{ctx}\nMESSAGE: {message}\nREQUEST: {clause}"}])
+            r = self.planner._call(
+                "fast", [{"role": "system", "content": DESIGN_SYSTEM}, {"role": "user", "content": f"{ctx}\nMESSAGE: {message}\nREQUEST: {clause}"}]
+            )
             d = parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return {"ops": [], "ask": f"I could not work that out ({type(e).__name__})."}
-        ops = [o for o in d.get("ops") or [] if isinstance(o, dict) and o.get("op") in ("new", "set", "drop", "look", "size", "qr", "batch", "export", "image", "logo")]
+        ops = [
+            o
+            for o in d.get("ops") or []
+            if isinstance(o, dict) and o.get("op") in ("new", "set", "drop", "look", "size", "qr", "batch", "export", "image", "logo")
+        ]
         for o in ops:
             if o["op"] == "new" and o.get("kind") not in KINDS:
                 o["kind"] = "post"
@@ -171,9 +214,14 @@ class DesignChat:
             k = op["op"]
             self._turn["intents"].append(k)
             if k == "new":
-                spec = {"kind": op["kind"], "style": op.get("style") if op.get("style") in KINDS[op["kind"]]["styles"] else KINDS[op["kind"]]["styles"][0],
-                        "palette": op.get("palette") if op.get("palette") in PALETTES else DEFAULT_PALETTE[op["kind"]], "fields": dict(op.get("fields") or {}),
-                        "qr": op.get("qr", False), "sizes": {}}
+                spec = {
+                    "kind": op["kind"],
+                    "style": op.get("style") if op.get("style") in KINDS[op["kind"]]["styles"] else KINDS[op["kind"]]["styles"][0],
+                    "palette": op.get("palette") if op.get("palette") in PALETTES else DEFAULT_PALETTE[op["kind"]],
+                    "fields": dict(op.get("fields") or {}),
+                    "qr": op.get("qr", False),
+                    "sizes": {},
+                }
                 for key in ("image", "logo", "gradient", "paper"):
                     if op.get(key):
                         spec[key] = self._file(op[key]) if key in ("image", "logo") else op[key]
@@ -201,7 +249,11 @@ class DesignChat:
                     spec["sizes"] = {}
                 if op.get("style"):
                     styles = KINDS[spec["kind"]]["styles"]
-                    spec["style"] = styles[(styles.index(spec["style"]) + 1) % len(styles)] if op["style"] == "next" else (op["style"] if op["style"] in styles else spec["style"])
+                    spec["style"] = (
+                        styles[(styles.index(spec["style"]) + 1) % len(styles)]
+                        if op["style"] == "next"
+                        else (op["style"] if op["style"] in styles else spec["style"])
+                    )
                     spec["sizes"] = {}
                 if op.get("palette") in PALETTES:
                     spec["palette"] = op["palette"]
@@ -280,9 +332,18 @@ class DesignChat:
             for i in (p["measure"] or {}).get("items", []):
                 if i.get("text_el") and i["role"] not in fitted:
                     fitted[i["role"]] = i.get("fitted") or i["size"]
-        nv = {"v": n, "spec": spec, "files": {"png": [p["png"] for p in res["pages"]], "pdf": res["pdf"], "html": [p["html"] for p in res["pages"]]},
-              "checks": checks, "fitted": fitted, "said": said, "parent": self.state["cur"], "when": _when(), "seconds": round(time.perf_counter() - t0, 1),
-              "prepared": {k: x for k, x in info.items() if k != "faces"}}
+        nv = {
+            "v": n,
+            "spec": spec,
+            "files": {"png": [p["png"] for p in res["pages"]], "pdf": res["pdf"], "html": [p["html"] for p in res["pages"]]},
+            "checks": checks,
+            "fitted": fitted,
+            "said": said,
+            "parent": self.state["cur"],
+            "when": _when(),
+            "seconds": round(time.perf_counter() - t0, 1),
+            "prepared": {k: x for k, x in info.items() if k != "faces"},
+        }
         self.state["versions"].append(nv)
         self.state["cur"] = n
         self.state["redo"] = []
@@ -293,9 +354,13 @@ class DesignChat:
         k = KINDS[spec["kind"]]
         bad = [c for c in nv["checks"] if not c["ok"] and c["level"] == "fail"]
         warn = [c for c in nv["checks"] if not c["ok"] and c["level"] == "warn"]
-        text = f"checked {len(nv['checks']) - len(bad) - len(warn)}/{len(nv['checks'])}" + (f"; not right: {'; '.join(c['what'] for c in bad[:3])}" if bad else "") + \
-            (f"; to look at: {'; '.join(c['what'] for c in warn[:2])}" if warn else "")
+        text = (
+            f"checked {len(nv['checks']) - len(bad) - len(warn)}/{len(nv['checks'])}"
+            + (f"; not right: {'; '.join(c['what'] for c in bad[:3])}" if bad else "")
+            + (f"; to look at: {'; '.join(c['what'] for c in warn[:2])}" if warn else "")
+        )
         from ai_pc.design.kinds import size_of
+
         w, h, unit, bleed, _ = size_of(spec)
         size = f"{w:g} x {h:g} mm" + (f" + {bleed:g} mm bleed" if bleed else "") if unit == "mm" else f"{w} x {h} px"
         who = spec["fields"].get("name") or spec["fields"].get("headline") or spec["fields"].get("recipient") or spec["fields"].get("event") or ""
@@ -305,8 +370,10 @@ class DesignChat:
         if spec.get("_text_at") == "top":
             extra += " The words went to the top, clear of the faces."
         files = [Path(p).name for p in nv["files"]["png"]] + ([Path(nv["files"]["pdf"]).name] if nv["files"]["pdf"] else [])
-        return (f"v{nv['v']}: {k['label']} ({spec['style']}, {spec.get('gradient') or spec['palette']}){' for ' + who if who else ''}, {size}"
-                f"{', front and back' if len(nv['files']['png']) > 1 else ''}.{extra} Files: {', '.join(files)}. ({text})")
+        return (
+            f"v{nv['v']}: {k['label']} ({spec['style']}, {spec.get('gradient') or spec['palette']}){' for ' + who if who else ''}, {size}"
+            f"{', front and back' if len(nv['files']['png']) > 1 else ''}.{extra} Files: {', '.join(files)}. ({text})"
+        )
 
     # ---------------------------------------------------------------- certificates for many names
     def _batch(self, op, said):
@@ -317,6 +384,7 @@ class DesignChat:
         if not names:
             return f"No names found in {op.get('file')}."
         from ai_pc.design.layouts import certificate
+
         spec = v["spec"]
         pages = []
         for nm in names:
@@ -326,6 +394,7 @@ class DesignChat:
         hp = self.folder / f"{stem}.html"
         hp.write_text(both, encoding="utf-8")
         from ai_pc.core import headless
+
         dom = headless.dom(hp, wait_ms=3000)
         m = re.search(r'<script type="application/json" id="measure">(.*?)</script>', dom, re.S)
         meas = json.loads(m.group(1)) if m else {"items": []}
@@ -335,14 +404,26 @@ class DesignChat:
         bad = [i["text"] for i in whos if i.get("over")]
         shrunk = [i["text"] for i in whos if i.get("fitted") and i.get("base") and i["fitted"] < i["base"] - 0.5]
         from pypdf import PdfReader
+
         pages_n = len(PdfReader(str(pdf)).pages)
-        chk = [{"ok": pages_n == len(names), "what": f"{pages_n} page(s) for {len(names)} name(s)", "level": "fail"},
-               {"ok": len(whos) == len(names) and sorted(i["text"] for i in whos) == sorted(names), "what": "every name printed once, spelled as given", "level": "fail"},
-               {"ok": not bad, "what": "every name fits its line" + (f" (not: {', '.join(bad[:3])})" if bad else ""), "level": "fail"}]
+        chk = [
+            {"ok": pages_n == len(names), "what": f"{pages_n} page(s) for {len(names)} name(s)", "level": "fail"},
+            {
+                "ok": len(whos) == len(names) and sorted(i["text"] for i in whos) == sorted(names),
+                "what": "every name printed once, spelled as given",
+                "level": "fail",
+            },
+            {"ok": not bad, "what": "every name fits its line" + (f" (not: {', '.join(bad[:3])})" if bad else ""), "level": "fail"},
+        ]
         self.state.setdefault("batches", []).append({"v": v["v"], "names": names, "pdf": str(pdf), "checks": chk})
         okn = sum(c["ok"] for c in chk)
-        return (f"{len(names)} certificates in one PDF ({pdf.name}, {pages_n} pages)" + (f"; {len(shrunk)} long name(s) set smaller to fit" if shrunk else "") +
-                f". (checked {okn}/{len(chk)}" + ("" if okn == len(chk) else f"; not right: {'; '.join(c['what'] for c in chk if not c['ok'])}") + ") Say 'export the pdf' to save it.")
+        return (
+            f"{len(names)} certificates in one PDF ({pdf.name}, {pages_n} pages)"
+            + (f"; {len(shrunk)} long name(s) set smaller to fit" if shrunk else "")
+            + f". (checked {okn}/{len(chk)}"
+            + ("" if okn == len(chk) else f"; not right: {'; '.join(c['what'] for c in chk if not c['ok'])}")
+            + ") Say 'export the pdf' to save it."
+        )
 
     def _names(self, file):
         p = Path(self._file(file)) if file else None
@@ -350,6 +431,7 @@ class DesignChat:
             return []
         if p.suffix.lower() == ".xlsx":
             import openpyxl
+
             ws = openpyxl.load_workbook(p, read_only=True, data_only=True).active
             vals = [r[0] for r in ws.iter_rows(values_only=True) if r and r[0]]
         else:
@@ -386,6 +468,7 @@ class DesignChat:
                 side = Path(p).stem.split("_")[-1]
                 if kw.get("for") == "whatsapp":
                     from PIL import Image
+
                     dst = out_dir / f"{base} {side}.jpg"
                     im = Image.open(p).convert("RGB")
                     if max(im.size) > 2000:
@@ -400,7 +483,11 @@ class DesignChat:
         note = ""
         if kw.get("for") == "print" and v["files"]["pdf"]:
             _, _, _, bleed, _ = __import__("ai_pc.design.kinds", fromlist=["size_of"]).size_of(spec)
-            note = f" (vector PDF at the exact size with {bleed:g} mm bleed: tell the print shop 'trim to size')" if bleed else " (vector PDF at the exact size)"
+            note = (
+                f" (vector PDF at the exact size with {bleed:g} mm bleed: tell the print shop 'trim to size')"
+                if bleed
+                else " (vector PDF at the exact size)"
+            )
         return "Saved " + "; ".join(str(s) for s in saved) + note + "." if saved else "Nothing to save."
 
     # ---------------------------------------------------------------- history
@@ -426,5 +513,11 @@ class DesignChat:
         return f"Now at v{n} ({self.cur()['said'][:60]})."
 
     def history(self):
-        return "\n".join(f"v{v['v']} {KINDS[v['spec']['kind']]['label']} ({v['spec']['style']}): '{v['said'][:60]}'" + (" <- now" if v["v"] == self.state["cur"] else "")
-                         for v in self.state["versions"]) or "Nothing yet."
+        return (
+            "\n".join(
+                f"v{v['v']} {KINDS[v['spec']['kind']]['label']} ({v['spec']['style']}): '{v['said'][:60]}'"
+                + (" <- now" if v["v"] == self.state["cur"] else "")
+                for v in self.state["versions"]
+            )
+            or "Nothing yet."
+        )

@@ -5,6 +5,7 @@ Pakistan time (Asia/Karachi, UTC+5).
 
   'meeting with Ali Traders on 12 October at 3 pm for 1 hour at the shop'   'remind me to pay rent every month on the 5th at 10 am'
 """
+
 import datetime as dt
 import re
 import uuid
@@ -14,8 +15,10 @@ from ai_pc.hub.hubparse import when
 
 NAME, LABEL = "calendar", "Calendar invites and reminders (.ics)"
 EXAMPLES = ["meeting with Ali Traders on 12 October at 3 pm for 1 hour at the shop", "remind me to pay rent every month on the 5th at 10 am"]
-TZ = ("BEGIN:VTIMEZONE\r\nTZID:Asia/Karachi\r\nBEGIN:STANDARD\r\nDTSTART:19700101T000000\r\nTZOFFSETFROM:+0500\r\nTZOFFSETTO:+0500\r\nTZNAME:PKT\r\n"
-      "END:STANDARD\r\nEND:VTIMEZONE\r\n")
+TZ = (
+    "BEGIN:VTIMEZONE\r\nTZID:Asia/Karachi\r\nBEGIN:STANDARD\r\nDTSTART:19700101T000000\r\nTZOFFSETFROM:+0500\r\nTZOFFSETTO:+0500\r\nTZNAME:PKT\r\n"
+    "END:STANDARD\r\nEND:VTIMEZONE\r\n"
+)
 DAYS = {"monday": "MO", "tuesday": "TU", "wednesday": "WE", "thursday": "TH", "friday": "FR", "saturday": "SA", "sunday": "SU"}
 
 
@@ -47,15 +50,29 @@ def read(text, now):
     m = re.search(r"\bfor\s+(\d+(?:\.\d+)?)\s*(hours?|hrs?|minutes?|mins?)\b", c)
     if m:
         mins = int(float(m.group(1)) * (60 if m.group(2).startswith("h") else 1))
-    place = re.search(r"\b(?:at|in)\s+(?:the\s+)?([a-z][\w' ]{2,40}?)(?:\s+(?:on|for|at|every)\b|$)", c[c.find(" ", 0):] if t else c)
+    place = re.search(r"\b(?:at|in)\s+(?:the\s+)?([a-z][\w' ]{2,40}?)(?:\s+(?:on|for|at|every)\b|$)", c[c.find(" ", 0) :] if t else c)
     where = None
     if place and not re.match(r"^\d", place.group(1)) and place.group(1).strip() not in ("noon",):
         where = place.group(1).strip()
-    title = re.sub(r"\b(?:on|at|for|every|from|in)\b.*$", "", re.sub(r"^\s*(?:remind me to|reminder to|add|schedule|book)\s+", "", text, flags=re.I),
-                   flags=re.I).strip(" ,.") or "Event"
+    title = (
+        re.sub(
+            r"\b(?:on|at|for|every|from|in)\b.*$",
+            "",
+            re.sub(r"^\s*(?:remind me to|reminder to|add|schedule|book)\s+", "", text, flags=re.I),
+            flags=re.I,
+        ).strip(" ,.")
+        or "Event"
+    )
     title = re.sub(r"\b(?:tomorrow|today|tonight|next \w+)\b", "", title, flags=re.I).strip(" ,.")
-    return {"title": title[:1].upper() + title[1:], "start": dt.datetime.combine(day, t or dt.time(9, 0)), "all_day": t is None and not rule,
-            "minutes": mins, "where": where, "rule": rule, "reminder": 30 if re.search(r"\bremind", c) else 15}
+    return {
+        "title": title[:1].upper() + title[1:],
+        "start": dt.datetime.combine(day, t or dt.time(9, 0)),
+        "all_day": t is None and not rule,
+        "minutes": mins,
+        "where": where,
+        "rule": rule,
+        "reminder": 30 if re.search(r"\bremind", c) else 15,
+    }
 
 
 def ics(events):
@@ -97,8 +114,18 @@ def run(op, ctx):
     text = one.read_text(encoding="utf-8")
     ok = text.count("BEGIN:VEVENT") == 1 and "END:VCALENDAR" in text and (e["title"].split()[0] in text)
     when_ = "all day " + f"{e['start']:%a %d %b %Y}" if e["all_day"] else f"{e['start']:%a %d %b %Y, %I:%M %p}".replace(" 0", " ")
-    rep = {"FREQ=DAILY": "every day"}.get(e["rule"]) or (f"every {next(k for k, v in DAYS.items() if v == e['rule'][-2:]).title()}" if e["rule"] and "WEEKLY" in e["rule"]
-                                                      else f"monthly on the {e['rule'].split('=')[-1]}" if e["rule"] else "")
-    return (f"'{e['title']}', {when_}" + (f", {e['minutes']} min" if not e["all_day"] else "") + (f", at {e['where']}" if e.get("where") else "") +
-            (f", {rep}" if rep else "") + f", reminder {e['reminder']} min before: {one} ({'checked' if ok else 'NOT right'}). "
-            "Open it to add it to Outlook, or import it in Google Calendar (Settings > Import).")
+    rep = {"FREQ=DAILY": "every day"}.get(e["rule"]) or (
+        f"every {next(k for k, v in DAYS.items() if v == e['rule'][-2:]).title()}"
+        if e["rule"] and "WEEKLY" in e["rule"]
+        else f"monthly on the {e['rule'].split('=')[-1]}"
+        if e["rule"]
+        else ""
+    )
+    return (
+        f"'{e['title']}', {when_}"
+        + (f", {e['minutes']} min" if not e["all_day"] else "")
+        + (f", at {e['where']}" if e.get("where") else "")
+        + (f", {rep}" if rep else "")
+        + f", reminder {e['reminder']} min before: {one} ({'checked' if ok else 'NOT right'}). "
+        "Open it to add it to Outlook, or import it in Google Calendar (Settings > Import)."
+    )

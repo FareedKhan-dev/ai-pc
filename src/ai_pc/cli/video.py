@@ -11,6 +11,7 @@ Options for new / revise: --no-export (build the JianYing project only), --fix N
 Media files must be inside the project's media/ folder. JianYing runs behind your windows; your mouse is never used.
 Kill switch during exports: Ctrl+Alt+Q.
 """
+
 import argparse
 import json
 import sys
@@ -28,6 +29,7 @@ def _log(m, **_):
 
 def _report(sess):
     from ai_pc.video import verify as V
+
     t = sess.get("timings", {})
     print("\n=== result")
     print(f"draft   {sess['map']['draft']}  ({sess['map']['seconds']:.1f} s, {sess['map']['canvas'][0]}x{sess['map']['canvas'][1]})")
@@ -54,12 +56,19 @@ def main(argv=None):
     n.add_argument("request")
     n.add_argument("--media", nargs="+", required=True)
     n.add_argument("--like", nargs="+", default=[], help="sample edits whose style to match (measured, not used as footage)")
-    n.add_argument("--template", default=None, help="follow a template: a library name, a video of it, a CapCut template link, "
-                                                    "a screenshot of its page, or words ('4 clips 15s #slowmo')")
+    n.add_argument(
+        "--template",
+        default=None,
+        help="follow a template: a library name, a video of it, a CapCut template link, a screenshot of its page, or words ('4 clips 15s #slowmo')",
+    )
     tp = sub.add_parser("template", help="templates: learn one from a video, add one from its link / screenshot / words, suggest, list")
     tp.add_argument("action", choices=["learn", "add", "suggest", "list", "show"])
-    tp.add_argument("target", nargs="?", default=None,
-                    help="learn: the video; add: a CapCut template link, a screenshot of its page or words; suggest: what you want; show: the name")
+    tp.add_argument(
+        "target",
+        nargs="?",
+        default=None,
+        help="learn: the video; add: a CapCut template link, a screenshot of its page or words; suggest: what you want; show: the name",
+    )
     tp.add_argument("--name", default=None)
     tp.add_argument("--video", default=None, help="add: a video of the template too (its preview), for the exact cut frames")
     tp.add_argument("--media", nargs="*", default=[], help="suggest: your footage (templates needing more clips than it has rank lower)")
@@ -96,6 +105,7 @@ def main(argv=None):
                 sys.exit(f"not a file inside {' or '.join(r + '/' for r in roots)}: {f}")
             out.append(str(p))
         return out
+
     if a.cmd == "new":
         files = inside(a.media)
         refs = inside(a.like, ("media", "out"))  # samples may be the user's or earlier edits
@@ -118,33 +128,54 @@ def main(argv=None):
         _report(sess)
     elif a.cmd == "template":
         from ai_pc.video import template as TP
+
         if a.action == "list":
             for nm in TP.library():
                 t = TP.load(nm) or {}
                 m = t.get("meta") or {}
-                print(f"  {nm}: {len(t.get('slots') or [])} slots, {t.get('seconds')} s, {'exact (from a video)' if t.get('exact', True) else 'from its page'}"
-                      + (f"  '{m['title']}'" if m.get("title") else "") + (f" {' '.join('#' + x for x in m.get('tags') or [])}" if m.get("tags") else ""))
+                print(
+                    f"  {nm}: {len(t.get('slots') or [])} slots, {t.get('seconds')} s, {'exact (from a video)' if t.get('exact', True) else 'from its page'}"
+                    + (f"  '{m['title']}'" if m.get("title") else "")
+                    + (f" {' '.join('#' + x for x in m.get('tags') or [])}" if m.get("tags") else "")
+                )
             if not TP.library():
                 print("no templates yet")
         elif a.action == "show":
             t = TP.load(a.target) or sys.exit(f"no template '{a.target}'")
-            print(json.dumps({k: t.get(k) for k in ("name", "source", "exact", "seconds", "bpm", "drop", "counts", "look_words", "notes")},
-                             ensure_ascii=False, indent=1))
+            print(
+                json.dumps(
+                    {k: t.get(k) for k in ("name", "source", "exact", "seconds", "bpm", "drop", "counts", "look_words", "notes")},
+                    ensure_ascii=False,
+                    indent=1,
+                )
+            )
             if t.get("techniques"):
                 from ai_pc.video import trends as TR
+
                 print("style:", TR.explain(t["techniques"]))
             for s in t["slots"][:60]:
                 v = ((t.get("vision") or {}).get("slots") or {}).get(str(s["n"])) or {}
-                extra = " ".join(x for x in (f"{s['speed']}x" if s.get("speed") else "", "ramp" if s.get("ramp") else "",
-                                             "B&W" if s.get("bw") else "", "guessed cut" if s.get("guessed") else "") if x)
-                print(f"  #{s['n']:<3} {s['start']:6.2f}s {s['dur']:5.2f}s  in: {s['into']:<8} {str(s.get('size') or '-'):<11} {extra} "
-                      f"{'text: ' + repr(v.get('text')) if v.get('text') else ''} {v.get('shows') or ''}")
+                extra = " ".join(
+                    x
+                    for x in (
+                        f"{s['speed']}x" if s.get("speed") else "",
+                        "ramp" if s.get("ramp") else "",
+                        "B&W" if s.get("bw") else "",
+                        "guessed cut" if s.get("guessed") else "",
+                    )
+                    if x
+                )
+                print(
+                    f"  #{s['n']:<3} {s['start']:6.2f}s {s['dur']:5.2f}s  in: {s['into']:<8} {str(s.get('size') or '-'):<11} {extra} "
+                    f"{'text: ' + repr(v.get('text')) if v.get('text') else ''} {v.get('shows') or ''}"
+                )
         elif a.action == "add":
             import re as _re
 
             from ai_pc.llm.planner import ChatPlanner
             from ai_pc.video import template_meta as TM
             from ai_pc.video import trends as TR
+
             src = a.target or sys.exit("add: give a CapCut template link, a screenshot of its page, or words ('SLOWMO HDR 4 clips 15s #slowmo')")
             planner = ChatPlanner()
             try:
@@ -156,14 +187,20 @@ def main(argv=None):
                     meta = TM.from_text(src)
             except TM.NotAllowed as e:
                 sys.exit(f"not read: {e}")
-            print(f"page      '{meta.get('title')}' by {meta.get('author') or '?'}: {meta.get('clips')} clips, {meta.get('seconds')} s, "
-                  f"{meta.get('aspect') or '?'}, {meta.get('uses') or '?'} uses  {' '.join('#' + x for x in meta.get('tags') or [])}")
+            print(
+                f"page      '{meta.get('title')}' by {meta.get('author') or '?'}: {meta.get('clips')} clips, {meta.get('seconds')} s, "
+                f"{meta.get('aspect') or '?'}, {meta.get('uses') or '?'} uses  {' '.join('#' + x for x in meta.get('tags') or [])}"
+            )
             if a.video:
-                t = TP.learn(inside([a.video], ("media", "out"))[0], planner, name=a.name or TP._slug(meta.get("title"), "template"), log=_log, meta=meta)
+                t = TP.learn(
+                    inside([a.video], ("media", "out"))[0], planner, name=a.name or TP._slug(meta.get("title"), "template"), log=_log, meta=meta
+                )
             else:
                 t = TP.from_meta(meta, name=a.name, planner=planner, log=_log)
-            print(f"added '{t['name']}': {len(t['slots'])} slots in {t['seconds']} s, "
-                  f"{'exact cut frames from the video' if t.get('exact', True) else 'even slots on the beat (give --video <preview> for the exact frames)'}")
+            print(
+                f"added '{t['name']}': {len(t['slots'])} slots in {t['seconds']} s, "
+                f"{'exact cut frames from the video' if t.get('exact', True) else 'even slots on the beat (give --video <preview> for the exact frames)'}"
+            )
             print(f"style     {TR.explain(t.get('techniques') or {})}")
             for x in t.get("notes") or []:
                 print(f"note      {x}")
@@ -172,24 +209,38 @@ def main(argv=None):
                 print(f"note      tags with no editing meaning here: {', '.join('#' + x for x in u)}")
         elif a.action == "suggest":
             from ai_pc.media import frames as FR
+
             files = inside(a.media) if a.media else []
-            an = {Path(f).name: {"file": Path(f).name, "kind": "image" if Path(f).suffix.lower() in TP.IMAGE_EXT else "video",
-                                 "seconds": float(FR.probe(f).get("seconds") or 0)} for f in files}
+            an = {
+                Path(f).name: {
+                    "file": Path(f).name,
+                    "kind": "image" if Path(f).suffix.lower() in TP.IMAGE_EXT else "video",
+                    "seconds": float(FR.probe(f).get("seconds") or 0),
+                }
+                for f in files
+            }
             for i, x in enumerate(TP.suggest(a.target or "", an or None, k=5), 1):
-                print(f"  {i}. {x['name']} ({x['clips']} clips, {x['seconds']} s, {'exact' if x['exact'] else 'from its page'})  score {x['score']}: {x['why']}")
+                print(
+                    f"  {i}. {x['name']} ({x['clips']} clips, {x['seconds']} s, {'exact' if x['exact'] else 'from its page'})  score {x['score']}: {x['why']}"
+                )
         else:
             from ai_pc.llm.planner import ChatPlanner
+
             src = inside([a.target], ("media", "out"))[0]
             t = TP.learn(src, ChatPlanner(), name=a.name or Path(src).stem[:30], log=_log)
             print(f"learned '{t['name']}': {len(t['slots'])} slots in {t['seconds']} s, {t['bpm']} BPM, drop at {t['drop']} s; {t['counts']}")
     elif a.cmd in ("ask", "chat"):
         from ai_pc.llm.planner import ChatPlanner
         from ai_pc.video import router as RT
+
         files = inside(a.media) if a.media else []
         refs = inside(getattr(a, "like", []) or [], ("media", "out"))
         msg = a.question if a.cmd == "ask" else a.message
-        last = getattr(a, "draft", None) or (max(studio.SESSIONS.glob("*.json"), key=lambda p: p.stat().st_mtime).stem
-                                             if studio.SESSIONS.exists() and any(studio.SESSIONS.glob("*.json")) else None)
+        last = getattr(a, "draft", None) or (
+            max(studio.SESSIONS.glob("*.json"), key=lambda p: p.stat().st_mtime).stem
+            if studio.SESSIONS.exists() and any(studio.SESSIONS.glob("*.json"))
+            else None
+        )
         planner = ChatPlanner()
         r = RT.route(msg, files, last, planner)
         refs += [str(p) for p in (ROOT / "media").rglob("*") for name in r["references"] if p.name.lower() == name.lower()]
@@ -198,7 +249,10 @@ def main(argv=None):
             _report(sess)
         elif a.cmd == "chat" and last:  # everything about an existing edit goes to its conversation (changes, questions, undo...)
             from ai_pc.video.conversation import Conversation
-            conv = Conversation.latest(last, planner=planner, log=_log, export=True) or Conversation.start(last, planner=planner, log=_log, export=True)
+
+            conv = Conversation.latest(last, planner=planner, log=_log, export=True) or Conversation.start(
+                last, planner=planner, log=_log, export=True
+            )
             print(conv.say(msg))
             print(f"(chat {conv.state['id']}, v{conv.state['cur']}; draft {conv.version.get('draft') or last})")
             usd = planner.cost()[1]
@@ -213,13 +267,18 @@ def main(argv=None):
     elif a.cmd == "talk":
         from ai_pc.llm.planner import ChatPlanner
         from ai_pc.video.conversation import Conversation
-        draft = a.draft or (max(studio.SESSIONS.glob("*.json"), key=lambda p: p.stat().st_mtime).stem
-                            if studio.SESSIONS.exists() and any(studio.SESSIONS.glob("*.json")) else None)
+
+        draft = a.draft or (
+            max(studio.SESSIONS.glob("*.json"), key=lambda p: p.stat().st_mtime).stem
+            if studio.SESSIONS.exists() and any(studio.SESSIONS.glob("*.json"))
+            else None
+        )
         if not draft:
             sys.exit("no edit yet: make one with 'ai-pc video new ...'")
         planner = ChatPlanner()
-        conv = (None if a.new else Conversation.latest(draft, planner=planner, log=_log, export=True)) or \
-            Conversation.start(draft, planner=planner, log=_log, export=True)
+        conv = (None if a.new else Conversation.latest(draft, planner=planner, log=_log, export=True)) or Conversation.start(
+            draft, planner=planner, log=_log, export=True
+        )
         print(f"Talking about {draft} (chat {conv.state['id']}, v{conv.state['cur']}). Ask, change, undo, 'export' when happy; 'quit' to leave.")
         while True:
             try:
@@ -237,6 +296,7 @@ def main(argv=None):
     elif a.cmd == "verify":
         from ai_pc.llm.planner import ChatPlanner
         from ai_pc.video import verify as V
+
         sess = studio.load(a.draft)
         video = ROOT / "out" / "video" / f"{a.draft}.mp4"
         sess["report"] = V.verify(video, sess["map"], planner=ChatPlanner(), log=_log)

@@ -4,6 +4,7 @@ a voice, and the file's format. numpy only; FFmpeg decodes.
 
   m = describe(path)   -> {"duration", "lufs", "true_peak", "noise_db", "speech_db", "snr_db", "hum": {"hz", "db"}, ...}
 """
+
 import json
 import math
 import re
@@ -13,8 +14,8 @@ from pathlib import Path
 import numpy as np
 
 NO_WINDOW = 0x08000000
-SR = 22050          # analysis rate: enough for hiss and 's' sounds (up to 11 kHz)
-FRAME = 0.05        # 50 ms level frames
+SR = 22050  # analysis rate: enough for hiss and 's' sounds (up to 11 kHz)
+FRAME = 0.05  # 50 ms level frames
 
 
 def run(args, timeout=600):
@@ -34,18 +35,37 @@ def probe(path):
     v = next((s for s in d.get("streams", []) if s.get("codec_type") == "video" and not (s.get("disposition") or {}).get("attached_pic")), None)
     fr = (v or {}).get("avg_frame_rate") or (v or {}).get("r_frame_rate") or "0/1"
     num, den = (fr.split("/") + ["1"])[:2]
-    return {"duration": float(fmt.get("duration") or (a or {}).get("duration") or 0), "size": int(fmt.get("size") or Path(path).stat().st_size),
-            "format": fmt.get("format_name", ""), "bitrate": int(fmt.get("bit_rate") or 0),
-            "audio": {"codec": a["codec_name"], "sr": int(a.get("sample_rate") or 0), "channels": int(a.get("channels") or 0),
-                      "bitrate": int(a.get("bit_rate") or 0)} if a else None,
-            "video": {"codec": v["codec_name"], "w": int(v["width"]), "h": int(v["height"]),
-                      "fps": round(float(num) / float(den), 3) if float(den or 0) else 0} if v else None}
+    return {
+        "duration": float(fmt.get("duration") or (a or {}).get("duration") or 0),
+        "size": int(fmt.get("size") or Path(path).stat().st_size),
+        "format": fmt.get("format_name", ""),
+        "bitrate": int(fmt.get("bit_rate") or 0),
+        "audio": {
+            "codec": a["codec_name"],
+            "sr": int(a.get("sample_rate") or 0),
+            "channels": int(a.get("channels") or 0),
+            "bitrate": int(a.get("bit_rate") or 0),
+        }
+        if a
+        else None,
+        "video": {
+            "codec": v["codec_name"],
+            "w": int(v["width"]),
+            "h": int(v["height"]),
+            "fps": round(float(num) / float(den), 3) if float(den or 0) else 0,
+        }
+        if v
+        else None,
+    }
 
 
 def load(path, sr=SR, channels=1, start=0.0, dur=None):
     """Float32 samples, mono by default (shape (n,)) or as (n, channels)."""
-    args = ["ffmpeg", "-v", "error", "-ss", f"{start:.3f}"] + (["-t", f"{dur:.3f}"] if dur else []) + \
-        ["-i", str(path), "-vn", "-ac", str(channels), "-ar", str(sr), "-f", "f32le", "-"]
+    args = (
+        ["ffmpeg", "-v", "error", "-ss", f"{start:.3f}"]
+        + (["-t", f"{dur:.3f}"] if dur else [])
+        + ["-i", str(path), "-vn", "-ac", str(channels), "-ar", str(sr), "-f", "f32le", "-"]
+    )
     code, out, err = run(args)
     y = np.frombuffer(out, np.float32)
     return y.reshape(-1, channels) if channels > 1 else y
@@ -54,11 +74,12 @@ def load(path, sr=SR, channels=1, start=0.0, dur=None):
 def loudness(path):
     """Integrated loudness (LUFS), loudness range (LU) and true peak (dBTP), as FFmpeg's ebur128 measures them."""
     code, _, err = run(["ffmpeg", "-nostats", "-hide_banner", "-i", str(path), "-vn", "-af", "ebur128=peak=true:framelog=quiet", "-f", "null", "-"])
-    tail = err[err.rfind("Summary:"):] if "Summary:" in err else err
+    tail = err[err.rfind("Summary:") :] if "Summary:" in err else err
 
     def grab(rx):
         m = re.search(rx, tail)
         return float(m.group(1)) if m else None
+
     lufs = grab(r"I:\s+(-?[\d.]+|-inf) LUFS")
     return {"lufs": lufs if lufs is not None else -70.0, "lra": grab(r"LRA:\s+(-?[\d.]+) LU"), "true_peak": grab(r"Peak:\s+(-?[\d.]+|-inf) dBFS")}
 
@@ -68,7 +89,7 @@ def frames_db(y, sr=SR, win=FRAME):
     k = len(y) // n
     if k == 0:
         return np.array([-120.0])
-    f = y[:k * n].reshape(k, n)
+    f = y[: k * n].reshape(k, n)
     return 20 * np.log10(np.maximum(np.sqrt((f.astype(np.float64) ** 2).mean(axis=1)), 1e-6))
 
 
@@ -82,7 +103,7 @@ def psd(y, sr=SR, seg=None):
     starts = range(0, max(1, len(y) - seg + 1), hop)
     acc, cnt = None, 0
     for s in starts:
-        x = y[s:s + seg]
+        x = y[s : s + seg]
         if len(x) < seg:
             break
         p = np.abs(np.fft.rfft(x * win)) ** 2
@@ -124,11 +145,11 @@ def pitch(y, sr=SR, db=None):
     loud = np.where(db > np.percentile(db, 70))[0]
     f0s = []
     for i in loud[:: max(1, len(loud) // 200)]:
-        x = y[i * n:(i + 2) * n].astype(np.float64)
+        x = y[i * n : (i + 2) * n].astype(np.float64)
         if len(x) < n * 2:
             continue
         x = x - x.mean()
-        ac = np.correlate(x, x, "full")[len(x) - 1:]
+        ac = np.correlate(x, x, "full")[len(x) - 1 :]
         lo, hi = int(sr / 400), int(sr / 70)
         if hi >= len(ac) or ac[0] <= 0:
             continue
@@ -175,13 +196,17 @@ def describe(path, deep=True):
     speech = float(np.percentile(db, 90))
     out = dict(info, silent=bool(speech < -60))
     out.update(loudness(path))
-    out.update(noise_db=round(floor, 1), speech_db=round(speech, 1), snr_db=round(speech - floor, 1),
-               peak_db=round(20 * math.log10(max(float(np.abs(y).max()) if len(y) else 0, 1e-6)), 1))
+    out.update(
+        noise_db=round(floor, 1),
+        speech_db=round(speech, 1),
+        snr_db=round(speech - floor, 1),
+        peak_db=round(20 * math.log10(max(float(np.abs(y).max()) if len(y) else 0, 1e-6)), 1),
+    )
     if not deep:
         return out
     freqs, p = psd(y)
     voice = _band_db(freqs, p, 150, 4000)
-    out["rumble_db"] = round(_band_db(freqs, p, 20, 70) - voice, 1)       # low-end energy against the voice band
+    out["rumble_db"] = round(_band_db(freqs, p, 20, 70) - voice, 1)  # low-end energy against the voice band
     n = int(SR * FRAME)
     loud_idx = np.where(db >= np.percentile(db, 75))[0]
     quiet_idx = np.where(db <= np.percentile(db, 15))[0]
@@ -189,12 +214,13 @@ def describe(path, deep=True):
     def part(idx):
         if not len(idx):
             return np.zeros(1, np.float32)
-        return np.concatenate([y[i * n:(i + 1) * n] for i in idx[:4000]])
+        return np.concatenate([y[i * n : (i + 1) * n] for i in idx[:4000]])
+
     fl, pl = psd(part(loud_idx), seg=2048)
     out["sibilance_db"] = round(_band_db(fl, pl, 5000, 9000) - _band_db(fl, pl, 300, 3000), 1)  # harsh 's' in the loud parts
     out["presence_db"] = round(_band_db(fl, pl, 1000, 4000), 1)
     fq, pq = psd(part(quiet_idx), seg=2048)
-    out["hiss_db"] = round(_band_db(fq, pq, 5000, 10000) - _band_db(fl, pl, 300, 3000), 1)       # hiss in the pauses against speech
+    out["hiss_db"] = round(_band_db(fq, pq, 5000, 10000) - _band_db(fl, pl, 300, 3000), 1)  # hiss in the pauses against speech
     out["hum"] = hum(y)
     out["clipped"] = clipping(path, info["audio"]["sr"])
     out["pauses"] = pauses(db, floor, speech)
@@ -207,6 +233,6 @@ def describe(path, deep=True):
 def level_db(path, spans, sr=SR):
     """The mean level (dBFS RMS) of a file inside the given [start, end] spans (for ducking and fades)."""
     y = load(path, sr=sr)
-    parts = [y[int(a * sr):int(b * sr)] for a, b in spans if b > a]
+    parts = [y[int(a * sr) : int(b * sr)] for a, b in spans if b > a]
     x = np.concatenate(parts) if parts else np.zeros(1, np.float32)
     return round(20 * math.log10(max(float(np.sqrt((x.astype(np.float64) ** 2).mean())) if len(x) else 0, 1e-6)), 1)

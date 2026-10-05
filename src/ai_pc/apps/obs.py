@@ -6,6 +6,7 @@ added to a scene, and a screenshot of what OBS shows. Every change is read back 
   'obs scenes'   'switch obs to scene Gaming'   "add text 'Live now' to obs scene Main"   'add image logo.png to obs scene Main'
   'start recording in obs'   'stop recording in obs'   'start streaming in obs'   'obs screenshot'
 """
+
 import base64
 import hashlib
 import itertools
@@ -20,10 +21,15 @@ from ai_pc.core import vault
 NAME, LABEL = "obs", "OBS Studio: scenes, sources, recording, streaming, screenshots (obs-websocket)"
 EXAMPLES = ["obs scenes", "switch obs to scene Gaming", "start recording in obs", "add text 'Live now' to obs scene Main"]
 OUTWARD = {"stream_start"}
-APP = {"label": "OBS Studio", "fields": [("password", "obs-websocket password", True), ("port", "Port (4455)", False)],
-       "steps": ["Install OBS Studio (say 'install obs studio' to the apps chat, or obsproject.com) and open it.",
-                 "Tools > WebSocket Server Settings: tick 'Enable WebSocket server', keep port 4455, 'Show Connect Info' to copy the password.",
-                 "Run 'ai-pc apps connect obs' and paste the password (kept encrypted)."]}
+APP = {
+    "label": "OBS Studio",
+    "fields": [("password", "obs-websocket password", True), ("port", "Port (4455)", False)],
+    "steps": [
+        "Install OBS Studio (say 'install obs studio' to the apps chat, or obsproject.com) and open it.",
+        "Tools > WebSocket Server Settings: tick 'Enable WebSocket server', keep port 4455, 'Show Connect Info' to copy the password.",
+        "Run 'ai-pc apps connect obs' and paste the password (kept encrypted).",
+    ],
+}
 _ids = itertools.count(1)
 
 
@@ -89,6 +95,7 @@ def connect(values, store=None):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower().strip(" .?!")
     if not re.search(r"\bobs\b", c):
         return None
@@ -138,12 +145,19 @@ def run(op, ctx):
                 c.req("CreateScene", {"sceneName": op["scene"]})
             c.req("SetCurrentProgramScene", {"sceneName": op["scene"]})
             now = c.req("GetCurrentProgramScene")
-            return f"OBS now shows scene '{now.get('currentProgramSceneName') or now.get('sceneName')}'" + (" (made new)" if k == "scene_new" else "") + "."
+            return (
+                f"OBS now shows scene '{now.get('currentProgramSceneName') or now.get('sceneName')}'"
+                + (" (made new)" if k == "scene_new" else "")
+                + "."
+            )
         if k in ("text", "image"):
             scene = op.get("scene") or c.req("GetCurrentProgramScene").get("currentProgramSceneName")
             name = f"AI PC {'Text' if k == 'text' else Path(op['file']).stem} {int(time.time()) % 10000}"
-            kind, settings = (("text_gdiplus_v3", {"text": op["text"], "font": {"face": "Arial", "size": 96, "style": "Bold"}}) if k == "text"
-                              else ("image_source", {"file": str(Path(op["file"]).resolve())}))
+            kind, settings = (
+                ("text_gdiplus_v3", {"text": op["text"], "font": {"face": "Arial", "size": 96, "style": "Bold"}})
+                if k == "text"
+                else ("image_source", {"file": str(Path(op["file"]).resolve())})
+            )
             c.req("CreateInput", {"sceneName": scene, "inputName": name, "inputKind": kind, "inputSettings": settings, "sceneItemEnabled": True})
             got = c.req("GetInputSettings", {"inputName": name})["inputSettings"]
             ok = (got.get("text") == op["text"]) if k == "text" else (Path(got.get("file", "")).name == Path(op["file"]).name)

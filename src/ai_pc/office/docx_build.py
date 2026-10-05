@@ -1,14 +1,15 @@
 """The .docx from a resolved plan (docplan.resolve), the way a professional sets a document:
 
-  real Word styles (Normal, Title, Heading 1-3, Caption, lists), set once from the theme, so the navigation pane, the
-  table of contents and later edits all work; headings kept with the text that follows them; tables with a header
-  row that repeats on every page, numbers right-aligned, column widths from their content, rows that never split;
-  native charts (charts.py); captions above tables and below figures; a cover and a table of contents for long work;
-  headers and "Page X of Y" footers (none on the cover); numbered lists that restart; letters, CVs, invoices and
-  certificates laid out the way they are expected to look.
+real Word styles (Normal, Title, Heading 1-3, Caption, lists), set once from the theme, so the navigation pane, the
+table of contents and later edits all work; headings kept with the text that follows them; tables with a header
+row that repeats on every page, numbers right-aligned, column widths from their content, rows that never split;
+native charts (charts.py); captions above tables and below figures; a cover and a table of contents for long work;
+headers and "Page X of Y" footers (none on the cover); numbered lists that restart; letters, CVs, invoices and
+certificates laid out the way they are expected to look.
 
-  build(plan, path) -> {"path", "blocks": [{"i", "type", "text"}], "text_width_cm"}
+build(plan, path) -> {"path", "blocks": [{"i", "type", "text"}], "text_width_cm"}
 """
+
 import re
 
 from docx import Document
@@ -22,8 +23,13 @@ from docx.shared import Cm, Pt, RGBColor
 from ai_pc.office import charts
 from ai_pc.office.docplan import fmt, plain, runs
 
-ALIGN = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER, "centre": WD_ALIGN_PARAGRAPH.CENTER,
-         "right": WD_ALIGN_PARAGRAPH.RIGHT, "justify": WD_ALIGN_PARAGRAPH.JUSTIFY}
+ALIGN = {
+    "left": WD_ALIGN_PARAGRAPH.LEFT,
+    "center": WD_ALIGN_PARAGRAPH.CENTER,
+    "centre": WD_ALIGN_PARAGRAPH.CENTER,
+    "right": WD_ALIGN_PARAGRAPH.RIGHT,
+    "justify": WD_ALIGN_PARAGRAPH.JUSTIFY,
+}
 PAGE = {"A4": (21.0, 29.7), "Letter": (21.59, 27.94)}
 
 
@@ -339,15 +345,29 @@ class _Builder:
         if p["doctype"] in ("assignment", "thesis", "research"):
             for k in ("university", "org", "institute", "school", "department"):
                 if m.get(k):
-                    self.para(m[k], align="center", base={"bold": k != "department", "size": 16 if k != "department" else 12, "color": th["head_color"]},
-                              after=4)
+                    self.para(
+                        m[k],
+                        align="center",
+                        base={"bold": k != "department", "size": 16 if k != "department" else 12, "color": th["head_color"]},
+                        after=4,
+                    )
             self.para("", after=60)
             self.para(p["title"], style="Title", align="center", after=6)
             if p["subtitle"]:
                 self.para(p["subtitle"], style="Subtitle", align="center")
             self.para("", after=50)
-            rows = [(lbl, m.get(k)) for lbl, k in (("Course", "course"), ("Submitted to", "instructor"), ("Submitted by", "author"),
-                                                   ("Roll No.", "roll_no"), ("Class / Section", "class"), ("Date", "date")) if m.get(k)]
+            rows = [
+                (lbl, m.get(k))
+                for lbl, k in (
+                    ("Course", "course"),
+                    ("Submitted to", "instructor"),
+                    ("Submitted by", "author"),
+                    ("Roll No.", "roll_no"),
+                    ("Class / Section", "class"),
+                    ("Date", "date"),
+                )
+                if m.get(k)
+            ]
             if rows:
                 self.kv({"items": [[a, b] for a, b in rows]}, centered=True, width=11.0)
         else:
@@ -402,8 +422,9 @@ class _Builder:
 
     def toc(self):
         th = self.th
-        self.para("Contents", base={"size": th["h1"], "color": th["head_color"], "bold": "semibold" not in th["head"].lower(), "font": th["head"]},
-                  after=10)
+        self.para(
+            "Contents", base={"size": th["h1"], "color": th["head_color"], "bold": "semibold" not in th["head"].lower(), "font": th["head"]}, after=10
+        )
         par = self.doc.add_paragraph()
         _field(par, 'TOC \\o "1-3" \\h \\z \\u', "Right-click to update the table of contents.")
         self.doc.add_paragraph().add_run().add_break(WD_BREAK.PAGE)
@@ -420,8 +441,11 @@ class _Builder:
     def paragraph(self, b):
         th = self.th
         st = str(b.get("style") or "normal").lower()
-        base = {"lead": {"size": th["size"] + 1.5, "color": th["muted"]}, "note": {"italic": True, "size": th["size"] - 1, "color": th["muted"]},
-                "small": {"size": th["size"] - 1.5}}.get(st, {})
+        base = {
+            "lead": {"size": th["size"] + 1.5, "color": th["muted"]},
+            "note": {"italic": True, "size": th["size"] - 1, "color": th["muted"]},
+            "small": {"size": th["size"] - 1.5},
+        }.get(st, {})
         if b.get("bold"):
             base = {**base, "bold": True}
         self.para(b["text"], align=b.get("align"), base=base)
@@ -487,11 +511,15 @@ class _Builder:
         _table_width(t, widths)
         _cell_margins(t)
         grid = th["name"] == "academic"
-        light = (tt["border"] if not grid else "000000")
-        edges = {"top": (8 if not grid else 6, tt["header_fill"] if not grid else "000000", "single"),
-                 "bottom": (8 if not grid else 6, tt["header_fill"] if not grid else "000000", "single"),
-                 "insideH": (4, light, "single"), "left": (6 if grid else 0, "000000", "single"),
-                 "right": (6 if grid else 0, "000000", "single"), "insideV": (4 if grid else 0, "000000", "single")}
+        light = tt["border"] if not grid else "000000"
+        edges = {
+            "top": (8 if not grid else 6, tt["header_fill"] if not grid else "000000", "single"),
+            "bottom": (8 if not grid else 6, tt["header_fill"] if not grid else "000000", "single"),
+            "insideH": (4, light, "single"),
+            "left": (6 if grid else 0, "000000", "single"),
+            "right": (6 if grid else 0, "000000", "single"),
+            "insideV": (4 if grid else 0, "000000", "single"),
+        }
         if th["name"] == "minimal":
             edges["insideH"] = (0, light, "single")
         _borders(t._tbl.tblPr, "w:tblBorders", edges)
@@ -536,6 +564,7 @@ class _Builder:
 
     def image(self, b):
         from pathlib import Path
+
         if not Path(str(b["path"])).exists():
             self.para(f"[image not found: {b['path']}]", base={"italic": True, "color": "C00000"})
             return
@@ -554,8 +583,11 @@ class _Builder:
         _cell_margins(t, 120, 120, 200, 160)
         cell = t.rows[0].cells[0]
         _shade(cell, th["table"].get("stripe") or "F2F2F2")
-        _borders(cell._tc.get_or_add_tcPr(), "w:tcBorders", {"left": (24, th["accent"], "single"), "top": (0, "", ""), "bottom": (0, "", ""),
-                                                              "right": (0, "", "")})
+        _borders(
+            cell._tc.get_or_add_tcPr(),
+            "w:tcBorders",
+            {"left": (24, th["accent"], "single"), "top": (0, "", ""), "bottom": (0, "", ""), "right": (0, "", "")},
+        )
         par = cell.paragraphs[0]
         if b.get("title"):
             _add_text(par, b["title"], {"bold": True, "color": th["head_color"]})
@@ -607,9 +639,11 @@ class _Builder:
         th = self.th
         c = b["computed"]
         cur, dec = c["currency"], c["decimals"]
-        money = (lambda x: f"{cur} {x:,.{dec}f}".strip())
-        rows = [[str(i + 1), it["desc"], fmt(it["qty"], 0 if float(it["qty"]).is_integer() else 2), money(it["price"]), money(line)]
-                for i, (it, line) in enumerate(zip(b["items"], c["lines"]))]
+        money = lambda x: f"{cur} {x:,.{dec}f}".strip()
+        rows = [
+            [str(i + 1), it["desc"], fmt(it["qty"], 0 if float(it["qty"]).is_integer() else 2), money(it["price"]), money(line)]
+            for i, (it, line) in enumerate(zip(b["items"], c["lines"]))
+        ]
         self.table({"columns": ["#", "Description", "Qty", "Unit price", "Amount"], "rows": rows, "numeric": [False, False, True, True, True]})
         tot = [["Subtotal", money(c["subtotal"])]]
         if c["discount"]:
@@ -659,7 +693,9 @@ class _Builder:
         self.para("_" * 28, align=b.get("align") or "left", after=2)
         for k in ("name", "title", "org", "date"):
             if b.get(k):
-                self.para(str(b[k]), align=b.get("align") or "left", base={"bold": k == "name", "color": None if k == "name" else self.th["muted"]}, after=0)
+                self.para(
+                    str(b[k]), align=b.get("align") or "left", base={"bold": k == "name", "color": None if k == "name" else self.th["muted"]}, after=0
+                )
 
     def references(self, b):
         for x in b["items"]:
@@ -688,7 +724,9 @@ class _Builder:
                 q.paragraph_format.space_after = Pt(0)
         rp = right.paragraphs[0]
         rp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        _add_text(rp, (p["title"] or ("QUOTATION" if p["doctype"] == "quotation" else "INVOICE")).upper(), {"size": th["title"] - 2, "color": th["accent"]})
+        _add_text(
+            rp, (p["title"] or ("QUOTATION" if p["doctype"] == "quotation" else "INVOICE")).upper(), {"size": th["title"] - 2, "color": th["accent"]}
+        )
         for lbl, k in (("No.", "number"), ("Date", "date"), ("Due", "due")):
             if m.get(k):
                 q = right.add_paragraph()
@@ -742,8 +780,14 @@ class _Builder:
             fn = getattr(self, b["type"], None)
             if fn:
                 fn(b)
-                self.out_blocks.append({"i": i, "type": b["type"], "text": plain(b.get("text") or b.get("title") or b.get("caption") or "")[:120],
-                                        "label": b.get("label")})
+                self.out_blocks.append(
+                    {
+                        "i": i,
+                        "type": b["type"],
+                        "text": plain(b.get("text") or b.get("title") or b.get("caption") or "")[:120],
+                        "label": b.get("label"),
+                    }
+                )
         cp = self.doc.core_properties
         cp.title = self.p["title"][:250]
         cp.subject = self.p["subtitle"][:250]
@@ -756,6 +800,7 @@ class _Builder:
 def build(plan, path):
     """Write the .docx for a plan (resolved here if it is not yet). Returns {"path", "blocks", "text_width_cm"}."""
     from ai_pc.office.docplan import resolve
+
     return _Builder(plan if "th" in plan else resolve(plan)).run(path)
 
 
@@ -764,6 +809,7 @@ def theme_of(doc, base="corporate"):
     """A theme for an existing document: its own body font and size, heading font and colour; the rest from `base`.
     New parts written into the document then look like the parts already there."""
     from ai_pc.office import themes
+
     th = themes.get(base)
     th = dict(th)
     th["table"] = dict(th["table"])
@@ -778,6 +824,7 @@ def theme_of(doc, base="corporate"):
             return style.font.name
         except Exception:  # noqa: BLE001
             return None
+
     normal = doc.styles["Normal"]
     defaults = doc.styles.element.find(qn("w:docDefaults"))
     size = normal.font.size.pt if normal.font.size else None
@@ -805,12 +852,27 @@ def builder_on(doc, th, language="en"):
     b = _Builder.__new__(_Builder)
     b.doc, b.th = doc, th
     sec = doc.sections[0]
-    w = (sec.page_width.cm if sec.page_width else 21.0) - (sec.left_margin.cm if sec.left_margin else 2.5) - (sec.right_margin.cm if sec.right_margin else 2.5)
+    w = (
+        (sec.page_width.cm if sec.page_width else 21.0)
+        - (sec.left_margin.cm if sec.left_margin else 2.5)
+        - (sec.right_margin.cm if sec.right_margin else 2.5)
+    )
     b.text_w = round(w, 2)
     b.rtl = language == "ur"
     b.out_blocks = []
-    b.p = {"th": th, "page": {"size": "A4", "orientation": "portrait", "margins": sec.left_margin.cm if sec.left_margin else 2.5},
-           "language": language, "doctype": "other", "meta": {}, "title": "", "subtitle": "", "cover": False, "toc": False, "header": "", "footer": {}}
+    b.p = {
+        "th": th,
+        "page": {"size": "A4", "orientation": "portrait", "margins": sec.left_margin.cm if sec.left_margin else 2.5},
+        "language": language,
+        "doctype": "other",
+        "meta": {},
+        "title": "",
+        "subtitle": "",
+        "cover": False,
+        "toc": False,
+        "header": "",
+        "footer": {},
+    }
     return b
 
 
@@ -818,6 +880,7 @@ def insert_blocks(doc, blocks, anchor=None, where="after", th=None, language="en
     """Plan blocks (docplan) written into an existing document: after / before the `anchor` body element, or at the
     end. Returns the new body elements. numbering: tables and figures already in the document (new labels continue)."""
     from ai_pc.office.docplan import resolve
+
     th = th or theme_of(doc)
     rp = resolve({"doctype": "other", "blocks": blocks, "cover": False, "toc": False, "header": "", "footer": {"page_numbers": False}})
     nt, nf = numbering

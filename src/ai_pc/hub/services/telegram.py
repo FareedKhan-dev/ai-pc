@@ -1,5 +1,6 @@
 """Telegram through the Bot API: messages and files to you (or a group the bot is in), and what was sent to the bot.
 The person's own chat is learned the first time they message the bot."""
+
 from pathlib import Path
 
 from ai_pc.core import vault
@@ -43,26 +44,47 @@ class Telegram(Base):
     def send(self, text, chat=None):
         cid = chat or self.my_chat()
         r = self.call("sendMessage", chat_id=cid, text=text)
-        return {"id": r["message_id"], "chat": cid, "where": "Telegram", "verified": r.get("text") == text,
-                "undo": {"service": "telegram", "op": "delete", "chat": cid, "message_id": r["message_id"]}}
+        return {
+            "id": r["message_id"],
+            "chat": cid,
+            "where": "Telegram",
+            "verified": r.get("text") == text,
+            "undo": {"service": "telegram", "op": "delete", "chat": cid, "message_id": r["message_id"]},
+        }
 
     def send_file(self, path, caption=None, chat=None):
         cid = chat or self.my_chat()
         p = Path(path)
         kind = "photo" if p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp") and p.stat().st_size < 10 * 1024 * 1024 else "document"
-        body, ctype = multipart({"chat_id": str(cid), **({"caption": caption} if caption else {})},
-                                {kind: (p.name, p.read_bytes(), "application/octet-stream")})
+        body, ctype = multipart(
+            {"chat_id": str(cid), **({"caption": caption} if caption else {})}, {kind: (p.name, p.read_bytes(), "application/octet-stream")}
+        )
         js = self.api().request("POST", "sendPhoto" if kind == "photo" else "sendDocument", data=body, headers={"Content-Type": ctype})
         if not js.get("ok"):
             raise HubError(f"telegram: could not send {p.name} ({js.get('description')})")
         r = js["result"]
-        return {"id": r["message_id"], "chat": cid, "where": "Telegram", "name": p.name, "verified": bool(r.get("photo") or r.get("document")),
-                "undo": {"service": "telegram", "op": "delete", "chat": cid, "message_id": r["message_id"]}}
+        return {
+            "id": r["message_id"],
+            "chat": cid,
+            "where": "Telegram",
+            "name": p.name,
+            "verified": bool(r.get("photo") or r.get("document")),
+            "undo": {"service": "telegram", "op": "delete", "chat": cid, "message_id": r["message_id"]},
+        }
 
     def delete(self, chat, message_id):
         self.call("deleteMessage", chat_id=chat, message_id=message_id)
         return {"deleted": message_id}
 
     def read(self, n=20):
-        return {"where": "Telegram", "messages": [{"who": (u["message"].get("from") or {}).get("first_name", "?"), "text": u["message"].get("text", ""),
-                                                   "date": u["message"].get("date")} for u in self.updates()[-n:]]}
+        return {
+            "where": "Telegram",
+            "messages": [
+                {
+                    "who": (u["message"].get("from") or {}).get("first_name", "?"),
+                    "text": u["message"].get("text", ""),
+                    "date": u["message"].get("date"),
+                }
+                for u in self.updates()[-n:]
+            ],
+        }

@@ -8,6 +8,7 @@
 Everything runs in ONE thread: UI Automation calls from two threads of one process deadlock (COM apartments), so the
 pop-up sweep runs inside the driver's wait loops. Kill switch: Ctrl+Alt+Q.
 """
+
 import atexit
 import json
 import subprocess
@@ -28,9 +29,9 @@ SESSIONS = OUT / "sessions"
 
 # Pop-ups JianYing may show at any moment, and the SAFE answer to each. The guard presses only these answers.
 KNOWN_POPUPS = [
-    ("开启推送通知", ["暂不"]),                          # "turn on push notifications?" -> "not now"
-    ("环境检测", ["确定"]),                              # hardware check result (information only) -> "OK"
-    ("发现新版本", ["暂不更新", "以后再说", "取消"]),      # update offers -> "later" (the updater is disabled anyway)
+    ("开启推送通知", ["暂不"]),  # "turn on push notifications?" -> "not now"
+    ("环境检测", ["确定"]),  # hardware check result (information only) -> "OK"
+    ("发现新版本", ["暂不更新", "以后再说", "取消"]),  # update offers -> "later" (the updater is disabled anyway)
     ("版本更新", ["暂不更新", "以后再说", "取消"]),
 ]
 NEVER_PRESS = {"开启", "同意", "允许", "立即更新", "升级", "开通", "购买", "登录", "确认支付"}  # enable/agree/update/buy/log in
@@ -68,12 +69,16 @@ class PopupGuard:
 
         from ai_pc.desktop.appknow import exe_path
         from ai_pc.video.jianying_driver import bg_click
+
         for w in uia.GetRootControl().GetChildren():
             if not str(exe_path(w.ProcessId) or "").lower().endswith("jianyingpro.exe"):
                 continue
             # the editor's own tree is large: there, look only inside its dialog windows (pop-ups live there)
-            roots = [w] if "MainWindow" not in (w.ClassName or "") else \
-                [c for c in w.GetChildren() if c.ControlTypeName == "WindowControl" and c.Name != "导出"]
+            roots = (
+                [w]
+                if "MainWindow" not in (w.ClassName or "")
+                else [c for c in w.GetChildren() if c.ControlTypeName == "WindowControl" and c.Name != "导出"]
+            )
             labels = [x for r in roots for x in self._labels(r)]
             for trigger, answers in KNOWN_POPUPS:
                 if not any(trigger in lab for lab, _ in labels):
@@ -93,6 +98,7 @@ GUARD = PopupGuard()
 def _jianying_windows():
     """Visible top-level windows of JianYing (main window, export dialog, login window, ...)."""
     from ai_pc.desktop.appknow import exe_path
+
     found = []
 
     def cb(h, _):
@@ -103,6 +109,7 @@ def _jianying_windows():
                     found.append(h)
         except Exception:  # noqa: BLE001
             pass
+
     win32gui.EnumWindows(cb, None)
     return found
 
@@ -162,8 +169,7 @@ class OffScreen:
                         l, t, r, b = win32api.GetMonitorInfo(win32api.MonitorFromRect(normal, 2))["Work"]
                         normal = (l, t, r, b)
                     win32gui.SetWindowPlacement(h, (flags, win32con.SW_SHOWNOACTIVATE, mn, mx, normal))
-                    win32gui.SetWindowPos(h, win32con.HWND_BOTTOM, 0, 0, 0, 0,
-                                          win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
+                    win32gui.SetWindowPos(h, win32con.HWND_BOTTOM, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
             except Exception:  # noqa: BLE001
                 pass
         self.saved.clear()
@@ -197,6 +203,7 @@ def _poll():
 def prewarm():
     """Start JianYing in the background (no UI Automation, returns at once) so it is ready when the plan is."""
     import uiautomation as uia
+
     if uia.WindowControl(searchDepth=1, Name="剪映专业版").Exists(0) or not JIANYING.exists():
         return False
     if not (JIANYING.parent / "update.exe.disabled").exists() or (JIANYING.parent / "update.exe").exists():
@@ -211,7 +218,9 @@ def prewarm():
         while time.time() < end:
             OFF.hide()
             time.sleep(0.1)
+
     import threading
+
     threading.Thread(target=park, daemon=True).start()
     return True
 
@@ -220,23 +229,27 @@ def _each_main_window(fn):
     def cb(h, _):
         if win32gui.GetWindowText(h) == "剪映专业版":
             fn(h)
+
     win32gui.EnumWindows(cb, None)
 
 
 def send_behind():
     """JianYing works fine behind other windows: keep it there so the user's windows stay in front."""
     from ai_pc.video.jianying_driver import keep_behind
+
     _each_main_window(keep_behind)
 
 
 def not_topmost():
-    _each_main_window(lambda h: win32gui.SetWindowPos(h, win32con.HWND_NOTOPMOST, 0, 0, 0, 0,
-                                                      win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE))
+    _each_main_window(
+        lambda h: win32gui.SetWindowPos(h, win32con.HWND_NOTOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE)
+    )
 
 
 def home_ready(timeout=90):
     """Until JianYing shows its home screen (the exporter starts from there)."""
     import uiautomation as uia
+
     t = time.time()
     while time.time() - t < timeout:
         w = uia.WindowControl(searchDepth=1, Name="剪映专业版")
@@ -251,6 +264,7 @@ def ensure_running(log=print):
     """Start JianYing 5.9 if it is not open (straight from its version folder, never the updating launcher), without
     taking focus, and wait for its home screen. Returns seconds spent."""
     import uiautomation as uia
+
     t = time.perf_counter()
     if uia.WindowControl(searchDepth=1, Name="剪映专业版").Exists(0):
         return 0.0
@@ -293,6 +307,7 @@ def restart(log=print, wait=15):
 
 def _items():
     from ai_pc.video import ccbridge
+
     own = {it["key"]: it for it in json.loads((ROOT / "kb" / "jianying" / "items.json").read_text(encoding="utf-8"))}
     return {**own, **ccbridge.items()}  # CapCut-only items ("<category>:cc:<name>") are checked the same way
 
@@ -302,6 +317,7 @@ def export(name, log=print, start=True, emap=None, offscreen=True):
     "login", "used"}: missing = items JianYing could not download, login = JianYing asked for an account."""
     from ai_pc.video.capcut_export import probe
     from ai_pc.video.jianying_driver import DriverError, JianyingDriver
+
     res = {"ok": False, "path": None, "info": None, "seconds": 0.0, "error": None, "missing": [], "login": False, "used": []}
     t0 = time.perf_counter()
     OFF.enabled = offscreen
@@ -326,6 +342,7 @@ def export(name, log=print, start=True, emap=None, offscreen=True):
         res["missing"] = sorted(missing)
         log(f"  resources: {len(ok)}/{len(keys)} downloaded in {time.perf_counter() - t:.1f} s" + (f"; MISSING {sorted(missing)}" if missing else ""))
         return f"JianYing could not download: {', '.join(sorted(missing))}" if missing else None
+
     dest = OUT / f"{name}.mp4"
     try:
         JianyingDriver(kill=kill, log=lambda m, **k: log(m), on_poll=_poll).export(name, dest, preflight=preflight)

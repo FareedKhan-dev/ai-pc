@@ -2,20 +2,24 @@
 the biggest energy rise ("drop"), quiet ranges and a rough speech / music guess. ~0.1-0.3 s for a minute of audio.
 Used to cut on beats, place impacts on hits, duck music under speech and check audio edits after export.
 """
+
 import subprocess
 
 import numpy as np
 
 SR = 22050
-HOP = 512                  # 23 ms per analysis frame
+HOP = 512  # 23 ms per analysis frame
 N_FFT = 2048
 NO_WINDOW = 0x08000000
 
 
 def load(path, start=0.0, dur=None, sr=SR):
     """Mono float32 samples of a file's audio (empty if it has none)."""
-    args = ["ffmpeg", "-v", "error", "-ss", f"{start:.3f}"] + (["-t", f"{dur:.3f}"] if dur else []) + \
-           ["-i", str(path), "-vn", "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"]
+    args = (
+        ["ffmpeg", "-v", "error", "-ss", f"{start:.3f}"]
+        + (["-t", f"{dur:.3f}"] if dur else [])
+        + ["-i", str(path), "-vn", "-ac", "1", "-ar", str(sr), "-f", "f32le", "-"]
+    )
     r = subprocess.run(args, capture_output=True, creationflags=NO_WINDOW)
     return np.frombuffer(r.stdout, np.float32)
 
@@ -72,7 +76,7 @@ def tempo(env, fps, lo_bpm=60, hi_bpm=190):
     x = env - env.mean()
     if len(x) < fps * 4 or not x.any():
         return 0.0, 0.0, 0.0
-    ac = np.correlate(x, x, mode="full")[len(x) - 1:]
+    ac = np.correlate(x, x, mode="full")[len(x) - 1 :]
     ac /= ac[0] + 1e-9
     lags = np.arange(int(fps * 60 / hi_bpm), min(len(ac) - 1, int(fps * 60 / lo_bpm)) + 1)
     if not len(lags):
@@ -108,7 +112,7 @@ def analyze(path, seconds=None):
             beats.append(round(j / fps, 3))
             t += step
     # loudness per second and the biggest sustained rise (a "drop" or the moment things kick in)
-    per_s = [float(np.mean(rms[int(i * fps):int((i + 1) * fps)])) for i in range(int(np.ceil(dur)))]
+    per_s = [float(np.mean(rms[int(i * fps) : int((i + 1) * fps)])) for i in range(int(np.ceil(dur)))]
     smooth = np.convolve(per_s, np.ones(2) / 2, mode="same") if len(per_s) > 2 else np.array(per_s)
     rise = np.diff(smooth) if len(smooth) > 1 else np.array([0.0])
     drop = float(np.argmax(rise) + 1) if len(rise) and rise.max() > 6 else None
@@ -139,11 +143,20 @@ def analyze(path, seconds=None):
     else:
         kind = "mixed/ambient"
     top = sorted(hits, key=lambda h: -h[1])[:24]
-    return {"seconds": round(dur, 2), "loudness_db": round(float(np.mean(rms[rms > loud - 40])) if (rms > loud - 40).any() else loud, 1),
-            "peak_db": round(float(_db(np.abs(y).max())), 1), "kind": kind, "syllabic": round(syll, 2),
-            "bpm": round(bpm, 1) if beats else None, "beat_confidence": conf, "beats": beats[:400],
-            "hits": [{"t": round(t, 2), "strength": round(s, 2)} for t, s in sorted(top)],
-            "drop": drop, "quiet": quiet[:40], "energy_db": [round(v, 1) for v in per_s]}
+    return {
+        "seconds": round(dur, 2),
+        "loudness_db": round(float(np.mean(rms[rms > loud - 40])) if (rms > loud - 40).any() else loud, 1),
+        "peak_db": round(float(_db(np.abs(y).max())), 1),
+        "kind": kind,
+        "syllabic": round(syll, 2),
+        "bpm": round(bpm, 1) if beats else None,
+        "beat_confidence": conf,
+        "beats": beats[:400],
+        "hits": [{"t": round(t, 2), "strength": round(s, 2)} for t, s in sorted(top)],
+        "drop": drop,
+        "quiet": quiet[:40],
+        "energy_db": [round(v, 1) for v in per_s],
+    }
 
 
 def window_level(path, t0, t1):
@@ -152,5 +165,9 @@ def window_level(path, t0, t1):
     if not len(y):
         return None
     rms = envelope(y, hop=256)
-    return {"mean_db": round(float(np.mean(rms)), 1), "max_db": round(float(np.max(rms)), 1),
-            "start_db": round(float(np.mean(rms[:max(1, len(rms) // 5)])), 1), "end_db": round(float(np.mean(rms[-max(1, len(rms) // 5):])), 1)}
+    return {
+        "mean_db": round(float(np.mean(rms)), 1),
+        "max_db": round(float(np.max(rms)), 1),
+        "start_db": round(float(np.mean(rms[: max(1, len(rms) // 5)])), 1),
+        "end_db": round(float(np.mean(rms[-max(1, len(rms) // 5) :])), 1),
+    }

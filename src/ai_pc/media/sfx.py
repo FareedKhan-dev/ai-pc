@@ -10,6 +10,7 @@ transitions and lightning. Each sound is made once into media/derived/sfx_<kind>
   thunder   a crack and a long rumble (with lightning)                         ~2.6 s
   glitch    digital stutter blips (glitch transitions / effects)              ~0.6 s
 """
+
 import wave
 
 import numpy as np
@@ -89,7 +90,7 @@ def synth(kind, seed=7):
         noise = _lowpass(rng.standard_normal(len(t)), 400 + 6000 * grow) * 2.2
         tone = _sweep(180, 1600, sec, -2.0) * 0.35
         x = (noise + tone) * grow
-        x[-int(0.004 * SR):] *= np.linspace(1, 0, int(0.004 * SR))  # stops dead on the moment
+        x[-int(0.004 * SR) :] *= np.linspace(1, 0, int(0.004 * SR))  # stops dead on the moment
         return _stereo(x, width=0.8)
     if kind == "sub_drop":
         sec = 1.6
@@ -109,7 +110,7 @@ def synth(kind, seed=7):
             n = int(rng.integers(300, 2600))
             f = float(rng.choice([180, 330, 700, 1400, 2900]))
             seg = np.sign(np.sin(2 * np.pi * f * np.arange(n) / SR)) * (0.5 if rng.random() < 0.7 else 0.0)
-            x[pos:pos + n] = seg[:len(x) - pos]
+            x[pos : pos + n] = seg[: len(x) - pos]
             pos += n + int(rng.integers(0, 900))
         return _stereo(x * 0.6, pan=np.sign(np.sin(np.linspace(0, 23, len(x)))) * 0.5)
     raise ValueError(f"unknown sound {kind!r}; known: {', '.join(KINDS)}")

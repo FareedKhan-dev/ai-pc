@@ -8,6 +8,7 @@ Writing rules in every prompt: specific and concrete, short paragraphs that lead
 terms and data used exactly; no invented statistics, studies, authors or links (approximate figures are labelled as
 such); tables and charts only where numbers help.
 """
+
 import datetime as dt
 import json
 import re
@@ -18,8 +19,11 @@ from pathlib import Path
 from ai_pc.core.util import parse_json
 
 SHORT = {"letter", "application", "cv", "invoice", "quotation", "notice", "memo", "certificate", "agenda"}
-SHORT_RX = re.compile(r"\b(?:letter|application|leave|cover letter|resume|résumé|cv|curriculum vitae|invoice|bill\b|quotation|quote for|notice|memo|"
-                      r"memorandum|certificate|agenda)\b", re.I)
+SHORT_RX = re.compile(
+    r"\b(?:letter|application|leave|cover letter|resume|résumé|cv|curriculum vitae|invoice|bill\b|quotation|quote for|notice|memo|"
+    r"memorandum|certificate|agenda)\b",
+    re.I,
+)
 WORDS_PER_PAGE = 420
 
 BLOCK_GUIDE = """Block types (inline **bold** and *italic* allowed in text):
@@ -43,7 +47,8 @@ RULES = """Writing rules:
   code: do not add a total row yourself (set "total": true instead).
 - Write for the audience and in the language asked (Urdu in Urdu script only if the client asked for Urdu)."""
 
-OUTLINE_SYSTEM = """You are a senior editor planning a document for a client. Reply with ONE JSON object:
+OUTLINE_SYSTEM = (
+    """You are a senior editor planning a document for a client. Reply with ONE JSON object:
 {"doctype": "report|proposal|assignment|essay|thesis|research|manual|business_plan|minutes|contract|newsletter|other",
  "title": "...", "subtitle": "...", "language": "en|ur", "audience": "...",
  "theme": "corporate|academic|modern|elegant|minimal|warm", "accent": "<colour word or #hex ONLY if the client named a colour, else null>",
@@ -61,13 +66,21 @@ Rules:
 - sections: 4-9 for a few pages; words per section add up to about target_pages x %d (less where tables/charts are);
   headings short (2-6 words) and specific; an executive summary / introduction first and a conclusion or
   recommendations last when the document type expects them; a References section only for academic work.
-- elements: tables or charts only where data helps; at most one chart per two pages.""" % WORDS_PER_PAGE
+- elements: tables or charts only where data helps; at most one chart per two pages."""
+    % WORDS_PER_PAGE
+)
 
-SECTION_SYSTEM = """You write ONE section of a document for a client (the whole outline is given so sections do not repeat
+SECTION_SYSTEM = (
+    """You write ONE section of a document for a client (the whole outline is given so sections do not repeat
 each other). Reply with ONE JSON object: {"blocks": [...]}. Do NOT repeat the section's own heading.
-""" + BLOCK_GUIDE + "\n" + RULES
+"""
+    + BLOCK_GUIDE
+    + "\n"
+    + RULES
+)
 
-SHORT_SYSTEM = """You write a complete short document for a client. Reply with ONE JSON object:
+SHORT_SYSTEM = (
+    """You write a complete short document for a client. Reply with ONE JSON object:
 {"doctype": "letter|application|cv|invoice|quotation|notice|memo|certificate|agenda",
  "title": "...", "subtitle": "...", "language": "en|ur", "theme": "corporate|academic|modern|elegant|minimal|warm",
  "accent": "<colour word or #hex ONLY if the client named a colour, else null>",
@@ -86,7 +99,11 @@ By type (use these exact block types):
 - notice / memo / agenda: title, meta {org, date}, then paragraph / bullets / table blocks; short and clear.
 - certificate: title (e.g. "Certificate of Achievement"), subtitle ("This is to certify that"), meta {org, recipient,
   date}, blocks = paragraph {text: what it is for, align: "center"}, signature {name, title, align: "center"}.
-""" + BLOCK_GUIDE + "\n" + RULES
+"""
+    + BLOCK_GUIDE
+    + "\n"
+    + RULES
+)
 
 
 def _ask(planner, system, user, tier="docs", log=print):
@@ -94,8 +111,10 @@ def _ask(planner, system, user, tier="docs", log=print):
     r = planner._call(tier, msgs)
     d = parse_json(r.text)
     if d is None:
-        r = planner._call(tier, msgs + [{"role": "assistant", "content": (r.text or "")[:3000]},
-                                        {"role": "user", "content": "Reply with the single JSON object only."}])
+        r = planner._call(
+            tier,
+            msgs + [{"role": "assistant", "content": (r.text or "")[:3000]}, {"role": "user", "content": "Reply with the single JSON object only."}],
+        )
         d = parse_json(r.text)
     return d if isinstance(d, dict) else {}
 
@@ -111,6 +130,7 @@ def read_inputs(files, limit=12000):
                 text.append(f"--- {p.name}\n" + p.read_text(encoding="utf-8", errors="replace")[:limit])
             elif ext == ".docx":
                 import docx
+
                 d = docx.Document(str(p))
                 text.append(f"--- {p.name}\n" + "\n".join(x.text for x in d.paragraphs if x.text.strip())[:limit])
                 for i, t in enumerate(d.tables[:5]):
@@ -119,6 +139,7 @@ def read_inputs(files, limit=12000):
                         tables.append({"name": f"{p.name} table {i + 1}", "columns": rows[0], "rows": rows[1:]})
             elif ext in (".xlsx", ".xlsm"):
                 import openpyxl
+
                 wb = openpyxl.load_workbook(str(p), data_only=True, read_only=True)
                 for ws in wb.worksheets[:4]:
                     rows = [[("" if v is None else v) for v in r] for r in ws.iter_rows(max_row=60, values_only=True)]
@@ -127,6 +148,7 @@ def read_inputs(files, limit=12000):
                         tables.append({"name": f"{p.name} / {ws.title}", "columns": [str(x) for x in rows[0]], "rows": rows[1:]})
             elif ext == ".pdf":
                 import pypdfium2 as pdfium
+
                 doc = pdfium.PdfDocument(str(p))
                 text.append(f"--- {p.name}\n" + "\n".join(doc[i].get_textpage().get_text_range() for i in range(min(len(doc), 15)))[:limit])
                 doc.close()
@@ -146,9 +168,8 @@ def _inputs_text(inputs, limit=9000):
         rows = "\n".join(" | ".join(str(c) for c in r) for r in t["rows"][:40])
         parts.append(f"CLIENT'S TABLE {t['name']}:\n" + " | ".join(str(c) for c in t["columns"]) + "\n" + rows)
     if inputs.get("images"):
-        parts.append("CLIENT'S IMAGES (can be placed with an image block {\"type\": \"image\", \"path\", \"caption\"}): "
-                     + ", ".join(inputs["images"]))
-    return "\n\n".join(parts)[:limit + 3000]
+        parts.append('CLIENT\'S IMAGES (can be placed with an image block {"type": "image", "path", "caption"}): ' + ", ".join(inputs["images"]))
+    return "\n\n".join(parts)[: limit + 3000]
 
 
 def words_per_page(th):
@@ -162,7 +183,21 @@ def pages_asked(request):
     m = re.search(r"\b(\d{1,3})\s*(?:-\s*)?(?:pages?|pgs?|sides?)\b", r)
     if m:
         return int(m.group(1))
-    words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "twelve": 12, "fifteen": 15, "twenty": 20}
+    words = {
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+        "twelve": 12,
+        "fifteen": 15,
+        "twenty": 20,
+    }
     m = re.search(r"\b(" + "|".join(words) + r")\s*(?:-\s*)?pages?\b", r)
     if m:
         return words[m.group(1)]
@@ -196,22 +231,32 @@ def design(request, inputs, planner, log=print, theme=None, pages=None):
         raise ValueError("the outline came back empty")
     target = want_pages or int(o.get("target_pages") or 3)
     from ai_pc.office import themes as TH
+
     th = TH.get(theme or o.get("theme"), None, o.get("doctype"))
     wpp = words_per_page(th)
     budget = max(150, round(target * wpp - 120))
     total = sum(int(s.get("words") or 0) for s in sections) or budget
     for s in sections:  # the words asked for, shared out as the outline weighted them
         s["words"] = max(80, round(budget * int(s.get("words") or budget / len(sections)) / total))
-    outline_txt = "\n".join(f"{i + 1}. {s['heading']}: {s.get('goal', '')} (~{s['words']} words; {', '.join(s.get('elements') or [])})"
-                            for i, s in enumerate(sections))
-    head = (f"TODAY: {today}\nREQUEST: {request}\nDOCUMENT: {o.get('doctype')} '{o.get('title')}' for {o.get('audience') or 'the client'}, "
-            f"language {o.get('language') or 'en'}\nOUTLINE:\n{outline_txt}\nDATA FROM THE CLIENT: {json.dumps(o.get('data_from_client') or [], ensure_ascii=False)[:1500]}\n\n{given}")
+    outline_txt = "\n".join(
+        f"{i + 1}. {s['heading']}: {s.get('goal', '')} (~{s['words']} words; {', '.join(s.get('elements') or [])})" for i, s in enumerate(sections)
+    )
+    head = (
+        f"TODAY: {today}\nREQUEST: {request}\nDOCUMENT: {o.get('doctype')} '{o.get('title')}' for {o.get('audience') or 'the client'}, "
+        f"language {o.get('language') or 'en'}\nOUTLINE:\n{outline_txt}\nDATA FROM THE CLIENT: {json.dumps(o.get('data_from_client') or [], ensure_ascii=False)[:1500]}\n\n{given}"
+    )
 
     def write(i):
         s = sections[i]
-        d = _ask(planner, SECTION_SYSTEM, head + f"\n\nWRITE SECTION {i + 1}: '{s['heading']}' — {s.get('goal', '')}\n"
-                 f"About {s['words']} words. Elements wanted: {', '.join(s.get('elements') or ['paragraphs'])}.", log=log)
+        d = _ask(
+            planner,
+            SECTION_SYSTEM,
+            head + f"\n\nWRITE SECTION {i + 1}: '{s['heading']}' — {s.get('goal', '')}\n"
+            f"About {s['words']} words. Elements wanted: {', '.join(s.get('elements') or ['paragraphs'])}.",
+            log=log,
+        )
         return [b for b in d.get("blocks") or [] if isinstance(b, dict)]
+
     with ThreadPoolExecutor(max_workers=6) as ex:
         bodies = list(ex.map(write, range(len(sections))))
     info["calls"] += len(sections)
@@ -224,23 +269,48 @@ def design(request, inputs, planner, log=print, theme=None, pages=None):
             if b.get("type") == "heading":
                 b["level"] = max(2, min(3, int(b.get("level") or 2)))
             blocks.append(b)
-    plan = {"doctype": o.get("doctype") or "report", "title": o.get("title"), "subtitle": o.get("subtitle"), "language": o.get("language"),
-            "theme": theme or o.get("theme"), "accent": o.get("accent"), "target_pages": target, "page": o.get("page") or {},
-            "meta": {k: v for k, v in (o.get("meta") or {}).items() if v}, "blocks": blocks}
-    info.update(mode="long", sections=len(sections), seconds=round(time.perf_counter() - t0, 1), outline=sections, words_per_page=wpp,
-                data=[str(x) for x in o.get("data_from_client") or []][:30])
+    plan = {
+        "doctype": o.get("doctype") or "report",
+        "title": o.get("title"),
+        "subtitle": o.get("subtitle"),
+        "language": o.get("language"),
+        "theme": theme or o.get("theme"),
+        "accent": o.get("accent"),
+        "target_pages": target,
+        "page": o.get("page") or {},
+        "meta": {k: v for k, v in (o.get("meta") or {}).items() if v},
+        "blocks": blocks,
+    }
+    info.update(
+        mode="long",
+        sections=len(sections),
+        seconds=round(time.perf_counter() - t0, 1),
+        outline=sections,
+        words_per_page=wpp,
+        data=[str(x) for x in o.get("data_from_client") or []][:30],
+    )
     return plan, info
 
 
-EXPAND_SYSTEM = """You lengthen one section of a document that came out shorter than the client asked. Keep everything that
+EXPAND_SYSTEM = (
+    """You lengthen one section of a document that came out shorter than the client asked. Keep everything that
 is there (same facts, same structure) and add substance: examples, explanation, implications, a table or list where it
 helps. Reply with ONE JSON object: {"blocks": [...]} — the WHOLE section again, without its heading.
-""" + BLOCK_GUIDE + "\n" + RULES
+"""
+    + BLOCK_GUIDE
+    + "\n"
+    + RULES
+)
 
-SHORTEN_SYSTEM = """You shorten one section of a document that came out longer than the client asked. Keep the key points,
+SHORTEN_SYSTEM = (
+    """You shorten one section of a document that came out longer than the client asked. Keep the key points,
 data, tables and charts; cut repetition and padding. Reply with ONE JSON object: {"blocks": [...]} — the WHOLE section
 again, without its heading.
-""" + BLOCK_GUIDE + "\n" + RULES
+"""
+    + BLOCK_GUIDE
+    + "\n"
+    + RULES
+)
 
 
 def resize(plan, request, planner, factor, log=print):
@@ -257,19 +327,25 @@ def resize(plan, request, planner, factor, log=print):
 
     def redo(span):
         a, z = span
-        body = blocks[a + 1:z]
+        body = blocks[a + 1 : z]
         want = max(80, round(words(body) * factor))
-        d = _ask(planner, system, f"REQUEST: {request}\nSECTION '{blocks[a].get('text')}' NOW:\n{json.dumps(body, ensure_ascii=False)[:9000]}\n\n"
-                 f"Make it about {want} words.", log=log)
+        d = _ask(
+            planner,
+            system,
+            f"REQUEST: {request}\nSECTION '{blocks[a].get('text')}' NOW:\n{json.dumps(body, ensure_ascii=False)[:9000]}\n\n"
+            f"Make it about {want} words.",
+            log=log,
+        )
         new = [b for b in d.get("blocks") or [] if isinstance(b, dict) and not (b.get("type") == "heading" and int(b.get("level") or 1) == 1)]
         return new or body
+
     with ThreadPoolExecutor(max_workers=6) as ex:
         bodies = list(ex.map(redo, spans))
     out = []
     for (a, z), body in zip(spans, bodies):
         out.append(blocks[a])
         out.extend(body)
-    return {**plan, "blocks": blocks[:starts[0]] + out}, len(spans)
+    return {**plan, "blocks": blocks[: starts[0]] + out}, len(spans)
 
 
 DECK_RX = re.compile(r"\b(?:presentation|slides?|slide ?deck|deck|ppt|pptx|powerpoint|pitch)\b", re.I)
@@ -314,7 +390,9 @@ def design_deck(request, inputs, planner, log=print, theme=None, slides=None):
     t0 = time.perf_counter()
     today = dt.date.today().strftime("%d %B %Y")
     n = slides or slides_asked(request)
-    d = _ask(planner, DECK_SYSTEM, f"TODAY: {today}\nREQUEST: {request}\n" + (f"SLIDES: exactly {n}\n" if n else "") + "\n" + _inputs_text(inputs), log=log)
+    d = _ask(
+        planner, DECK_SYSTEM, f"TODAY: {today}\nREQUEST: {request}\n" + (f"SLIDES: exactly {n}\n" if n else "") + "\n" + _inputs_text(inputs), log=log
+    )
     if not d.get("slides"):
         raise ValueError("the deck came back empty")
     if theme:
@@ -323,8 +401,11 @@ def design_deck(request, inputs, planner, log=print, theme=None, slides=None):
     return d, {"calls": 1, "mode": "deck", "seconds": round(time.perf_counter() - t0, 1)}
 
 
-BOOK_RX = re.compile(r"\b(?:excel|spreadsheet|xlsx|workbook|worksheet|google sheets?|tracker|ledger|(?:attendance|expense|budget|grade|marks?|salary|"
-                     r"inventory|stock|time|fee|result) ?sheet|calculator in excel)\b", re.I)
+BOOK_RX = re.compile(
+    r"\b(?:excel|spreadsheet|xlsx|workbook|worksheet|google sheets?|tracker|ledger|(?:attendance|expense|budget|grade|marks?|salary|"
+    r"inventory|stock|time|fee|result) ?sheet|calculator in excel)\b",
+    re.I,
+)
 
 BOOK_SYSTEM = """You design an Excel workbook for a client. Reply with ONE JSON object:
 {"title": "...", "theme": "corporate|modern|minimal|warm|elegant", "accent": "<colour ONLY if the client named one, else null>", "sheets": [...]}

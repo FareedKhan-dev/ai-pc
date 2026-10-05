@@ -10,6 +10,7 @@
   .venv\\Scripts\\python.exe tests\\integration\\test_three.py
 About six minutes. Everything is written under out\\_tests\\three\\engine.
 """
+
 import itertools
 import shutil
 import sys
@@ -57,6 +58,7 @@ def fixtures():
     else:  # a picture with words and shapes of its own when the design tests have not been run
         im = Image.new("RGB", (1050, 600), (245, 245, 245))
         from PIL import ImageDraw
+
         d = ImageDraw.Draw(im)
         d.rectangle([0, 0, 360, 600], fill=(40, 90, 170))
         d.ellipse([110, 230, 250, 370], fill=(255, 255, 255))
@@ -71,8 +73,11 @@ def main():
     t0 = time.time()
     card = fixtures()
     # ------------------------------------------------ house geometry from plans (plain Python)
-    plans = {"5 marla": F.plan({"plot": [25, 45], "bedrooms": 2, "floors": 1}), "7 marla 2 storeys": F.plan({"plot": [30, 60], "bedrooms": 3, "floors": 2}),
-             "1 kanal 2 storeys": F.plan({"plot": [50, 90], "bedrooms": 5, "floors": 2})}
+    plans = {
+        "5 marla": F.plan({"plot": [25, 45], "bedrooms": 2, "floors": 1}),
+        "7 marla 2 storeys": F.plan({"plot": [30, 60], "bedrooms": 3, "floors": 2}),
+        "1 kanal 2 storeys": F.plan({"plot": [50, 90], "bedrooms": 5, "floors": 2}),
+    }
     for nm, lay in plans.items():
         s = house_spec(lay)
         boxes = s["boxes"]
@@ -89,23 +94,44 @@ def main():
         steps = [b for b in boxes if b["c"] == "out_ground_stairs" and "_step" in b["n"]]
         {round(b["b"][5] - b["b"][2], 1) for b in steps}
         treads = sorted(b["b"][4] - b["b"][1] for b in steps)
-        check(f"{nm}: stairs like built ones (risers 6.5-8.5 in, treads 9-12 in)", 6.5 <= (CLEAR_H + SLAB) / len(steps) <= 8.5 and 9 <= treads[0] <= 12.1,
-              f"{len(steps)} steps, first tread {treads[0]:.1f}")
+        check(
+            f"{nm}: stairs like built ones (risers 6.5-8.5 in, treads 9-12 in)",
+            6.5 <= (CLEAR_H + SLAB) / len(steps) <= 8.5 and 9 <= treads[0] <= 12.1,
+            f"{len(steps)} steps, first tread {treads[0]:.1f}",
+        )
         if lay.get("upper"):
             terr = [r for r in lay["upper"]["rooms"] if r["kind"] == "terrace"]
             slabs = [b["b"] for b in boxes if b["c"] == "out_slabs" and b["b"][2] > 150]
-            over = [sl for sl in slabs for t in terr if min(sl[3], t["x1"]) - max(sl[0], t["x0"]) > 1 and min(sl[4], t["y1"]) - max(sl[1], t["y0"]) > 1]
+            over = [
+                sl for sl in slabs for t in terr if min(sl[3], t["x1"]) - max(sl[0], t["x0"]) > 1 and min(sl[4], t["y1"]) - max(sl[1], t["y0"]) > 1
+            ]
             check(f"{nm}: the terrace is open to the sky", terr and not over)
         check(f"{nm}: a parapet round the roof", sum(1 for b in boxes if b["c"] == "out_parapet") >= 4)
         check(f"{nm}: cladding round the front windows", any(b["c"] == "out_cladding" for b in boxes))
-        check(f"{nm}: every room named, with its size", len([x for x in s["labels"] if x.get("kind") != "size"]) == len([r for r in lay["rooms"] if r["kind"] != "passage"]))
+        check(
+            f"{nm}: every room named, with its size",
+            len([x for x in s["labels"] if x.get("kind") != "size"]) == len([r for r in lay["rooms"] if r["kind"] != "passage"]),
+        )
     # ------------------------------------------------ houses rendered
     r = MK.house(plans["5 marla"], OUT, "h1", views=("plan3d", "top", "front"), log=quiet)
     ok, why = all_pass(r)
     check(f"1 storey: 3D plan, top and front rendered, every check passing ({r['seconds']:.0f} s)", ok and len(r["outputs"]) == 3, why)
-    r = MK.house(plans["7 marla 2 storeys"], OUT, "h2", views=("front", "aerial", "orbit"), storey="first", log=quiet, seconds=2, colors={"wall": "plaster_cream"})
+    r = MK.house(
+        plans["7 marla 2 storeys"],
+        OUT,
+        "h2",
+        views=("front", "aerial", "orbit"),
+        storey="first",
+        log=quiet,
+        seconds=2,
+        colors={"wall": "plaster_cream"},
+    )
     ok, why = all_pass(r)
-    check(f"2 storeys: front, aerial and a 2 s turn-around, every check passing ({r['seconds']:.0f} s)", ok and Path(r["outputs"]["orbit"]).exists(), why)
+    check(
+        f"2 storeys: front, aerial and a 2 s turn-around, every check passing ({r['seconds']:.0f} s)",
+        ok and Path(r["outputs"]["orbit"]).exists(),
+        why,
+    )
     # ------------------------------------------------ the checks fail on spoiled results
     blank = OUT / "blank.png"
     Image.new("RGB", (640, 360), (128, 128, 128)).save(blank)
@@ -115,7 +141,10 @@ def main():
     m = Image.new("RGBA", (480, 270), (0, 0, 0, 0))
     m.paste((255, 255, 255, 255), (300, 50, 480, 200))
     m.save(cut)
-    cs = {c["what"].split(": ")[1]: c for c in K.view_checks("spoiled", {"framing": {"x0": 0.6, "x1": 1.2, "y0": 0.2, "y1": 0.8, "behind": 0}}, blank, empty)}
+    cs = {
+        c["what"].split(": ")[1]: c
+        for c in K.view_checks("spoiled", {"framing": {"x0": 0.6, "x1": 1.2, "y0": 0.2, "y1": 0.8, "behind": 0}}, blank, empty)
+    }
     check("checks: a blank picture fails", not cs["a real picture"]["ok"])
     check("checks: nothing in view fails", not cs["subject visible"]["ok"])
     check("checks: a subject out of frame is caught", not cs["whole subject framed"]["ok"])
@@ -146,7 +175,11 @@ def main():
     # ------------------------------------------------ 3D files
     r = MK.model({"file": str(OUT / "cube.obj"), "export": "glb"}, OUT, "m1", log=quiet)
     st = r["stats"]
-    check("3D file: a 2 m cube measured (12 triangles, watertight, 8 m3)", st["triangles"] == 12 and st["watertight"] and abs(st["volume_m3"] - 8) < 1e-3, str(st))
+    check(
+        "3D file: a 2 m cube measured (12 triangles, watertight, 8 m3)",
+        st["triangles"] == 12 and st["watertight"] and abs(st["volume_m3"] - 8) < 1e-3,
+        str(st),
+    )
     ok, why = all_pass(r)
     check("3D file: pictured and saved as GLB, opened again the same", ok and Path(r["outputs"]["export"]).exists(), why)
     r = MK.model({"file": str(OUT / "open_box.obj"), "export": "stl", "render": False}, OUT, "m2", log=quiet)
@@ -155,21 +188,40 @@ def main():
     check("3D file: saved as STL and opened again the same", ok, why)
     # ------------------------------------------------ rules
     ctx = {"files": {"card.png": "C:/x/card.png", "chair.glb": "C:/x/chair.glb"}}
-    cases = {("a 3D model of a 5 marla house with 3 bedrooms", None): ("house_new",), ("make my house plan 3d", None): ("house_from_cad",),
-             ("show the front", "house"): ("view",), ("make a video going round it", "house"): ("view",), ("make the kitchen bigger", "house"): ("cad",),
-             ("grey walls with wood panels", "house"): ("colors", "colors"), ("the first floor", "house"): ("storey",), ("no furniture", "house"): ("furniture",),
-             ("a 3D intro for Khan Electronics in gold", None): ("text_new", "text_style"), ("make it spin in", "text"): ("text_style",),
-             ("put card.png on a box", None): ("mockup",), ("now a mug", "mockup"): ("mockup_kind",), ("show me chair.glb", None): ("model",),
-             ("convert it to stl", "model"): ("model_export",), ("is it ready for 3d printing?", "model"): ("ask",), ("save it to my desktop", "house"): ("save",),
-             ("put it on my desktop", "house"): ("save",)}
+    cases = {
+        ("a 3D model of a 5 marla house with 3 bedrooms", None): ("house_new",),
+        ("make my house plan 3d", None): ("house_from_cad",),
+        ("show the front", "house"): ("view",),
+        ("make a video going round it", "house"): ("view",),
+        ("make the kitchen bigger", "house"): ("cad",),
+        ("grey walls with wood panels", "house"): ("colors", "colors"),
+        ("the first floor", "house"): ("storey",),
+        ("no furniture", "house"): ("furniture",),
+        ("a 3D intro for Khan Electronics in gold", None): ("text_new", "text_style"),
+        ("make it spin in", "text"): ("text_style",),
+        ("put card.png on a box", None): ("mockup",),
+        ("now a mug", "mockup"): ("mockup_kind",),
+        ("show me chair.glb", None): ("model",),
+        ("convert it to stl", "model"): ("model_export",),
+        ("is it ready for 3d printing?", "model"): ("ask",),
+        ("save it to my desktop", "house"): ("save",),
+        ("put it on my desktop", "house"): ("save",),
+    }
     for (text, subj), want in cases.items():
         got = tuple(o["op"] for o in parse(text, dict(ctx, subject=subj))["ops"])
         check(f"rules: {text!r}", got == want, str(got))
     got = [(o["op"], o["args"].get("kind")) for o in parse("put card.png on a mug", dict(ctx, subject=None))["ops"]]
     check("rules: a file's name is not a word ('card.png' on a mug is a mug)", got == [("mockup", "mug")], str(got))
-    got = [(o["op"], o["args"].get("kind")) for o in parse("my client wants their visiting card card.png shown on a coffee mug", dict(ctx, subject=None))["ops"]]
+    got = [
+        (o["op"], o["args"].get("kind"))
+        for o in parse("my client wants their visiting card card.png shown on a coffee mug", dict(ctx, subject=None))["ops"]
+    ]
     check("rules: the product after 'on a' gets the picture", got == [("mockup", "mug")], str(got))
-    got = [o["args"].get("text") for o in parse("make me a logo animation for 'Pak Motors' that looks like chrome", dict(ctx, subject=None))["ops"] if o["op"] == "text_new"]
+    got = [
+        o["args"].get("text")
+        for o in parse("make me a logo animation for 'Pak Motors' that looks like chrome", dict(ctx, subject=None))["ops"]
+        if o["op"] == "text_new"
+    ]
     check("rules: a title's words come from the quotes", got == ["Pak Motors"], str(got))
     got = [o["op"] for o in parse("can a 3D printer handle this?", dict(ctx, subject="model"))["ops"]]
     check("rules: a printing question is a question, not a conversion", got == ["ask"], str(got))
@@ -179,12 +231,19 @@ def main():
     chats = OUT / "chats"
     c = ThreeChat.start(chats_dir=chats, log=quiet, files=[card, OUT / "cube.obj"])
     a = c.say("a 3D model of a 7 marla house with 2 bedrooms")
-    check("chat: a house from words (the CAD lane draws the plan)", c.cur() and c.cur()["subject"] == "house" and "plan3d" in c.cur()["outputs"], a[:160])
+    check(
+        "chat: a house from words (the CAD lane draws the plan)",
+        c.cur() and c.cur()["subject"] == "house" and "plan3d" in c.cur()["outputs"],
+        a[:160],
+    )
     plan1 = c.state["params"]["plan"]
     a = c.say("make the kitchen bigger")
     check("chat: a change to the plan goes to the CAD lane, the 3D follows", c.state["params"]["plan"] != plan1 and c.cur()["v"] == 1, a[:200])
     c.say("cream walls with brick cladding")
-    check("chat: colours from words", c.state["params"]["colors"].get("wall") == "plaster_cream" and c.state["params"]["colors"].get("accent") == "brick_red")
+    check(
+        "chat: colours from words",
+        c.state["params"]["colors"].get("wall") == "plaster_cream" and c.state["params"]["colors"].get("accent") == "brick_red",
+    )
     c.say("undo")
     check("chat: undo", c.state["cur"] == 1)
     c.say(f"put {card.name} on a mug")

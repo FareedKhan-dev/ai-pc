@@ -1,4 +1,5 @@
 """'it', 'the video', 'the original', 'the plan' and file names resolve to the right file."""
+
 import pytest
 
 from ai_pc.assistant.artifacts import Artifacts, kind_of, kind_words

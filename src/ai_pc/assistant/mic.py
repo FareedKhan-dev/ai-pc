@@ -3,6 +3,7 @@ nothing to install, 16 kHz mono like the speech model wants, recording only betw
 
   rec = Recorder(); rec.start()      ... rec.level (0..1, for the meter) ...      path = rec.stop("note.wav")  (None if too short)
 """
+
 import array
 import ctypes
 import math
@@ -14,23 +15,43 @@ from pathlib import Path
 
 WAVE_MAPPER = 0xFFFFFFFF  # the microphone chosen in Windows' sound settings
 WHDR_DONE, WHDR_PREPARED = 0x1, 0x2
-MMSYSERR = {1: "an error in the sound system", 2: "no microphone", 4: "the microphone is in use", 6: "no microphone",
-            7: "no microphone driver", 32: "the microphone cannot record this format"}
+MMSYSERR = {
+    1: "an error in the sound system",
+    2: "no microphone",
+    4: "the microphone is in use",
+    6: "no microphone",
+    7: "no microphone driver",
+    32: "the microphone cannot record this format",
+}
 
 
 class WAVEFORMATEX(ctypes.Structure):
     _pack_ = 1  # mmsystem.h packs everything to bytes
-    _fields_ = [("wFormatTag", wintypes.WORD), ("nChannels", wintypes.WORD), ("nSamplesPerSec", wintypes.DWORD),
-                ("nAvgBytesPerSec", wintypes.DWORD), ("nBlockAlign", wintypes.WORD), ("wBitsPerSample", wintypes.WORD), ("cbSize", wintypes.WORD)]
+    _fields_ = [
+        ("wFormatTag", wintypes.WORD),
+        ("nChannels", wintypes.WORD),
+        ("nSamplesPerSec", wintypes.DWORD),
+        ("nAvgBytesPerSec", wintypes.DWORD),
+        ("nBlockAlign", wintypes.WORD),
+        ("wBitsPerSample", wintypes.WORD),
+        ("cbSize", wintypes.WORD),
+    ]
 
 
 class WAVEHDR(ctypes.Structure):
     pass
 
 
-WAVEHDR._fields_ = [("lpData", ctypes.c_void_p), ("dwBufferLength", wintypes.DWORD), ("dwBytesRecorded", wintypes.DWORD),
-                    ("dwUser", ctypes.c_size_t), ("dwFlags", wintypes.DWORD), ("dwLoops", wintypes.DWORD),
-                    ("lpNext", ctypes.POINTER(WAVEHDR)), ("reserved", ctypes.c_size_t)]
+WAVEHDR._fields_ = [
+    ("lpData", ctypes.c_void_p),
+    ("dwBufferLength", wintypes.DWORD),
+    ("dwBytesRecorded", wintypes.DWORD),
+    ("dwUser", ctypes.c_size_t),
+    ("dwFlags", wintypes.DWORD),
+    ("dwLoops", wintypes.DWORD),
+    ("lpNext", ctypes.POINTER(WAVEHDR)),
+    ("reserved", ctypes.c_size_t),
+]
 _winmm = None
 
 
@@ -38,14 +59,28 @@ def _api():
     global _winmm
     if _winmm is None:
         w = ctypes.WinDLL("winmm")
-        w.waveInOpen.argtypes = [ctypes.POINTER(wintypes.HANDLE), wintypes.UINT, ctypes.POINTER(WAVEFORMATEX), ctypes.c_size_t, ctypes.c_size_t,
-                                 wintypes.DWORD]
+        w.waveInOpen.argtypes = [
+            ctypes.POINTER(wintypes.HANDLE),
+            wintypes.UINT,
+            ctypes.POINTER(WAVEFORMATEX),
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+            wintypes.DWORD,
+        ]
         for f in (w.waveInPrepareHeader, w.waveInUnprepareHeader, w.waveInAddBuffer):
             f.argtypes = [wintypes.HANDLE, ctypes.POINTER(WAVEHDR), wintypes.UINT]
         for f in (w.waveInStart, w.waveInStop, w.waveInReset, w.waveInClose):
             f.argtypes = [wintypes.HANDLE]
-        for f in (w.waveInOpen, w.waveInPrepareHeader, w.waveInUnprepareHeader, w.waveInAddBuffer, w.waveInStart, w.waveInStop, w.waveInReset,
-                  w.waveInClose):
+        for f in (
+            w.waveInOpen,
+            w.waveInPrepareHeader,
+            w.waveInUnprepareHeader,
+            w.waveInAddBuffer,
+            w.waveInStart,
+            w.waveInStop,
+            w.waveInReset,
+            w.waveInClose,
+        ):
             f.restype = wintypes.UINT
         _winmm = w
     return _winmm
@@ -88,6 +123,7 @@ def write_wav(path, chunks, rate, channels):
 
 class Recorder:
     """Records from the default microphone between start() and stop() (at most max_seconds)."""
+
     FORMATS = ((16000, 1), (44100, 1), (48000, 2))
 
     def __init__(self, chunk_ms=100, buffers=8, max_seconds=120, min_seconds=0.35):

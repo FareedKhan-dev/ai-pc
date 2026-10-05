@@ -5,6 +5,7 @@ every contact.
 
   'contact Ali Raza, 0300-1234567, ali@x.com, Ali Traders'   'contacts from customers.xlsx'   'qr of my contact card'
 """
+
 import re
 from pathlib import Path
 
@@ -24,6 +25,7 @@ def phone(s):
 def card(c):
     def esc(s):
         return str(s).replace("\\", "\\\\").replace(",", "\\,").replace(";", "\\;")
+
     first, _, last = c["name"].partition(" ")
     lines = ["BEGIN:VCARD", "VERSION:3.0", f"N:{esc(last)};{esc(first)};;;", f"FN:{esc(c['name'])}"]
     if c.get("company"):
@@ -56,27 +58,44 @@ def from_sheet(path):
     p = Path(path)
     if p.suffix.lower() == ".csv":
         import csv
+
         with p.open(encoding="utf-8-sig", newline="") as f:
             rows = list(csv.reader(f))
     else:
         from openpyxl import load_workbook
+
         rows = [list(r) for r in load_workbook(p, data_only=True, read_only=True).active.iter_rows(values_only=True)]
     head = [str(h or "").lower() for h in rows[0]]
 
     def col(*words):
         return next((i for i, h in enumerate(head) if any(w in h for w in words)), None)
-    ni, pi, ei, ci, ai = col("name"), col("phone", "mobile", "cell", "whatsapp", "number"), col("email", "e-mail"), col("company", "business", "shop"), col("address", "city")
+
+    ni, pi, ei, ci, ai = (
+        col("name"),
+        col("phone", "mobile", "cell", "whatsapp", "number"),
+        col("email", "e-mail"),
+        col("company", "business", "shop"),
+        col("address", "city"),
+    )
     out = []
     for r in rows[1:]:
         if ni is None or not r[ni]:
             continue
-        out.append({"name": str(r[ni]).strip(), "phone": phone(r[pi]) if pi is not None else None, "email": str(r[ei]).strip() if ei is not None and r[ei] else None,
-                    "company": str(r[ci]).strip() if ci is not None and r[ci] else None, "address": str(r[ai]).strip() if ai is not None and r[ai] else None})
+        out.append(
+            {
+                "name": str(r[ni]).strip(),
+                "phone": phone(r[pi]) if pi is not None else None,
+                "email": str(r[ei]).strip() if ei is not None and r[ei] else None,
+                "company": str(r[ci]).strip() if ci is not None and r[ci] else None,
+                "address": str(r[ai]).strip() if ai is not None and r[ai] else None,
+            }
+        )
     return out
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     m = re.match(r"^\s*(?:add\s+)?(?:a\s+)?contact(?:\s+card)?\s*:?\s+(.+)$", text, re.I)
     if m and not re.match(r"^\s*(?:cards?\s+)?from\b", m.group(1), re.I):
         return {"op": "card", "contacts": [from_words(m.group(1))], "qr": bool(re.search(r"\bqr\b", text, re.I))}
@@ -101,6 +120,7 @@ def run(op, ctx):
     reply = f"{len(cs)} contact card(s): {dest} ({'checked' if ok else 'NOT right'})."
     if op.get("qr") and len(cs) == 1:
         import segno
+
         q = out / (dest.stem + "_qr.png")
         segno.make(card(cs[0]), error="m").save(str(q), scale=8, border=2)
         reply += f" QR code of the card: {q}."

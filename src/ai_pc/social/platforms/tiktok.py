@@ -8,17 +8,25 @@ It asks TikTok what the creator may post first (creator_info: nickname, longest 
 chunks TikTok asks for (5-64 MB, the remainder in the last), resumes after a break, and polls until TikTok confirms.
 TikTok cannot delete or edit posts through its API, does not give comments, and gives numbers only for public videos.
 """
+
 from pathlib import Path
 
 from ai_pc.social.base import Platform, SocialError
 
 API = "https://open.tiktokapis.com"
 MB = 1024 * 1024
-FAILS = {"file_format_check_failed": "TikTok did not accept the file's format", "duration_check_failed": "the video is too long or too short for this account",
-         "frame_rate_check_failed": "TikTok wants 23-60 frames a second", "picture_size_check_failed": "the frame size is outside 360-4096 px",
-         "spam_risk_too_many_posts": "TikTok's daily posting limit for this account is reached", "spam_risk_user_banned_from_posting": "TikTok has stopped this account posting",
-         "spam_risk_text": "TikTok flagged the caption as spam", "spam_risk": "TikTok flagged this as spam", "auth_removed": "the TikTok sign-in was withdrawn",
-         "publish_cancelled": "the post was cancelled"}
+FAILS = {
+    "file_format_check_failed": "TikTok did not accept the file's format",
+    "duration_check_failed": "the video is too long or too short for this account",
+    "frame_rate_check_failed": "TikTok wants 23-60 frames a second",
+    "picture_size_check_failed": "the frame size is outside 360-4096 px",
+    "spam_risk_too_many_posts": "TikTok's daily posting limit for this account is reached",
+    "spam_risk_user_banned_from_posting": "TikTok has stopped this account posting",
+    "spam_risk_text": "TikTok flagged the caption as spam",
+    "spam_risk": "TikTok flagged this as spam",
+    "auth_removed": "the TikTok sign-in was withdrawn",
+    "publish_cancelled": "the post was cancelled",
+}
 
 
 PREF = 10 * MB
@@ -54,6 +62,7 @@ class TikTok(Platform):
     def token(self):
         self.need("access_token")
         from ai_pc.social import auth
+
         return auth.fresh_token(self) if not self.transport else self.creds["access_token"]
 
     def tapi(self, timeout=60):
@@ -85,8 +94,11 @@ class TikTok(Platform):
         if code in ("spam_risk_too_many_posts", "spam_risk_too_many_pending_share", "reached_active_user_cap"):
             return SocialError("limit", f"TikTok: {FAILS.get(code, code)} (try tomorrow)", retry_after=6 * 3600)
         if code == "unaudited_client_can_only_post_to_private_accounts":
-            return SocialError("policy", "TikTok lets this app post directly only while your account is private (TikTok audits apps before public "
-                                         "posting and does not audit personal tools); send it as a draft instead, or make the account private for the post")
+            return SocialError(
+                "policy",
+                "TikTok lets this app post directly only while your account is private (TikTok audits apps before public "
+                "posting and does not audit personal tools); send it as a draft instead, or make the account private for the post",
+            )
         if code == "internal_error":
             return SocialError("retry", "TikTok had a problem; trying again")
         return SocialError("invalid", f"TikTok: {code} {msg or ''}".strip())
@@ -102,14 +114,18 @@ class TikTok(Platform):
 
     def warnings(self, post, target):
         draft = (post.get("privacy") or "draft") not in ("private",)
-        w = ["goes to your TikTok inbox as a draft: open TikTok to post it publicly (TikTok lets personal tools post publicly only that way)" if draft else
-             "posts as private ('only me'); TikTok requires your account to be private while it posts, and you make the video public in the app"]
+        w = [
+            "goes to your TikTok inbox as a draft: open TikTok to post it publicly (TikTok lets personal tools post publicly only that way)"
+            if draft
+            else "posts as private ('only me'); TikTok requires your account to be private while it posts, and you make the video public in the app"
+        ]
         w.append("By posting, you agree to TikTok's Music Usage Confirmation")
         return w
 
     # ---------------------------------------------------------------- publishing
     def publish(self, job, post, prepared, budget=120):
         import time
+
         r = job.get("remote") or {}
         media = prepared.get("media") or []
         if not media:
@@ -126,14 +142,33 @@ class TikTok(Platform):
             cs, n = chunk_plan(size)
             src = {"source": "FILE_UPLOAD", "video_size": size, "chunk_size": cs, "total_chunk_count": n}
             if direct:
-                body = {"post_info": {"title": (prepared.get("text") or "")[:2200], "privacy_level": "SELF_ONLY", "disable_comment": False,
-                                      "disable_duet": False, "disable_stitch": False, "brand_content_toggle": False, "brand_organic_toggle": False,
-                                      "is_aigc": bool(post.get("ai"))}, "source_info": src}
+                body = {
+                    "post_info": {
+                        "title": (prepared.get("text") or "")[:2200],
+                        "privacy_level": "SELF_ONLY",
+                        "disable_comment": False,
+                        "disable_duet": False,
+                        "disable_stitch": False,
+                        "brand_content_toggle": False,
+                        "brand_organic_toggle": False,
+                        "is_aigc": bool(post.get("ai")),
+                    },
+                    "source_info": src,
+                }
                 d = self._post("v2/post/publish/video/init/", body)
             else:
                 d = self._post("v2/post/publish/inbox/video/init/", {"source_info": src})
-            self.checkpoint(job, publish_id=d["publish_id"], upload_url=d["upload_url"], upload_at=time.time(), chunk_size=cs, chunks=n, sent=0,
-                            draft=not direct, creator=info.get("creator_nickname"))
+            self.checkpoint(
+                job,
+                publish_id=d["publish_id"],
+                upload_url=d["upload_url"],
+                upload_at=time.time(),
+                chunk_size=cs,
+                chunks=n,
+                sent=0,
+                draft=not direct,
+                creator=info.get("creator_nickname"),
+            )
             r = job["remote"]
         if r.get("sent", 0) < r["chunks"]:
             if time.time() - r.get("upload_at", 0) > 3500:  # TikTok's upload address lasts an hour: start again with a fresh one
@@ -146,8 +181,14 @@ class TikTok(Platform):
                         continue
                     f.seek(a)
                     data = f.read(b - a + 1)
-                    status, _, content = up.request("PUT", r["upload_url"], data=data, raw=True, retries=2,
-                                                    headers={"Content-Type": "video/mp4", "Content-Length": str(len(data)), "Content-Range": f"bytes {a}-{b}/{size}"})
+                    status, _, content = up.request(
+                        "PUT",
+                        r["upload_url"],
+                        data=data,
+                        raw=True,
+                        retries=2,
+                        headers={"Content-Type": "video/mp4", "Content-Length": str(len(data)), "Content-Range": f"bytes {a}-{b}/{size}"},
+                    )
                     if status in (201, 206):
                         self.checkpoint(job, sent=i + 1)
                         continue
@@ -165,8 +206,13 @@ class TikTok(Platform):
                 ids = d.get("publicaly_available_post_id") or []  # (TikTok's spelling) filled only for public posts
                 if ids:
                     self.checkpoint(job, video_id=str(ids[0]))
-                return {"status": "published", "id": str(ids[0]) if ids else r["publish_id"], "permalink": None, "verified": True,
-                        "notes": ["in your TikTok inbox: open TikTok to post it" if r.get("draft") else "posted as private ('only me')"]}
+                return {
+                    "status": "published",
+                    "id": str(ids[0]) if ids else r["publish_id"],
+                    "permalink": None,
+                    "verified": True,
+                    "notes": ["in your TikTok inbox: open TikTok to post it" if r.get("draft") else "posted as private ('only me')"],
+                }
             if st == "FAILED":
                 why = d.get("fail_reason") or "unknown"
                 self.checkpoint(job, publish_id=None, upload_url=None, sent=0)
@@ -184,11 +230,21 @@ class TikTok(Platform):
         vid = (job.get("remote") or {}).get("video_id")
         if not vid:
             return {}  # drafts and private videos have no numbers in TikTok's API
-        js = self.call(self.tapi().request, "POST", "v2/video/query/", params={"fields": "id,view_count,like_count,comment_count,share_count,share_url"},
-                       json_body={"filters": {"video_ids": [vid]}})
+        js = self.call(
+            self.tapi().request,
+            "POST",
+            "v2/video/query/",
+            params={"fields": "id,view_count,like_count,comment_count,share_count,share_url"},
+            json_body={"filters": {"video_ids": [vid]}},
+        )
         vs = (js.get("data") or {}).get("videos") or []
         if not vs:
             return {}
         v = vs[0]
-        return {"views": v.get("view_count"), "likes": v.get("like_count"), "comments": v.get("comment_count"), "shares": v.get("share_count"),
-                "url": v.get("share_url")}
+        return {
+            "views": v.get("view_count"),
+            "likes": v.get("like_count"),
+            "comments": v.get("comment_count"),
+            "shares": v.get("share_count"),
+            "url": v.get("share_url"),
+        }

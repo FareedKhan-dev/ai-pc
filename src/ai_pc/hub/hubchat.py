@@ -9,6 +9,7 @@ can be undone where the service allows it.
   hc.say("draft an email to ali@x.com about the invoice saying it is paid")   -> a draft in Gmail; "send" sends it
   hc.say("brief me")  /  hc.say("undo")  /  hc.say("what did you do today?")
 """
+
 import datetime as dt
 import json
 import re
@@ -24,9 +25,14 @@ from ai_pc.hub.hubparse import parse
 
 AUDIT = ROOT / "state" / "hub" / "audit.jsonl"
 CHATS = ROOT / "out" / "hub" / "chats"
-YES = re.compile(r"^\s*(?:yes|yeah|yep|y|ok|okay|sure|send(?: it)?|post(?: it)?|go(?: ahead)?|do it|confirm(?:ed)?|approved?|please do|create it|book it|add it)\b[\s.!]*$", re.I)
+YES = re.compile(
+    r"^\s*(?:yes|yeah|yep|y|ok|okay|sure|send(?: it)?|post(?: it)?|go(?: ahead)?|do it|confirm(?:ed)?|approved?|please do|create it|book it|add it)\b[\s.!]*$",
+    re.I,
+)
 NO = re.compile(r"^\s*(?:no|nope|n|cancel|stop|don'?t|drop it|never mind|forget it|discard)\b", re.I)
-EDIT = re.compile(r"^\s*(?:change|make)\s+(?:the\s+)?(?:text|message|it|body|wording)\s+(?:to|say)\s+(.+)$|^\s*(?:make it say|it should say)\s+(.+)$", re.I)
+EDIT = re.compile(
+    r"^\s*(?:change|make)\s+(?:the\s+)?(?:text|message|it|body|wording)\s+(?:to|say)\s+(.+)$|^\s*(?:make it say|it should say)\s+(.+)$", re.I
+)
 HUB_SYSTEM = """You turn a request about work apps into actions for a program. Reply with ONE JSON object: {"ops": [...]} or {"ask": "<short question>"}.
 Actions (service is one of the connected ones given):
  {"op": "post", "service": "slack|microsoft|telegram|whatsapp", "to": "#channel | @person | me | phone", "text": "...", "team": "Teams team name (microsoft only)"}
@@ -71,7 +77,14 @@ class HubChat:
         cid = f"hub_{time.strftime('%Y%m%d_%H%M%S')}"
         folder = Path(chats_dir or CHATS) / cid
         folder.mkdir(parents=True, exist_ok=True)
-        st = {"id": cid, "folder": str(folder), "turns": [], "pending": None, "done": [], "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in (files or [])}}
+        st = {
+            "id": cid,
+            "folder": str(folder),
+            "turns": [],
+            "pending": None,
+            "done": [],
+            "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in (files or [])},
+        }
         return cls(st, planner, transports, creds)
 
     def services(self):
@@ -81,7 +94,9 @@ class HubChat:
 
     def conn(self, name):
         if name not in self.services():
-            raise HubError(f"{SERVICES.get(name, {}).get('label', name)} is not connected: run 'ai-pc hub steps {name}' then 'ai-pc hub connect {name}'")
+            raise HubError(
+                f"{SERVICES.get(name, {}).get('label', name)} is not connected: run 'ai-pc hub steps {name}' then 'ai-pc hub connect {name}'"
+            )
         return S.connector(name, creds=(self.creds or {}).get(name) if self.creds is not None else None, transport=self.transports.get(name))
 
     def save(self):
@@ -116,7 +131,9 @@ class HubChat:
             else:
                 if p:
                     self.state["pending"] = None
-                r = parse(message, {"services": self.services(), "files": self.state["files"], "now": _now(), "figma_link": self.state.get("figma_link")})
+                r = parse(
+                    message, {"services": self.services(), "files": self.state["files"], "now": _now(), "figma_link": self.state.get("figma_link")}
+                )
                 if not r["ops"] and not r.get("ask"):
                     r = self._llm(message)
                 if r.get("ask") and not r["ops"]:
@@ -135,13 +152,21 @@ class HubChat:
 
     def _llm(self, message):
         if self.planner is None:
-            return {"ops": [], "ask": "I could not read that. Try e.g. 'post \"...\" to #general', 'check my email', 'brief me', "
-                                      "'add a trello card \"...\" to To Do'."}
+            return {
+                "ops": [],
+                "ask": "I could not read that. Try e.g. 'post \"...\" to #general', 'check my email', 'brief me', "
+                "'add a trello card \"...\" to To Do'.",
+            }
         self._turn["llm"] = True
         sys_ = HUB_SYSTEM.replace("{today}", _now().strftime("%A %d %B %Y, %H:%M"))
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": sys_},
-                                            {"role": "user", "content": f"CONNECTED: {', '.join(self.services()) or 'none'}\nREQUEST: {message}"}])
+            r = self.planner._call(
+                "fast",
+                [
+                    {"role": "system", "content": sys_},
+                    {"role": "user", "content": f"CONNECTED: {', '.join(self.services()) or 'none'}\nREQUEST: {message}"},
+                ],
+            )
             d = parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return {"ops": [], "ask": f"I could not work that out ({type(e).__name__})."}
@@ -178,19 +203,31 @@ class HubChat:
     def preview(self, op):
         k, svc = op["op"], SERVICES.get(op.get("service"), {}).get("label", op.get("service", ""))
         say = {
-            "post": lambda: f"Ready to post to {op['to']} on {svc}: \"{op['text']}\"",
-            "send_draft": lambda: f"Ready to send the email to {', '.join(op['to'])}: subject \"{op['subject']}\"",
-            "meeting": lambda: f"Ready to book \"{op['title']}\" on {svc}, {self._when_words(op)}, inviting {', '.join(op['with'])}",
-            "task": lambda: f"Ready to add \"{op['title']}\" to {svc}" + (f" ({op['where']})" if op.get("where") else "") + (f", due {op['due']}" if op.get("due") else ""),
-            "move": lambda: f"Ready to move \"{op['item']}\" to {op['to']} on {svc}",
-            "done": lambda: f"Ready to mark \"{op['item']}\" done on {svc}",
-            "comment": lambda: (f"Ready to comment on the Figma file: \"{op['text']}\"" if op.get("service") == "figma" else
-                                f"Ready to comment on \"{op['item']}\" ({svc}): \"{op['text']}\""),
-            "contact": lambda: f"Ready to add {' '.join(x for x in (op.get('first'), op.get('last')) if x) or op.get('email')} to HubSpot"
-                               + (f" ({op['email']})" if op.get("email") else ""),
-            "deal": lambda: f"Ready to add the deal \"{op['name']}\" to HubSpot" + (f" worth {op['amount']}" if op.get("amount") else ""),
-            "upload": lambda: f"Ready to {'share' if op.get('share_with') else 'post'} {Path(op['path']).name}"
-                              + (f" with {', '.join(op['share_with'])}" if op.get("share_with") else f" to {op.get('to')}") + f" on {svc}",
+            "post": lambda: f'Ready to post to {op["to"]} on {svc}: "{op["text"]}"',
+            "send_draft": lambda: f'Ready to send the email to {", ".join(op["to"])}: subject "{op["subject"]}"',
+            "meeting": lambda: f'Ready to book "{op["title"]}" on {svc}, {self._when_words(op)}, inviting {", ".join(op["with"])}',
+            "task": lambda: (
+                f'Ready to add "{op["title"]}" to {svc}'
+                + (f" ({op['where']})" if op.get("where") else "")
+                + (f", due {op['due']}" if op.get("due") else "")
+            ),
+            "move": lambda: f'Ready to move "{op["item"]}" to {op["to"]} on {svc}',
+            "done": lambda: f'Ready to mark "{op["item"]}" done on {svc}',
+            "comment": lambda: (
+                f'Ready to comment on the Figma file: "{op["text"]}"'
+                if op.get("service") == "figma"
+                else f'Ready to comment on "{op["item"]}" ({svc}): "{op["text"]}"'
+            ),
+            "contact": lambda: (
+                f"Ready to add {' '.join(x for x in (op.get('first'), op.get('last')) if x) or op.get('email')} to HubSpot"
+                + (f" ({op['email']})" if op.get("email") else "")
+            ),
+            "deal": lambda: f'Ready to add the deal "{op["name"]}" to HubSpot' + (f" worth {op['amount']}" if op.get("amount") else ""),
+            "upload": lambda: (
+                f"Ready to {'share' if op.get('share_with') else 'post'} {Path(op['path']).name}"
+                + (f" with {', '.join(op['share_with'])}" if op.get("share_with") else f" to {op.get('to')}")
+                + f" on {svc}"
+            ),
         }.get(k, lambda: f"Ready to {k} on {svc}")()
         return say + ". Say 'yes' to go ahead, 'no' to drop it, or tell me what to change."
 
@@ -203,9 +240,17 @@ class HubChat:
         if self.planner is None:
             return f"Hello,\n\nI am writing about {op.get('about') or op.get('subject') or 'this'}.\n\nBest regards"
         self._turn["llm"] = True
-        r = self.planner._call("fast", [{"role": "user", "content": "Write a short, polite business email body (no subject line, no placeholders like [Name], "
-                                                                  f"sign off with 'Best regards'). Topic: {op.get('about') or op.get('subject')}. To: {', '.join(op['to'])}. "
-                                                                  "Use only facts in the topic; do not invent dates, amounts or names."}])
+        r = self.planner._call(
+            "fast",
+            [
+                {
+                    "role": "user",
+                    "content": "Write a short, polite business email body (no subject line, no placeholders like [Name], "
+                    f"sign off with 'Best regards'). Topic: {op.get('about') or op.get('subject')}. To: {', '.join(op['to'])}. "
+                    "Use only facts in the topic; do not invent dates, amounts or names.",
+                }
+            ],
+        )
         return r.text.strip()
 
     # ---------------------------------------------------------------- doing
@@ -217,8 +262,13 @@ class HubChat:
         if k == "log":
             return self.log()
         if k == "services":
-            return "Connected: " + (", ".join(SERVICES[s]["label"] for s in self.services()) or "nothing yet") + ". Not yet: " + \
-                ", ".join(SERVICES[s]["label"] for s in SERVICES if s not in self.services()) + "."
+            return (
+                "Connected: "
+                + (", ".join(SERVICES[s]["label"] for s in self.services()) or "nothing yet")
+                + ". Not yet: "
+                + ", ".join(SERVICES[s]["label"] for s in SERVICES if s not in self.services())
+                + "."
+            )
         if k == "brief":
             return self.brief(op.get("send_to"))
         if not svc:
@@ -237,8 +287,10 @@ class HubChat:
                     res = c.send(op["to"], op["text"])
                 except HubError as e:
                     if "131047" in str(e.body) or "re-engagement" in str(e).lower():
-                        raise HubError("WhatsApp only allows a template message to people who have not written to you in the last 24 hours "
-                                       "(say 'send the hello_world template to ...')")
+                        raise HubError(
+                            "WhatsApp only allows a template message to people who have not written to you in the last 24 hours "
+                            "(say 'send the hello_world template to ...')"
+                        )
                     raise
             words = f"Posted to {res['where']}"
         elif k == "read":
@@ -252,10 +304,19 @@ class HubChat:
             return f"{r['where']}, last {len(msgs)} message(s):\n" + "\n".join(f"  {x[:200]}" for x in lines[-12:])
         elif k == "email":
             res = c.draft(op["to"], op.get("subject") or "Hello", op.get("body") or "", attachments=op.get("attach") or ())
-            self.state["pending"] = {"op": "send_draft", "service": svc, "draft_id": res["id"], "to": op["to"], "subject": op.get("subject"), "body": op.get("body")}
+            self.state["pending"] = {
+                "op": "send_draft",
+                "service": svc,
+                "draft_id": res["id"],
+                "to": op["to"],
+                "subject": op.get("subject"),
+                "body": op.get("body"),
+            }
             self._record(op, res)
-            return (f"Draft saved in {res['where']} ({'checked' if res['verified'] else 'not checked'}):\nTo: {', '.join(op['to'])}\nSubject: {op.get('subject')}\n\n"
-                    f"{op.get('body')}\n\nSay 'send' to send it, 'no' to keep it as a draft, or 'change the text to ...'.")
+            return (
+                f"Draft saved in {res['where']} ({'checked' if res['verified'] else 'not checked'}):\nTo: {', '.join(op['to'])}\nSubject: {op.get('subject')}\n\n"
+                f"{op.get('body')}\n\nSay 'send' to send it, 'no' to keep it as a draft, or 'change the text to ...'."
+            )
         elif k == "send_draft":
             res = c.send_draft(op["draft_id"])
             words = f"Sent the email to {', '.join(op['to'])}"
@@ -271,14 +332,20 @@ class HubChat:
             day = dt.date.fromisoformat(op["day"])
             if svc == "zoom":
                 ms = [m for m in c.meetings()["meetings"] if (m.get("start") or "").startswith(op["day"])]
-                return (f"Zoom on {day:%a %d %b}: " + "; ".join(f"{m['title']} at {m['start'][11:16]} ({m['link']})" for m in ms)) if ms else f"No Zoom meetings on {day:%a %d %b}."
+                return (
+                    (f"Zoom on {day:%a %d %b}: " + "; ".join(f"{m['title']} at {m['start'][11:16]} ({m['link']})" for m in ms))
+                    if ms
+                    else f"No Zoom meetings on {day:%a %d %b}."
+                )
             from ai_pc.hub.services.google import day_bounds
+
             s, e = day_bounds(day)
             r = c.events(s, e)
             if not r["events"]:
                 return f"Nothing on your calendar on {day:%a %d %b}."
-            return f"{day:%a %d %b} ({r['where']}):\n" + "\n".join(f"  {str(ev['start'])[11:16] or 'all day'}  {ev['title']}" + (f"  ({ev['where']})" if ev.get("where") else "")
-                                                                for ev in r["events"])
+            return f"{day:%a %d %b} ({r['where']}):\n" + "\n".join(
+                f"  {str(ev['start'])[11:16] or 'all day'}  {ev['title']}" + (f"  ({ev['where']})" if ev.get("where") else "") for ev in r["events"]
+            )
         elif k == "meeting":
             start = dt.datetime.fromisoformat(op["start"])
             end = start + dt.timedelta(minutes=int(op.get("minutes", 30)))
@@ -286,7 +353,9 @@ class HubChat:
                 res = c.create(op["title"], start, op.get("minutes", 30))
             else:
                 res = c.create_event(op["title"], start, end, attendees=op.get("with") or (), meet=op.get("online", True))
-            words = f"Booked \"{op['title']}\" ({self._when_words(op)}) in {res['where']}" + (f", invites sent to {', '.join(op['with'])}" if op.get("with") else "")
+            words = f'Booked "{op["title"]}" ({self._when_words(op)}) in {res["where"]}' + (
+                f", invites sent to {', '.join(op['with'])}" if op.get("with") else ""
+            )
         elif k == "task":
             if svc == "trello":
                 res = c.create(op["title"], op.get("where"), op.get("board"), due=op.get("due"))
@@ -296,14 +365,22 @@ class HubChat:
                 res = c.add_row(op.get("where") or "Tasks", op["title"], date=op.get("due"))
             elif svc == "jira":
                 res = c.create(op["title"], op.get("where"), op.get("kind", "Task"))
-            words = f"Added \"{op['title']}\" to {res['where']}"
+            words = f'Added "{op["title"]}" to {res["where"]}'
         elif k == "tasks":
             if svc == "trello":
                 cards = c.cards(op.get("where"))
-                return "Trello: " + ("; ".join(f"{x['name']} [{x['list']}]" + (f" due {x['due'][:10]}" if x.get("due") else "") for x in cards[:25]) or "no cards") + "."
+                return (
+                    "Trello: "
+                    + ("; ".join(f"{x['name']} [{x['list']}]" + (f" due {x['due'][:10]}" if x.get("due") else "") for x in cards[:25]) or "no cards")
+                    + "."
+                )
             if svc == "asana":
                 r = c.tasks(op.get("where"))
-                return f"Asana, {r['where']}: " + ("; ".join(f"{t['name']}" + (f" due {t['due']}" if t.get("due") else "") for t in r["tasks"][:25]) or "nothing open") + "."
+                return (
+                    f"Asana, {r['where']}: "
+                    + ("; ".join(f"{t['name']}" + (f" due {t['due']}" if t.get("due") else "") for t in r["tasks"][:25]) or "nothing open")
+                    + "."
+                )
             if svc == "jira":
                 r = c.search()
                 return "Jira, yours and open: " + ("; ".join(f"{i['key']} {i['summary']} [{i['status']}]" for i in r["issues"]) or "none") + "."
@@ -312,7 +389,7 @@ class HubChat:
                 return f"Notion, {r['where']}: " + ("; ".join(x["title"] for x in r["rows"][:25]) or "empty") + "."
         elif k == "move":
             res = c.move(op["item"], op["to"])
-            words = f"Moved \"{op['item']}\" ({res['where']})"
+            words = f'Moved "{op["item"]}" ({res["where"]})'
         elif k == "done":
             if svc == "asana":
                 res = c.complete(op["item"])
@@ -320,9 +397,10 @@ class HubChat:
                 res = c.move(op["item"], "Done")
             else:
                 res = c.move(op["item"], "Done")
-            words = f"Marked \"{op['item']}\" done"
+            words = f'Marked "{op["item"]}" done'
         elif k == "comment" and svc == "figma":
             from ai_pc.hub.services.figma import key_of
+
             key, node = key_of(op["link"])
             self.state["figma_link"] = op["link"]
             res = c.comment(key, op["text"], node)
@@ -335,7 +413,7 @@ class HubChat:
             words = f"Added {res['name']} to HubSpot"
         elif k == "deal":
             res = c.add_deal(op["name"], op.get("amount"))
-            words = f"Added the deal \"{op['name']}\" to HubSpot"
+            words = f'Added the deal "{op["name"]}" to HubSpot'
         elif svc == "figma" and k in ("frames", "export", "comments", "tokens"):
             return self._figma(c, op)
         elif svc == "canva" and k in ("designs", "design", "export", "import"):
@@ -372,22 +450,42 @@ class HubChat:
         if not where:
             return None
         from ai_pc.windows import fs as WF
-        return WF.known({"download": "downloads", "downloads": "downloads", "document": "documents", "documents": "documents", "photos": "pictures",
-                         "pictures": "pictures", "videos": "videos", "desktop": "desktop"}.get(where, where))
+
+        return WF.known(
+            {
+                "download": "downloads",
+                "downloads": "downloads",
+                "document": "documents",
+                "documents": "documents",
+                "photos": "pictures",
+                "pictures": "pictures",
+                "videos": "videos",
+                "desktop": "desktop",
+            }.get(where, where)
+        )
 
     def _figma(self, c, op):
         from ai_pc.hub.services.figma import key_of
+
         key, node = key_of(op["link"])
         self.state["figma_link"] = op["link"]
         k = op["op"]
         if k == "frames":
             fr = c.frames(key)
             data = c.file(key)
-            return f"Figma, {data.get('name') or key}: {len(fr)} frame(s): " + "; ".join(f"{f['name']} ({f['w']}x{f['h']}, {f['page']})" for f in fr[:25]) + "."
+            return (
+                f"Figma, {data.get('name') or key}: {len(fr)} frame(s): "
+                + "; ".join(f"{f['name']} ({f['w']}x{f['h']}, {f['page']})" for f in fr[:25])
+                + "."
+            )
         if k == "comments":
             cs = c.comments(key)
             open_ = [x for x in cs if not x["resolved"]]
-            return f"Figma comments: {len(open_)} open of {len(cs)}" + (": " + "; ".join(f"{x['who']}: {x['text'][:120]}" for x in open_[:12]) if open_ else "") + "."
+            return (
+                f"Figma comments: {len(open_)} open of {len(cs)}"
+                + (": " + "; ".join(f"{x['who']}: {x['text'][:120]}" for x in open_[:12]) if open_ else "")
+                + "."
+            )
         if k == "tokens":
             t = c.tokens(key)
             cols = ", ".join(f"{x['hex']}" + (f" ({x['name']})" if x.get("name") else "") for x in t["colors"][:10])
@@ -406,42 +504,75 @@ class HubChat:
         got = c.export(key, ids, op.get("format") or "png", folder=dest, names=names)
         ok = [g for g in got if g.get("path")]
         where = str(Path(ok[0]["path"]).parent) if ok else "nowhere"
-        return f"Exported {len(ok)} of {len(ids)} frame(s) as {(op.get('format') or 'png').upper()} to {where}" + \
-            (f": {', '.join(Path(g['path']).name for g in ok[:8])}" if ok else "") + "."
+        return (
+            f"Exported {len(ok)} of {len(ids)} frame(s) as {(op.get('format') or 'png').upper()} to {where}"
+            + (f": {', '.join(Path(g['path']).name for g in ok[:8])}" if ok else "")
+            + "."
+        )
 
     def _canva(self, c, op):
         k = op["op"]
         if k == "designs":
             ds = c.designs(op.get("query"), 25)
-            return ("Canva designs" + (f" matching '{op['query']}'" if op.get("query") else "") + f": {len(ds)}: " +
-                    "; ".join(f"{d['name']}" + (f" ({d['pages']} pages)" if (d.get("pages") or 0) > 1 else "") for d in ds) + ".") if ds else "No Canva designs found."
+            return (
+                (
+                    "Canva designs"
+                    + (f" matching '{op['query']}'" if op.get("query") else "")
+                    + f": {len(ds)}: "
+                    + "; ".join(f"{d['name']}" + (f" ({d['pages']} pages)" if (d.get("pages") or 0) > 1 else "") for d in ds)
+                    + "."
+                )
+                if ds
+                else "No Canva designs found."
+            )
         if k == "design":
             res = c.create(op.get("title") or "Untitled design", op.get("kind"))
             self._record(op, res)
-            return f"Made the Canva design \"{res['name']}\" ({'checked' if res.get('verified') else 'NOT confirmed by Canva'}). Open it: {res.get('link')}"
+            return f'Made the Canva design "{res["name"]}" ({"checked" if res.get("verified") else "NOT confirmed by Canva"}). Open it: {res.get("link")}'
         if k == "import":
             p = Path(op["path"])
             if not p.exists():
                 raise HubError(f"no file {p.name} (give the full path, or start the chat with --with {p.name})")
             res = c.import_file(p)
             self._record(op, res)
-            return f"Imported {p.name} into Canva as \"{res['name']}\" ({'checked' if res.get('verified') else 'NOT confirmed by Canva'}). Open it: {res.get('link')}"
+            return f'Imported {p.name} into Canva as "{res["name"]}" ({"checked" if res.get("verified") else "NOT confirmed by Canva"}). Open it: {res.get("link")}'
         res = c.export(op["design"], op.get("format") or "pdf", folder=self._dest(op.get("to")))
-        return f"Saved \"{res['design']}\" as {res['format'].upper()}: " + ", ".join(res["files"][:6]) + (f" (+{len(res['files']) - 6} more)" if len(res["files"]) > 6 else "") + "."
+        return (
+            f'Saved "{res["design"]}" as {res["format"].upper()}: '
+            + ", ".join(res["files"][:6])
+            + (f" (+{len(res['files']) - 6} more)" if len(res["files"]) > 6 else "")
+            + "."
+        )
 
     def _record(self, op, res):
-        entry = {"service": op.get("service"), "op": op["op"], "where": res.get("where"), "id": res.get("id"), "link": res.get("link"),
-                 "verified": res.get("verified"), "summary": (op.get("text") or op.get("title") or op.get("subject") or op.get("name")
-                                                          or (Path(op["path"]).name if op.get("path") else ""))[:120],
-                 "undo": res.get("undo")}
+        entry = {
+            "service": op.get("service"),
+            "op": op["op"],
+            "where": res.get("where"),
+            "id": res.get("id"),
+            "link": res.get("link"),
+            "verified": res.get("verified"),
+            "summary": (
+                op.get("text") or op.get("title") or op.get("subject") or op.get("name") or (Path(op["path"]).name if op.get("path") else "")
+            )[:120],
+            "undo": res.get("undo"),
+        }
         self.state["done"].append(entry)
         if not self.transports:
             audit(entry)
 
     def _summarize(self, text, what):
         self._turn["llm"] = True
-        r = self.planner._call("fast", [{"role": "user", "content": f"Sum up {what} for a busy person in 3-6 short bullet points: who needs what, decisions, "
-                                                                  f"deadlines. Use only what is written; quote numbers exactly.\n\n{text[:6000]}"}])
+        r = self.planner._call(
+            "fast",
+            [
+                {
+                    "role": "user",
+                    "content": f"Sum up {what} for a busy person in 3-6 short bullet points: who needs what, decisions, "
+                    f"deadlines. Use only what is written; quote numbers exactly.\n\n{text[:6000]}",
+                }
+            ],
+        )
         return "\n" + r.text.strip()
 
     # ---------------------------------------------------------------- history
@@ -452,14 +583,16 @@ class HubChat:
         d = done[-1]
         u = d.get("undo")
         if not u:
-            return f"The last action ({d['op']} on {d['service']}) cannot be taken back by the service" + (", so send a correction instead." if d["op"] in ("send_draft", "post") else ".")
+            return f"The last action ({d['op']} on {d['service']}) cannot be taken back by the service" + (
+                ", so send a correction instead." if d["op"] in ("send_draft", "post") else "."
+            )
         c = self.conn(u["service"])
         args = {k: v for k, v in u.items() if k not in ("service", "op")}
         getattr(c, u["op"])(**args)
         d["undone"] = True
         if not self.transports:
             audit({"service": u["service"], "op": f"undo {d['op']}", "where": d.get("where"), "id": d.get("id"), "summary": d.get("summary", "")})
-        return f"Undone: {d['op']} \"{d['summary']}\" ({d.get('where')})."
+        return f'Undone: {d["op"]} "{d["summary"]}" ({d.get("where")}).'
 
     def log(self):
         today = _now().date().isoformat()
@@ -475,7 +608,9 @@ class HubChat:
         rows = rows or [dict(d, time="") for d in self.state["done"]]
         if not rows:
             return "Nothing done today."
-        return "Today:\n" + "\n".join(f"  {e.get('time', '')[11:16]} {e['service']}: {e['op']} \"{e.get('summary', '')}\" -> {e.get('where')}" for e in rows[-20:])
+        return "Today:\n" + "\n".join(
+            f'  {e.get("time", "")[11:16]} {e["service"]}: {e["op"]} "{e.get("summary", "")}" -> {e.get("where")}' for e in rows[-20:]
+        )
 
     # ---------------------------------------------------------------- the briefing
     def brief(self, send_to=None):
@@ -486,11 +621,18 @@ class HubChat:
             try:
                 c = self.conn(name)
                 from ai_pc.hub.services.google import day_bounds
+
                 s, e = day_bounds(today)
                 ev = c.events(s, e)["events"]
-                parts.append(f"Calendar ({SERVICES[name]['label'].split(' (')[0]}): " + ("; ".join(f"{str(x['start'])[11:16]} {x['title']}" for x in ev) or "nothing today"))
+                parts.append(
+                    f"Calendar ({SERVICES[name]['label'].split(' (')[0]}): "
+                    + ("; ".join(f"{str(x['start'])[11:16]} {x['title']}" for x in ev) or "nothing today")
+                )
                 mail = c.unread(8)["messages"]
-                parts.append(f"Unread mail: {len(mail)}" + (" - " + "; ".join(f"{m['from'].split('<')[0].strip()}: {m['subject']}" for m in mail[:5]) if mail else ""))
+                parts.append(
+                    f"Unread mail: {len(mail)}"
+                    + (" - " + "; ".join(f"{m['from'].split('<')[0].strip()}: {m['subject']}" for m in mail[:5]) if mail else "")
+                )
                 raw += [f"EMAIL {m['from']}: {m['subject']} - {m['snippet'][:150]}" for m in mail]
             except HubError as e:
                 parts.append(f"{SERVICES[name]['label']}: could not read ({e})")
@@ -518,7 +660,9 @@ class HubChat:
                     parts.append("Asana due or late: " + ("; ".join(f"{t['name']} ({t['due']})" for t in ts[:8]) or "none"))
                 else:
                     iss = c.search()["issues"]
-                    parts.append(f"Jira, open and yours: {len(iss)}" + (" - " + "; ".join(f"{i['key']} {i['summary']}" for i in iss[:5]) if iss else ""))
+                    parts.append(
+                        f"Jira, open and yours: {len(iss)}" + (" - " + "; ".join(f"{i['key']} {i['summary']}" for i in iss[:5]) if iss else "")
+                    )
             except HubError as e:
                 parts.append(f"{SERVICES[name]['label']}: could not read ({e})")
         if not parts:

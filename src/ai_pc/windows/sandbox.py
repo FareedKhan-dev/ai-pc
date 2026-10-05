@@ -3,6 +3,7 @@ with photos (EXIF dates in August and September; a WhatsApp one dated only by it
 PDFs, a spreadsheet, old installers and a new one, unfinished downloads (one abandoned, one still downloading), the
 same photo and PDF downloaded twice, an empty folder, a zip, a short video and a song; and an empty Documents and
 Pictures."""
+
 import datetime as dt
 import os
 import shutil
@@ -19,6 +20,7 @@ def _when(path, days_ago):
 
 def _photo(path, w, h, colour, taken=None):
     from PIL import Image, ImageDraw
+
     im = Image.new("RGB", (w, h), colour)
     d = ImageDraw.Draw(im)
     d.rectangle([w // 4, h // 4, 3 * w // 4, 3 * h // 4], outline="white", width=6)
@@ -36,16 +38,22 @@ def build(base):
     for d in (dl, docs, pics):
         d.mkdir(parents=True)
     y = dt.datetime.now().year
-    shots = [(f"IMG_{y}0812_101500.jpg", dt.datetime(y, 8, 12, 10, 15), "#2E7D32"), (f"IMG_{y}0819_183000.jpg", dt.datetime(y, 8, 19, 18, 30), "#1565C0"),
-             (f"IMG_{y}0903_090500.jpg", dt.datetime(y, 9, 3, 9, 5), "#C62828"), (f"IMG_{y}0915_164200.jpg", dt.datetime(y, 9, 15, 16, 42), "#6A1B9A"),
-             (f"WhatsApp Image {y}-08-25 at 20.11.03.jpeg", None, "#EF6C00")]  # WhatsApp strips EXIF: its date is only in its name
+    shots = [
+        (f"IMG_{y}0812_101500.jpg", dt.datetime(y, 8, 12, 10, 15), "#2E7D32"),
+        (f"IMG_{y}0819_183000.jpg", dt.datetime(y, 8, 19, 18, 30), "#1565C0"),
+        (f"IMG_{y}0903_090500.jpg", dt.datetime(y, 9, 3, 9, 5), "#C62828"),
+        (f"IMG_{y}0915_164200.jpg", dt.datetime(y, 9, 15, 16, 42), "#6A1B9A"),
+        (f"WhatsApp Image {y}-08-25 at 20.11.03.jpeg", None, "#EF6C00"),
+    ]  # WhatsApp strips EXIF: its date is only in its name
     for name, when, colour in shots:
         _photo(dl / name, 2400, 1600, colour, when)
         _when(dl / name, 20)
     shutil.copy2(dl / f"IMG_{y}0812_101500.jpg", dl / f"IMG_{y}0812_101500 (1).jpg")  # downloaded twice
     from PIL import Image
+
     Image.new("RGB", (1366, 768), "#ECEFF1").save(dl / "Screenshot 2026-09-12 104455.png")
     import docx
+
     d = docx.Document()
     d.add_heading("Fareed Hassan Khan", 0)
     d.add_paragraph("Data analyst. Python, Excel, Power BI.")
@@ -60,6 +68,7 @@ def build(base):
         shutil.copy2(src_pdf, dl / name)
     shutil.copy2(dl / "Electricity bill Aug.pdf", dl / "Electricity bill Aug (1).pdf")  # the same bill twice
     from openpyxl import Workbook
+
     wb = Workbook()
     wb.active.append(["Month", "Spend"])
     wb.active.append(["August", 42000])
@@ -75,10 +84,37 @@ def build(base):
         z.writestr("ahmed/notes.txt", "From the wedding.")
     (dl / "New folder").mkdir()
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "testsrc=duration=3:size=320x240:rate=25", "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
-                    "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", str(dl / "clip from phone.mp4")], check=True, creationflags=flags)
-    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=330:duration=4", "-c:a", "libmp3lame", str(dl / "song.mp3")], check=True,
-                   creationflags=flags)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc=duration=3:size=320x240:rate=25",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:duration=3",
+            "-shortest",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            str(dl / "clip from phone.mp4"),
+        ],
+        check=True,
+        creationflags=flags,
+    )
+    subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=330:duration=4", "-c:a", "libmp3lame", str(dl / "song.mp3")],
+        check=True,
+        creationflags=flags,
+    )
     (dl / "notes.txt").write_text("Call the bank on Monday.\n", encoding="utf-8")
     return {"root": base, "downloads": dl, "documents": docs, "pictures": pics}
 

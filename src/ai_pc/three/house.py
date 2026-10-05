@@ -9,15 +9,16 @@ Blender only builds and renders the boxes (src/ai_pc/three/bl/house_scene.py).
   a box: {"n": name, "c": collection, "m": material, "b": [x0, y0, z0, x1, y1, z1]} (inches; x across the plot, y from the
   road to the back, z up)
 """
+
 from ai_pc.cad import draft as DR
 from ai_pc.cad.floorplan import INNER, OUTER
 
-CLEAR_H = 126.0        # 10'-6" floor to ceiling, as Pakistani houses are built
-SLAB = 6.0             # roof / floor slab
-PLINTH = 18.0          # the ground floor stands 1'-6" above the road
-DOOR_H = 84.0          # 7'-0" doors and window heads
-SILL = 36.0            # 3'-0" window sills
-VENT = (78.0, 96.0)    # bath ventilators: high up
+CLEAR_H = 126.0  # 10'-6" floor to ceiling, as Pakistani houses are built
+SLAB = 6.0  # roof / floor slab
+PLINTH = 18.0  # the ground floor stands 1'-6" above the road
+DOOR_H = 84.0  # 7'-0" doors and window heads
+SILL = 36.0  # 3'-0" window sills
+VENT = (78.0, 96.0)  # bath ventilators: high up
 PARAPET = 36.0
 BOUNDARY_H = 72.0
 STYLES = {
@@ -26,9 +27,23 @@ STYLES = {
     "grey": {"wall": "plaster_grey", "accent": "wood_light", "frame": "frame_black", "door": "wood_dark", "parapet": "plaster_grey"},
     "classic": {"wall": "plaster_cream", "accent": "brick_red", "frame": "frame_white", "door": "wood_dark", "parapet": "brick_red"},
 }
-FLOORS = {"porch": "concrete", "terrace": "tiles_terrace", "kitchen": "tiles_grey", "store": "tiles_grey", "powder": "tiles_grey", "stairs": "marble",
-          "bedroom": "wood_floor", "drawing": "marble", "guest": "wood_floor", "lounge": "marble", "family": "marble", "dining": "marble",
-          "servant": "tiles_grey", "passage": "marble", "bath": "tiles_bath"}
+FLOORS = {
+    "porch": "concrete",
+    "terrace": "tiles_terrace",
+    "kitchen": "tiles_grey",
+    "store": "tiles_grey",
+    "powder": "tiles_grey",
+    "stairs": "marble",
+    "bedroom": "wood_floor",
+    "drawing": "marble",
+    "guest": "wood_floor",
+    "lounge": "marble",
+    "family": "marble",
+    "dining": "marble",
+    "servant": "tiles_grey",
+    "passage": "marble",
+    "bath": "tiles_bath",
+}
 
 
 def _rect_minus(cells_rects, holes):
@@ -90,20 +105,39 @@ class _Rec:
 
 # furniture in each block's own frame (the DXF block's origin and axes), as boxes (x0, y0, z0, x1, y1, z1, material)
 FURNITURE = {
-    "BED_DOUBLE": [(0, 0, 0, 60, 78, 14, "wood_furn"), (2, 2, 14, 58, 76, 22, "fabric_white"), (4, 4, 22, 28, 18, 26, "fabric_white"),
-                   (32, 4, 22, 56, 18, 26, "fabric_white"), (2, 34, 22, 58, 76, 23, "fabric_accent"), (0, -3, 0, 60, 0, 40, "wood_furn")],
-    "SOFA3": [(0, 0, 0, 78, 33, 16, "fabric_sofa"), (0, 0, 16, 78, 9, 32, "fabric_sofa"), (0, 0, 16, 6, 33, 24, "fabric_sofa"),
-              (72, 0, 16, 78, 33, 24, "fabric_sofa")],
+    "BED_DOUBLE": [
+        (0, 0, 0, 60, 78, 14, "wood_furn"),
+        (2, 2, 14, 58, 76, 22, "fabric_white"),
+        (4, 4, 22, 28, 18, 26, "fabric_white"),
+        (32, 4, 22, 56, 18, 26, "fabric_white"),
+        (2, 34, 22, 58, 76, 23, "fabric_accent"),
+        (0, -3, 0, 60, 0, 40, "wood_furn"),
+    ],
+    "SOFA3": [
+        (0, 0, 0, 78, 33, 16, "fabric_sofa"),
+        (0, 0, 16, 78, 9, 32, "fabric_sofa"),
+        (0, 0, 16, 6, 33, 24, "fabric_sofa"),
+        (72, 0, 16, 78, 33, 24, "fabric_sofa"),
+    ],
     "COFFEE": [(0, 0, 14, 40, 22, 17, "wood_furn"), (2, 2, 0, 38, 20, 14, "wood_dark")],
     "TV_UNIT": [(0, 0, 0, 60, 16, 20, "wood_furn"), (8, 4, 20, 52, 6, 46, "screen")],
-    "DINING4": [(0, 0, 28, 48, 32, 30, "wood_furn"), (20, 12, 0, 28, 20, 28, "wood_dark")] +
-               [(cx - 9, -20, 0, cx + 9, -4, 17, "wood_dark") for cx in (12, 36)] + [(cx - 9, 36, 0, cx + 9, 52, 17, "wood_dark") for cx in (12, 36)],
-    "DINING6": [(0, 0, 28, 72, 38, 30, "wood_furn"), (30, 14, 0, 42, 24, 28, "wood_dark")] +
-               [(cx - 9, -20, 0, cx + 9, -4, 17, "wood_dark") for cx in (12, 36, 60)] + [(cx - 9, 42, 0, cx + 9, 58, 17, "wood_dark") for cx in (12, 36, 60)],
+    "DINING4": [(0, 0, 28, 48, 32, 30, "wood_furn"), (20, 12, 0, 28, 20, 28, "wood_dark")]
+    + [(cx - 9, -20, 0, cx + 9, -4, 17, "wood_dark") for cx in (12, 36)]
+    + [(cx - 9, 36, 0, cx + 9, 52, 17, "wood_dark") for cx in (12, 36)],
+    "DINING6": [(0, 0, 28, 72, 38, 30, "wood_furn"), (30, 14, 0, 42, 24, 28, "wood_dark")]
+    + [(cx - 9, -20, 0, cx + 9, -4, 17, "wood_dark") for cx in (12, 36, 60)]
+    + [(cx - 9, 42, 0, cx + 9, 58, 17, "wood_dark") for cx in (12, 36, 60)],
     "WC": [(2, 0, 0, 18, 8, 30, "ceramic"), (3, 8, 0, 17, 30, 15, "ceramic")],
     "BASIN": [(0, 0, 30, 22, 17, 34, "ceramic"), (8, 0, 0, 14, 6, 30, "ceramic")],
-    "CAR": [(0, 10, 6, 72, 158, 30, "car_paint"), (8, 34, 30, 64, 130, 52, "car_glass"), (10, 40, 30, 62, 124, 53, "car_paint"),
-            (-2, 24, 0, 6, 52, 22, "tyre"), (66, 24, 0, 74, 52, 22, "tyre"), (-2, 116, 0, 6, 144, 22, "tyre"), (66, 116, 0, 74, 144, 22, "tyre")],
+    "CAR": [
+        (0, 10, 6, 72, 158, 30, "car_paint"),
+        (8, 34, 30, 64, 130, 52, "car_glass"),
+        (10, 40, 30, 62, 124, 53, "car_paint"),
+        (-2, 24, 0, 6, 52, 22, "tyre"),
+        (66, 24, 0, 74, 52, 22, "tyre"),
+        (-2, 116, 0, 6, 144, 22, "tyre"),
+        (66, 116, 0, 74, 144, 22, "tyre"),
+    ],
     "STOVE": [(0, 0, 36, 24, 20, 37, "steel")],
     "SINK": [(0, 0, 35, 30, 18, 36.5, "steel")],
 }
@@ -153,7 +187,9 @@ def _floor(fl, z, boxes, style, name, cut=None, with_furniture=True, th=0.0):
         if z + head < top:
             _box(boxes, f"{name}_lintel{k}", f"{name}_walls", style["wall"] if outer(r) else "plaster_inside", x0, y0, z + head, x1, y1, top)
         if base > 0:
-            _box(boxes, f"{name}_sill{k}", f"{name}_walls", style["wall"] if outer(r) else "plaster_inside", x0, y0, z, x1, y1, z + min(base, top - z))
+            _box(
+                boxes, f"{name}_sill{k}", f"{name}_walls", style["wall"] if outer(r) else "plaster_inside", x0, y0, z, x1, y1, z + min(base, top - z)
+            )
         if kind != "door" and z + base < top:  # glass in the middle of the wall, a frame round it
             mid = (o["at"],)
             zt = z + min(head, top - z)
@@ -166,7 +202,9 @@ def _floor(fl, z, boxes, style, name, cut=None, with_furniture=True, th=0.0):
                         _box(boxes, f"{name}_frame{k}h", f"{name}_frames", style["frame"], x0 + 2, mid[0] - 1.5, fz[0], x1 - 2, mid[0] + 1.5, fz[1])
                 if (x1 - x0) > 40:  # a mullion down the middle of a wide window
                     cx = (x0 + x1) / 2
-                    _box(boxes, f"{name}_frame{k}m", f"{name}_frames", style["frame"], cx - 1, mid[0] - 1.5, z + base + 2, cx + 1, mid[0] + 1.5, zt - 2)
+                    _box(
+                        boxes, f"{name}_frame{k}m", f"{name}_frames", style["frame"], cx - 1, mid[0] - 1.5, z + base + 2, cx + 1, mid[0] + 1.5, zt - 2
+                    )
                 if outer(r) and o.get("side") in ("front", "rear") and z + head + 4 <= top and kind == "window":  # a sunshade (chajja) over it
                     out = -1 if o.get("side") == "front" else 1
                     yy = (y0, y0 - 18) if out < 0 else (y1, y1 + 18)
@@ -294,7 +332,18 @@ def house_spec(lay, style="modern", view="all", floor="ground", furniture=True, 
         if porch:  # columns at the porch's open front corners, the gate between them, a ramp up from the road
             for cx in (porch["x0"], porch["x1"] - 12):
                 _box(boxes, "out_porch_col", "out_walls", st["accent"], cx, env[1], PLINTH, cx + 12, env[1] + 12, PLINTH + CLEAR_H)
-            _box(boxes, "out_gate", "out_gate", "gate_metal", porch["x0"] + 12, env[1] + 3, PLINTH, porch["x1"] - 12, env[1] + 5, PLINTH + BOUNDARY_H - 12)
+            _box(
+                boxes,
+                "out_gate",
+                "out_gate",
+                "gate_metal",
+                porch["x0"] + 12,
+                env[1] + 3,
+                PLINTH,
+                porch["x1"] - 12,
+                env[1] + 5,
+                PLINTH + BOUNDARY_H - 12,
+            )
             boxes.append({"n": "out_ramp", "c": "out_site", "m": "concrete", "w": [porch["x0"], -40, 2, porch["x1"], 0, PLINTH]})
         _box(boxes, "out_plinth", "out_site", "plinth", env[0] - 2, env[1] - 2, 0, env[2] + 2, env[3] + 2, PLINTH)
         if D > env[3] + 1:  # the open yard behind, walled
@@ -320,12 +369,30 @@ def house_spec(lay, style="modern", view="all", floor="ground", furniture=True, 
                 cx, cy = lb["at"]
                 text = "\n".join(x.title().replace("Tv ", "TV ") for x in lb["lines"])
                 bw = lb["box"][2] - lb["box"][0] - 4  # the width the drawing keeps free for the words
-                labs.append({"text": text, "x": cx, "y": cy + lb["h"] * 0.35, "z": zf + 0.5, "size": lb["h"] * 1.35, "floor": nm, "room": r["id"],
-                             "w": bw})
+                labs.append(
+                    {"text": text, "x": cx, "y": cy + lb["h"] * 0.35, "z": zf + 0.5, "size": lb["h"] * 1.35, "floor": nm, "room": r["id"], "w": bw}
+                )
                 if lb.get("size_h"):
-                    labs.append({"text": lb["size"], "x": cx, "y": cy - lb["h"] * (0.75 + 0.55 * (len(lb["lines"]) - 1)), "z": zf + 0.5,
-                                 "size": lb["size_h"] * 1.25, "floor": nm, "room": r["id"], "kind": "size", "w": bw})
-    expect = {"doors": sum(len(f["doors"]) for _, f, _ in storeys), "windows": sum(len(f.get("windows", [])) for _, f, _ in storeys),
-              "rooms": {nm: {r["id"]: round((r["x1"] - r["x0"]) * (r["y1"] - r["y0"]) / 144, 1) for r in f["rooms"]} for nm, f, _ in storeys},
-              "height": storeys[-1][2] + CLEAR_H + SLAB + PARAPET, "storeys": len(storeys), "plot": [W, D], "envelope": env}
+                    labs.append(
+                        {
+                            "text": lb["size"],
+                            "x": cx,
+                            "y": cy - lb["h"] * (0.75 + 0.55 * (len(lb["lines"]) - 1)),
+                            "z": zf + 0.5,
+                            "size": lb["size_h"] * 1.25,
+                            "floor": nm,
+                            "room": r["id"],
+                            "kind": "size",
+                            "w": bw,
+                        }
+                    )
+    expect = {
+        "doors": sum(len(f["doors"]) for _, f, _ in storeys),
+        "windows": sum(len(f.get("windows", [])) for _, f, _ in storeys),
+        "rooms": {nm: {r["id"]: round((r["x1"] - r["x0"]) * (r["y1"] - r["y0"]) / 144, 1) for r in f["rooms"]} for nm, f, _ in storeys},
+        "height": storeys[-1][2] + CLEAR_H + SLAB + PARAPET,
+        "storeys": len(storeys),
+        "plot": [W, D],
+        "envelope": env,
+    }
     return {"boxes": boxes, "labels": labs, "expect": expect, "style": st, "unit": 0.0254, "floors": [n for n, _, _ in storeys]}

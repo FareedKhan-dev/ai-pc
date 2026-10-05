@@ -1,5 +1,6 @@
 """A small WebSocket client (RFC 6455: the opening handshake, masked text frames, ping/pong, close) for apps that are
 driven over a local WebSocket (OBS Studio's obs-websocket). No library needed."""
+
 import base64
 import hashlib
 import os
@@ -21,8 +22,10 @@ class WebSocket:
             raise WSError("only ws:// (a program on this PC or the local network) is used here")
         self.sock = socket.create_connection((u.hostname, u.port or 80), timeout=timeout)
         key = base64.b64encode(os.urandom(16)).decode()
-        req = (f"GET {u.path or '/'} HTTP/1.1\r\nHost: {u.hostname}:{u.port or 80}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-               f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: obswebsocket.json\r\n\r\n")
+        req = (
+            f"GET {u.path or '/'} HTTP/1.1\r\nHost: {u.hostname}:{u.port or 80}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Protocol: obswebsocket.json\r\n\r\n"
+        )
         self.sock.sendall(req.encode())
         head = b""
         while b"\r\n\r\n" not in head:
@@ -52,7 +55,9 @@ class WebSocket:
         mask = os.urandom(4)
         n = len(payload)
         head = bytes([0x80 | opcode])
-        head += bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536 else bytes([0x80 | 127]) + struct.pack(">Q", n)
+        head += (
+            bytes([0x80 | n]) if n < 126 else bytes([0x80 | 126]) + struct.pack(">H", n) if n < 65536 else bytes([0x80 | 127]) + struct.pack(">Q", n)
+        )
         self.sock.sendall(head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload)))
 
     def send(self, text):

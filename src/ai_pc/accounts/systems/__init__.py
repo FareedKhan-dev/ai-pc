@@ -11,6 +11,7 @@ cancelled there too.
 A connector has: name, label, kinds, ready() -> (ok, text), create(b, doc) -> remote id, read(b, doc, remote) -> {"total"},
 void(b, doc, remote), and builds every create from Connector.step(..., look=...).
 """
+
 import importlib
 import re
 
@@ -22,10 +23,18 @@ LABEL = {"quickbooks": "QuickBooks Online", "tally": "TallyPrime", "xero": "Xero
 # what goes first: a receipt or credit note needs the invoice it settles to be there already
 PRIORITY = {"invoice": 0, "quote": 0, "bill": 0, "expense": 0, "credit_note": 1, "receipt": 2, "payment": 2}
 # our expense accounts, as the words other charts of accounts use for the same thing
-EXPENSE_KEYS = {"6000": r"\brent", "6010": r"wage|salar|payroll", "6020": r"electric|light|power|utilit|heat|\bgas\b|water",
-                "6030": r"phone|internet|telephone|communication", "6040": r"travel|motor|vehicle|transport|freight|fuel|courier",
-                "6050": r"repair|maintenance", "6060": r"advertis|marketing|promotion", "6070": r"bank (?:fee|charge|service)",
-                "6080": r"stationery|printing|office (?:suppl|exp)", "6090": r"general|other|misc|sundr"}
+EXPENSE_KEYS = {
+    "6000": r"\brent",
+    "6010": r"wage|salar|payroll",
+    "6020": r"electric|light|power|utilit|heat|\bgas\b|water",
+    "6030": r"phone|internet|telephone|communication",
+    "6040": r"travel|motor|vehicle|transport|freight|fuel|courier",
+    "6050": r"repair|maintenance",
+    "6060": r"advertis|marketing|promotion",
+    "6070": r"bank (?:fee|charge|service)",
+    "6080": r"stationery|printing|office (?:suppl|exp)",
+    "6090": r"general|other|misc|sundr",
+}
 
 
 class SyncError(Exception):
@@ -80,6 +89,7 @@ def once(b, system, kind, local, make):
 
 class Connector:
     """What every accounting system's connector shares: each remote object a document needs is a step, made once."""
+
     name = label = ""
     kinds = ()
 
@@ -137,6 +147,7 @@ def rate_of(amount, tax):
     from decimal import Decimal
 
     from ai_pc.accounts.money import pct
+
     if not tax or not amount:
         return None
     for places in ("1", "0.1", "0.01"):
@@ -204,7 +215,7 @@ def push(b, name, doc, conn=None):
 def pending(b, name, kinds):
     """Documents not yet in the system, and cancellations not yet carried there, in the order they must go."""
     out = []
-    for d in b.docs(limit=10 ** 7):
+    for d in b.docs(limit=10**7):
         if d["kind"] not in kinds:
             continue
         r = linked(b, d["id"], name)
@@ -218,7 +229,7 @@ def sync_all(b, name, conn=None, docs=None):
     """Every document not yet there (or the ones given); stops at a sign-in, limit or connection problem."""
     conn = conn or connector(name)
     out = []
-    for d in (docs if docs is not None else pending(b, name, conn.kinds)):
+    for d in docs if docs is not None else pending(b, name, conn.kinds):
         try:
             r = push(b, name, d, conn)
             out.append(dict(r, number=d["number"], ok=r["verified"]))
@@ -232,6 +243,7 @@ def sync_all(b, name, conn=None, docs=None):
 # ---------------------------------------------------------------- setting up
 def cli(cmd, name):
     import getpass
+
     names = [name] if name else list(MODULES) + ["fbr"]
     for n in names:
         if n not in MODULES and n != "fbr":

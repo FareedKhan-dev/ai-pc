@@ -7,6 +7,7 @@ own render matches the picture the layers make.
   "krita poster 1080x1350: title 'Art Fair' white, subtitle 'Sunday 4 pm' yellow"   'krita layers sky.png and tree.png'
   'krita canvas 3000x2000 with layers sketch, ink, colours'
 """
+
 import os
 import re
 import shutil
@@ -20,8 +21,11 @@ from PIL import Image
 from ai_pc.core.config import ROOT
 
 NAME, LABEL = "krita", "Krita: layered artwork (posters, stacked pictures, painters' canvases) as .kra + PNG"
-EXAMPLES = ["krita poster 1080x1350: title 'Art Fair' white, subtitle 'Sunday 4 pm' yellow", "krita layers sky.png and tree.png",
-            "krita canvas 3000x2000 with layers sketch, ink, colours"]
+EXAMPLES = [
+    "krita poster 1080x1350: title 'Art Fair' white, subtitle 'Sunday 4 pm' yellow",
+    "krita layers sky.png and tree.png",
+    "krita canvas 3000x2000 with layers sketch, ink, colours",
+]
 HOME = ROOT / "tools" / "krita"
 
 
@@ -41,8 +45,17 @@ def write_ora(path, size, layers):
     with zipfile.ZipFile(path, "w") as z:
         z.writestr(zipfile.ZipInfo("mimetype"), "image/openraster", compress_type=zipfile.ZIP_STORED)
         for i, (name, im, (x, y)) in reversed(list(enumerate(layers))):
-            ET.SubElement(st, "layer", name=name, src=f"data/layer{i}.png", x=str(x), y=str(y), opacity="1.0", visibility="visible",
-                          **{"composite-op": "svg:src-over"})
+            ET.SubElement(
+                st,
+                "layer",
+                name=name,
+                src=f"data/layer{i}.png",
+                x=str(x),
+                y=str(y),
+                opacity="1.0",
+                visibility="visible",
+                **{"composite-op": "svg:src-over"},
+            )
         for i, (name, im, _) in enumerate(layers):
             buf = BytesIO()
             im.convert("RGBA").save(buf, "PNG")
@@ -62,6 +75,7 @@ def krita(*args, timeout=300):
     user has no Krita of their own) a kritarc pointing its resources (97 MB of brushes and the like) into tools/krita/home is
     there only while it runs; anything it made in AppData is removed after."""
     from ai_pc.core import hidden_desktop
+
     local, roam = Path(os.environ["LOCALAPPDATA"]), Path(os.environ["APPDATA"])
     rc = local / "kritarc"
     leftovers = [rc, local / "kritadisplayrc", roam / "krita", local / "krita"]
@@ -94,6 +108,7 @@ def parse(text, ctx):
         names = [n.strip().title() for n in re.split(r",|\band\b", m.group(3) or "sketch, ink, colours") if n.strip()]
         return {"op": "canvas", "size": (int(m.group(1)), int(m.group(2))) if m.group(1) else (3000, 2000), "layers": names}
     from ai_pc.apps import photoshop
+
     op = photoshop.parse(re.sub(r"\bkrita\b", "photoshop", text, flags=re.I), ctx)
     return dict(op, app="krita") if op else None
 
@@ -102,11 +117,14 @@ def run(op, ctx):
     if not exe():
         return "Krita is not in tools/krita."
     from ai_pc.apps import photoshop
+
     out = Path(ctx["out"]) / "krita"
     out.mkdir(parents=True, exist_ok=True)
     if op["op"] == "canvas":
         size = op["size"]
-        layers = [("Paper", Image.new("RGBA", size, (255, 255, 255, 255)), (0, 0))] + [(n, Image.new("RGBA", size, (0, 0, 0, 0)), (0, 0)) for n in op["layers"]]
+        layers = [("Paper", Image.new("RGBA", size, (255, 255, 255, 255)), (0, 0))] + [
+            (n, Image.new("RGBA", size, (0, 0, 0, 0)), (0, 0)) for n in op["layers"]
+        ]
         stem = "canvas_" + "_".join(n.lower() for n in op["layers"])
     elif op["op"] == "stack":
         ims = [Image.open(f).convert("RGBA") for f in op["files"]]
@@ -127,14 +145,21 @@ def run(op, ctx):
     diff = None
     if png.exists():
         import numpy as np
+
         a = np.asarray(Image.open(png).convert("RGBA"), dtype=np.int16)
         b = np.asarray(flat.convert("RGBA"), dtype=np.int16)
         if a.shape == b.shape:
             diff = float(np.abs(a - b).mean())
-    checks = [("Krita made its own .kra with every layer by name", kra.exists() and set(n for n, _, _ in layers) <= set(names)),
-              ("Krita's render matches the picture the layers make" + (f" (mean difference {diff:.2f} of 255)" if diff is not None else ""),
-               diff is not None and diff < 1.0)]
+    checks = [
+        ("Krita made its own .kra with every layer by name", kra.exists() and set(n for n, _, _ in layers) <= set(names)),
+        (
+            "Krita's render matches the picture the layers make" + (f" (mean difference {diff:.2f} of 255)" if diff is not None else ""),
+            diff is not None and diff < 1.0,
+        ),
+    ]
     bad = [w for w, ok in checks if not ok]
-    return (f"Krita file {kra} ({size[0]}x{size[1]}, layers: {', '.join(n for n, _, _ in reversed(layers))}), {png.name} rendered by Krita, and "
-            f"{ora.name} (OpenRaster: also opens in GIMP and MyPaint). Made by Krita on a hidden desktop. " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f". {(r1[2] or r1[1])[-200:]}"))
+    return (
+        f"Krita file {kra} ({size[0]}x{size[1]}, layers: {', '.join(n for n, _, _ in reversed(layers))}), {png.name} rendered by Krita, and "
+        f"{ora.name} (OpenRaster: also opens in GIMP and MyPaint). Made by Krita on a hidden desktop. "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f". {(r1[2] or r1[1])[-200:]}")
+    )

@@ -5,6 +5,7 @@ global camera shift (phase correlation), colour statistics and labelled contact 
 Speed: sampling skips B-frames (they are most of the decoding work) and runs 4 ffmpeg processes on time chunks;
 if a file has so few non-B frames that sampling gets sparse, those chunks are decoded fully instead.
 """
+
 import io
 import json
 import re
@@ -31,9 +32,20 @@ def _run(args, binary=True):
 
 def probe(path):
     """Duration, size, frame rate, rotation and streams of a media file (ffprobe)."""
-    r = _run(["ffprobe", "-v", "error", "-show_entries",
-              "format=duration:stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels:"
-              "stream_side_data=rotation:stream_tags=rotate", "-of", "json", str(path)], binary=False)
+    r = _run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration:stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels:"
+            "stream_side_data=rotation:stream_tags=rotate",
+            "-of",
+            "json",
+            str(path),
+        ],
+        binary=False,
+    )
     d = json.loads(r.stdout or "{}")
     v = next((s for s in d.get("streams", []) if s.get("codec_type") == "video"), None)
     a = next((s for s in d.get("streams", []) if s.get("codec_type") == "audio"), None)
@@ -56,9 +68,28 @@ def probe(path):
 def _decode(path, start, dur, fps, width, skip_b):
     """Frames of one time chunk with their exact times (showinfo), at most `fps` per second."""
     sel = f"select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,{1 / fps - 0.004:.4f})',scale={width}:-2,showinfo"
-    args = ["ffmpeg", "-v", "info", "-nostats"] + (["-skip_frame", "bidir"] if skip_b else []) + \
-           ["-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", str(path), "-an", "-vf", sel, "-fps_mode", "passthrough",
-            "-f", "rawvideo", "-pix_fmt", "bgr24", "-"]
+    args = (
+        ["ffmpeg", "-v", "info", "-nostats"]
+        + (["-skip_frame", "bidir"] if skip_b else [])
+        + [
+            "-ss",
+            f"{start:.3f}",
+            "-t",
+            f"{dur:.3f}",
+            "-i",
+            str(path),
+            "-an",
+            "-vf",
+            sel,
+            "-fps_mode",
+            "passthrough",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "bgr24",
+            "-",
+        ]
+    )
     r = _run(args)
     times = [start + float(x) for x in _PTS.findall(r.stderr.decode("utf-8", "ignore"))]
     return times, r.stdout
@@ -78,7 +109,8 @@ def sample(path, fps=4.0, width=640, start=0.0, end=None, chunks=4):
         if len(times) < 0.5 * (b - a) * min(fps, 2):  # B-frame-heavy file: too sparse without them
             times, raw = _decode(path, a, b - a, fps, width, False)
         k = len(raw) // (width * height * 3)
-        return times[:k], np.frombuffer(raw, np.uint8)[:k * width * height * 3].reshape(k, height, width, 3)
+        return times[:k], np.frombuffer(raw, np.uint8)[: k * width * height * 3].reshape(k, height, width, 3)
+
     with ThreadPoolExecutor(n) as ex:
         parts = list(ex.map(one, range(n)))
     times = [t for p in parts for t in p[0]]
@@ -89,8 +121,9 @@ def sample(path, fps=4.0, width=640, start=0.0, end=None, chunks=4):
 def frame_at(path, t, width=None):
     """One frame (BGR) at time t, accurately seeked. None past the end."""
     vf = ["-vf", f"scale={width}:-2"] if width else []
-    r = _run(["ffmpeg", "-v", "error", "-ss", f"{max(0.0, t):.3f}", "-i", str(path), "-frames:v", "1", *vf,
-              "-f", "image2pipe", "-vcodec", "png", "-"])
+    r = _run(
+        ["ffmpeg", "-v", "error", "-ss", f"{max(0.0, t):.3f}", "-i", str(path), "-frames:v", "1", *vf, "-f", "image2pipe", "-vcodec", "png", "-"]
+    )
     if not r.stdout:
         return None
     return cv2.imdecode(np.frombuffer(r.stdout, np.uint8), cv2.IMREAD_COLOR)
@@ -105,10 +138,29 @@ def window(path, t0, t1, fps=15, width=480):
     """All frames of [t0, t1] at `fps` (full decode of just that window): for motion checks."""
     info = probe(path)
     height = int(round(width * info["height"] / info["width"] / 2) * 2)
-    r = _run(["ffmpeg", "-v", "error", "-ss", f"{max(0.0, t0):.3f}", "-t", f"{max(0.05, t1 - t0):.3f}", "-i", str(path),
-              "-an", "-vf", f"fps={fps},scale={width}:{height}", "-f", "rawvideo", "-pix_fmt", "bgr24", "-"])
+    r = _run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-ss",
+            f"{max(0.0, t0):.3f}",
+            "-t",
+            f"{max(0.05, t1 - t0):.3f}",
+            "-i",
+            str(path),
+            "-an",
+            "-vf",
+            f"fps={fps},scale={width}:{height}",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "bgr24",
+            "-",
+        ]
+    )
     k = len(r.stdout) // (width * height * 3)
-    return np.frombuffer(r.stdout, np.uint8)[:k * width * height * 3].reshape(k, height, width, 3)
+    return np.frombuffer(r.stdout, np.uint8)[: k * width * height * 3].reshape(k, height, width, 3)
 
 
 def image(path, width=None):
@@ -135,10 +187,17 @@ def faces(frame, min_score=0.6):
     d.setScoreThreshold(min_score)
     _, found = d.detect(frame)
     out = []
-    for f in (found if found is not None else []):
+    for f in found if found is not None else []:
         x, y, fw, fh = (float(v) for v in f[:4])
-        out.append({"box": [x / w, y / h, fw / w, fh / h], "right_eye": [f[4] / w, f[5] / h], "left_eye": [f[6] / w, f[7] / h],
-                    "nose": [f[8] / w, f[9] / h], "score": round(float(f[14]), 3)})
+        out.append(
+            {
+                "box": [x / w, y / h, fw / w, fh / h],
+                "right_eye": [f[4] / w, f[5] / h],
+                "left_eye": [f[6] / w, f[7] / h],
+                "nose": [f[8] / w, f[9] / h],
+                "score": round(float(f[14]), 3),
+            }
+        )
     for o in out:
         o.update({k: [round(float(v), 4) for v in o[k]] for k in ("box", "right_eye", "left_eye", "nose")})
     return sorted(out, key=lambda o: -o["box"][2] * o["box"][3])
@@ -199,9 +258,13 @@ def colour(frame):
     small = cv2.resize(frame, (160, max(2, round(frame.shape[0] * 160 / frame.shape[1]))), interpolation=cv2.INTER_AREA)
     hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
     lab = cv2.cvtColor(small, cv2.COLOR_BGR2LAB).astype(np.float32)
-    return {"brightness": round(float(hsv[..., 2].mean() / 255), 3), "saturation": round(float(hsv[..., 1].mean() / 255), 3),
-            "warmth": round(float((lab[..., 2].mean() - 128) / 64), 3), "tint": round(float((lab[..., 1].mean() - 128) / 64), 3),
-            "contrast": round(float(lab[..., 0].std() / 128), 3)}
+    return {
+        "brightness": round(float(hsv[..., 2].mean() / 255), 3),
+        "saturation": round(float(hsv[..., 1].mean() / 255), 3),
+        "warmth": round(float((lab[..., 2].mean() - 128) / 64), 3),
+        "tint": round(float((lab[..., 1].mean() - 128) / 64), 3),
+        "contrast": round(float(lab[..., 0].std() / 128), 3),
+    }
 
 
 def hist(frame):

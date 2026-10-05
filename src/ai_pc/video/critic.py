@@ -8,6 +8,7 @@
              seconds, the lint results and what is possible here -> a score, issues and a few patch operations.
 3. improve() applies the patches, resolves again and keeps the new plan only if the checks did not get worse.
 """
+
 import copy
 import json
 import re
@@ -54,20 +55,57 @@ Item names only from the design or ALTERNATIVES. At most 6 operations; [] if it 
 
 SHOT_FIELDS = {"beats", "speed", "around", "want", "file", "section", "reframe", "chroma", "background"}
 
-SETTABLE = {"name", "params", "strength", "intensity", "to", "back", "text", "position", "size", "color", "font", "bold", "outline",
-            "shadow", "background", "intro", "outro", "loop", "volume", "sound", "kind", "speed", "ramp", "reframe", "fade_in",
-            "fade_out", "expect", "duration", "from", "chroma", "points", "property", "over_text", "max_width", "vertical"}
+SETTABLE = {
+    "name",
+    "params",
+    "strength",
+    "intensity",
+    "to",
+    "back",
+    "text",
+    "position",
+    "size",
+    "color",
+    "font",
+    "bold",
+    "outline",
+    "shadow",
+    "background",
+    "intro",
+    "outro",
+    "loop",
+    "volume",
+    "sound",
+    "kind",
+    "speed",
+    "ramp",
+    "reframe",
+    "fade_in",
+    "fade_out",
+    "expect",
+    "duration",
+    "from",
+    "chroma",
+    "points",
+    "property",
+    "over_text",
+    "max_width",
+    "vertical",
+}
 
 
 def timeline(R, cat=None):
     """The resolved edit in absolute seconds (what a reviewer or a reviser needs to reason about moments)."""
     if cat is None:
         from ai_pc.video.editplan import Catalog
+
         cat = Catalog.shared()
     lines = []
     for c in R.get("clips", []):
         sp = "/".join(f"{p['speed']:g}x" for p in c["pieces"])
-        lines.append(f"  clip {c['id']} {c['start']:.1f}-{c['end']:.1f} s: {c['file']} (file {c['window'][0]:.1f}-{c['window'][1]:.1f} s, speed {sp})")
+        lines.append(
+            f"  clip {c['id']} {c['start']:.1f}-{c['end']:.1f} s: {c['file']} (file {c['window'][0]:.1f}-{c['window'][1]:.1f} s, speed {sp})"
+        )
     for e in sorted(R.get("edits", []), key=lambda e: (e.get("window") or [0])[0]):
         w = e.get("window") or [0, 0]
         what = e.get("text") or e.get("sfx") or e.get("file") or ""
@@ -87,11 +125,13 @@ def _overlap(a, b):
 def lint(R, plan, brief, cat=None):
     if cat is None:
         from ai_pc.video.editplan import Catalog
+
         cat = Catalog.shared()
     issues = []
 
     def add(sev, eid, issue, hint):
         issues.append({"severity": sev, "id": eid, "issue": issue, "hint": hint})
+
     end = R.get("end", 0.0)
     edits = [e for e in R.get("edits", []) if e.get("window")]
     present = {e["id"] for e in R.get("edits", [])} | {c["id"] for c in R.get("clips", [])}
@@ -117,7 +157,7 @@ def lint(R, plan, brief, cat=None):
         add("medium", "global", f"the video is {end:.1f} s, the target was {tgt} s", "change clip durations")
     alltexts = [e for e in edits if e["type"] == "text"]
     for i, a in enumerate(alltexts):
-        for b in alltexts[i + 1:]:
+        for b in alltexts[i + 1 :]:
             if _overlap(a["window"], b["window"]) and (str(a["id"]).startswith("kt") != str(b["id"]).startswith("kt")):
                 add("medium", b["id"], f"two titles at once: '{a['text'][:20]}' and '{b['text'][:20]}'", "keep one title per moment")
     texts = [e for e in edits if e["type"] == "text" and not str(e["id"]).startswith("kt")]  # kinetic words are short by design
@@ -125,7 +165,7 @@ def lint(R, plan, brief, cat=None):
         if t["window"][1] - t["window"][0] < 1.2:
             add("medium", t["id"], f"title '{t['text'][:30]}' is on screen only {t['window'][1] - t['window'][0]:.1f} s", "keep titles >= 1.2 s")
     for i, a in enumerate(texts):
-        for b in texts[i + 1:]:
+        for b in texts[i + 1 :]:
             if _overlap(a["window"], b["window"]) and a.get("box") and b.get("box"):
                 ax0, ay0, ax1, ay1 = a["box"]
                 bx0, by0, bx1, by1 = b["box"]
@@ -138,19 +178,30 @@ def lint(R, plan, brief, cat=None):
             add("medium", e["id"], f"{len(at_once) + 1} effects at once around {e['window'][0]:.1f} s", "at most two effects at the same moment")
         if e.get("category") == "character_effect":
             if e.get("face_share", 1) < 0.3:
-                add("high", e["id"], f"person effect at {e['window'][0]:.1f}-{e['window'][1]:.1f} s but a clear face is visible only "
-                                     f"{e.get('face_share', 0) * 100:.0f}% of that time", "move it where the face is visible, or use a full-frame effect")
+                add(
+                    "high",
+                    e["id"],
+                    f"person effect at {e['window'][0]:.1f}-{e['window'][1]:.1f} s but a clear face is visible only "
+                    f"{e.get('face_share', 0) * 100:.0f}% of that time",
+                    "move it where the face is visible, or use a full-frame effect",
+                )
             for o in at_once:
                 card = cat.card(o["item"]) if o.get("item") else {}
                 if o.get("category") == "scene_effect" and card.get("target") in OVERLAY_TARGETS:
-                    add("high", o["id"], f"full-frame effect {card.get('en')} runs over the person effect {e['id']} and may hide it",
-                        "put them one after the other")
+                    add(
+                        "high",
+                        o["id"],
+                        f"full-frame effect {card.get('en')} runs over the person effect {e['id']} and may hide it",
+                        "put them one after the other",
+                    )
     impacts = [e for e in edits if e["type"] == "shake" or (e["type"] == "zoom" and e.get("back"))]
     sounds = [e for e in edits if e["type"] == "audio"]
     if any(not s.get("sfx") for s in sounds):
         impacts = []  # music under a beat-synced edit already carries every hit
     for e in impacts:
-        if not any(abs(s["window"][0] - e["window"][0]) <= 0.25 or (s.get("sfx") == "riser" and abs(s["window"][1] - e["window"][0]) <= 0.25) for s in sounds):
+        if not any(
+            abs(s["window"][0] - e["window"][0]) <= 0.25 or (s.get("sfx") == "riser" and abs(s["window"][1] - e["window"][0]) <= 0.25) for s in sounds
+        ):
             add("low", e["id"], f"{e['type']} at {e['window'][0]:.1f} s has no impact sound with it", "add an sfx impact or hit at that moment")
     clip_sound = any(c.get("volume", 1) > 0.05 for c in R.get("clips", []))
     if not sounds and not clip_sound:
@@ -161,8 +212,12 @@ def lint(R, plan, brief, cat=None):
                 add("low", c["id"], f"a {c['dur']:.1f} s shot in a fast-paced edit", "cut it shorter or add movement")
     untried = sorted({e["item"] for e in edits if e.get("item") and e["item"] not in cat.boost})
     if untried:
-        add("low", "global", f"{len(untried)} item(s) never used here before ({', '.join(u.split(':', 1)[1] for u in untried[:4])})",
-            "fine, but prefer proven items when equal")
+        add(
+            "low",
+            "global",
+            f"{len(untried)} item(s) never used here before ({', '.join(u.split(':', 1)[1] for u in untried[:4])})",
+            "fine, but prefer proven items when equal",
+        )
     if end > 2 and not any(e["window"][1] >= end - 1.2 for e in edits if e["type"] in ("text", "zoom", "animation", "effect", "audio")):
         add("low", "global", "the ending has no final beat (title, push-in, outro or sound)", "end on a moment")
     return issues
@@ -178,8 +233,11 @@ def alternatives(groups, cat, limit=40):
     for g, cards in groups.items():
         for c in cards:
             k = f"{c['category']}:{c['name']}"
-            out.append(f"{c['category']} {c['name']} \"{c.get('en')}\"" + (" (proven)" if k in proven else "") +
-                       (f" [target {c['target']}]" if c.get("target") else ""))
+            out.append(
+                f'{c["category"]} {c["name"]} "{c.get("en")}"'
+                + (" (proven)" if k in proven else "")
+                + (f" [target {c['target']}]" if c.get("target") else "")
+            )
     return "\n".join(out[:limit])
 
 
@@ -190,9 +248,11 @@ def review(planner, request, brief, plan, R, issues, aware_text, alts, design=No
     if design is not None:
         slim = {k: design.get(k) for k in ("style", "music", "shots", "recipes", "edits")}
         dz = f"DESIGN:\n{json.dumps(slim, ensure_ascii=False)}\nRHYTHM: {json.dumps(plan.get('_rhythm'), ensure_ascii=False)}\n\n"
-    user = (f"REQUEST:\n{request}\n\nTREATMENT AND REQUIREMENT MAP:\n{json.dumps(think, ensure_ascii=False)}\n\n{dz}"
-            f"TIMELINE (absolute seconds, {R.get('end', 0):.1f} s long):\n{timeline(R)}\n\nAUTOMATIC CHECKS:\n{checks}\n\n"
-            f"{aware_text}\n\nALTERNATIVES:\n{alts}\n\nReview it and reply with the JSON.")
+    user = (
+        f"REQUEST:\n{request}\n\nTREATMENT AND REQUIREMENT MAP:\n{json.dumps(think, ensure_ascii=False)}\n\n{dz}"
+        f"TIMELINE (absolute seconds, {R.get('end', 0):.1f} s long):\n{timeline(R)}\n\nAUTOMATIC CHECKS:\n{checks}\n\n"
+        f"{aware_text}\n\nALTERNATIVES:\n{alts}\n\nReview it and reply with the JSON."
+    )
     system = CRITIC_DESIGN_SYSTEM if design is not None else CRITIC_SYSTEM
     r = planner._call("fast", [{"role": "system", "content": system}, {"role": "user", "content": user}])
     d = parse_json(r.text)
@@ -280,7 +340,10 @@ def apply_design_patch(design, ops):
                 same[0].update(r)
             else:
                 recipes.append(r)
-            done.append(f"recipe {r['use']}" + (" off" if r.get("off") else f" {json.dumps({k: v for k, v in r.items() if k != 'use'}, ensure_ascii=False)[:60]}"))
+            done.append(
+                f"recipe {r['use']}"
+                + (" off" if r.get("off") else f" {json.dumps({k: v for k, v in r.items() if k != 'use'}, ensure_ascii=False)[:60]}")
+            )
         elif kind in ("set", "move", "add") or (kind == "remove" and op.get("id") in eb):
             sub, ds = apply_patch({"clips": [], "edits": extras}, [op])
             d["edits"] = extras = sub["edits"]
@@ -295,17 +358,26 @@ def apply_design_patch(design, ops):
 def improve(planner, request, brief, plan, analyses, aware_text, groups, log=print, design=None):
     """Review before rendering. Returns (plan, resolved, critique summary)."""
     from ai_pc.video.editplan import Catalog, resolve
+
     t0 = time.perf_counter()
     cat = Catalog.shared()
     R = resolve(plan, analyses)
     before = lint(R, plan, brief, cat)
     crit = review(planner, request, brief, plan, R, before, aware_text, alternatives(groups, cat), design)
     ops = crit.get("patch") if isinstance(crit.get("patch"), list) else []
-    summary = {"score": crit.get("score"), "verdict": crit.get("verdict"), "issues": crit.get("issues") or [],
-               "lint_before": before, "applied": [], "kept": True, "design": design}
+    summary = {
+        "score": crit.get("score"),
+        "verdict": crit.get("verdict"),
+        "issues": crit.get("issues") or [],
+        "lint_before": before,
+        "applied": [],
+        "kept": True,
+        "design": design,
+    }
     if ops:
         if design is not None:  # a designed edit: change the design, let the code cut it on the beat again
             from ai_pc.video.recipes import compose
+
             design2, done = apply_design_patch(design, ops)
         else:
             plan2, done = apply_patch(plan, ops)
@@ -325,7 +397,9 @@ def improve(planner, request, brief, plan, analyses, aware_text, groups, log=pri
         else:
             summary.update(kept=False, rejected=done, lint_after=after)
     summary["seconds"] = round(time.perf_counter() - t0, 1)
-    log(f"critic {summary['seconds']} s: score {summary['score']}/10, {len(before)} check(s) flagged"
+    log(
+        f"critic {summary['seconds']} s: score {summary['score']}/10, {len(before)} check(s) flagged"
         + (f"; applied {len(summary['applied'])}: " + "; ".join(summary["applied"]) if summary["applied"] else "")
-        + ("; patch rejected (it made the checks worse)" if not summary["kept"] else ""))
+        + ("; patch rejected (it made the checks worse)" if not summary["kept"] else "")
+    )
     return plan, R, summary

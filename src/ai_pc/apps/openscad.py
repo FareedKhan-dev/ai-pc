@@ -7,6 +7,7 @@ with no errors, and the STL is the size asked. 'slice it' then sends it to Prusa
   'openscad box with lid 80x60x40 mm, 2 mm walls'   "openscad name tag 'ALI' 60x20 mm"   'openscad gear 20 teeth module 2'
   'openscad phone stand 70 degrees'   'openscad render bracket.scad'
 """
+
 import os
 import re
 import struct
@@ -15,8 +16,12 @@ from pathlib import Path
 from ai_pc.core.config import ROOT
 
 NAME, LABEL = "openscad", "OpenSCAD: parametric printable objects (boxes, tags, stands, gears) to STL + preview"
-EXAMPLES = ["openscad box with lid 80x60x40 mm, 2 mm walls", "openscad name tag 'ALI' 60x20 mm", "openscad gear 20 teeth module 2",
-            "openscad phone stand 70 degrees"]
+EXAMPLES = [
+    "openscad box with lid 80x60x40 mm, 2 mm walls",
+    "openscad name tag 'ALI' 60x20 mm",
+    "openscad gear 20 teeth module 2",
+    "openscad phone stand 70 degrees",
+]
 HOME = ROOT / "tools" / "openscad"
 
 BOX = """// Box with a snug lid (made by AI PC). Change the numbers below in OpenSCAD's Customizer.
@@ -111,8 +116,10 @@ def env():
     (home / "fontcache").mkdir(parents=True, exist_ok=True)
     conf = home / "fonts.conf"
     fonts = openscad_exe().parent / "fonts"
-    text = ('<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
-            f"  <dir>{fonts.as_posix()}</dir>\n  <dir>C:/Windows/Fonts</dir>\n  <cachedir>{(home / 'fontcache').as_posix()}</cachedir>\n</fontconfig>\n")
+    text = (
+        '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
+        f"  <dir>{fonts.as_posix()}</dir>\n  <dir>C:/Windows/Fonts</dir>\n  <cachedir>{(home / 'fontcache').as_posix()}</cachedir>\n</fontconfig>\n"
+    )
     if not conf.exists() or conf.read_text(encoding="utf-8") != text:
         conf.write_text(text, encoding="utf-8")
     return dict(os.environ, FONTCONFIG_FILE=str(conf))
@@ -120,6 +127,7 @@ def env():
 
 def run_scad(scad, out, extra=()):
     from ai_pc.core import hidden_desktop
+
     return hidden_desktop.run([str(openscad_exe()), "-o", str(out), *extra, str(scad)], timeout=300, env=env())
 
 
@@ -130,7 +138,7 @@ def stl_box(path):
         pts = [tuple(map(float, m)) for m in re.findall(rb"vertex\s+(\S+)\s+(\S+)\s+(\S+)", data)]
     else:
         n = struct.unpack("<I", data[80:84])[0]
-        pts = [struct.unpack("<3f", data[84 + i * 50 + 12 + k * 12: 84 + i * 50 + 24 + k * 12]) for i in range(n) for k in range(3)]
+        pts = [struct.unpack("<3f", data[84 + i * 50 + 12 + k * 12 : 84 + i * 50 + 24 + k * 12]) for i in range(n) for k in range(3)]
     lo = [min(p[i] for p in pts) for i in range(3)]
     hi = [max(p[i] for p in pts) for i in range(3)]
     return [round(hi[i] - lo[i], 2) for i in range(3)]
@@ -142,14 +150,23 @@ def design(c):
         m = re.search(num + r"\s*[x×]\s*" + num + r"\s*[x×]\s*" + num, c)
         L, W, H = (float(v) for v in m.groups()) if m else (80.0, 60.0, 40.0)
         t = float((re.search(num + r"\s*mm\s+walls?", c) or [None, 2])[1])
-        return "box", BOX.format(L=L, W=W, H=H, t=t), [L + 2 * t + 10 + L + 4 * t + 0.6, W + 4 * t + 0.6, H + t], f"box {L:g} x {W:g} x {H:g} mm inside with a lid, {t:g} mm walls"
+        return (
+            "box",
+            BOX.format(L=L, W=W, H=H, t=t),
+            [L + 2 * t + 10 + L + 4 * t + 0.6, W + 4 * t + 0.6, H + t],
+            f"box {L:g} x {W:g} x {H:g} mm inside with a lid, {t:g} mm walls",
+        )
     if re.search(r"\b(?:name\s*tag|tag|keychain|key\s*ring)\b", c):
         text = re.search(r"['\"]([^'\"]{1,20})['\"]", c)
         m = re.search(num + r"\s*[x×]\s*" + num, c)
         L, H = (float(v) for v in m.groups()) if m else (60.0, 20.0)
         hole = 0 if re.search(r"\bno\s+hole\b", c) or (re.search(r"\bname\s*tag\b", c) and not re.search(r"\bkey", c)) else 4
-        return "tag", TAG.format(text=(text.group(1) if text else "NAME").upper(), L=L, H=H, hole=hole), [L, H, 3.2], \
-            f"{'keychain' if hole else 'name tag'} '{(text.group(1) if text else 'NAME').upper()}' {L:g} x {H:g} mm"
+        return (
+            "tag",
+            TAG.format(text=(text.group(1) if text else "NAME").upper(), L=L, H=H, hole=hole),
+            [L, H, 3.2],
+            f"{'keychain' if hole else 'name tag'} '{(text.group(1) if text else 'NAME').upper()}' {L:g} x {H:g} mm",
+        )
     if re.search(r"\bphone\s*stand\b|\bstand\b", c):
         a = float((re.search(num + r"\s*(?:deg|degrees|°)", c) or [None, 70])[1])
         W = float((re.search(num + r"\s*mm\s+wide", c) or [None, 70])[1])
@@ -159,12 +176,18 @@ def design(c):
         m = float((re.search(r"\bmodule\s*" + num, c) or [None, 2])[1])
         T = float((re.search(num + r"\s*mm\s+thick", c) or [None, 6])[1])
         bore = float((re.search(r"\bbore\s*" + num + r"|" + num + r"\s*mm\s+bore", c) or [None, 5, None])[1] or 5)
-        return "gear", GEAR.format(n=n, m=m, T=T, bore=bore), [(n + 2) * m, (n + 2) * m, T], f"spur gear, {n} teeth, module {m:g} ({(n + 2) * m:g} mm across)"
+        return (
+            "gear",
+            GEAR.format(n=n, m=m, T=T, bore=bore),
+            [(n + 2) * m, (n + 2) * m, T],
+            f"spur gear, {n} teeth, module {m:g} ({(n + 2) * m:g} mm across)",
+        )
     return None
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bopenscad\b|\.scad\b", c):
         return None
@@ -196,15 +219,23 @@ def run(op, ctx):
     manifold = bool(re.search(r"3D object \(manifold\)", report) and re.search(r"Status:\s+NoError", report))
     if not manifold and stl.exists() and re.search(r"3D object \(PolySet\)", report):  # a plain extrusion skips OpenSCAD's own solid check
         from ai_pc.apps import prusaslicer
+
         if prusaslicer.EXE.exists():
             manifold = prusaslicer.info(stl).get("manifold") == "yes"  # PrusaSlicer's check of the same STL
-    checks = [("one watertight (manifold) solid with no errors or warnings", rc == 0 and stl.exists() and manifold and not problems),
-              ("a PNG preview was rendered", png.exists())]
+    checks = [
+        ("one watertight (manifold) solid with no errors or warnings", rc == 0 and stl.exists() and manifold and not problems),
+        ("a PNG preview was rendered", png.exists()),
+    ]
     size = stl_box(stl) if stl.exists() else None
     if want and size:
-        checks.append((f"the STL is the size asked ({' x '.join(f'{v:g}' for v in want)} mm)", all(abs(a - b) <= 0.15 + 0.01 * b for a, b in zip(size, want))))
+        checks.append(
+            (f"the STL is the size asked ({' x '.join(f'{v:g}' for v in want)} mm)", all(abs(a - b) <= 0.15 + 0.01 * b for a, b in zip(size, want)))
+        )
     bad = [w for w, ok in checks if not ok]
     ctx.setdefault("memo", {})["model3d"] = str(stl)
-    return (f"OpenSCAD {what}: {scad.name} (parametric: change the numbers at the top in OpenSCAD), {stl} " +
-            (f"({' x '.join(f'{v:g}' for v in size)} mm)" if size else "") + f", {png.name}. Say 'slice it for ender 3' to print it. " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(problems[:3])))
+    return (
+        f"OpenSCAD {what}: {scad.name} (parametric: change the numbers at the top in OpenSCAD), {stl} "
+        + (f"({' x '.join(f'{v:g}' for v in size)} mm)" if size else "")
+        + f", {png.name}. Say 'slice it for ender 3' to print it. "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(problems[:3]))
+    )

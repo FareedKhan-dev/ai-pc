@@ -7,6 +7,7 @@ thumbnail; a photographed page scanned to a PDF; four photos in a collage; and a
   .venv\\Scripts\\python.exe tests\\integration\\photo_conversations.py [--offline]
 --offline: rules only (the turns that need the model are skipped).
 """
+
 import json
 import os
 import re
@@ -68,6 +69,7 @@ def near(c, want, tol=12):
 
 def _page():
     import test_photo
+
     test_photo.OUT.mkdir(parents=True, exist_ok=True)
     _, doc, _, _, gps = test_photo.made_up()
     p = OUT / "page_photo.jpg"
@@ -76,62 +78,132 @@ def _page():
 
 
 CHATS = [
-    ("presenter", GS, [], [
-        ("what's in the photo?", "describe", lambda w: w.says(r"green screen", r"1 face")),
-        ("remove the background", "remove_background", lambda w: w.im.mode == "RGBA" and w.im.getchannel("A").getpixel((5, 5)) == 0 and w.says(r"green screen keyed")),
-        ("make the background light blue", "replace_background", lambda w: near(w.px(0.02, 0.02), (207, 232, 255))),
-        ("make a passport photo", "passport", lambda w: w.size() == (413, 531) and near(w.px(0.03, 0.03), (255, 255, 255), 6) and w.says(r"head 7\d%")),
-        ("print 6 of them on a 4x6 sheet", "passport", lambda w: w.size() == (1200, 1800) and w.says(r"6 copies")),
-        ("go back to v1", "goto", lambda w: w.v() == 1),
-        ("replace the background with natural-landscape-with-a-road-_still_16.70.png", "replace_background",
-         lambda w: w.im.mode == "RGB" and not near(w.px(0.02, 0.5), (90, 220, 30), 60) and w.says(r"natural-landscape")),
-        ("add a title 'Live every Friday' at the top", "text", lambda w: w.says(r"Live every Friday", r"at the top")),
-        ("move the title to the bottom", "text", lambda w: w.says(r"at the bottom", r"Changed the text")),
-        ("save it for an instagram story without cropping under 400 kb", "export",
-         lambda w: w.export().suffix == ".jpg" and Image.open(w.export()).size == (1080, 1920) and w.kb() <= 400),
-    ]),
-    ("car", CAR, [], [
-        ("it's too dark, fix it", "auto", lambda w: w.st()["brightness"] > 0.35 and w.says(r"it was dark")),
-        ("crop to the car", "crop", lambda w: w.size()[0] < 1280 and abs(w.size()[0] / w.size()[1] - 16 / 9) < 0.02),
-        ("add 'FOR SALE' at the top in red", "text", lambda w: w.says(r"FOR SALE", r"red")),
-        ("make the text bigger", "text", lambda w: w.last_ops()[-1].get("size") == "huge" and w.says(r"Changed the text")),
-        ("watermark '© Fareed Motors'", "watermark", lambda w: w.says(r"35% opacity")),
-        ("compare with the original", "compare", lambda w: Path(re.search(r"Side by side: (.+?\.jpg)", w.reply).group(1)).exists()),
-        ("undo", "undo", lambda w: w.v() == 4 and w.says(r"make the text bigger")),
-        ("save it as webp under 150 kb", "export", lambda w: w.export().suffix == ".webp" and w.kb() <= 150),
-    ]),
-    ("party", PARTY, [], [
-        ("blur all the faces", "blur_faces", lambda w: w.says(r"Blurred (8|9|10) face")),
-        ("make it warmer", "warmth", lambda w: w.st()["warmth"] > A.stats(Image.open(PARTY))["warmth"]),
-        ("crop it to 4:5", "crop", lambda w: abs(w.size()[0] / w.size()[1] - 0.8) < 0.01),
-        ("pixelate the faces instead", "blur_faces", lambda w: w.says(r"Pixelated", r"redid the 2 edit") and abs(w.size()[0] / w.size()[1] - 0.8) < 0.01),
-        ("make it a meme: 'when the beat drops' / 'and you know every word'", "meme", lambda w: w.says(r"Meme text")),
-        ("add a white border", "border", lambda w: near(w.px(0, 0), (255, 255, 255), 2)),
-        ("crop it square", "crop", lambda w: w.size()[0] == w.size()[1] and near(w.px(0, 0), (255, 255, 255), 2) and w.says(r"stays on the outside")),
-        ("history", "history", lambda w: len(w.reply.splitlines()) >= 7),
-    ]),
-    ("sunset car", BMW, [], [
-        ("make it cinematic", "cinematic", lambda w: w.says(r"cinematic")),
-        ("add a title 'New Arrival'", "text", lambda w: w.says(r"New Arrival")),
-        ("export it for a youtube thumbnail", "export", lambda w: Image.open(w.export()).size == (1280, 720)),
-        ("make it a polaroid with the caption 'Dream car'", "polaroid", lambda w: w.size()[1] > w.size()[0] * 1.0 and near(w.px(0.5, 0.97), (250, 250, 247), 30)),
-    ]),
-    ("page", None, [], [
-        ("scan this document", "document", lambda w: w.st()["brightness"] > 0.75 and 1.15 < w.size()[1] / w.size()[0] < 1.65),
-        ("save it as pdf", "export", lambda w: w.export().suffix == ".pdf" and w.export().read_bytes()[:5] == b"%PDF-"),
-    ]),
-    ("collage", BMW, [CAR, PARTY, LAND], [
-        ("make a collage", "collage", lambda w: w.size()[0] == 2048 and w.says(r"4 photos")),
-        ("add a thin white border", "border", lambda w: near(w.px(0, 0), (255, 255, 255), 2)),
-    ]),
-    ("location", None, [], [
-        ("where was this taken?", "describe", lambda w: w.says(r"31\.5\d", r"74\.3\d", r"TestCam")),
-        ("remove the location and save it", "export", lambda w: not Image.open(w.export()).getexif().get_ifd(0x8825) and w.says(r"location removed")),
-    ]),
-    ("model", LAND, [], [
-        ("give it a moody film noir feel", None, lambda w: w.st()["saturation"] < 0.12, True),
-        ("the colours look a bit washed out, can you bring them back?", None, lambda w: w.st()["saturation"] > 0.0, True),
-    ]),
+    (
+        "presenter",
+        GS,
+        [],
+        [
+            ("what's in the photo?", "describe", lambda w: w.says(r"green screen", r"1 face")),
+            (
+                "remove the background",
+                "remove_background",
+                lambda w: w.im.mode == "RGBA" and w.im.getchannel("A").getpixel((5, 5)) == 0 and w.says(r"green screen keyed"),
+            ),
+            ("make the background light blue", "replace_background", lambda w: near(w.px(0.02, 0.02), (207, 232, 255))),
+            (
+                "make a passport photo",
+                "passport",
+                lambda w: w.size() == (413, 531) and near(w.px(0.03, 0.03), (255, 255, 255), 6) and w.says(r"head 7\d%"),
+            ),
+            ("print 6 of them on a 4x6 sheet", "passport", lambda w: w.size() == (1200, 1800) and w.says(r"6 copies")),
+            ("go back to v1", "goto", lambda w: w.v() == 1),
+            (
+                "replace the background with natural-landscape-with-a-road-_still_16.70.png",
+                "replace_background",
+                lambda w: w.im.mode == "RGB" and not near(w.px(0.02, 0.5), (90, 220, 30), 60) and w.says(r"natural-landscape"),
+            ),
+            ("add a title 'Live every Friday' at the top", "text", lambda w: w.says(r"Live every Friday", r"at the top")),
+            ("move the title to the bottom", "text", lambda w: w.says(r"at the bottom", r"Changed the text")),
+            (
+                "save it for an instagram story without cropping under 400 kb",
+                "export",
+                lambda w: w.export().suffix == ".jpg" and Image.open(w.export()).size == (1080, 1920) and w.kb() <= 400,
+            ),
+        ],
+    ),
+    (
+        "car",
+        CAR,
+        [],
+        [
+            ("it's too dark, fix it", "auto", lambda w: w.st()["brightness"] > 0.35 and w.says(r"it was dark")),
+            ("crop to the car", "crop", lambda w: w.size()[0] < 1280 and abs(w.size()[0] / w.size()[1] - 16 / 9) < 0.02),
+            ("add 'FOR SALE' at the top in red", "text", lambda w: w.says(r"FOR SALE", r"red")),
+            ("make the text bigger", "text", lambda w: w.last_ops()[-1].get("size") == "huge" and w.says(r"Changed the text")),
+            ("watermark '© Fareed Motors'", "watermark", lambda w: w.says(r"35% opacity")),
+            ("compare with the original", "compare", lambda w: Path(re.search(r"Side by side: (.+?\.jpg)", w.reply).group(1)).exists()),
+            ("undo", "undo", lambda w: w.v() == 4 and w.says(r"make the text bigger")),
+            ("save it as webp under 150 kb", "export", lambda w: w.export().suffix == ".webp" and w.kb() <= 150),
+        ],
+    ),
+    (
+        "party",
+        PARTY,
+        [],
+        [
+            ("blur all the faces", "blur_faces", lambda w: w.says(r"Blurred (8|9|10) face")),
+            ("make it warmer", "warmth", lambda w: w.st()["warmth"] > A.stats(Image.open(PARTY))["warmth"]),
+            ("crop it to 4:5", "crop", lambda w: abs(w.size()[0] / w.size()[1] - 0.8) < 0.01),
+            (
+                "pixelate the faces instead",
+                "blur_faces",
+                lambda w: w.says(r"Pixelated", r"redid the 2 edit") and abs(w.size()[0] / w.size()[1] - 0.8) < 0.01,
+            ),
+            ("make it a meme: 'when the beat drops' / 'and you know every word'", "meme", lambda w: w.says(r"Meme text")),
+            ("add a white border", "border", lambda w: near(w.px(0, 0), (255, 255, 255), 2)),
+            (
+                "crop it square",
+                "crop",
+                lambda w: w.size()[0] == w.size()[1] and near(w.px(0, 0), (255, 255, 255), 2) and w.says(r"stays on the outside"),
+            ),
+            ("history", "history", lambda w: len(w.reply.splitlines()) >= 7),
+        ],
+    ),
+    (
+        "sunset car",
+        BMW,
+        [],
+        [
+            ("make it cinematic", "cinematic", lambda w: w.says(r"cinematic")),
+            ("add a title 'New Arrival'", "text", lambda w: w.says(r"New Arrival")),
+            ("export it for a youtube thumbnail", "export", lambda w: Image.open(w.export()).size == (1280, 720)),
+            (
+                "make it a polaroid with the caption 'Dream car'",
+                "polaroid",
+                lambda w: w.size()[1] > w.size()[0] * 1.0 and near(w.px(0.5, 0.97), (250, 250, 247), 30),
+            ),
+        ],
+    ),
+    (
+        "page",
+        None,
+        [],
+        [
+            ("scan this document", "document", lambda w: w.st()["brightness"] > 0.75 and 1.15 < w.size()[1] / w.size()[0] < 1.65),
+            ("save it as pdf", "export", lambda w: w.export().suffix == ".pdf" and w.export().read_bytes()[:5] == b"%PDF-"),
+        ],
+    ),
+    (
+        "collage",
+        BMW,
+        [CAR, PARTY, LAND],
+        [
+            ("make a collage", "collage", lambda w: w.size()[0] == 2048 and w.says(r"4 photos")),
+            ("add a thin white border", "border", lambda w: near(w.px(0, 0), (255, 255, 255), 2)),
+        ],
+    ),
+    (
+        "location",
+        None,
+        [],
+        [
+            ("where was this taken?", "describe", lambda w: w.says(r"31\.5\d", r"74\.3\d", r"TestCam")),
+            (
+                "remove the location and save it",
+                "export",
+                lambda w: not Image.open(w.export()).getexif().get_ifd(0x8825) and w.says(r"location removed"),
+            ),
+        ],
+    ),
+    (
+        "model",
+        LAND,
+        [],
+        [
+            ("give it a moody film noir feel", None, lambda w: w.st()["saturation"] < 0.12, True),
+            ("the colours look a bit washed out, can you bring them back?", None, lambda w: w.st()["saturation"] > 0.0, True),
+        ],
+    ),
 ]
 
 
@@ -164,9 +236,22 @@ def run(planner):
             except Exception as e:  # noqa: BLE001
                 check_ok, err = False, err or f"check {type(e).__name__}: {e}"
             ok = intent_ok and check_ok and not err
-            rows.append({"chat": name, "msg": msg, "ok": ok, "intents": intents, "seconds": round(secs, 2), "llm": bool(c.last_turn.get("llm")), "reply": reply[:900],
-                         "error": err})
-            print(f"{'OK ' if ok else 'BAD'} [{','.join(intents)}{'+llm' if c.last_turn.get('llm') else ''}] {secs:5.2f}s  {msg}\n      {reply[:300]}", flush=True)
+            rows.append(
+                {
+                    "chat": name,
+                    "msg": msg,
+                    "ok": ok,
+                    "intents": intents,
+                    "seconds": round(secs, 2),
+                    "llm": bool(c.last_turn.get("llm")),
+                    "reply": reply[:900],
+                    "error": err,
+                }
+            )
+            print(
+                f"{'OK ' if ok else 'BAD'} [{','.join(intents)}{'+llm' if c.last_turn.get('llm') else ''}] {secs:5.2f}s  {msg}\n      {reply[:300]}",
+                flush=True,
+            )
             if not ok:
                 print(f"      intent_ok={intent_ok} check_ok={check_ok} {err or ''}")
     n, ok = len(rows), sum(r["ok"] for r in rows)
@@ -180,6 +265,7 @@ if __name__ == "__main__":
     planner = None
     if "--offline" not in sys.argv:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     ok, n = run(planner)
     sys.exit(0 if ok == n else 1)

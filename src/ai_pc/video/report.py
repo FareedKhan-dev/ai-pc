@@ -9,6 +9,7 @@
   cost          time and AI spend of the run
 Pure computation over the session (~0.5 s, mostly the loudness of the export). Saved as out/video/reports/<draft>.md.
 """
+
 import re
 
 from ai_pc.core.config import ROOT
@@ -32,9 +33,24 @@ def _status(ids, results):
 
 # words in a requirement entry -> the edit type that delivers it (the planner writes "transition 分割" or "filter 青橙"
 # for what code later realises with another working item of the same kind)
-TYPE_WORDS = {"transition": "transition", "filter": "filter", "grade": "filter", "colour": "filter", "color": "filter",
-              "look": "filter", "title": "text", "label": "text", "text": "text", "caption": "captions", "subtitle": "captions",
-              "shake": "shake", "zoom": "zoom", "music": "audio", "sfx": "audio", "sound": "audio"}
+TYPE_WORDS = {
+    "transition": "transition",
+    "filter": "filter",
+    "grade": "filter",
+    "colour": "filter",
+    "color": "filter",
+    "look": "filter",
+    "title": "text",
+    "label": "text",
+    "text": "text",
+    "caption": "captions",
+    "subtitle": "captions",
+    "shake": "shake",
+    "zoom": "zoom",
+    "music": "audio",
+    "sfx": "audio",
+    "sound": "audio",
+}
 
 
 def ask_ids(entry, made, R):
@@ -74,10 +90,36 @@ def assess(sess):
         st, got = _status([i for i in ids if i in present], results)
         if ids and not any(i in present for i in ids):
             st = "not met"
-        score.append({"ask": q.get("ask"), "how": q.get("how"), "status": st, "confidence": q.get("confidence"),
-                      "evidence": [f"{g['id']}: {g.get('why', '')[:90]}" for g in got][:3], "fallback": q.get("fallback")})
-    subs = [n for n in R.get("notes", []) if any(w in n for w in ("VIP", "does not download", "account", "did not render", "using",
-                                                                    "read as", "dropped", "skipped", "lowered", "shortened", "moved"))]
+        score.append(
+            {
+                "ask": q.get("ask"),
+                "how": q.get("how"),
+                "status": st,
+                "confidence": q.get("confidence"),
+                "evidence": [f"{g['id']}: {g.get('why', '')[:90]}" for g in got][:3],
+                "fallback": q.get("fallback"),
+            }
+        )
+    subs = [
+        n
+        for n in R.get("notes", [])
+        if any(
+            w in n
+            for w in (
+                "VIP",
+                "does not download",
+                "account",
+                "did not render",
+                "using",
+                "read as",
+                "dropped",
+                "skipped",
+                "lowered",
+                "shortened",
+                "moved",
+            )
+        )
+    ]
     # quality
     clips = R.get("clips", [])
     durs = [c["dur"] for c in clips]
@@ -85,18 +127,27 @@ def assess(sess):
     kinds = {}
     for e in edits:
         kinds[e["type"]] = kinds.get(e["type"], 0) + 1
-    hook = any(e.get("window") and e["window"][0] < 1.5 and e["type"] in ("effect", "transition", "text", "zoom", "shake", "animation") for e in edits)
+    hook = any(
+        e.get("window") and e["window"][0] < 1.5 and e["type"] in ("effect", "transition", "text", "zoom", "shake", "animation") for e in edits
+    )
     loud = None
     ex = sess.get("export") or {}
     if ex.get("ok") and ex.get("path"):
         try:
             from ai_pc.media.audio import analyze as audio_analyze
+
             a = audio_analyze(ex["path"])
             loud = a and a.get("loudness_db")
         except Exception:  # noqa: BLE001
             loud = None
-    quality = {"length_s": R.get("end"), "shots": len(clips), "avg_shot_s": round(sum(durs) / len(durs), 2) if durs else None,
-               "hook": hook, "edits": kinds, "loudness_db": loud}
+    quality = {
+        "length_s": R.get("end"),
+        "shots": len(clips),
+        "avg_shot_s": round(sum(durs) / len(durs), 2) if durs else None,
+        "hook": hook,
+        "edits": kinds,
+        "loudness_db": loud,
+    }
     flaws = [f"{r['id']} ({r.get('type')}): {r.get('why', '')[:100]}" for r in rep.get("results", []) if r.get("status") in ("fail", "warn")]
     nxt = []
     aw = sess.get("awareness") or {}
@@ -121,10 +172,21 @@ def assess(sess):
             seen.add(x)
             nxt2.append(x)
     t = sess.get("timings", {})
-    out = {"draft": M.get("draft"), "video": ex.get("path"), "scorecard": score, "substituted": subs, "quality": quality,
-           "flaws": flaws, "next": nxt2[:6], "critic": {k: (sess.get("critic") or {}).get(k) for k in ("score", "verdict", "applied")},
-           "checks": rep.get("counts"), "time_s": t.get("total_s"), "ai_usd": sess.get("ai_usd"),
-           "edit_type": sess.get("edit_type"), "reference": (sess.get("reference") or {}).get("file")}
+    out = {
+        "draft": M.get("draft"),
+        "video": ex.get("path"),
+        "scorecard": score,
+        "substituted": subs,
+        "quality": quality,
+        "flaws": flaws,
+        "next": nxt2[:6],
+        "critic": {k: (sess.get("critic") or {}).get(k) for k in ("score", "verdict", "applied")},
+        "checks": rep.get("counts"),
+        "time_s": t.get("total_s"),
+        "ai_usd": sess.get("ai_usd"),
+        "edit_type": sess.get("edit_type"),
+        "reference": (sess.get("reference") or {}).get("file"),
+    }
     return out, markdown(out, think)
 
 
@@ -147,8 +209,13 @@ def markdown(a, think=None):
     if a["substituted"]:
         L += ["", "## What was done differently, and why", ""] + [f"- {s}" for s in a["substituted"]]
     q = a["quality"]
-    L += ["", "## Quality", "", f"- {q['length_s']} s, {q['shots']} shots (avg {q['avg_shot_s']} s), hook in the first 1.5 s: {'yes' if q['hook'] else 'no'}",
-          f"- edits: {', '.join(f'{k} {v}' for k, v in q['edits'].items())}"]
+    L += [
+        "",
+        "## Quality",
+        "",
+        f"- {q['length_s']} s, {q['shots']} shots (avg {q['avg_shot_s']} s), hook in the first 1.5 s: {'yes' if q['hook'] else 'no'}",
+        f"- edits: {', '.join(f'{k} {v}' for k, v in q['edits'].items())}",
+    ]
     if q.get("loudness_db") is not None:
         L.append(f"- loudness {q['loudness_db']} dB")
     c = a.get("checks") or {}
@@ -174,7 +241,11 @@ def save(a, md):
 
 def short(a):
     """A few lines for the console."""
-    s = ["asked vs delivered: " + ", ".join(f"{q['ask'][:40]} = {q['status']}" for q in a["scorecard"]) if a["scorecard"] else "asked vs delivered: (no requirement map)"]
+    s = [
+        "asked vs delivered: " + ", ".join(f"{q['ask'][:40]} = {q['status']}" for q in a["scorecard"])
+        if a["scorecard"]
+        else "asked vs delivered: (no requirement map)"
+    ]
     if a.get("edit_type"):
         s.insert(0, f"edit type: {a['edit_type'].get('label')}" + (f"; style matched to {a['reference']}" if a.get("reference") else ""))
     if a["substituted"]:

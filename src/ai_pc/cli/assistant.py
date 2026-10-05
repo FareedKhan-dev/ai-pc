@@ -11,6 +11,7 @@ apps, social media, and 88 more programs).
   ai-pc web                                the chat as a page in your browser on this PC (type, attach, hold the mic)
   --offline                                rules only, no AI model (programs that need the model will say so)
 """
+
 import argparse
 import sys
 from pathlib import Path
@@ -20,11 +21,13 @@ def _planner(offline):
     if offline:
         return None
     from ai_pc.llm.planner import ChatPlanner
+
     return ChatPlanner()
 
 
 def _open(resume, offline):
     from ai_pc.assistant.chat import AIPCChat
+
     planner = _planner(offline)
     chat = (AIPCChat.load(planner=planner) if resume else None) or AIPCChat.start(planner=planner)
     return chat, planner
@@ -37,7 +40,7 @@ def _common(ap):
 
 def _show(r):
     if getattr(r, "heard", None):
-        print(f"(heard: \"{r.heard}\")")
+        print(f'(heard: "{r.heard}")')
     print(r)
     for f in getattr(r, "files", []) or []:
         print(f"  made: {f}")
@@ -69,8 +72,10 @@ def chat(argv=None):
             _show(r)
         print(f"(chat {c.state['id']}; AI ${_cost(planner):.4f})")
         return 0
-    print(f"AI PC chat {c.state['id']}. Type a request ('what can you do?' for the list); a file path sends that file; "
-          f"'voice <file>' sends a voice note; 'quit' to leave.")
+    print(
+        f"AI PC chat {c.state['id']}. Type a request ('what can you do?' for the list); a file path sends that file; "
+        f"'voice <file>' sends a voice note; 'quit' to leave."
+    )
     pending = files
     while True:
         try:
@@ -101,6 +106,7 @@ def web(argv=None):
     _common(ap)
     a = ap.parse_args(argv)
     from ai_pc.assistant.web import serve
+
     c, _ = _open(a.resume, a.offline)
     print(f"AI PC chat {c.state['id']}: opening http://127.0.0.1:{a.port}/ (this PC only; Ctrl+C to stop)")
     try:
@@ -115,6 +121,7 @@ def telegram(argv=None):
     _common(ap)
     a = ap.parse_args(argv)
     from ai_pc.assistant.telegram import Bridge
+
     c, _ = _open(a.resume, a.offline)
     print(f"AI PC chat {c.state['id']} is answering your Telegram bot (Ctrl+C to stop).")
     try:

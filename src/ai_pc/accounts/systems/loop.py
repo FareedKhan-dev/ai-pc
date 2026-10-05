@@ -1,5 +1,6 @@
 """A sign-in's way back to this PC at http://localhost:PORT/path, listened for on both 127.0.0.1 and ::1 (a browser may
 send 'localhost' to either), for services that refuse 127.0.0.1 (Xero)."""
+
 import http.server
 import secrets
 import socket
@@ -31,11 +32,17 @@ def loopback_localhost(build_url, port, path, show=print, open_url=webbrowser.op
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             ok = "code" in got and got.get("state") == state
-            self.wfile.write(("<h2>Signed in. You can close this tab and go back to the AI PC.</h2>" if ok else
-                              "<h2>Sign-in did not finish. Go back to the AI PC and try again.</h2>").encode())
+            self.wfile.write(
+                (
+                    "<h2>Signed in. You can close this tab and go back to the AI PC.</h2>"
+                    if ok
+                    else "<h2>Sign-in did not finish. Go back to the AI PC and try again.</h2>"
+                ).encode()
+            )
 
         def log_message(self, *a):
             pass
+
     servers = []
     for cls, host in ((http.server.HTTPServer, "127.0.0.1"), (_V6, "::1")):
         try:

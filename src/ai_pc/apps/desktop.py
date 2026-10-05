@@ -3,6 +3,7 @@ and a file, folder or web address opened in the program Windows uses for it. Not
 
   'take a screenshot'   "copy 'Meezan Bank PK36MEZN0001234567890123' to the clipboard"   "what's in my clipboard?"   'open D:\\Shop\\prices.xlsx'
 """
+
 import datetime as dt
 import os
 import re
@@ -14,6 +15,7 @@ EXAMPLES = ["take a screenshot", "copy 'Meezan Bank PK36MEZN0001234567890123' to
 
 def screenshot(dest):
     from PIL import ImageGrab
+
     im = ImageGrab.grab(all_screens=True)
     im.save(dest)
     return im.size
@@ -21,6 +23,7 @@ def screenshot(dest):
 
 def clip_get():
     import win32clipboard as cb
+
     cb.OpenClipboard()
     try:
         return cb.GetClipboardData(cb.CF_UNICODETEXT) if cb.IsClipboardFormatAvailable(cb.CF_UNICODETEXT) else None
@@ -30,6 +33,7 @@ def clip_get():
 
 def clip_set(text):
     import win32clipboard as cb
+
     cb.OpenClipboard()
     try:
         cb.EmptyClipboard()

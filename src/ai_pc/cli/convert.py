@@ -20,6 +20,7 @@ background', 'louder', 'normalize the volume', 'the sound is half a second late'
 with intro.mp4', 'use the cpu', 'will it play on my tv?', 'what is this file?', 'how good is it?', 'compare', 'save it to
 my desktop', 'record my screen for 20 seconds', 'undo', 'go back to v1', 'history'.
 """
+
 import argparse
 import sys
 import time
@@ -55,8 +56,10 @@ def main(argv=None):
 
     from ai_pc.convert import media as MD
     from ai_pc.convert.convchat import ConvertChat
+
     if a.cmd == "look":
         from ai_pc.convert.presets import PRESETS, issues
+
         p = MD.probe(a.file)
         print(MD.describe(p))
         for key in ("everywhere", "whatsapp", "email", "tv", "iphone", "instagram", "editing"):
@@ -71,6 +74,7 @@ def main(argv=None):
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     if a.cmd == "talk":
         c = ConvertChat.load(a.chat, planner=planner) if a.chat else ConvertChat.start(a.file, planner=planner, files=a.extra)

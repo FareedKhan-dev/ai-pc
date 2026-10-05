@@ -15,6 +15,7 @@ Things to say: 'invoice for <customer>: <qty> <item> at <price>, 18% tax, due in
 from invoice 3', 'cancel invoice 4', 'who owes me money?', 'profit this month', 'sales tax for september', 'stock',
 'statement for <customer>', 'email invoice 3 to ali@x.com', 'send invoice 3 to quickbooks', 'undo'.
 """
+
 import argparse
 import sys
 
@@ -39,6 +40,7 @@ def main(argv=None):
     c.add_argument("system")
     a = ap.parse_args(argv)
     from ai_pc.accounts.accountschat import AccountsChat
+
     if a.cmd == "report":
         what = {"balance": "balance_sheet", "trial": "trial_balance", "tax": "sales_tax"}.get(a.what, a.what)
         return print(AccountsChat.start().run({"op": "report", "what": what}))
@@ -46,10 +48,12 @@ def main(argv=None):
         return print(AccountsChat.start().run({"op": "show", "kind": None, "ref": a.number}))
     if a.cmd in ("steps", "connect"):
         from ai_pc.accounts import systems
+
         return systems.cli(a.cmd, getattr(a, "system", None))
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     ac = AccountsChat.start(planner=planner)
     print(f"Accounts chat {ac.state['id']} for {ac.b.company().get('name')}. 'quit' to leave.")

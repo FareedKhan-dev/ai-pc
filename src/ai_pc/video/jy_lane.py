@@ -10,6 +10,7 @@ Safety: same rules as the CapCut video lane (video_lane.py): files only from the
 checked against the free catalogue, numbers clamped, projects written only as agent_<word>_<HHMMSS> drafts. Every
 feature is applied in its own guard, so one bad item becomes a note instead of a failed build.
 """
+
 import difflib
 import json
 import os
@@ -28,31 +29,95 @@ VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 CANVAS = {"16:9": (1920, 1080), "9:16": (1080, 1920), "1:1": (1080, 1080), "4:5": (1080, 1350)}
-POS = {"top": (0, 0.75), "center": (0, 0), "middle": (0, 0), "bottom": (0, -0.8), "upper": (0, 0.45), "lower": (0, -0.45),
-       "top_left": (-0.6, 0.75), "top_right": (0.6, 0.75), "bottom_left": (-0.6, -0.8), "bottom_right": (0.6, -0.8),
-       "lower_left": (-0.55, -0.55), "lower_right": (0.55, -0.55)}
+POS = {
+    "top": (0, 0.75),
+    "center": (0, 0),
+    "middle": (0, 0),
+    "bottom": (0, -0.8),
+    "upper": (0, 0.45),
+    "lower": (0, -0.45),
+    "top_left": (-0.6, 0.75),
+    "top_right": (0.6, 0.75),
+    "bottom_left": (-0.6, -0.8),
+    "bottom_right": (0.6, -0.8),
+    "lower_left": (-0.55, -0.55),
+    "lower_right": (0.55, -0.55),
+}
 MASKS = {"linear": "线性", "mirror": "镜面", "circle": "圆形", "rectangle": "矩形", "rect": "矩形", "heart": "爱心", "star": "星形"}
-BLENDS = {"multiply": "正片叠底", "color dodge": "颜色减淡", "color burn": "颜色加深", "linear burn": "线性加深",
-          "soft light": "柔光", "hard light": "强光", "screen": "滤色", "overlay": "叠加", "lighten": "变亮", "darken": "变暗"}
-KF = {"scale": "uniform_scale", "uniform_scale": "uniform_scale", "x": "position_x", "position_x": "position_x",
-      "y": "position_y", "position_y": "position_y", "rotation": "rotation", "alpha": "alpha", "opacity": "alpha",
-      "brightness": "brightness", "contrast": "contrast", "saturation": "saturation", "volume": "volume"}
-KF_RANGE = {"uniform_scale": (0.05, 10), "position_x": (-3, 3), "position_y": (-3, 3), "rotation": (-3600, 3600),
-            "alpha": (0, 1), "brightness": (-1, 1), "contrast": (-1, 1), "saturation": (-1, 1), "volume": (0, 2)}
+BLENDS = {
+    "multiply": "正片叠底",
+    "color dodge": "颜色减淡",
+    "color burn": "颜色加深",
+    "linear burn": "线性加深",
+    "soft light": "柔光",
+    "hard light": "强光",
+    "screen": "滤色",
+    "overlay": "叠加",
+    "lighten": "变亮",
+    "darken": "变暗",
+}
+KF = {
+    "scale": "uniform_scale",
+    "uniform_scale": "uniform_scale",
+    "x": "position_x",
+    "position_x": "position_x",
+    "y": "position_y",
+    "position_y": "position_y",
+    "rotation": "rotation",
+    "alpha": "alpha",
+    "opacity": "alpha",
+    "brightness": "brightness",
+    "contrast": "contrast",
+    "saturation": "saturation",
+    "volume": "volume",
+}
+KF_RANGE = {
+    "uniform_scale": (0.05, 10),
+    "position_x": (-3, 3),
+    "position_y": (-3, 3),
+    "rotation": (-3600, 3600),
+    "alpha": (0, 1),
+    "brightness": (-1, 1),
+    "contrast": (-1, 1),
+    "saturation": (-1, 1),
+    "volume": (0, 2),
+}
 
 
 def _free(enum):
     return {m.name: m for m in enum if not getattr(m.value, "is_vip", False) and m.name.lower() != "undefined"}
 
 
-CAT = {"filter": _free(jy.FilterType), "transition": _free(jy.TransitionType), "scene_effect": _free(jy.VideoSceneEffectType),
-       "character_effect": _free(jy.VideoCharacterEffectType), "intro": _free(jy.IntroType), "outro": _free(jy.OutroType),
-       "combo": _free(jy.GroupAnimationType), "text_intro": _free(jy.TextIntro), "text_outro": _free(jy.TextOutro),
-       "text_loop": _free(jy.TextLoopAnim), "font": _free(jy.FontType), "tone": _free(jy.ToneEffectType),
-       "audio_scene": _free(jy.AudioSceneEffectType)}
+CAT = {
+    "filter": _free(jy.FilterType),
+    "transition": _free(jy.TransitionType),
+    "scene_effect": _free(jy.VideoSceneEffectType),
+    "character_effect": _free(jy.VideoCharacterEffectType),
+    "intro": _free(jy.IntroType),
+    "outro": _free(jy.OutroType),
+    "combo": _free(jy.GroupAnimationType),
+    "text_intro": _free(jy.TextIntro),
+    "text_outro": _free(jy.TextOutro),
+    "text_loop": _free(jy.TextLoopAnim),
+    "font": _free(jy.FontType),
+    "tone": _free(jy.ToneEffectType),
+    "audio_scene": _free(jy.AudioSceneEffectType),
+}
 # how many names of each kind the planner is shown (the whole free catalogue would be ~2,700 names)
-SHOWN = {"filter": 60, "transition": 50, "scene_effect": 70, "intro": 40, "outro": 25, "combo": 30, "text_intro": 45,
-         "text_outro": 35, "text_loop": 30, "font": 45, "tone": 14, "audio_scene": 12}
+SHOWN = {
+    "filter": 60,
+    "transition": 50,
+    "scene_effect": 70,
+    "intro": 40,
+    "outro": 25,
+    "combo": 30,
+    "text_intro": 45,
+    "text_outro": 35,
+    "text_loop": 30,
+    "font": 45,
+    "tone": 14,
+    "audio_scene": 12,
+}
 
 
 def _shown(kind):
@@ -60,7 +125,7 @@ def _shown(kind):
     n = SHOWN[kind]
     if kind == "font":  # prefer readable Latin fonts plus a few Chinese ones
         latin = [x for x in names if x.isascii()]
-        return latin[:n - 10] + [x for x in names if not x.isascii()][:10]
+        return latin[: n - 10] + [x for x in names if not x.isascii()][:10]
     step = max(1, len(names) // n)
     return names[::step][:n]
 
@@ -118,7 +183,7 @@ def _n(v, lo, hi, d):
 
 def _rgb(v, d=(1.0, 1.0, 1.0)):
     m = re.fullmatch(r"#?([0-9a-fA-F]{6})", str(v or "").strip())
-    return tuple(int(m.group(1)[i:i + 2], 16) / 255 for i in (0, 2, 4)) if m else d
+    return tuple(int(m.group(1)[i : i + 2], 16) / 255 for i in (0, 2, 4)) if m else d
 
 
 def _hex(v, d="#000000"):
@@ -172,13 +237,25 @@ def _video_seg(s, start_us, f, notes, where, stats, canvas):
     dur_us = round(dur * SEC)
     pos = _pos(s.get("position")) or (0, 0)
     sc = _n(s.get("scale"), 0.05, 10, 1.0)
-    cs = jy.ClipSettings(transform_x=pos[0], transform_y=pos[1], scale_x=sc, scale_y=sc,
-                         rotation=_n(s.get("rotation"), -360, 360, 0), alpha=_n(s.get("alpha"), 0, 1, 1))
+    cs = jy.ClipSettings(
+        transform_x=pos[0],
+        transform_y=pos[1],
+        scale_x=sc,
+        scale_y=sc,
+        rotation=_n(s.get("rotation"), -360, 360, 0),
+        alpha=_n(s.get("alpha"), 0, 1, 1),
+    )
     if f["kind"] == "image":
         seg = jy.VideoSegment(f["path"], trange(start_us, dur_us), clip_settings=cs)
     else:
-        seg = jy.VideoSegment(f["path"], trange(start_us, dur_us), source_timerange=trange(round(src_from * SEC), round(dur * speed * SEC)),
-                              speed=speed, volume=_n(s.get("volume"), 0, 2, 1.0), clip_settings=cs)
+        seg = jy.VideoSegment(
+            f["path"],
+            trange(start_us, dur_us),
+            source_timerange=trange(round(src_from * SEC), round(dur * speed * SEC)),
+            speed=speed,
+            volume=_n(s.get("volume"), 0, 2, 1.0),
+            clip_settings=cs,
+        )
     flt = find("filter", s.get("filter"), notes, where)
     if flt and _guard(notes, f"{where}filter", seg.add_filter, flt, _n(s.get("filter_strength"), 0, 100, 80)) is not None:
         stats["filters"] += 1
@@ -198,8 +275,14 @@ def _video_seg(s, start_us, f, notes, where, stats, canvas):
         mask = next((x for x in jy.MaskType if x.name == mt), None)
         if mask:
             c = _pos(m.get("center")) or (0, 0)
-            kw = dict(center_x=c[0], center_y=c[1], size=_n(m.get("size"), 0.05, 2, 0.5), rotation=_n(m.get("rotation"), -360, 360, 0),
-                      feather=_n(m.get("feather"), 0, 100, 0), invert=bool(m.get("invert")))
+            kw = dict(
+                center_x=c[0],
+                center_y=c[1],
+                size=_n(m.get("size"), 0.05, 2, 0.5),
+                rotation=_n(m.get("rotation"), -360, 360, 0),
+                feather=_n(m.get("feather"), 0, 100, 0),
+                invert=bool(m.get("invert")),
+            )
             if mt == "矩形":
                 kw.update(rect_width=_n(m.get("rect_width"), 0.05, 2, kw["size"]), round_corner=_n(m.get("round_corner"), 0, 100, 0))
             if _guard(notes, f"{where}mask", seg.add_mask, mask, **kw) is not None:
@@ -226,9 +309,26 @@ def build(plan, files=None):
     t0 = time.perf_counter()
     files = files if files is not None else media_files()
     notes = []
-    stats = dict.fromkeys(["video_segments", "transitions", "filters", "effects", "animations", "masks", "blends",
-                           "keyframes", "texts", "text_animations", "subtitles", "audio_segments", "audio_effects",
-                           "track_effects", "track_filters"], 0)
+    stats = dict.fromkeys(
+        [
+            "video_segments",
+            "transitions",
+            "filters",
+            "effects",
+            "animations",
+            "masks",
+            "blends",
+            "keyframes",
+            "texts",
+            "text_animations",
+            "subtitles",
+            "audio_segments",
+            "audio_effects",
+            "track_effects",
+            "track_filters",
+        ],
+        0,
+    )
     name = draft_name(plan.get("name"))
     canvas = CANVAS.get(str(plan.get("canvas", "16:9")), CANVAS["16:9"])
     script = jy.DraftFolder(str(DRAFTS)).create_draft(name, canvas[0], canvas[1], 30, allow_replace=name.startswith("agent_"))
@@ -284,8 +384,15 @@ def build(plan, files=None):
         src_from = _n(a.get("from"), 0, max(0, f["seconds"] - 0.5), 0)
         dur = min(_n(a.get("duration"), 0.5, 600, f["seconds"]), f["seconds"] - src_from)
         at = round(_n(a.get("at"), 0, 3600, 0) * SEC)
-        seg = _guard(notes, where.rstrip(": "), jy.AudioSegment, f["path"], trange(at, round(dur * SEC)),
-                     source_timerange=trange(round(src_from * SEC), round(dur * SEC)), volume=_n(a.get("volume"), 0, 2, 0.6))
+        seg = _guard(
+            notes,
+            where.rstrip(": "),
+            jy.AudioSegment,
+            f["path"],
+            trange(at, round(dur * SEC)),
+            source_timerange=trange(round(src_from * SEC), round(dur * SEC)),
+            volume=_n(a.get("volume"), 0, 2, 0.6),
+        )
         if not seg:
             continue
         fi, fo = _n(a.get("fade_in"), 0, 10, 0), _n(a.get("fade_out"), 0, 10, 0)
@@ -351,18 +458,39 @@ def build(plan, files=None):
         du = round(_n(t.get("duration"), 0.3, 600, 3) * SEC)
         pos = _pos(t.get("position")) or POS["bottom"]
         sc = _n(t.get("scale"), 0.1, 10, 1.0)
-        style = jy.TextStyle(size=_n(t.get("size"), 2, 30, 8), bold=bool(t.get("bold")), italic=bool(t.get("italic")),
-                             color=_rgb(t.get("color")), alpha=_n(t.get("alpha"), 0, 1, 1), align=1, auto_wrapping=True)
+        style = jy.TextStyle(
+            size=_n(t.get("size"), 2, 30, 8),
+            bold=bool(t.get("bold")),
+            italic=bool(t.get("italic")),
+            color=_rgb(t.get("color")),
+            alpha=_n(t.get("alpha"), 0, 1, 1),
+            align=1,
+            auto_wrapping=True,
+        )
         b = t.get("outline")
         border = jy.TextBorder(color=_rgb(b.get("color"), (0, 0, 0)), width=_n(b.get("width"), 0, 100, 40)) if isinstance(b, dict) else None
         bg = t.get("background")
-        background = jy.TextBackground(color=_hex(bg.get("color")), alpha=_n(bg.get("alpha"), 0, 1, 0.6),
-                                       round_radius=_n(bg.get("round_radius"), 0, 1, 0.2)) if isinstance(bg, dict) else None
+        background = (
+            jy.TextBackground(color=_hex(bg.get("color")), alpha=_n(bg.get("alpha"), 0, 1, 0.6), round_radius=_n(bg.get("round_radius"), 0, 1, 0.2))
+            if isinstance(bg, dict)
+            else None
+        )
         shadow = jy.TextShadow(alpha=0.6) if t.get("shadow") else None
-        seg = _guard(notes, where.rstrip(": "), jy.TextSegment, txt, trange(st, du), font=find("font", t.get("font"), notes, where),
-                     style=style, clip_settings=jy.ClipSettings(transform_x=pos[0], transform_y=pos[1], scale_x=sc, scale_y=sc,
-                                                                 rotation=_n(t.get("rotation"), -360, 360, 0)),
-                     border=border, background=background, shadow=shadow)
+        seg = _guard(
+            notes,
+            where.rstrip(": "),
+            jy.TextSegment,
+            txt,
+            trange(st, du),
+            font=find("font", t.get("font"), notes, where),
+            style=style,
+            clip_settings=jy.ClipSettings(
+                transform_x=pos[0], transform_y=pos[1], scale_x=sc, scale_y=sc, rotation=_n(t.get("rotation"), -360, 360, 0)
+            ),
+            border=border,
+            background=background,
+            shadow=shadow,
+        )
         if not seg:
             continue
         for kind in ("text_intro", "text_outro", "text_loop"):
@@ -391,9 +519,11 @@ def build(plan, files=None):
     # ---- subtitles: written as an .srt inside the project, then imported
     subs = [s for s in (plan.get("subtitles") or []) if isinstance(s, dict) and str(s.get("text") or "").strip()][:80]
     if subs:
+
         def ts(x):
             ms = int(round(x * 1000))
             return f"{ms // 3600000:02d}:{ms // 60000 % 60:02d}:{ms // 1000 % 60:02d},{ms % 1000:03d}"
+
         lines = []
         for i, s in enumerate(sorted(subs, key=lambda s: _n(s.get("start"), 0, 3600, 0))):
             a = _n(s.get("start"), 0, 3600, 0)
@@ -403,15 +533,30 @@ def build(plan, files=None):
         srt.parent.mkdir(parents=True, exist_ok=True)
         srt.write_text("\n".join(lines), encoding="utf-8")
         script.append_track(jy.TrackSpec(jy.TrackType.text, "subtitles"))
-        if _guard(notes, "subtitles", script.import_srt, str(srt), "subtitles",
-                  text_style=jy.TextStyle(size=6, color=(1, 1, 1), align=1, auto_wrapping=True),
-                  clip_settings=jy.ClipSettings(transform_y=-0.86)) is not None:
+        if (
+            _guard(
+                notes,
+                "subtitles",
+                script.import_srt,
+                str(srt),
+                "subtitles",
+                text_style=jy.TextStyle(size=6, color=(1, 1, 1), align=1, auto_wrapping=True),
+                clip_settings=jy.ClipSettings(transform_y=-0.86),
+            )
+            is not None
+        ):
             stats["subtitles"] = len(subs)
 
     script.save()
-    return {"draft": name, "path": str(DRAFTS / name), "seconds": round(script.duration / SEC, 2),
-            "tracks": len(a_tracks) + len(built_v) + bool(looks) + bool(fx) + len(t_tracks) + bool(subs),
-            "stats": stats, "notes": notes, "ms": round((time.perf_counter() - t0) * 1000)}
+    return {
+        "draft": name,
+        "path": str(DRAFTS / name),
+        "seconds": round(script.duration / SEC, 2),
+        "tracks": len(a_tracks) + len(built_v) + bool(looks) + bool(fx) + len(t_tracks) + bool(subs),
+        "stats": stats,
+        "notes": notes,
+        "ms": round((time.perf_counter() - t0) * 1000),
+    }
 
 
 PLAN_SYSTEM = """You plan video edits for JianYing (CapCut's Chinese edition). You never write code: output ONE compact JSON object (the plan), nothing else.
@@ -443,11 +588,24 @@ Rules: copy names EXACTLY from the lists (they are the free items). Keep "from" 
 
 
 def plan_prompt(request, files):
-    media = "\n".join(f"- {f['file']} ({f['kind']}" + (f", {f['seconds']} s" if f.get("seconds") else "") +
-                      (f", {f['size']}" if f.get("size") else "") + ")" for f in files)
-    labels = {"filter": "FILTERS", "transition": "TRANSITIONS", "scene_effect": "EFFECTS", "intro": "CLIP INTROS",
-              "outro": "CLIP OUTROS", "combo": "CLIP COMBOS", "text_intro": "TEXT INTROS", "text_outro": "TEXT OUTROS",
-              "text_loop": "TEXT LOOPS", "font": "FONTS", "tone": "VOICE EFFECTS", "audio_scene": "AUDIO EFFECTS"}
+    media = "\n".join(
+        f"- {f['file']} ({f['kind']}" + (f", {f['seconds']} s" if f.get("seconds") else "") + (f", {f['size']}" if f.get("size") else "") + ")"
+        for f in files
+    )
+    labels = {
+        "filter": "FILTERS",
+        "transition": "TRANSITIONS",
+        "scene_effect": "EFFECTS",
+        "intro": "CLIP INTROS",
+        "outro": "CLIP OUTROS",
+        "combo": "CLIP COMBOS",
+        "text_intro": "TEXT INTROS",
+        "text_outro": "TEXT OUTROS",
+        "text_loop": "TEXT LOOPS",
+        "font": "FONTS",
+        "tone": "VOICE EFFECTS",
+        "audio_scene": "AUDIO EFFECTS",
+    }
     cat = "\n".join(f"{labels[k]}: {', '.join(_shown(k))}" for k in labels)
     return f"REQUEST:\n{request}\n\nAVAILABLE MEDIA:\n{media}\n\n{cat}\n\nReply with the plan JSON only."
 
@@ -455,6 +613,7 @@ def plan_prompt(request, files):
 def make_plan(request, planner, files=None, tier="video"):
     from ai_pc.core.util import parse_json
     from ai_pc.llm.planner import PlannerError
+
     files = files if files is not None else media_files()
     msgs = [{"role": "system", "content": PLAN_SYSTEM}, {"role": "user", "content": plan_prompt(request, files)}]
     t0 = time.perf_counter()

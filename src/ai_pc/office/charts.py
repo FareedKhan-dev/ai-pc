@@ -6,6 +6,7 @@ it renders, so a chart looks exactly like one made in Word.
   spec = {"chart": "column|bar|line|pie|doughnut|area|stacked|stacked_bar", "title": ..., "categories": [...],
           "series": [{"name": ..., "values": [...]}], "number_format": "#,##0"}
 """
+
 from docx.opc.constants import CONTENT_TYPE as CT
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.opc.packuri import PackURI
@@ -19,9 +20,16 @@ from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION
 from pptx.oxml import parse_xml as pptx_parse
 from pptx.util import Pt
 
-TYPES = {"column": XL_CHART_TYPE.COLUMN_CLUSTERED, "bar": XL_CHART_TYPE.BAR_CLUSTERED, "line": XL_CHART_TYPE.LINE_MARKERS,
-         "pie": XL_CHART_TYPE.PIE, "doughnut": XL_CHART_TYPE.DOUGHNUT, "area": XL_CHART_TYPE.AREA,
-         "stacked": XL_CHART_TYPE.COLUMN_STACKED, "stacked_bar": XL_CHART_TYPE.BAR_STACKED}
+TYPES = {
+    "column": XL_CHART_TYPE.COLUMN_CLUSTERED,
+    "bar": XL_CHART_TYPE.BAR_CLUSTERED,
+    "line": XL_CHART_TYPE.LINE_MARKERS,
+    "pie": XL_CHART_TYPE.PIE,
+    "doughnut": XL_CHART_TYPE.DOUGHNUT,
+    "area": XL_CHART_TYPE.AREA,
+    "stacked": XL_CHART_TYPE.COLUMN_STACKED,
+    "stacked_bar": XL_CHART_TYPE.BAR_STACKED,
+}
 EMU_PER_CM = 360000
 
 
@@ -158,6 +166,7 @@ def add_chart(doc, paragraph, spec, th, width_cm=15.0, height_cm=8.5):
         '<wp:effectExtent l="0" t="0" r="0" b="0"/>'
         f'<wp:docPr id="{4000 + n}" name="Chart {n}"/><wp:cNvGraphicFramePr/>'
         '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">'
-        f'<c:chart r:id="{rid}"/></a:graphicData></a:graphic></wp:inline></w:drawing>')
+        f'<c:chart r:id="{rid}"/></a:graphicData></a:graphic></wp:inline></w:drawing>'
+    )
     paragraph.add_run()._r.append(inline)
     return str(chart_part.partname)

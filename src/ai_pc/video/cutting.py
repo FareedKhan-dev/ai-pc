@@ -8,12 +8,13 @@ freeze); this module decides the exact source window and timeline length:
   - velocity = the classic speed ramp: fast (1.8x) -> slow (0.35x) on the key moment -> fast again.
 Returns plan clips (schema v2) and the timeline (id, start, end, section).
 """
+
 import bisect
 import math
 from collections import Counter
 
 SPEEDS = {"normal": 1.0, "slow": 0.4, "fast": 1.8, "freeze": 0.0}
-VEL = (1.8, 0.35, 1.8)          # velocity ramp speeds
+VEL = (1.8, 0.35, 1.8)  # velocity ramp speeds
 VEL_SPLIT = (0.35, 0.40, 0.25)  # share of the shot's timeline length in each part
 FACE_WORDS = ("face", "eye", "close", "person", "man", "woman", "him", "her", "boss", "look", "stare", "portrait", "smile")
 ACTION_WORDS = ("walk", "run", "action", "move", "jump", "fast", "drive", "dance", "fight", "enter", "stride", "spin")
@@ -132,14 +133,19 @@ def fit(shots, beat, bps, target, drop_at=None, keep=(), drop_by=None):
 
     def raw(ss):  # without the bar padding: a step that the padding hides still moves the edit the right way
         return sum(_beats(x, bps) for x in ss)
+
     added, best_seen, grown = 0, (abs(total(cur) - target), cur), Counter()
-    if total(cur) < 0.6 * target and sum(1 for i, x in enumerate(cur) if x.get("section") == "drop" and
-                                         (i == 0 or cur[i - 1].get("section") != "drop")) < 2:
+    if (
+        total(cur) < 0.6 * target
+        and sum(1 for i, x in enumerate(cur) if x.get("section") == "drop" and (i == 0 or cur[i - 1].get("section") != "drop")) < 2
+    ):
         # far too short for one act: a second act like a real 1-minute edit (break -> build -> drop) before the ending
         at = next((i for i, x in enumerate(cur) if x.get("section") == "outro"), len(cur))
-        act = ([{"section": "break", "beats": bps.get("break", 4), "speed": "slow"} for _ in range(2)] +
-               [{"section": "build", "beats": bps.get("build", 2)} for _ in range(4)] +
-               [{"section": "drop", "beats": bps.get("drop", 2)} for _ in range(8)])
+        act = (
+            [{"section": "break", "beats": bps.get("break", 4), "speed": "slow"} for _ in range(2)]
+            + [{"section": "build", "beats": bps.get("build", 2)} for _ in range(4)]
+            + [{"section": "drop", "beats": bps.get("drop", 2)} for _ in range(8)]
+        )
         cur = cur[:at] + [{**x, "id": f"act{k + 1}", "file": None, "cutaway": True} for k, x in enumerate(act)] + cur[at:]
     for _ in range(200):
         t = total(cur)
@@ -152,26 +158,34 @@ def fit(shots, beat, bps, target, drop_at=None, keep=(), drop_by=None):
             b, norm, h = _beats(s, bps), bps.get(s.get("section") or "drop", 2), held(cur, i, keep)
             if t > target:
                 if b > (max(norm, math.ceil(1.6 / beat)) if s.get("label") else 1):  # a label must stay readable
-                    ops.append((0 if not h and b > norm else 2 if not h else 4, cur[:i] + [{**s, "beats": b - 1}] + cur[i + 1:]))
+                    ops.append((0 if not h and b > norm else 2 if not h else 4, cur[:i] + [{**s, "beats": b - 1}] + cur[i + 1 :]))
                 if not h and n > 4:
-                    ops.append((3 if s.get("label") else 1, cur[:i] + cur[i + 1:]))
+                    ops.append((3 if s.get("label") else 1, cur[:i] + cur[i + 1 :]))
             else:
                 if i == n - 1 and b < 8:
                     ops.append((0, cur[:i] + [{**s, "beats": b + 1}]))
                 elif not h and b < 2 * norm:
-                    ops.append((2, cur[:i] + [{**s, "beats": b + 1}] + cur[i + 1:]))
+                    ops.append((2, cur[:i] + [{**s, "beats": b + 1}] + cur[i + 1 :]))
                 sec = s.get("section") or "drop"
                 if i < n - 1 and cur[i + 1].get("section") != sec and sec not in ("intro", "outro"):
                     # spread over the sections (the drop and the build first), not all into the first one
                     # a whole bar at a time (2 shots of 2 beats...), so the bar padding never hides the step
                     # and after the first drop first: a long wait for the drop loses the viewer
                     pri = 1 + 0.15 * grown[sec] - {"drop": 0.1, "build": 0.05}.get(sec, 0) + (0.45 if fd0 is not None and i < fd0 else 0)
-                    if drop_by and fd0 is not None and i < fd0 and \
-                            sum(shot_lengths(cur, beat, bps, drop_at)[:fd0]) + 4 * beat > drop_by * target:
+                    if drop_by and fd0 is not None and i < fd0 and sum(shot_lengths(cur, beat, bps, drop_at)[:fd0]) + 4 * beat > drop_by * target:
                         continue  # the build-up is long enough: the extra time goes after the drop
-                    new = [{"id": f"x{added + 1}" if j == 0 else f"x{added + 1}_{j + 1}", "section": sec, "file": None, "beats": norm,
-                            "cutaway": True, "want": s.get("want", "")} for j in range(max(1, 4 // max(1, norm)))]
-                    ops.append((pri, cur[:i + 1] + new + cur[i + 1:]))
+                    new = [
+                        {
+                            "id": f"x{added + 1}" if j == 0 else f"x{added + 1}_{j + 1}",
+                            "section": sec,
+                            "file": None,
+                            "beats": norm,
+                            "cutaway": True,
+                            "want": s.get("want", ""),
+                        }
+                        for j in range(max(1, 4 // max(1, norm)))
+                    ]
+                    ops.append((pri, cur[: i + 1] + new + cur[i + 1 :]))
         best, r0 = None, raw(cur)
         for pri, cand in ops:
             t2 = total(cand)
@@ -201,8 +215,9 @@ def spread_files(shots, analyses, keep=(), avoid=(), less=()):
     more than ~1.8x its fair share of the edit. Only files the planner chose are used (it read every file's captions:
     one it left out is usually off-topic, like a kickboxer in a football reel). Shots of the same file in a row stay
     (the planner's sequence of one place; the cut engine never repeats a moment)."""
-    vids = {a["file"].lower(): a for a in analyses.values() if a.get("kind") in ("video", "image")
-            and a["file"] not in avoid}  # off-brief footage (a white car in an ad for the red one) is never used
+    vids = {
+        a["file"].lower(): a for a in analyses.values() if a.get("kind") in ("video", "image") and a["file"] not in avoid
+    }  # off-brief footage (a white car in an ad for the red one) is never used
     if not vids:
         return shots
     cur = [dict(s) for s in shots]
@@ -223,6 +238,7 @@ def spread_files(shots, analyses, keep=(), avoid=(), less=()):
     def pick(exclude):  # in proportion to how much the planner used each file (one it used once stays minor)
         opts = [f for f in vids if f not in exclude and f not in less] or [f for f in vids if f not in exclude]
         return min(opts, key=lambda f: (uses[f] / (planned[f] + 0.5), -quality.get(f, 5))) if opts else None
+
     for i, s in enumerate(cur):
         f = str(s.get("file") or "").lower()
         prev = str(cur[i - 1].get("file") or "").lower() if i else ""
@@ -257,8 +273,31 @@ def _faces_between(a, t0, t1):
     return any(x["faces"] and x["faces"][0]["box"][2] > 0.05 for x in a.get("faces", []) if t0 - 0.2 <= x["t"] <= t1 + 0.2)
 
 
-PERSON_WORDS = ("man", "woman", "person", "people", "girl", "boy", "player", "athlete", "chef", "couple", "bride", "groom",
-                "dancer", "crowd", "rider", "driver", "child", "he ", "she ", "his ", "her ", "someone", "hands")
+PERSON_WORDS = (
+    "man",
+    "woman",
+    "person",
+    "people",
+    "girl",
+    "boy",
+    "player",
+    "athlete",
+    "chef",
+    "couple",
+    "bride",
+    "groom",
+    "dancer",
+    "crowd",
+    "rider",
+    "driver",
+    "child",
+    "he ",
+    "she ",
+    "his ",
+    "her ",
+    "someone",
+    "hands",
+)
 
 
 def _has_person(a):
@@ -334,8 +373,19 @@ def cut(shots, analyses, beat, style_cfg=None, drop_at=None, canvas=None):
             if v:
                 clip["reframe"] = v
         clips.append(clip)
-        timeline.append({"id": sid, "start": round(t, 4), "end": round(t + dur, 4), "section": sec, "speed": speed,
-                         "kind": a.get("kind"), "want": s.get("want", ""), "label": s.get("label"), "file": a["file"]})
+        timeline.append(
+            {
+                "id": sid,
+                "start": round(t, 4),
+                "end": round(t + dur, 4),
+                "section": sec,
+                "speed": speed,
+                "kind": a.get("kind"),
+                "want": s.get("want", ""),
+                "label": s.get("label"),
+                "file": a["file"],
+            }
+        )
         t += dur
     drop = next((x["start"] for x in timeline if x["section"] == "drop"), None)
     return clips, timeline, drop

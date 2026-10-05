@@ -1,5 +1,6 @@
 """Notion through its API (the integration sees only pages shared with it): find pages and databases, read a database,
 add a row (a page) with a title, status and date, add text to a page, archive. Every page made is read back."""
+
 from ai_pc.hub.http import Api, HubError
 from ai_pc.hub.services import Base, norm
 
@@ -22,8 +23,12 @@ class Notion(Base):
 
     def api(self):
         self.need("token")
-        return Api("https://api.notion.com/v1", headers={"Authorization": f"Bearer {self.creds['token']}", "Notion-Version": VERSION},
-                   service="notion", transport=self.transport)
+        return Api(
+            "https://api.notion.com/v1",
+            headers={"Authorization": f"Bearer {self.creds['token']}", "Notion-Version": VERSION},
+            service="notion",
+            transport=self.transport,
+        )
 
     def whoami(self):
         me = self.api().get("users/me")
@@ -42,9 +47,15 @@ class Notion(Base):
         if not hit:
             raise HubError(f"notion: no database called {name} is shared with the integration")
         schema = self.api().get(f"databases/{hit['id']}")
-        return dict(hit, props={k: v["type"] for k, v in schema.get("properties", {}).items()},
-                    options={k: [o["name"] for o in (v.get(v["type"]) or {}).get("options", [])] for k, v in schema.get("properties", {}).items()
-                             if v["type"] in ("select", "status", "multi_select")})
+        return dict(
+            hit,
+            props={k: v["type"] for k, v in schema.get("properties", {}).items()},
+            options={
+                k: [o["name"] for o in (v.get(v["type"]) or {}).get("options", [])]
+                for k, v in schema.get("properties", {}).items()
+                if v["type"] in ("select", "status", "multi_select")
+            },
+        )
 
     def rows(self, db_name, limit=50):
         db = self.database(db_name)
@@ -81,18 +92,32 @@ class Notion(Base):
             body["children"] = [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": note}}]}}]
         page = self.api().post("pages", json=body)
         back = self.api().get(f"pages/{page['id']}")
-        return {"id": page["id"], "url": page.get("url"), "where": db["title"], "name": title, "verified": _title(back) == title,
-                "undo": {"service": "notion", "op": "archive", "id": page["id"]}}
+        return {
+            "id": page["id"],
+            "url": page.get("url"),
+            "where": db["title"],
+            "name": title,
+            "verified": _title(back) == title,
+            "undo": {"service": "notion", "op": "archive", "id": page["id"]},
+        }
 
     def add_text(self, page_name, text):
         pages = self.search(page_name, "page")
         p = next((x for x in pages if norm(x["title"]) == norm(page_name)), None) or (pages[0] if pages else None)
         if not p:
             raise HubError(f"notion: no page called {page_name} is shared with the integration")
-        res = self.api().patch(f"blocks/{p['id']}/children", json={"children": [
-            {"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": text}}]}}]})
+        res = self.api().patch(
+            f"blocks/{p['id']}/children",
+            json={"children": [{"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"type": "text", "text": {"content": text}}]}}]},
+        )
         bid = (res.get("results") or [{}])[0].get("id")
-        return {"id": bid, "url": p["url"], "where": p["title"], "verified": bool(bid), "undo": {"service": "notion", "op": "delete_block", "id": bid}}
+        return {
+            "id": bid,
+            "url": p["url"],
+            "where": p["title"],
+            "verified": bool(bid),
+            "undo": {"service": "notion", "op": "delete_block", "id": bid},
+        }
 
     def archive(self, id):  # noqa: A002
         self.api().patch(f"pages/{id}", json={"archived": True})

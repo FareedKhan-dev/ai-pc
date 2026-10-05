@@ -9,6 +9,7 @@
           the request, the brief, what is in each file (analyze.describe), the awareness sheet and the candidate items.
           Only candidate names and real files can survive the resolver afterwards.
 """
+
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -19,8 +20,22 @@ from ai_pc.video import analyze as AN
 from ai_pc.video import taxonomy as TX
 from ai_pc.video.editplan import PLATFORMS, Catalog
 
-KINDS = ("scene_effect", "character_effect", "filter", "transition", "clip_intro", "clip_outro", "clip_combo", "text_intro",
-         "text_outro", "text_loop", "font", "audio_effect", "voice", "speech_to_song")
+KINDS = (
+    "scene_effect",
+    "character_effect",
+    "filter",
+    "transition",
+    "clip_intro",
+    "clip_outro",
+    "clip_combo",
+    "text_intro",
+    "text_outro",
+    "text_loop",
+    "font",
+    "audio_effect",
+    "voice",
+    "speech_to_song",
+)
 
 BRIEF_SYSTEM = """You are an assistant editor. Turn a video-editing request into a brief for the lead editor.
 Reply with ONE JSON object:
@@ -202,7 +217,7 @@ Output compact JSON only."""
 
 
 def _card_line(c, proven=None):
-    bits = [f"{c['category']} {c['name']} \"{c.get('en') or ''}\" - {c.get('desc') or ''}"]
+    bits = [f'{c["category"]} {c["name"]} "{c.get("en") or ""}" - {c.get("desc") or ""}']
     if proven and f"{c['category']}:{c['name']}" in proven:
         bits.append("(proven)")
     extra = []
@@ -214,8 +229,13 @@ def _card_line(c, proven=None):
     if extra:
         bits.append("[" + "; ".join(str(x) for x in extra) + "]")
     if c.get("params"):
-        bits.append("params: " + ", ".join(f"{k.replace('effects_adjust_', '').replace('change_voice_param_', '')}"
-                                           f"({v.split('default ')[-1].rstrip(')')})" for k, v in c["params"].items()))
+        bits.append(
+            "params: "
+            + ", ".join(
+                f"{k.replace('effects_adjust_', '').replace('change_voice_param_', '')}({v.split('default ')[-1].rstrip(')')})"
+                for k, v in c["params"].items()
+            )
+        )
     if c.get("default_duration_s"):
         bits.append(f"default {c['default_duration_s']} s")
     return "  " + " ".join(bits)
@@ -227,16 +247,27 @@ class Director:
         self.design_json = None
 
     def brief(self, request, quick_media):
-        lines = "\n".join(f"- {m['file']} ({m['kind']}" + (f", {m['seconds']:.1f} s" if m.get("seconds") else "") +
-                          (f", {m['width']}x{m['height']}" if m.get("width") else "") + (", has sound" if m.get("has_audio") else "") + ")"
-                          for m in quick_media)
+        lines = "\n".join(
+            f"- {m['file']} ({m['kind']}"
+            + (f", {m['seconds']:.1f} s" if m.get("seconds") else "")
+            + (f", {m['width']}x{m['height']}" if m.get("width") else "")
+            + (", has sound" if m.get("has_audio") else "")
+            + ")"
+            for m in quick_media
+        )
         system = BRIEF_SYSTEM % TX.brief_list()
-        r = self.planner._call("fast", [{"role": "system", "content": system},
-                                        {"role": "user", "content": f"REQUEST:\n{request}\n\nFILES:\n{lines}"}])
+        r = self.planner._call(
+            "fast", [{"role": "system", "content": system}, {"role": "user", "content": f"REQUEST:\n{request}\n\nFILES:\n{lines}"}]
+        )
         b = parse_json(r.text)
         if not isinstance(b, dict):
-            r = self.planner._call("fast", [{"role": "system", "content": system},
-                                            {"role": "user", "content": f"REQUEST:\n{request}\n\nFILES:\n{lines}\n\nReply with the JSON object only."}])
+            r = self.planner._call(
+                "fast",
+                [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": f"REQUEST:\n{request}\n\nFILES:\n{lines}\n\nReply with the JSON object only."},
+                ],
+            )
             b = parse_json(r.text) or {}
         return b
 
@@ -257,10 +288,13 @@ class Director:
                 found = ix.search(q, categories=[k], k=per_kind * 3, exclude=self.cat.missing, boost=self.cat.rank)
                 if k == "character_effect" and part in ("eyes", "face", "head", "body", "hands"):
                     # the named body part comes first: an eye effect for "lightning on my eyes", even if its name says "red glow"
-                    on_part = [c for c in ix.search(f"{part} {q}", categories=[k], k=40, exclude=self.cat.missing, boost=self.cat.rank)
-                               if c.get("target") == part][:3]
+                    on_part = [
+                        c
+                        for c in ix.search(f"{part} {q}", categories=[k], k=40, exclude=self.cat.missing, boost=self.cat.rank)
+                        if c.get("target") == part
+                    ][:3]
                     found = on_part + [c for c in found if c not in on_part]
-                for c in found[:per_kind + (3 if k == "character_effect" else 0)]:
+                for c in found[: per_kind + (3 if k == "character_effect" else 0)]:
                     key = f"{c['category']}:{c['name']}"
                     if key not in seen:
                         seen.add(key)
@@ -271,12 +305,22 @@ class Director:
                     title += f" (must sit on the {part}: use an item with target {part}, plus a broader effect if wanted)"
                 groups[title] = cards
         mood = f"{brief.get('mood') or ''} {brief.get('pace') or ''}"
-        palette = {"transition": f"{mood} transition", "text_intro": f"{mood} pop bounce slam typewriter", "text_outro": f"{mood} fade out",
-                   "font": f"{mood} bold heavy display title", "filter": f"{mood} cinematic", "clip_intro": f"{mood} zoom", "clip_combo": f"{mood}"}
+        palette = {
+            "transition": f"{mood} transition",
+            "text_intro": f"{mood} pop bounce slam typewriter",
+            "text_outro": f"{mood} fade out",
+            "font": f"{mood} bold heavy display title",
+            "filter": f"{mood} cinematic",
+            "clip_intro": f"{mood} zoom",
+            "clip_combo": f"{mood}",
+        }
         style = []
         for k, q in palette.items():
-            got = [c for c in ix.search(q, categories=[k], k=8, exclude=self.cat.missing, boost=self.cat.rank)
-                   if f"{c['category']}:{c['name']}" not in seen][:4]
+            got = [
+                c
+                for c in ix.search(q, categories=[k], k=8, exclude=self.cat.missing, boost=self.cat.rank)
+                if f"{c['category']}:{c['name']}" not in seen
+            ][:4]
             if k == "font":  # titles in this project are usually Latin; keep readable Latin fonts first
                 got = sorted(got, key=lambda c: 0 if c.get("script") in ("latin", "both") else 1)
             for c in got:
@@ -288,24 +332,36 @@ class Director:
     def design(self, request, brief, analyses, groups, aware_text="", extra=""):
         """The v3 path: style + music + shot list + recipes (+ extras); recipes.compose() writes the edits."""
         from ai_pc.video.styles import describe
+
         plat = brief.get("platform") if brief.get("platform") in PLATFORMS else None
         pinfo = ""
         if plat:
             p = PLATFORMS[plat]
             sf = p["safe"]
-            pinfo = (f"{plat}: canvas {p['aspect']}" + (f", at most {p['max_s']} s" if p["max_s"] else "") +
-                     f"; the app covers the top {sf['top'] * 100:.0f}%, bottom {sf['bottom'] * 100:.0f}% and right {sf['right'] * 100:.0f}%")
+            pinfo = (
+                f"{plat}: canvas {p['aspect']}"
+                + (f", at most {p['max_s']} s" if p["max_s"] else "")
+                + f"; the app covers the top {sf['top'] * 100:.0f}%, bottom {sf['bottom'] * 100:.0f}% and right {sf['right'] * 100:.0f}%"
+            )
         media = "\n".join(AN.describe(a) for a in analyses.values())
         proven = {k for k, f in self.cat.boost.items() if f > 1.3}
         cands = "\n".join(f"[{g}]\n" + "\n".join(_card_line(c, proven) for c in cards) for g, cards in groups.items())
-        user = (f"REQUEST:\n{request}\n\nBRIEF:\n{json.dumps(brief, ensure_ascii=False)}\n\nPLATFORM:\n{pinfo or 'none given'}\n\n"
-                f"{extra}MEDIA:\n{media}\n\n{aware_text}\n\nCANDIDATES (free catalogue items; copy names exactly):\n{cands}\n\nWrite the design JSON.")
+        user = (
+            f"REQUEST:\n{request}\n\nBRIEF:\n{json.dumps(brief, ensure_ascii=False)}\n\nPLATFORM:\n{pinfo or 'none given'}\n\n"
+            f"{extra}MEDIA:\n{media}\n\n{aware_text}\n\nCANDIDATES (free catalogue items; copy names exactly):\n{cands}\n\nWrite the design JSON."
+        )
         msgs = [{"role": "system", "content": DESIGN_SYSTEM % describe()}, {"role": "user", "content": user}]
         r = self.planner._call("video", msgs)
         d = parse_json(r.text)
         if not isinstance(d, dict) or not d.get("shots"):
-            r = self.planner._call("video", msgs + [{"role": "assistant", "content": r.text[:3000]},
-                                                    {"role": "user", "content": "Reply with the design JSON only (it needs a shots list)."}])
+            r = self.planner._call(
+                "video",
+                msgs
+                + [
+                    {"role": "assistant", "content": r.text[:3000]},
+                    {"role": "user", "content": "Reply with the design JSON only (it needs a shots list)."},
+                ],
+            )
             d = parse_json(r.text)
         if not isinstance(d, dict) or not d.get("shots"):
             raise ValueError("the planner returned no valid design")
@@ -318,20 +374,31 @@ class Director:
         if plat:
             p = PLATFORMS[plat]
             sf = p["safe"]
-            pinfo = (f"{plat}: canvas {p['aspect']}" + (f", at most {p['max_s']} s" if p["max_s"] else "") +
-                     f"; the app covers the top {sf['top'] * 100:.0f}%, bottom {sf['bottom'] * 100:.0f}% and right {sf['right'] * 100:.0f}% "
-                     "(text is moved out of there automatically)")
+            pinfo = (
+                f"{plat}: canvas {p['aspect']}"
+                + (f", at most {p['max_s']} s" if p["max_s"] else "")
+                + f"; the app covers the top {sf['top'] * 100:.0f}%, bottom {sf['bottom'] * 100:.0f}% and right {sf['right'] * 100:.0f}% "
+                "(text is moved out of there automatically)"
+            )
         media = "\n".join(AN.describe(a) for a in analyses.values())
         proven = {k for k, f in self.cat.boost.items() if f > 1.3}
         cands = "\n".join(f"[{g}]\n" + "\n".join(_card_line(c, proven) for c in cards) for g, cards in groups.items())
-        user = (f"REQUEST:\n{request}\n\nBRIEF:\n{json.dumps(brief, ensure_ascii=False)}\n\nPLATFORM:\n{pinfo or 'none given'}\n\n"
-                f"MEDIA:\n{media}\n\n{aware_text}\n\nCANDIDATES (free catalogue items; copy names exactly):\n{cands}\n\nWrite the plan JSON.")
+        user = (
+            f"REQUEST:\n{request}\n\nBRIEF:\n{json.dumps(brief, ensure_ascii=False)}\n\nPLATFORM:\n{pinfo or 'none given'}\n\n"
+            f"MEDIA:\n{media}\n\n{aware_text}\n\nCANDIDATES (free catalogue items; copy names exactly):\n{cands}\n\nWrite the plan JSON."
+        )
         msgs = [{"role": "system", "content": PLAN_SYSTEM}, {"role": "user", "content": user}]
         r = self.planner._call("video", msgs)
         plan = parse_json(r.text)
         if not isinstance(plan, dict):
-            r = self.planner._call("video", msgs + [{"role": "assistant", "content": r.text[:3000]},
-                                                    {"role": "user", "content": "That was not one valid JSON object. Reply with the plan JSON only."}])
+            r = self.planner._call(
+                "video",
+                msgs
+                + [
+                    {"role": "assistant", "content": r.text[:3000]},
+                    {"role": "user", "content": "That was not one valid JSON object. Reply with the plan JSON only."},
+                ],
+            )
             plan = parse_json(r.text)
         if not isinstance(plan, dict):
             raise ValueError("the planner returned no valid plan")
@@ -348,10 +415,12 @@ class Director:
             info = F.probe(f) if k in ("video", "audio") else {}
             if k == "image":
                 from PIL import Image
+
                 with Image.open(f) as im:
                     info = {"width": im.width, "height": im.height}
             quick.append({"file": str(f).replace("\\", "/").split("/")[-1], "kind": k, **info})
         from ai_pc.video import reference as RF
+
         with ThreadPoolExecutor(3) as ex:
             fa = ex.submit(AN.analyze, files, self.planner, self.log)
             fr = [ex.submit(RF.fingerprint, r, self.planner, self.log) for r in (references or [])]
@@ -369,6 +438,7 @@ class Director:
         self.ref_profile = RF.profile(self.reference) if self.reference else None
         t_an = time.perf_counter() - t0
         from ai_pc.media import speech as SP
+
         if SP.available():  # what is said, for captions, cuts and emphasis (~2 s per minute of speech, cached)
             for a in analyses.values():
                 snd = a.get("sound") or {}
@@ -379,11 +449,15 @@ class Director:
                         self.log(f"  transcription failed for {a['file']}: {type(e).__name__}: {e}")
         groups = self.candidates(brief)
         from ai_pc.video import awareness, lessons
+
         aware, aware_text = awareness.snapshot(brief, analyses, groups, self.cat, lessons.text(), request)
         self.edit_type = et = TX.classify(request, analyses, brief, self.reference)
         nxt = et["alternatives"][0] if et["alternatives"] else None
-        self.log(f"edit type: {et['label']} ({et['confidence'] * 100:.0f}%"
-                 + (f"; then {TX.TYPES[nxt[0]]['label']} {nxt[1] * 100:.0f}%" if nxt else "") + f") - {'; '.join(et['reasons'][:2])}")
+        self.log(
+            f"edit type: {et['label']} ({et['confidence'] * 100:.0f}%"
+            + (f"; then {TX.TYPES[nxt[0]]['label']} {nxt[1] * 100:.0f}%" if nxt else "")
+            + f") - {'; '.join(et['reasons'][:2])}"
+        )
         extra = TX.design_block(et) + "\n\n"
         if self.reference:
             extra += RF.describe(self.reference, self.ref_profile) + "\n\n"
@@ -402,6 +476,7 @@ class Director:
                     d["target_seconds"] = brief["target_seconds"]  # compose fits the cut to it exactly
                 d["_edit_type"] = et["type"]
                 return d
+
             design, usage, chars = self.design(request, brief, analyses, groups, aware_text, extra)
             design = settle(design)
             try:
@@ -415,8 +490,15 @@ class Director:
         else:
             plan, usage, chars = self.plan(request, brief, analyses, groups, aware_text)
         t_plan = time.perf_counter() - t1
-        timings = {"brief_s": round(t_brief, 1), "analysis_s": round(t_an, 1), "plan_s": round(t_plan, 1),
-                   "plan_tokens": [usage.get("prompt_tokens"), usage.get("completion_tokens")], "prompt_chars": chars}
-        self.log(f"brief {t_brief:.1f} s (parallel with analysis {t_an:.1f} s), {sum(len(v) for v in groups.values())} candidates, "
-                 f"plan {t_plan:.1f} s ({usage.get('prompt_tokens')} -> {usage.get('completion_tokens')} tokens)")
+        timings = {
+            "brief_s": round(t_brief, 1),
+            "analysis_s": round(t_an, 1),
+            "plan_s": round(t_plan, 1),
+            "plan_tokens": [usage.get("prompt_tokens"), usage.get("completion_tokens")],
+            "prompt_chars": chars,
+        }
+        self.log(
+            f"brief {t_brief:.1f} s (parallel with analysis {t_an:.1f} s), {sum(len(v) for v in groups.values())} candidates, "
+            f"plan {t_plan:.1f} s ({usage.get('prompt_tokens')} -> {usage.get('completion_tokens')} tokens)"
+        )
         return plan, brief, groups, analyses, timings

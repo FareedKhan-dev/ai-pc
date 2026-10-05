@@ -7,6 +7,7 @@ headless Chrome, plus a .drawio file that opens for editing in draw.io (diagrams
 Checks: every name is drawn, no two boxes overlap, every arrow joins two boxes, the picture is not blank, and the
 draw.io file reads back with the same boxes and arrows.
 """
+
 import html
 import math
 import re
@@ -14,8 +15,11 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 NAME, LABEL = "diagrams", "Diagrams: flowcharts, org charts, mind maps (SVG, PNG, PDF, draw.io)"
-EXAMPLES = ["flowchart: Start -> Take order -> In stock? -yes-> Pack -> Ship -> End; In stock? -no-> Order from supplier -> Pack",
-            "org chart: CEO > Sales Manager, Accounts Manager; Sales Manager > Ali, Sara", "mind map: Marketing: Social media (Facebook, Instagram), Ads, SEO"]
+EXAMPLES = [
+    "flowchart: Start -> Take order -> In stock? -yes-> Pack -> Ship -> End; In stock? -no-> Order from supplier -> Pack",
+    "org chart: CEO > Sales Manager, Accounts Manager; Sales Manager > Ali, Sara",
+    "mind map: Marketing: Social media (Facebook, Instagram), Ads, SEO",
+]
 FONT, CHAR = 15, 8.2  # px; average width of a character of Segoe UI at 15 px
 W_MAX, PAD, GAP_X, GAP_Y = 190, 14, 46, 64
 COLORS = {"box": "#e8f0fe", "edge": "#1a73e8", "decision": "#fef7e0", "end": "#e6f4ea", "text": "#1f2937", "root": "#1a73e8"}
@@ -88,7 +92,7 @@ def read_mind(spec):
         name = re.sub(r"\s*\(.*\)", "", b).strip()
         nodes[name] = "branch"
         edges.append((root, name, ""))
-        for leaf in (leaves.group(1).split(",") if leaves else []):
+        for leaf in leaves.group(1).split(",") if leaves else []:
             leaf = leaf.strip()
             if leaf:
                 nodes[f"{leaf}"] = "leaf"
@@ -112,6 +116,7 @@ def layout_layers(nodes, edges):
             elif m not in state:
                 walk(m)
         state[n] = 2
+
     for n in order:
         if n not in state:
             walk(n)
@@ -122,6 +127,7 @@ def layout_layers(nodes, edges):
         if n not in layer:
             layer[n] = max((depth(p, seen + (n,)) + 1 for p in preds[n] if p not in seen), default=0)
         return layer[n]
+
     for n in order:
         depth(n)
     sizes = {n: box_size(n, nodes[n] if nodes[n] == "diamond" else "box") for n in nodes}
@@ -196,6 +202,7 @@ def layout_tree(nodes, edges):
                 place(k, d + 1)
             xs = [pos[k][0] for k in kids[n]]
             pos[n] = ((min(xs) + max(xs)) / 2, ys[d])
+
     for r in roots:
         place(r, 0)
 
@@ -203,6 +210,7 @@ def layout_tree(nodes, edges):
         yield n
         for k in kids[n]:
             yield from subtree(k)
+
     for d in sorted(set(level.values())):  # a wide parent over narrow children: move it (and all under it) right
         row = sorted((n for n in level if level[n] == d), key=lambda n: pos[n][0])
         for a, b in zip(row, row[1:]):
@@ -210,7 +218,7 @@ def layout_tree(nodes, edges):
             if need > 0:
                 for s in subtree(b):
                     pos[s] = (pos[s][0] + need, pos[s][1])
-                for c in row[row.index(b) + 1:]:
+                for c in row[row.index(b) + 1 :]:
                     if c not in set(subtree(b)):
                         for s in subtree(c):
                             pos[s] = (pos[s][0] + need, pos[s][1])
@@ -244,7 +252,7 @@ def overlaps(pos, sizes, margin=4):
     names = list(pos)
     out = []
     for i, a in enumerate(names):
-        for b in names[i + 1:]:
+        for b in names[i + 1 :]:
             (ax, ay), (bx, by) = pos[a], pos[b]
             if abs(ax - bx) * 2 < sizes[a][0] + sizes[b][0] + margin and abs(ay - by) * 2 < sizes[a][1] + sizes[b][1] + margin:
                 out.append((a, b))
@@ -274,28 +282,38 @@ def svg(kind, nodes, edges, pos, sizes, title="", via=None):
     loops = kind != "mind" and any(pos[b][1] <= pos[a][1] for a, b, _ in edges)
     x0, y0 = min(xs) - 40, min(ys) - (70 if title else 40)
     w, h = max(xs) - x0 + (90 if loops else 40), max(ys) - y0 + 40
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:.0f} {y0:.0f} {w:.0f} {h:.0f}" width="{w:.0f}" height="{h:.0f}" '
-           'font-family="Segoe UI, Arial, sans-serif">', f'<rect x="{x0:.0f}" y="{y0:.0f}" width="{w:.0f}" height="{h:.0f}" fill="#ffffff"/>',
-           '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">'
-           f'<path d="M0,0 L10,5 L0,10 z" fill="{COLORS["edge"]}"/></marker></defs>']
+    out = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{x0:.0f} {y0:.0f} {w:.0f} {h:.0f}" width="{w:.0f}" height="{h:.0f}" '
+        'font-family="Segoe UI, Arial, sans-serif">',
+        f'<rect x="{x0:.0f}" y="{y0:.0f}" width="{w:.0f}" height="{h:.0f}" fill="#ffffff"/>',
+        '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">'
+        f'<path d="M0,0 L10,5 L0,10 z" fill="{COLORS["edge"]}"/></marker></defs>',
+    ]
     if title:
-        out.append(f'<text x="{x0 + w / 2:.0f}" y="{y0 + 38:.0f}" text-anchor="middle" font-size="22" font-weight="700" fill="{COLORS["text"]}">'
-                   f'{html.escape(title)}</text>')
+        out.append(
+            f'<text x="{x0 + w / 2:.0f}" y="{y0 + 38:.0f}" text-anchor="middle" font-size="22" font-weight="700" fill="{COLORS["text"]}">'
+            f"{html.escape(title)}</text>"
+        )
     for a, b, label in edges:
         (ax, ay), (bx, by) = pos[a], pos[b]
         if kind == "mind":
-            out.append(f'<path d="M{ax:.1f},{ay:.1f} C{(ax + bx) / 2:.1f},{ay:.1f} {(ax + bx) / 2:.1f},{by:.1f} {bx:.1f},{by:.1f}" stroke="{COLORS["edge"]}" '
-                       'stroke-width="2.5" fill="none" opacity="0.7"/>')
+            out.append(
+                f'<path d="M{ax:.1f},{ay:.1f} C{(ax + bx) / 2:.1f},{ay:.1f} {(ax + bx) / 2:.1f},{by:.1f} {bx:.1f},{by:.1f}" stroke="{COLORS["edge"]}" '
+                'stroke-width="2.5" fill="none" opacity="0.7"/>'
+            )
             continue
         sy, ty = ay + sizes[a][1] / 2, by - sizes[b][1] / 2
         if (a, b) in via:  # through its waypoints, in its own lane
             pts = [(ax, sy)] + via[(a, b)] + [(bx, ty)]
             d = f"M{pts[0][0]:.1f},{pts[0][1]:.1f} " + " ".join(
-                f"C{p[0]:.1f},{(p[1] + q[1]) / 2:.1f} {q[0]:.1f},{(p[1] + q[1]) / 2:.1f} {q[0]:.1f},{q[1]:.1f}" for p, q in zip(pts, pts[1:]))
+                f"C{p[0]:.1f},{(p[1] + q[1]) / 2:.1f} {q[0]:.1f},{(p[1] + q[1]) / 2:.1f} {q[0]:.1f},{q[1]:.1f}" for p, q in zip(pts, pts[1:])
+            )
             out.append(f'<path d="{d}" stroke="{COLORS["edge"]}" stroke-width="2" fill="none" marker-end="url(#arrow)"/>')
             if label:
-                out.append(f'<text x="{(pts[0][0] + pts[1][0]) / 2 + 8:.1f}" y="{(pts[0][1] + pts[1][1]) / 2:.1f}" font-size="13" fill="{COLORS["edge"]}" '
-                           f'font-weight="600">{html.escape(label)}</text>')
+                out.append(
+                    f'<text x="{(pts[0][0] + pts[1][0]) / 2 + 8:.1f}" y="{(pts[0][1] + pts[1][1]) / 2:.1f}" font-size="13" fill="{COLORS["edge"]}" '
+                    f'font-weight="600">{html.escape(label)}</text>'
+                )
             continue
         if by <= ay:  # a loop back up: round the side
             side = max(pos[a][0] + sizes[a][0] / 2, pos[b][0] + sizes[b][0] / 2) + 40
@@ -312,19 +330,33 @@ def svg(kind, nodes, edges, pos, sizes, title="", via=None):
     for n, shape in nodes.items():
         x, y = pos[n]
         w, h, lines = sizes[n]
-        fill = COLORS["decision"] if shape == "diamond" else COLORS["end"] if shape == "terminal" else COLORS["root"] if shape == "root" else COLORS["box"]
+        fill = (
+            COLORS["decision"]
+            if shape == "diamond"
+            else COLORS["end"]
+            if shape == "terminal"
+            else COLORS["root"]
+            if shape == "root"
+            else COLORS["box"]
+        )
         color = "#ffffff" if shape == "root" else COLORS["text"]
         if shape == "diamond":
-            out.append(f'<polygon data-name="{html.escape(n)}" points="{x:.1f},{y - h / 2:.1f} {x + w / 2:.1f},{y:.1f} {x:.1f},{y + h / 2:.1f} {x - w / 2:.1f},{y:.1f}" '
-                       f'fill="{fill}" stroke="#c9a227" stroke-width="2"/>')
+            out.append(
+                f'<polygon data-name="{html.escape(n)}" points="{x:.1f},{y - h / 2:.1f} {x + w / 2:.1f},{y:.1f} {x:.1f},{y + h / 2:.1f} {x - w / 2:.1f},{y:.1f}" '
+                f'fill="{fill}" stroke="#c9a227" stroke-width="2"/>'
+            )
         else:
             rx = h / 2 if shape in ("terminal", "root", "leaf") else 10
-            out.append(f'<rect data-name="{html.escape(n)}" x="{x - w / 2:.1f}" y="{y - h / 2:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{rx:.1f}" fill="{fill}" '
-                       f'stroke="{COLORS["edge"] if shape != "leaf" else "#9aa0a6"}" stroke-width="{2 if shape != "leaf" else 1.2}"/>')
+            out.append(
+                f'<rect data-name="{html.escape(n)}" x="{x - w / 2:.1f}" y="{y - h / 2:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{rx:.1f}" fill="{fill}" '
+                f'stroke="{COLORS["edge"] if shape != "leaf" else "#9aa0a6"}" stroke-width="{2 if shape != "leaf" else 1.2}"/>'
+            )
         top = y - (len(lines) - 1) * (FONT + 5) / 2 + FONT / 3
         for i, line in enumerate(lines):
-            out.append(f'<text x="{x:.1f}" y="{top + i * (FONT + 5):.1f}" text-anchor="middle" font-size="{FONT + (3 if shape == "root" else 0)}" '
-                       f'font-weight="{700 if shape in ("root", "branch") else 500}" fill="{color}">{html.escape(line)}</text>')
+            out.append(
+                f'<text x="{x:.1f}" y="{top + i * (FONT + 5):.1f}" text-anchor="middle" font-size="{FONT + (3 if shape == "root" else 0)}" '
+                f'font-weight="{700 if shape in ("root", "branch") else 500}" fill="{color}">{html.escape(line)}</text>'
+            )
     out.append("</svg>")
     return "\n".join(out)
 
@@ -340,16 +372,25 @@ def drawio(kind, nodes, edges, pos, sizes, via=None):
     ET.SubElement(cells, "mxCell", id="0")
     ET.SubElement(cells, "mxCell", id="1", parent="0")
     ids = {}
-    style = {"diamond": "rhombus;whiteSpace=wrap;html=1;fillColor=#fef7e0;strokeColor=#c9a227;",
-             "terminal": "rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#e6f4ea;strokeColor=#1a73e8;",
-             "root": "ellipse;whiteSpace=wrap;html=1;fillColor=#1a73e8;fontColor=#ffffff;fontStyle=1;",
-             "leaf": "rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9aa0a6;"}
+    style = {
+        "diamond": "rhombus;whiteSpace=wrap;html=1;fillColor=#fef7e0;strokeColor=#c9a227;",
+        "terminal": "rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#e6f4ea;strokeColor=#1a73e8;",
+        "root": "ellipse;whiteSpace=wrap;html=1;fillColor=#1a73e8;fontColor=#ffffff;fontStyle=1;",
+        "leaf": "rounded=1;arcSize=50;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9aa0a6;",
+    }
     for i, (n, shape) in enumerate(nodes.items(), 2):
         ids[n] = str(i)
         x, y = pos[n]
         w, h, _ = sizes[n]
-        c = ET.SubElement(cells, "mxCell", id=ids[n], value=n, style=style.get(shape, "rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#1a73e8;"),
-                          vertex="1", parent="1")
+        c = ET.SubElement(
+            cells,
+            "mxCell",
+            id=ids[n],
+            value=n,
+            style=style.get(shape, "rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f0fe;strokeColor=#1a73e8;"),
+            vertex="1",
+            parent="1",
+        )
         ET.SubElement(c, "mxGeometry", x=f"{x - w / 2:.0f}", y=f"{y - h / 2:.0f}", width=f"{w:.0f}", height=f"{h:.0f}", **{"as": "geometry"})
     for j, (a, b, label) in enumerate(edges):
         st = "edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;" if kind != "mind" else "curved=1;endArrow=none;html=1;"
@@ -382,9 +423,13 @@ def make(kind, spec, out, name="diagram", title=""):
     page = out / f"{name}.html"
     vb = re.search(r'width="(\d+)" height="(\d+)"', s)
     w, h = int(vb.group(1)), int(vb.group(2))
-    page.write_text(f"<!doctype html><html><head><meta charset='utf-8'><style>@page{{size:{w}px {h}px;margin:0}}html,body{{margin:0;background:#fff}}"
-                    f"</style></head><body>{s}</body></html>", encoding="utf-8")
+    page.write_text(
+        f"<!doctype html><html><head><meta charset='utf-8'><style>@page{{size:{w}px {h}px;margin:0}}html,body{{margin:0;background:#fff}}"
+        f"</style></head><body>{s}</body></html>",
+        encoding="utf-8",
+    )
     from ai_pc.core import headless
+
     headless.png(page, out / f"{name}.png", size=(w, h), wait_ms=400, lane="apps")
     headless.pdf(page, out / f"{name}.pdf", wait_ms=400, lane="apps")
     (out / f"{name}.drawio").write_text(drawio(kind, nodes, edges, pos, sizes, via), encoding="utf-8")
@@ -399,17 +444,26 @@ def check(r):
     out.append(("no boxes overlap", not overlaps(r["pos"], r["sizes"])))
     out.append(("every arrow joins two boxes", all(a in r["pos"] and b in r["pos"] for a, b, _ in r["edges"])))
     from PIL import Image, ImageStat
+
     im = Image.open(r["files"][0]).convert("L")
     out.append(("the picture is not blank", ImageStat.Stat(im).stddev[0] > 8))
     x = ET.parse(r["files"][3]).getroot()
-    out.append(("the draw.io file reads back", len(x.findall(".//mxCell[@vertex='1']")) == len(r["nodes"]) and
-                len(x.findall(".//mxCell[@edge='1']")) == len(r["edges"])))
+    out.append(
+        (
+            "the draw.io file reads back",
+            len(x.findall(".//mxCell[@vertex='1']")) == len(r["nodes"]) and len(x.findall(".//mxCell[@edge='1']")) == len(r["edges"]),
+        )
+    )
     return out
 
 
 def parse(text, ctx):
-    m = re.match(r"^\s*(?:make|draw|create)?\s*(?:a|an|the)?\s*(flow ?chart|process diagram|org(?:anisation|anization)? ?chart|mind ?map)\s*(?:of|for)?\s*"
-                 r"(?:'([^']*)'|\"([^\"]*)\")?\s*:\s*(.+)$", text, re.I | re.S)
+    m = re.match(
+        r"^\s*(?:make|draw|create)?\s*(?:a|an|the)?\s*(flow ?chart|process diagram|org(?:anisation|anization)? ?chart|mind ?map)\s*(?:of|for)?\s*"
+        r"(?:'([^']*)'|\"([^\"]*)\")?\s*:\s*(.+)$",
+        text,
+        re.I | re.S,
+    )
     if not m:
         return None
     word = m.group(1).lower().replace(" ", "")
@@ -422,6 +476,9 @@ def run(op, ctx):
     r = make(op["kind"], op["spec"], Path(ctx["out"]) / "diagrams", name, op.get("title", ""))
     checks = check(r)
     bad = [w for w, ok in checks if not ok]
-    return (f"{name.replace('_', ' ').title()} with {len(r['nodes'])} boxes and {len(r['edges'])} links: " + ", ".join(str(f) for f in r["files"]) +
-            (". Checked: " + ", ".join(w for w, _ in checks) if not bad else ". NOT right: " + ", ".join(bad)) +
-            ". The .drawio file opens for editing in draw.io (app.diagrams.net).")
+    return (
+        f"{name.replace('_', ' ').title()} with {len(r['nodes'])} boxes and {len(r['edges'])} links: "
+        + ", ".join(str(f) for f in r["files"])
+        + (". Checked: " + ", ".join(w for w, _ in checks) if not bad else ". NOT right: " + ", ".join(bad))
+        + ". The .drawio file opens for editing in draw.io (app.diagrams.net)."
+    )

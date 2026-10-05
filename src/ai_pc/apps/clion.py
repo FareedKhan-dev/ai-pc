@@ -9,6 +9,7 @@ and line.
 
   "clion c++ project called 'Shop'"   'c++ app called Stock'   'cmake build C:\\code\\game\\CMakeLists.txt'
 """
+
 import os
 import re
 import shutil
@@ -16,7 +17,10 @@ from pathlib import Path
 
 from ai_pc.core.config import ROOT
 
-NAME, LABEL = "clion", "C++ (CLion, Visual Studio, VS Code): CMake projects built with clang, tested by CTest, one standalone .exe; build any CMakeLists.txt"
+NAME, LABEL = (
+    "clion",
+    "C++ (CLion, Visual Studio, VS Code): CMake projects built with clang, tested by CTest, one standalone .exe; build any CMakeLists.txt",
+)
 EXAMPLES = ["clion c++ project called 'Shop'", "c++ app called Stock", "cmake build CMakeLists.txt"]
 TOOLS = ROOT / "tools"
 CLANG = TOOLS / "llvm-mingw" / "bin"
@@ -262,12 +266,18 @@ def ready():
 
 
 def env():
-    return dict(os.environ, PATH=os.pathsep.join([str(CLANG), str(CMAKE.parent), str(NINJA.parent), os.environ["PATH"]]),
-                CMAKE_GENERATOR="Ninja", CC=str(CLANG / "clang.exe"), CXX=str(CLANG / "clang++.exe"))
+    return dict(
+        os.environ,
+        PATH=os.pathsep.join([str(CLANG), str(CMAKE.parent), str(NINJA.parent), os.environ["PATH"]]),
+        CMAKE_GENERATOR="Ninja",
+        CC=str(CLANG / "clang.exe"),
+        CXX=str(CLANG / "clang++.exe"),
+    )
 
 
 def sh(*args, cwd, timeout=900):
     from ai_pc.core import hidden_desktop
+
     rc, out, err, timed_out = hidden_desktop.run([str(a) for a in args], timeout=timeout, cwd=str(cwd), env=env())
     return rc == 0 and not timed_out, out + err
 
@@ -301,12 +311,14 @@ def build(folder, build_dir):
 def imports(exe):
     """The DLLs an .exe needs, read by llvm-objdump."""
     from ai_pc.core import hidden_desktop
+
     rc, out, err, _ = hidden_desktop.run([str(CLANG / "llvm-objdump.exe"), "-p", str(exe)], timeout=60, env=env())
     return sorted({m.lower() for m in re.findall(r"DLL Name:\s*(\S+)", out)})
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"c\+\+|\bcpp\b|\bcmake\b|\bclion\b|code::blocks|\bdev-c\+\+|\bcmakelists\b", c):
         return None
@@ -325,8 +337,15 @@ def run(op, ctx):
         ok, log, errs, tests = build(folder, folder / "build" / "aipc")
         m = re.search(r"(\d+)% tests passed, (\d+) tests? failed out of (\d+)", tests)
         if not ok:
-            return (f"CMake build of {folder.name} FAILED" + (f" with {len(errs)} error(s): " + "; ".join(errs[:8]) if errs else
-                    (f": {m.group(2)} of {m.group(3)} tests failed" if m and m.group(2) != "0" else ": " + log.strip()[-300:])) + ".")
+            return (
+                f"CMake build of {folder.name} FAILED"
+                + (
+                    f" with {len(errs)} error(s): " + "; ".join(errs[:8])
+                    if errs
+                    else (f": {m.group(2)} of {m.group(3)} tests failed" if m and m.group(2) != "0" else ": " + log.strip()[-300:])
+                )
+                + "."
+            )
         exes = [p.name for p in (folder / "build" / "aipc").glob("*.exe")]
         return f"{folder.name} builds with CMake + clang: " + (f"CTest {m.group(0)}; " if m else "no tests; ") + "programs: " + ", ".join(exes) + "."
     name = op["name"]
@@ -334,9 +353,16 @@ def run(op, ctx):
     out = (Path(ctx["out"]) / "clion" / name).resolve()
     if out.exists():
         shutil.rmtree(out, ignore_errors=True)
-    files = {"CMakeLists.txt": CMAKELISTS.format(name=re.sub(r"[^A-Za-z0-9_]", "_", name), exe=exe), "CMakePresets.json": PRESETS,
-             "include/inventory.hpp": HEADER, "src/inventory.cpp": SOURCE, "src/main.cpp": MAIN, "tests/inventory_tests.cpp": TESTS,
-             ".gitignore": "build/\n.idea/\n.vs/\ncmake-build-*/\n", ".clang-format": "BasedOnStyle: Google\nColumnLimit: 120\n"}
+    files = {
+        "CMakeLists.txt": CMAKELISTS.format(name=re.sub(r"[^A-Za-z0-9_]", "_", name), exe=exe),
+        "CMakePresets.json": PRESETS,
+        "include/inventory.hpp": HEADER,
+        "src/inventory.cpp": SOURCE,
+        "src/main.cpp": MAIN,
+        "tests/inventory_tests.cpp": TESTS,
+        ".gitignore": "build/\n.idea/\n.vs/\ncmake-build-*/\n",
+        ".clang-format": "BasedOnStyle: Google\nColumnLimit: 120\n",
+    }
     for rel, text in files.items():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         (out / rel).write_text(text, encoding="utf-8")
@@ -344,19 +370,36 @@ def run(op, ctx):
     ok, log, errs, tests = build(out, bdir)
     program = bdir / f"{exe}.exe"
     from ai_pc.core import hidden_desktop
+
     rc, ran, _, _ = hidden_desktop.run([str(program)], timeout=60) if program.exists() else (None, "", "", False)
     dlls = imports(program) if program.exists() else []
     foreign = [d for d in dlls if re.search(r"c\+\+|unwind|winpthread|gcc|stdc", d)]
-    checks = [("CMake configured it and clang++ built it (C++20, -Wall -Wextra -Wpedantic), no errors or warnings",
-               ok and not errs and "warning:" not in log),
-              ("CTest ran the tests: 5 of 5 passed", "5 of 5 tests passed" in tests and "100% tests passed" in tests),
-              (f"{exe}.exe runs and prints the stock's value (Rs 22,000)", rc == 0 and "Total value: Rs 22,000" in ran),
-              (f"the .exe stands alone: it needs only Windows' own DLLs ({', '.join(dlls[:3])}{'...' if len(dlls) > 3 else ''})", bool(dlls) and not foreign),
-              ("compile_commands.json is there for IDEs and clangd", (bdir / "compile_commands.json").exists())]
+    checks = [
+        (
+            "CMake configured it and clang++ built it (C++20, -Wall -Wextra -Wpedantic), no errors or warnings",
+            ok and not errs and "warning:" not in log,
+        ),
+        ("CTest ran the tests: 5 of 5 passed", "5 of 5 tests passed" in tests and "100% tests passed" in tests),
+        (f"{exe}.exe runs and prints the stock's value (Rs 22,000)", rc == 0 and "Total value: Rs 22,000" in ran),
+        (
+            f"the .exe stands alone: it needs only Windows' own DLLs ({', '.join(dlls[:3])}{'...' if len(dlls) > 3 else ''})",
+            bool(dlls) and not foreign,
+        ),
+        ("compile_commands.json is there for IDEs and clangd", (bdir / "compile_commands.json").exists()),
+    ]
     ctx.setdefault("memo", {})["project"] = str(out)  # for VS Code and the other tools
     bad = [w for w, good in checks if not good]
-    return (f"C++ project {out} (CMake: CMakeLists.txt + CMakePresets.json, include/, src/, tests/; open the folder in CLion, Visual Studio or VS Code). "
-            f"Program: {program} ({program.stat().st_size / 1024:,.0f} KB)" if program.exists() else f"C++ project {out}") + \
-        (f". Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else ". ") + \
-        ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ". " + "; ".join(errs[:5]) +
-         " " + (tests.strip()[-300:] if not errs else ""))
+    return (
+        (
+            f"C++ project {out} (CMake: CMakeLists.txt + CMakePresets.json, include/, src/, tests/; open the folder in CLion, Visual Studio or VS Code). "
+            f"Program: {program} ({program.stat().st_size / 1024:,.0f} KB)"
+            if program.exists()
+            else f"C++ project {out}"
+        )
+        + (f". Output: {' | '.join(ln.strip() for ln in ran.strip().splitlines()[-2:])}. " if ran else ". ")
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + ". " + "; ".join(errs[:5]) + " " + (tests.strip()[-300:] if not errs else "")
+        )
+    )

@@ -1,4 +1,5 @@
 """Foundation test on Calculator: app discovery, launch, UIA snapshot speed (vs naive walk), invoke speed, cleanup."""
+
 import statistics as st
 import sys
 import time
@@ -31,8 +32,10 @@ try:
         t = time.perf_counter()
         snap = uia.snapshot(hwnd)
         times.append(ms(t))
-    print(f"[uia] cached snapshot: {len(snap.els)} elements ({snap.found} found, richness {snap.richness}): "
-          f"median {st.median(times):.0f} ms, min {min(times):.0f} ms, max {max(times):.0f} ms")
+    print(
+        f"[uia] cached snapshot: {len(snap.els)} elements ({snap.found} found, richness {snap.richness}): "
+        f"median {st.median(times):.0f} ms, min {min(times):.0f} ms, max {max(times):.0f} ms"
+    )
     import uiautomation as auto
 
     ctl = auto.ControlFromHandle(hwnd)
@@ -67,7 +70,9 @@ try:
     total = ms(t_all)
     t = time.perf_counter()
     result = uia.live_name(disp)
-    print(f"[act] 6 invokes in {total:.1f} ms total (per action median {st.median(lat):.1f} ms, max {max(lat):.1f}); display read in {ms(t):.1f} ms -> {result!r}")
+    print(
+        f"[act] 6 invokes in {total:.1f} ms total (per action median {st.median(lat):.1f} ms, max {max(lat):.1f}); display read in {ms(t):.1f} ms -> {result!r}"
+    )
     assert "42" in (result or ""), "wrong result"
 
     # --- repeat to get a stable per-action figure
@@ -79,7 +84,7 @@ try:
             uia.invoke(by_aid[aid])
             lat.append(ms(t))
     lat.sort()
-    print(f"[act] steady state over {len(lat)} invokes: median {st.median(lat):.1f} ms, p95 {lat[int(len(lat) * .95)]:.1f} ms")
+    print(f"[act] steady state over {len(lat)} invokes: median {st.median(lat):.1f} ms, p95 {lat[int(len(lat) * 0.95)]:.1f} ms")
 finally:
     inputs.close_window(hwnd)
     for _ in range(40):

@@ -1,5 +1,6 @@
 """Fakes for tests/integration/test_popular.py: an OBS Studio obs-websocket v5 server (a real local WebSocket: handshake, Hello with a
 password challenge, requests and answers)."""
+
 import base64
 import hashlib
 import json
@@ -48,6 +49,7 @@ class FakeObs:
                 buf[0] += chunk
             out, buf[0] = buf[0][:k], buf[0][k:]
             return out
+
         b1, b2 = read(2)
         n = b2 & 0x7F
         if n == 126:
@@ -63,8 +65,10 @@ class FakeObs:
         head, rest = head.split(b"\r\n\r\n", 1)
         key = next(ln.split(":", 1)[1].strip() for ln in head.decode().split("\r\n") if ln.lower().startswith("sec-websocket-key"))
         accept = base64.b64encode(hashlib.sha1((key + GUID).encode()).digest()).decode()
-        conn.sendall(f"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n"
-                     "Sec-WebSocket-Protocol: obswebsocket.json\r\n\r\n".encode())
+        conn.sendall(
+            f"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n"
+            "Sec-WebSocket-Protocol: obswebsocket.json\r\n\r\n".encode()
+        )
         buf = [rest]
         salt, challenge = "s4lt", "ch4llenge"
         self._send(conn, {"op": 0, "d": {"obsWebSocketVersion": "5.5.6", "rpcVersion": 1, "authentication": {"challenge": challenge, "salt": salt}}})
@@ -86,14 +90,27 @@ class FakeObs:
                 d = json.loads(data)["d"]
                 self.requests.append(d["requestType"])
                 ok, res = self._answer(d["requestType"], d.get("requestData") or {})
-                self._send(conn, {"op": 7, "d": {"requestType": d["requestType"], "requestId": d["requestId"],
-                                                 "requestStatus": {"result": ok, "code": 100 if ok else 600, "comment": "" if ok else "not found"}, "responseData": res}})
+                self._send(
+                    conn,
+                    {
+                        "op": 7,
+                        "d": {
+                            "requestType": d["requestType"],
+                            "requestId": d["requestId"],
+                            "requestStatus": {"result": ok, "code": 100 if ok else 600, "comment": "" if ok else "not found"},
+                            "responseData": res,
+                        },
+                    },
+                )
         except (ConnectionError, OSError):
             conn.close()
 
     def _answer(self, kind, d):
         if kind == "GetSceneList":
-            return True, {"currentProgramSceneName": self.current, "scenes": [{"sceneName": s, "sceneIndex": i} for i, s in enumerate(reversed(self.scenes))]}
+            return True, {
+                "currentProgramSceneName": self.current,
+                "scenes": [{"sceneName": s, "sceneIndex": i} for i, s in enumerate(reversed(self.scenes))],
+            }
         if kind == "GetCurrentProgramScene":
             return True, {"currentProgramSceneName": self.current, "sceneName": self.current}
         if kind == "SetCurrentProgramScene":
@@ -128,6 +145,7 @@ class FakeObs:
             return True, {"outputActive": self.streaming}
         if kind == "SaveSourceScreenshot":
             from PIL import Image
+
             Image.new("RGB", (1280, 720), "black").save(d["imageFilePath"])
             return True, {}
         return False, {}
@@ -167,14 +185,29 @@ class FakeGoogle:
                         d["styles"].append(r["updateParagraphStyle"]["paragraphStyle"]["namedStyleType"])
                 return self.js(200, {"replies": [{} for _ in b["requests"]]})
             d = self.docs[did]
-            return self.js(200, {"documentId": did, "body": {"content": [{"paragraph": {"elements": [{"textRun": {"content": ln + "\n"}}]}}
-                                                                         for ln in d["text"].split("\n")]}})
+            return self.js(
+                200,
+                {
+                    "documentId": did,
+                    "body": {"content": [{"paragraph": {"elements": [{"textRun": {"content": ln + "\n"}}]}} for ln in d["text"].split("\n")]},
+                },
+            )
         if url.startswith("https://slides."):
             if path == "presentations":
                 pid = f"deck{self.n}"
-                self.decks[pid] = {"title": b["title"], "slides": [{"objectId": "p", "pageElements": [
-                    {"objectId": "t0", "shape": {"placeholder": {"type": "CENTERED_TITLE"}}}, {"objectId": "s0", "shape": {"placeholder": {"type": "SUBTITLE"}}}]}],
-                    "texts": {}}
+                self.decks[pid] = {
+                    "title": b["title"],
+                    "slides": [
+                        {
+                            "objectId": "p",
+                            "pageElements": [
+                                {"objectId": "t0", "shape": {"placeholder": {"type": "CENTERED_TITLE"}}},
+                                {"objectId": "s0", "shape": {"placeholder": {"type": "SUBTITLE"}}},
+                            ],
+                        }
+                    ],
+                    "texts": {},
+                }
                 return self.js(200, dict(presentationId=pid, **self.decks[pid]))
             pid, _, act = path.partition(":")
             pid = pid.split("/")[1]
@@ -184,7 +217,9 @@ class FakeGoogle:
                 for r in b["requests"]:
                     if "createSlide" in r:
                         cs = r["createSlide"]
-                        deck["slides"].append({"objectId": cs["objectId"], "pageElements": [{"objectId": m["objectId"]} for m in cs["placeholderIdMappings"]]})
+                        deck["slides"].append(
+                            {"objectId": cs["objectId"], "pageElements": [{"objectId": m["objectId"]} for m in cs["placeholderIdMappings"]]}
+                        )
                         ids |= {m["objectId"] for m in cs["placeholderIdMappings"]}
                     elif "insertText" in r:
                         if r["insertText"]["objectId"] not in ids:
@@ -194,7 +229,13 @@ class FakeGoogle:
             return self.js(200, dict(presentationId=pid, **deck))
         if path == "forms":
             fid = f"form{self.n}"
-            self.forms[fid] = {"formId": fid, "info": b["info"], "items": [], "settings": {}, "responderUri": f"https://docs.google.com/forms/d/e/{fid}/viewform"}
+            self.forms[fid] = {
+                "formId": fid,
+                "info": b["info"],
+                "items": [],
+                "settings": {},
+                "responderUri": f"https://docs.google.com/forms/d/e/{fid}/viewform",
+            }
             return self.js(200, {"formId": fid, "info": b["info"], "responderUri": self.forms[fid]["responderUri"]})
         fid, _, act = path.partition(":")
         fid = fid.split("/")[1]
@@ -226,6 +267,7 @@ class FakeGitHub:
     def send(self, method, url, headers, data, timeout):
         import re
         import subprocess
+
         self.sent.append({"method": method, "url": url})
         if headers.get("Authorization") != "Bearer gh-token":
             return self.js(401, {"message": "Bad credentials"})
@@ -240,8 +282,14 @@ class FakeGitHub:
                 return self.js(422, {"message": "Repository creation failed.", "errors": [{"message": "name already exists on this account"}]})
             bare = self.folder / f"{b['name']}.git"
             subprocess.run(["git", "init", "--bare", "-q", str(bare)], check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            self.repos[b["name"]] = {"name": b["name"], "full_name": f"ayesha/{b['name']}", "private": b["private"], "html_url": f"https://github.com/ayesha/{b['name']}",
-                                     "clone_url": str(bare), "updated_at": "2026-10-04T12:00:00Z"}
+            self.repos[b["name"]] = {
+                "name": b["name"],
+                "full_name": f"ayesha/{b['name']}",
+                "private": b["private"],
+                "html_url": f"https://github.com/ayesha/{b['name']}",
+                "clone_url": str(bare),
+                "updated_at": "2026-10-04T12:00:00Z",
+            }
             return self.js(201, self.repos[b["name"]])
         m = re.fullmatch(r"repos/ayesha/([\w.-]+)(?:/(commits|issues)(?:/(.+))?)?", path)
         if not m or m.group(1) not in self.repos:
@@ -250,8 +298,12 @@ class FakeGitHub:
         if not m.group(2):
             return self.js(200, r)
         if m.group(2) == "commits":
-            p = subprocess.run(["git", "--git-dir", r["clone_url"], "rev-parse", f"refs/heads/{m.group(3)}"], capture_output=True, text=True,
-                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            p = subprocess.run(
+                ["git", "--git-dir", r["clone_url"], "rev-parse", f"refs/heads/{m.group(3)}"],
+                capture_output=True,
+                text=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
             return self.js(200, {"sha": p.stdout.strip()}) if p.returncode == 0 else self.js(404, {"message": "No commit found"})
         lst = self.issues.setdefault(m.group(1), [])
         if method == "POST":
@@ -266,6 +318,7 @@ def _js(status, body):
 
 class FakeSpotify:
     """Spotify Web API: search, the user, playlists and their tracks, now playing, top tracks."""
+
     CATALOG = {("blinding lights", "the weeknd"): "0VjIjW4GlUZAMYd2vXMi3b", ("shape of you", "ed sheeran"): "7qiZfU4dY1lWllzX7mPBI3"}
 
     def __init__(self):
@@ -273,6 +326,7 @@ class FakeSpotify:
 
     def send(self, method, url, headers, data, timeout):
         import urllib.parse as up
+
         self.sent.append({"method": method, "url": url})
         if headers.get("Authorization") != "Bearer sp-token":
             return _js(401, {"error": {"status": 401, "message": "Invalid access token"}})
@@ -284,6 +338,7 @@ class FakeSpotify:
             return _js(200, {"id": "ayesha", "display_name": "Ayesha"})
         if path == "search":
             import re
+
             m = re.match(r"track:(.+) artist:(.+)", q["q"])
             key = (m.group(1).lower(), m.group(2).lower()) if m else None
             tid = self.CATALOG.get(key)
@@ -291,7 +346,13 @@ class FakeSpotify:
             return _js(200, {"tracks": {"items": items}})
         if path == "users/ayesha/playlists":
             pid = f"pl{len(self.playlists) + 1}"
-            self.playlists[pid] = {"id": pid, "name": b["name"], "public": b["public"], "uris": [], "external_urls": {"spotify": f"https://open.spotify.com/playlist/{pid}"}}
+            self.playlists[pid] = {
+                "id": pid,
+                "name": b["name"],
+                "public": b["public"],
+                "uris": [],
+                "external_urls": {"spotify": f"https://open.spotify.com/playlist/{pid}"},
+            }
             return _js(201, self.playlists[pid])
         if path.startswith("playlists/") and path.endswith("/tracks"):
             p = self.playlists[path.split("/")[1]]
@@ -315,6 +376,7 @@ class FakeSalesforce:
 
     def send(self, method, url, headers, data, timeout):
         import urllib.parse as up
+
         self.sent.append({"method": method, "url": url})
         if url.startswith("https://login.salesforce.com/services/oauth2/token"):
             self.session = "sf-token-2"
@@ -362,7 +424,15 @@ class FakeGraph:
             return _js(401, {"error": {"code": "InvalidAuthenticationToken"}})
         path = url.split("/v1.0/", 1)[1].split("?")[0]
         if path == "me/todo/lists":
-            return _js(200, {"value": [{"id": "L1", "displayName": "Tasks", "wellknownListName": "defaultList"}, {"id": "L2", "displayName": "Shop", "wellknownListName": "none"}]})
+            return _js(
+                200,
+                {
+                    "value": [
+                        {"id": "L1", "displayName": "Tasks", "wellknownListName": "defaultList"},
+                        {"id": "L2", "displayName": "Shop", "wellknownListName": "none"},
+                    ]
+                },
+            )
         if path == "me/todo/lists/L1/tasks" and method == "POST":
             b = json.loads(data)
             tid = f"T{len(self.tasks) + 1}"

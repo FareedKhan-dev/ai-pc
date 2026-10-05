@@ -9,6 +9,7 @@
 Each Office job runs in a child process with a timeout. Office is started as a new instance of its own (COM
 "-Embedding"), so a document the user has open is never touched, and only that instance is ever stopped.
 """
+
 import io
 import json
 import subprocess
@@ -21,8 +22,17 @@ import psutil
 from ai_pc.core.config import ROOT
 
 EXES = {"word": "WINWORD.EXE", "powerpoint": "POWERPNT.EXE", "excel": "EXCEL.EXE"}
-APP_OF = {".docx": "word", ".doc": "word", ".rtf": "word", ".odt": "word", ".pptx": "powerpoint", ".ppt": "powerpoint",
-          ".xlsx": "excel", ".xlsm": "excel", ".xls": "excel"}
+APP_OF = {
+    ".docx": "word",
+    ".doc": "word",
+    ".rtf": "word",
+    ".odt": "word",
+    ".pptx": "powerpoint",
+    ".ppt": "powerpoint",
+    ".xlsx": "excel",
+    ".xlsm": "excel",
+    ".xls": "excel",
+}
 NO_WINDOW = 0x08000000
 
 
@@ -46,8 +56,13 @@ def office(job, timeout=180):
     exe = EXES[job["app"]]
     before = {p.pid for p in psutil.process_iter(["name"]) if (p.info["name"] or "").upper() == exe}
     since = time.time()
-    p = subprocess.Popen([sys.executable, "-m", "ai_pc.office._com", json.dumps(job)], cwd=str(ROOT),
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=NO_WINDOW)
+    p = subprocess.Popen(
+        [sys.executable, "-m", "ai_pc.office._com", json.dumps(job)],
+        cwd=str(ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        creationflags=NO_WINDOW,
+    )
     try:
         out, err = p.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -66,7 +81,7 @@ def office(job, timeout=180):
     line = next((ln for ln in out.decode("utf-8", "replace").splitlines()[::-1] if ln.startswith("@@RESULT ")), None)
     if line is None:
         return {"ok": False, "error": "no result from the Office job: " + err.decode("utf-8", "replace")[-600:]}
-    return json.loads(line[len("@@RESULT "):])
+    return json.loads(line[len("@@RESULT ") :])
 
 
 class Server:
@@ -77,19 +92,28 @@ class Server:
     def __init__(self):
         import queue
         import threading
+
         self.p, self.q, self.since = None, queue.Queue(), 0.0
         self.lock = threading.Lock()
 
     def _start(self):
         import threading
+
         self.since = time.time()
-        self.p = subprocess.Popen([sys.executable, "-m", "ai_pc.office._com", "serve"], cwd=str(ROOT), stdin=subprocess.PIPE,
-                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, creationflags=NO_WINDOW)
+        self.p = subprocess.Popen(
+            [sys.executable, "-m", "ai_pc.office._com", "serve"],
+            cwd=str(ROOT),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            creationflags=NO_WINDOW,
+        )
         p, q = self.p, self.q
 
         def pump():
             for raw in iter(p.stdout.readline, b""):
                 q.put(raw.decode("utf-8", "replace"))
+
         threading.Thread(target=pump, daemon=True).start()
 
     def _kill(self):
@@ -108,6 +132,7 @@ class Server:
 
     def run(self, job, timeout=180):
         import queue
+
         with self.lock:
             if self.p is None or self.p.poll() is not None:
                 self._start()
@@ -123,7 +148,7 @@ class Server:
                     self._kill()
                     return {"ok": False, "error": f"{job['app']} did not finish in {timeout} s; the background worker was restarted"}
                 if line.startswith("@@RESULT "):
-                    return json.loads(line[len("@@RESULT "):])
+                    return json.loads(line[len("@@RESULT ") :])
 
     def close(self):
         with self.lock:
@@ -161,6 +186,7 @@ def to_pdf(src, pdf=None, update_fields=False, save=False, timeout=180, server=N
 def pages(pdf, scale=1.0, first=None, last=None):
     """Page images (PIL, RGB). scale 1.0 = 72 dpi (A4 ~ 595x842 px)."""
     import pypdfium2 as pdfium
+
     doc = pdfium.PdfDocument(str(pdf))
     try:
         n = len(doc)
@@ -173,6 +199,7 @@ def pages(pdf, scale=1.0, first=None, last=None):
 def page_size(pdf):
     """[(width, height)] in points for every page."""
     import pypdfium2 as pdfium
+
     doc = pdfium.PdfDocument(str(pdf))
     try:
         return [tuple(doc[i].get_size()) for i in range(len(doc))]
@@ -183,6 +210,7 @@ def page_size(pdf):
 def lines(pdf):
     """Every text line: {"page": 0-based, "text", "box": [x0, y0, x1, y1]} in points from the page's top-left."""
     import pypdfium2 as pdfium
+
     doc = pdfium.PdfDocument(str(pdf))
     out = []
     try:
@@ -205,6 +233,7 @@ def text(pdf):
     """Each page's text in reading order (words joined as the page shows them, unlike `lines`, whose boxes split words
     at hyphens)."""
     import pypdfium2 as pdfium
+
     doc = pdfium.PdfDocument(str(pdf))
     try:
         out = []
@@ -220,6 +249,7 @@ def text(pdf):
 def outline(pdf):
     """[(level, title, page 0-based)] from the PDF's bookmarks (Word makes one per heading)."""
     from pypdf import PdfReader
+
     r = PdfReader(str(pdf))
     out = []
 
@@ -232,6 +262,7 @@ def outline(pdf):
                     out.append((level, str(it.title), r.get_destination_page_number(it)))
                 except Exception:  # noqa: BLE001
                     continue
+
     walk(r.outline, 1)
     return out
 
@@ -239,6 +270,7 @@ def outline(pdf):
 def fonts(pdf):
     """Base names of the fonts the PDF uses (subset prefixes removed): {"Calibri", "Calibri-Bold", ...}."""
     from pypdf import PdfReader
+
     r = PdfReader(str(pdf))
     names = set()
     for pg in r.pages:
@@ -260,6 +292,7 @@ def fonts(pdf):
 def sheet(images, labels=None, cols=4, cell_w=360, quality=85):
     """A contact sheet of page images, each with its label, as JPEG bytes."""
     from PIL import Image, ImageDraw, ImageFont
+
     cells = []
     for im in images:
         h = round(im.height * cell_w / im.width)

@@ -1,7 +1,8 @@
 """Generalisation test on a different, larger app the agent has never seen: Windows Settings (read-only task).
 
-  python tests/integration/test_settings.py
+python tests/integration/test_settings.py
 """
+
 import shutil
 import sys
 import time
@@ -36,11 +37,13 @@ def close_settings():
 
 
 def run(verbose):
-    a = Agent(planner=ChatPlanner(), grounder=Grounder(autostart=False), confirm=Confirmer("deny"), dry_run=False,
-              store=STORE, verbose=verbose)
+    a = Agent(planner=ChatPlanner(), grounder=Grounder(autostart=False), confirm=Confirmer("deny"), dry_run=False, store=STORE, verbose=verbose)
     r = a.run(GOAL, app="Settings")
-    print(f"\n>>> lane={r.lane} ok={r.ok} answer={r.answer!r}\n    total {r.ms} ms | model calls {r.llm_calls} | steps {r.steps} | {r.timings}"
-          + (f"\n    error: {r.error}" if r.error else ""), flush=True)
+    print(
+        f"\n>>> lane={r.lane} ok={r.ok} answer={r.answer!r}\n    total {r.ms} ms | model calls {r.llm_calls} | steps {r.steps} | {r.timings}"
+        + (f"\n    error: {r.error}" if r.error else ""),
+        flush=True,
+    )
     return r
 
 

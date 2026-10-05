@@ -16,6 +16,7 @@ HTML and CSS:
   page.elements: {css class: {"name", "type", "box": [x, y, w, h] in the design, "text"...}}  (what designcheck.py measures)
   page.fonts: {family: {(weight, italic)}}    page.notes: what could not be kept exactly
 """
+
 import datetime as dt
 import hashlib
 import html
@@ -33,20 +34,61 @@ from ai_pc.core.config import STATE
 
 FONT_CACHE = STATE / "fonts"
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
-SYSTEM_FONTS = {"arial", "helvetica", "segoe ui", "times new roman", "georgia", "verdana", "tahoma", "calibri", "cambria", "courier new",
-                "trebuchet ms", "impact", "consolas", "comic sans ms", "segoe ui emoji", "sans-serif", "serif", "monospace", "system-ui"}
+SYSTEM_FONTS = {
+    "arial",
+    "helvetica",
+    "segoe ui",
+    "times new roman",
+    "georgia",
+    "verdana",
+    "tahoma",
+    "calibri",
+    "cambria",
+    "courier new",
+    "trebuchet ms",
+    "impact",
+    "consolas",
+    "comic sans ms",
+    "segoe ui emoji",
+    "sans-serif",
+    "serif",
+    "monospace",
+    "system-ui",
+}
 CONTAINERS = {"FRAME", "GROUP", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"}
 VECTORS = {"VECTOR", "STAR", "REGULAR_POLYGON", "BOOLEAN_OPERATION", "LINE"}
 SKIP = {"SLICE", "STICKY", "CONNECTOR", "WIDGET", "EMBED", "LINK_UNFURL", "STAMP", "HIGHLIGHT", "WASHI_TAPE", "CODE_BLOCK", "MEDIA"}
-GENERIC = re.compile(r"^(?:frame|group|rectangle|ellipse|vector|line|polygon|star|image|img|photo|picture|union|subtract|intersect|exclude|"
-                     r"text|component|instance|auto layout|layer|shape|path|mask group|mask|boolean|container|div|wrapper|"
-                     r"text ?box|rounded rectangle|oval|freeform|straight connector|connector|"
-                     r"(?:content|text|picture|title) placeholder|google shape)[\s_;-]*\d*$"
-                     r"|^(?:title|subtitle|chart)[\s_-]*\d+$", re.I)  # PowerPoint's own names carry a number; a designer's 'Title' is kept
-SECTIONS = re.compile(r"\b(?:hero|features?|pricing|plans?|testimonials?|reviews?|faq|about|contact|services?|team|gallery|blog|cta|"
-                      r"newsletter|products?|how it works|stats|partners|clients|portfolio|banner|section)\b", re.I)
-WEIGHTS = {"thin": 100, "hairline": 100, "extralight": 200, "ultralight": 200, "light": 300, "regular": 400, "normal": 400, "book": 400,
-           "medium": 500, "semibold": 600, "demibold": 600, "bold": 700, "extrabold": 800, "ultrabold": 800, "black": 900, "heavy": 900}
+GENERIC = re.compile(
+    r"^(?:frame|group|rectangle|ellipse|vector|line|polygon|star|image|img|photo|picture|union|subtract|intersect|exclude|"
+    r"text|component|instance|auto layout|layer|shape|path|mask group|mask|boolean|container|div|wrapper|"
+    r"text ?box|rounded rectangle|oval|freeform|straight connector|connector|"
+    r"(?:content|text|picture|title) placeholder|google shape)[\s_;-]*\d*$"
+    r"|^(?:title|subtitle|chart)[\s_-]*\d+$",
+    re.I,
+)  # PowerPoint's own names carry a number; a designer's 'Title' is kept
+SECTIONS = re.compile(
+    r"\b(?:hero|features?|pricing|plans?|testimonials?|reviews?|faq|about|contact|services?|team|gallery|blog|cta|"
+    r"newsletter|products?|how it works|stats|partners|clients|portfolio|banner|section)\b",
+    re.I,
+)
+WEIGHTS = {
+    "thin": 100,
+    "hairline": 100,
+    "extralight": 200,
+    "ultralight": 200,
+    "light": 300,
+    "regular": 400,
+    "normal": 400,
+    "book": 400,
+    "medium": 500,
+    "semibold": 600,
+    "demibold": 600,
+    "bold": 700,
+    "extrabold": 800,
+    "ultrabold": 800,
+    "black": 900,
+    "heavy": 900,
+}
 
 
 # ---------------------------------------------------------------- small helpers
@@ -129,8 +171,18 @@ def family_weight(name, weight=None):
 
 def stack(family):
     f = family.lower()
-    generic = "monospace" if "mono" in f or "code" in f else "serif" if re.search(r"serif|times|georgia|garamond|playfair|merriweather|lora|"
-                                                                                  r"baskerville|bodoni", f) and "sans" not in f else "sans-serif"
+    generic = (
+        "monospace"
+        if "mono" in f or "code" in f
+        else "serif"
+        if re.search(
+            r"serif|times|georgia|garamond|playfair|merriweather|lora|"
+            r"baskerville|bodoni",
+            f,
+        )
+        and "sans" not in f
+        else "sans-serif"
+    )
     fall = {"sans-serif": "Arial, sans-serif", "serif": "Georgia, serif", "monospace": "Consolas, monospace"}[generic]
     return f'"{family}", {fall}'
 
@@ -191,11 +243,14 @@ def flex_container(n):
     horiz = n.get("layoutMode") == "HORIZONTAL"
     css = {"display": "flex", "flex-direction": "row" if horiz else "column"}
     pad = [n.get("paddingTop", 0) or 0, n.get("paddingRight", 0) or 0, n.get("paddingBottom", 0) or 0, n.get("paddingLeft", 0) or 0]
-    jc = {"MIN": "flex-start", "CENTER": "center", "MAX": "flex-end", "SPACE_BETWEEN": "space-between"}.get(n.get("primaryAxisAlignItems") or "MIN", "flex-start")
+    jc = {"MIN": "flex-start", "CENTER": "center", "MAX": "flex-end", "SPACE_BETWEEN": "space-between"}.get(
+        n.get("primaryAxisAlignItems") or "MIN", "flex-start"
+    )
     if jc != "flex-start":
         css["justify-content"] = jc
-    css["align-items"] = {"MIN": "flex-start", "CENTER": "center", "MAX": "flex-end", "BASELINE": "baseline"}.get(n.get("counterAxisAlignItems") or "MIN",
-                                                                                                                  "flex-start")
+    css["align-items"] = {"MIN": "flex-start", "CENTER": "center", "MAX": "flex-end", "BASELINE": "baseline"}.get(
+        n.get("counterAxisAlignItems") or "MIN", "flex-start"
+    )
     gap = float(n.get("itemSpacing", 0) or 0)
     if n.get("layoutWrap") == "WRAP":
         css["flex-wrap"] = "wrap"
@@ -264,21 +319,35 @@ class Page:
         (folder / "styles.css").write_text((font_css + "\n" if font_css else "") + self.css, encoding="utf-8", newline="\n")
         d = folder / "design"
         d.mkdir(exist_ok=True)
-        meta = {"source": self.source, "name": self.title, "w": self.w, "h": self.h, "root": self.root, "made": dt.datetime.now().isoformat(timespec="seconds"),
-                "fonts": {k: sorted([list(x) for x in v]) for k, v in self.fonts.items()}, "notes": self.notes, "elements": self.elements,
-                **self.origin_info}
+        meta = {
+            "source": self.source,
+            "name": self.title,
+            "w": self.w,
+            "h": self.h,
+            "root": self.root,
+            "made": dt.datetime.now().isoformat(timespec="seconds"),
+            "fonts": {k: sorted([list(x) for x in v]) for k, v in self.fonts.items()},
+            "notes": self.notes,
+            "elements": self.elements,
+            **self.origin_info,
+        }
         (d / "design.json").write_text(json.dumps(meta, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
         (folder / "README.md").write_text(self.readme(), encoding="utf-8", newline="\n")
         return written + ["index.html", "styles.css", "design/design.json", "README.md"]
 
     def readme(self):
         where = {"figma": "the Figma frame", "canva": "the Canva design"}.get(self.source, "the design")
-        lines = [f"# {self.title}", "",
-                 f"Made by the AI PC from {where} \"{self.title}\" ({fmt(self.w)} x {fmt(self.h)} px) on {dt.date.today():%d %B %Y}.", "",
-                 "Open `index.html` in a browser. `styles.css` has one rule per design layer, named after the layer.", "",
-                 "- `assets/`: the pictures, and the fonts (from Google Fonts, free licences: SIL Open Font License or Apache 2.0)",
-                 "- `design/design.json`: where every element sits in the design (the AI PC measures the page against it)",
-                 "- `design/reference.png`: the design as the design tool draws it, when it could be fetched"]
+        lines = [
+            f"# {self.title}",
+            "",
+            f'Made by the AI PC from {where} "{self.title}" ({fmt(self.w)} x {fmt(self.h)} px) on {dt.date.today():%d %B %Y}.',
+            "",
+            "Open `index.html` in a browser. `styles.css` has one rule per design layer, named after the layer.",
+            "",
+            "- `assets/`: the pictures, and the fonts (from Google Fonts, free licences: SIL Open Font License or Apache 2.0)",
+            "- `design/design.json`: where every element sits in the design (the AI PC measures the page against it)",
+            "- `design/reference.png`: the design as the design tool draws it, when it could be fetched",
+        ]
         if self.notes:
             lines += ["", "Not kept exactly:", *[f"- {n}" for n in self.notes[:20]]]
         return "\n".join(lines) + "\n"
@@ -316,7 +385,11 @@ class Build:
 
     def record(self, cls, n, **extra):
         x, y, w, h = bbox(n)
-        e = {"name": n.get("name", ""), "type": n.get("type"), "box": [round(x - self.origin[0], 2), round(y - self.origin[1], 2), round(w, 2), round(h, 2)]}
+        e = {
+            "name": n.get("name", ""),
+            "type": n.get("type"),
+            "box": [round(x - self.origin[0], 2), round(y - self.origin[1], 2), round(w, 2), round(h, 2)],
+        }
         e.update(extra)
         self.elements[cls] = e
 
@@ -364,7 +437,10 @@ class Build:
             (a, c, e), (b, d, f) = n["relativeTransform"][0], n["relativeTransform"][1]
             sw, sh = n["size"]["x"], n["size"]["y"]
             if t in VECTORS:
-                xs, ys = [a * u + c * v for u, v in ((0, 0), (sw, 0), (0, sh), (sw, sh))], [b * u + d * v for u, v in ((0, 0), (sw, 0), (0, sh), (sw, sh))]
+                xs, ys = (
+                    [a * u + c * v for u, v in ((0, 0), (sw, 0), (0, sh), (sw, sh))],
+                    [b * u + d * v for u, v in ((0, 0), (sw, 0), (0, sh), (sw, sh))],
+                )
                 css.update(position="absolute", left=px(e + min(xs)), top=px(f + min(ys)))
                 return css
             cx, cy = a * sw / 2 + c * sh / 2 + e, b * sw / 2 + d * sh / 2 + f
@@ -465,8 +541,16 @@ class Build:
             iw = n.get("individualStrokeWeights")
             if iw and len({round(iw.get(k, 0), 2) for k in ("top", "right", "bottom", "left")}) > 1:
                 t, r, b, l = (float(iw.get(k, 0) or 0) for k in ("top", "right", "bottom", "left"))
-                shadows += [s for s, v in ((f"inset 0 {px(t)} 0 0 {col}", t), (f"inset {px(-r)} 0 0 0 {col}", r), (f"inset 0 {px(-b)} 0 0 {col}", b),
-                                           (f"inset {px(l)} 0 0 0 {col}", l)) if v]
+                shadows += [
+                    s
+                    for s, v in (
+                        (f"inset 0 {px(t)} 0 0 {col}", t),
+                        (f"inset {px(-r)} 0 0 0 {col}", r),
+                        (f"inset 0 {px(-b)} 0 0 {col}", b),
+                        (f"inset {px(l)} 0 0 0 {col}", l),
+                    )
+                    if v
+                ]
             elif wgt > 0:
                 align = n.get("strokeAlign") or "INSIDE"
                 css["outline"] = f"{px(wgt)} {'dashed' if n.get('strokeDashes') else 'solid'} {col}"
@@ -523,8 +607,13 @@ class Build:
             return self.vector(n, ctx, ind)
         if t in ("RECTANGLE", "ELLIPSE") or t in CONTAINERS or n.get("children"):
             fills = visible(n.get("fills"))
-            if len(fills) == 1 and fills[0].get("type") == "IMAGE" and not n.get("children") and fills[0].get("scaleMode") != "TILE" \
-                    and not visible(n.get("strokes")):
+            if (
+                len(fills) == 1
+                and fills[0].get("type") == "IMAGE"
+                and not n.get("children")
+                and fills[0].get("scaleMode") != "TILE"
+                and not visible(n.get("strokes"))
+            ):
                 return self.picture(n, ctx, ind, fills[0])
             return self.box(n, ctx, ind)
         self.note(f"'{n.get('name')}' ({str(t).lower()}) is not drawn")
@@ -539,8 +628,9 @@ class Build:
         nm = (n.get("name") or "").strip().lower()
         if ctx.get("phrasing"):
             return "span"
-        if re.search(r"\b(?:button|btn)\b", nm) and not any(re.search(r"\b(?:button|btn|link)\b", (k.get("name") or "").lower())
-                                                            for k in list(walk(n))[1:]):
+        if re.search(r"\b(?:button|btn)\b", nm) and not any(
+            re.search(r"\b(?:button|btn|link)\b", (k.get("name") or "").lower()) for k in list(walk(n))[1:]
+        ):
             return "button"
         if ctx.get("depth") == 1:
             if re.search(r"\b(?:nav|navbar|navigation|menu)\b", nm):
@@ -580,8 +670,14 @@ class Build:
         attrs = ' type="button"' if tag == "button" else ""
         if not kids:
             return [f'{ind}<{tag} class="{cls}"{attrs}></{tag}>']
-        sub = dict(origin=(x, y), flex=n if auto else None, rotated=bool(turn(n)) and t != "GROUP", depth=ctx.get("depth", 0) + 1,
-                   phrasing=ctx.get("phrasing") or tag in ("button", "a"), landmark=ctx.get("landmark") or tag in ("nav", "header", "footer", "button"))
+        sub = dict(
+            origin=(x, y),
+            flex=n if auto else None,
+            rotated=bool(turn(n)) and t != "GROUP",
+            depth=ctx.get("depth", 0) + 1,
+            phrasing=ctx.get("phrasing") or tag in ("button", "a"),
+            landmark=ctx.get("landmark") or tag in ("nav", "header", "footer", "button"),
+        )
         return [f'{ind}<{tag} class="{cls}"{attrs}>'] + self.children(n, kids, sub, ind + "  ") + [f"{ind}</{tag}>"]
 
     def children(self, n, kids, sub, ind):
@@ -595,7 +691,7 @@ class Build:
         while i < len(kids):
             k = kids[i]
             if k.get("isMask"):
-                out += self.mask(k, kids[i + 1:], sub, ind)
+                out += self.mask(k, kids[i + 1 :], sub, ind)
                 break
             c = dict(sub)
             if neg and id(k) in flow and flow.index(id(k)) > 0:
@@ -686,8 +782,10 @@ class Build:
         self.decorate(n, css, "svg")
         self.record(cls, n)
         self.rule(cls, css)
-        svg = (f'<svg class="{cls}" width="{fmt(bw)}" height="{fmt(bh)}" viewBox="0 0 {fmt(bw)} {fmt(bh)}" fill="none" xmlns="http://www.w3.org/2000/svg" '
-               f'aria-hidden="true">' + (f"<defs>{''.join(defs)}</defs>" if defs else "") + g_open + "".join(body) + ("</g>" if tf else "") + "</svg>")
+        svg = (
+            f'<svg class="{cls}" width="{fmt(bw)}" height="{fmt(bh)}" viewBox="0 0 {fmt(bw)} {fmt(bh)}" fill="none" xmlns="http://www.w3.org/2000/svg" '
+            f'aria-hidden="true">' + (f"<defs>{''.join(defs)}</defs>" if defs else "") + g_open + "".join(body) + ("</g>" if tf else "") + "</svg>"
+        )
         return [ind + svg]
 
     def svg_paint(self, p, sw, sh, defs, cls, n):
@@ -701,16 +799,23 @@ class Build:
             hp, op = p.get("gradientHandlePositions") or [], float(p.get("opacity", 1))
             if len(hp) < 2:
                 return None, ""
-            stops = "".join(f'<stop offset="{fmt(s["position"], 4)}" stop-color="{rgba(dict(s["color"], a=1))}"'
-                            + (f' stop-opacity="{fmt(s["color"].get("a", 1) * op, 3)}"' if s["color"].get("a", 1) * op < 0.999 else "") + "/>"
-                            for s in p.get("gradientStops") or [])
+            stops = "".join(
+                f'<stop offset="{fmt(s["position"], 4)}" stop-color="{rgba(dict(s["color"], a=1))}"'
+                + (f' stop-opacity="{fmt(s["color"].get("a", 1) * op, 3)}"' if s["color"].get("a", 1) * op < 0.999 else "")
+                + "/>"
+                for s in p.get("gradientStops") or []
+            )
             x0, y0, x1, y1 = hp[0]["x"] * sw, hp[0]["y"] * sh, hp[1]["x"] * sw, hp[1]["y"] * sh
             if t == "GRADIENT_LINEAR":
-                defs.append(f'<linearGradient id="{gid}" gradientUnits="userSpaceOnUse" x1="{fmt(x0)}" y1="{fmt(y0)}" x2="{fmt(x1)}" y2="{fmt(y1)}">{stops}'
-                            "</linearGradient>")
+                defs.append(
+                    f'<linearGradient id="{gid}" gradientUnits="userSpaceOnUse" x1="{fmt(x0)}" y1="{fmt(y0)}" x2="{fmt(x1)}" y2="{fmt(y1)}">{stops}'
+                    "</linearGradient>"
+                )
             else:
-                defs.append(f'<radialGradient id="{gid}" gradientUnits="userSpaceOnUse" cx="{fmt(x0)}" cy="{fmt(y0)}" r="{fmt(math.hypot(x1 - x0, y1 - y0))}">'
-                            f"{stops}</radialGradient>")
+                defs.append(
+                    f'<radialGradient id="{gid}" gradientUnits="userSpaceOnUse" cx="{fmt(x0)}" cy="{fmt(y0)}" r="{fmt(math.hypot(x1 - x0, y1 - y0))}">'
+                    f"{stops}</radialGradient>"
+                )
                 if t == "GRADIENT_ANGULAR":
                     self.note(f"'{n.get('name')}': an angular gradient in an icon is drawn as a radial one")
             return f"url(#{gid})", ""
@@ -718,8 +823,10 @@ class Build:
             src = self.image_src(p.get("imageRef"), n)
             if not src:
                 return None, ""
-            defs.append(f'<pattern id="{gid}" patternUnits="userSpaceOnUse" width="{fmt(sw)}" height="{fmt(sh)}"><image href="{src}" width="{fmt(sw)}" '
-                        f'height="{fmt(sh)}" preserveAspectRatio="xMidYMid slice"/></pattern>')
+            defs.append(
+                f'<pattern id="{gid}" patternUnits="userSpaceOnUse" width="{fmt(sw)}" height="{fmt(sh)}"><image href="{src}" width="{fmt(sw)}" '
+                f'height="{fmt(sh)}" preserveAspectRatio="xMidYMid slice"/></pattern>'
+            )
             return f"url(#{gid})", ""
         return None, ""
 
@@ -759,8 +866,14 @@ class Build:
             if top.get("type") == "SOLID":
                 css["color"] = rgba(top.get("color"), top.get("opacity", 1))
             elif top.get("type", "").startswith("GRADIENT"):
-                css.update({"background-image": gradient_css(top, w, h), "-webkit-background-clip": "text", "background-clip": "text",
-                            "color": "transparent"})
+                css.update(
+                    {
+                        "background-image": gradient_css(top, w, h),
+                        "-webkit-background-clip": "text",
+                        "background-clip": "text",
+                        "color": "transparent",
+                    }
+                )
             else:
                 css["color"] = "#000000"
         elif fills is not None:
@@ -837,8 +950,14 @@ class Build:
             inner = f'<a href="{html.escape(link["url"])}">{inner}</a>'
         self.rule(cls, css, slot)
         # what the checks will look for: the words, and whether the box is fixed (a wider font would spill out of it)
-        self.record(cls, n, text=n.get("characters", ""), nowrap=mode == "WIDTH_AND_HEIGHT", fixed_h=mode in ("NONE", "TRUNCATE"),
-                    hug=ctx.get("flex") is not None and sizing(n, ctx["flex"])[0] == "HUG")
+        self.record(
+            cls,
+            n,
+            text=n.get("characters", ""),
+            nowrap=mode == "WIDTH_AND_HEIGHT",
+            fixed_h=mode in ("NONE", "TRUNCATE"),
+            hug=ctx.get("flex") is not None and sizing(n, ctx["flex"])[0] == "HUG",
+        )
         return [f'{ind}<{tag} class="{cls}">{inner}</{tag}>']
 
     def text_inner(self, n, cls, lists):
@@ -936,19 +1055,63 @@ class Build:
         solid = [p for p in visible(r.get("fills")) if p.get("type") == "SOLID"]
         bg = rgba(solid[-1]["color"], solid[-1].get("opacity", 1)) if solid else "#ffffff"
         name = title or r.get("name") or "Page"
-        page_html = "\n".join(["<!doctype html>", '<html lang="en">', "<head>", '  <meta charset="utf-8">',
-                               '  <meta name="viewport" content="width=device-width, initial-scale=1">', f"  <title>{html.escape(name)}</title>",
-                               '  <link rel="stylesheet" href="styles.css">', "</head>", "<body>", f'  <main class="{cls}">', *body, "  </main>",
-                               "</body>", "</html>", ""])
-        base = [("*, *::before, *::after", {"box-sizing": "border-box"}), ("html, body", {"margin": "0", "padding": "0"}),
-                ("body", {"background": bg, "-webkit-font-smoothing": "antialiased", "text-rendering": "geometricPrecision"}),
-                ("h1, h2, h3, h4, h5, h6, p, ul, ol, figure", {"margin": "0"}), ("img, svg", {"display": "block"}),
-                ("button", {"border": "0", "margin": "0", "padding": "0", "background": "none", "font": "inherit", "color": "inherit",
-                            "text-align": "inherit", "cursor": "pointer"}),
-                ("a", {"color": "inherit", "text-decoration": "none"})]
-        css_text = "\n".join(f"{sel} {{\n" + "".join(f"  {k}: {v};\n" for k, v in props.items()) + "}\n" for sel, props in base + [r for r in self.rules if r])
-        return Page(title=name, w=W, h=H, html=page_html, css=css_text, assets=self.assets, elements=self.elements, notes=self.notes,
-                    fonts=self.fonts, root=cls, source=self.source, origin_info=origin_info or {})
+        page_html = "\n".join(
+            [
+                "<!doctype html>",
+                '<html lang="en">',
+                "<head>",
+                '  <meta charset="utf-8">',
+                '  <meta name="viewport" content="width=device-width, initial-scale=1">',
+                f"  <title>{html.escape(name)}</title>",
+                '  <link rel="stylesheet" href="styles.css">',
+                "</head>",
+                "<body>",
+                f'  <main class="{cls}">',
+                *body,
+                "  </main>",
+                "</body>",
+                "</html>",
+                "",
+            ]
+        )
+        base = [
+            ("*, *::before, *::after", {"box-sizing": "border-box"}),
+            ("html, body", {"margin": "0", "padding": "0"}),
+            ("body", {"background": bg, "-webkit-font-smoothing": "antialiased", "text-rendering": "geometricPrecision"}),
+            ("h1, h2, h3, h4, h5, h6, p, ul, ol, figure", {"margin": "0"}),
+            ("img, svg", {"display": "block"}),
+            (
+                "button",
+                {
+                    "border": "0",
+                    "margin": "0",
+                    "padding": "0",
+                    "background": "none",
+                    "font": "inherit",
+                    "color": "inherit",
+                    "text-align": "inherit",
+                    "cursor": "pointer",
+                },
+            ),
+            ("a", {"color": "inherit", "text-decoration": "none"}),
+        ]
+        css_text = "\n".join(
+            f"{sel} {{\n" + "".join(f"  {k}: {v};\n" for k, v in props.items()) + "}\n" for sel, props in base + [r for r in self.rules if r]
+        )
+        return Page(
+            title=name,
+            w=W,
+            h=H,
+            html=page_html,
+            css=css_text,
+            assets=self.assets,
+            elements=self.elements,
+            notes=self.notes,
+            fonts=self.fonts,
+            root=cls,
+            source=self.source,
+            origin_info=origin_info or {},
+        )
 
 
 def build(doc, node_id=None, images=None, source="figma", title=None, origin_info=None):
@@ -1010,7 +1173,9 @@ def google_fonts(fonts, folder, fetch=_get):
         if not css:
             missing.append(fam)
             continue
-        blocks = re.findall(r"/\*\s*([\w-]+)\s*\*/\s*(@font-face\s*\{.*?\})", css, re.S) or [("all", b) for b in re.findall(r"@font-face\s*\{.*?\}", css, re.S)]
+        blocks = re.findall(r"/\*\s*([\w-]+)\s*\*/\s*(@font-face\s*\{.*?\})", css, re.S) or [
+            ("all", b) for b in re.findall(r"@font-face\s*\{.*?\}", css, re.S)
+        ]
         keep = [(s, b) for s, b in blocks if s in ("latin", "latin-ext", "all")] or blocks
         dest = folder / "assets" / "fonts"
         dest.mkdir(parents=True, exist_ok=True)

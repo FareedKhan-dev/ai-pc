@@ -1,13 +1,14 @@
 """Checks after every change to a project:
 
-  risks(project)         lines that could harm this PC if run (deleting outside the project, running other programs or
-                         shell commands, the registry, the network, eval of strings): shown before anything runs
-  check(project, run)    every file compiles (Python) or parses (JavaScript); the tests pass (unittest, or npm test);
-                         the program runs and exits cleanly; a web page loads in headless Chrome with no console errors;
-                         a page made from a design (design/design.json) is measured against the design (for information:
-                         changes asked for after it was made are meant to differ)
-                         -> [{"ok", "what", "level", "detail"}]
+risks(project)         lines that could harm this PC if run (deleting outside the project, running other programs or
+                       shell commands, the registry, the network, eval of strings): shown before anything runs
+check(project, run)    every file compiles (Python) or parses (JavaScript); the tests pass (unittest, or npm test);
+                       the program runs and exits cleanly; a web page loads in headless Chrome with no console errors;
+                       a page made from a design (design/design.json) is measured against the design (for information:
+                       changes asked for after it was made are meant to differ)
+                       -> [{"ok", "what", "level", "detail"}]
 """
+
 import re
 from pathlib import Path
 
@@ -69,7 +70,13 @@ def check(project, run=None, sample_input=None, timeout=60, design=True):
         out.append(_c(r["code"] == 0, "npm test passes", detail=(r["err"] + r["out"])[-2500:]))
     if run and all(c["ok"] for c in out):
         r = project.run(run, timeout=timeout, stdin=sample_input)
-        out.append(_c(r["code"] == 0, f"runs: {' '.join(run)} (exit {r['code']}, {r['seconds']} s)", detail=((r["out"] or "") + ("\n" + r["err"] if r["err"] else "")).strip()[-2000:]))
+        out.append(
+            _c(
+                r["code"] == 0,
+                f"runs: {' '.join(run)} (exit {r['code']}, {r['seconds']} s)",
+                detail=((r["out"] or "") + ("\n" + r["err"] if r["err"] else "")).strip()[-2000:],
+            )
+        )
     html = [f for f in files if f.endswith((".html", ".htm"))]
     if html:
         out += web(project, "index.html" if "index.html" in html else html[0])
@@ -83,6 +90,7 @@ def check(project, run=None, sample_input=None, timeout=60, design=True):
 def design_match(project):
     """The page against the design it was made from (designcheck.py)."""
     from ai_pc.coding import designcheck
+
     try:
         r = designcheck.check(project.folder, shot=(project.folder / "design" / "reference.png").exists())
     except Exception as e:  # noqa: BLE001
@@ -93,16 +101,23 @@ def design_match(project):
 def web(project, page):
     """The page in headless Chrome (its own profile, nothing shown): it loads, has content, and logs no errors."""
     from ai_pc.core import headless
+
     p = project.inside(page)
     try:
         out, err, secs = headless._run(["--dump-dom", "--enable-logging=stderr", "--v=0", "--virtual-time-budget=3000"], p.as_uri(), 60, "code")
     except headless.RenderError as e:
         return [_c(False, f"{page} opens in a browser", detail=str(e))]
-    errors = [ln for ln in err.splitlines() if ("CONSOLE" in ln and re.search(r"Uncaught|Error|error|Failed", ln))
-              or "Failed to load resource" in ln or "net::ERR_FILE_NOT_FOUND" in ln]
+    errors = [
+        ln
+        for ln in err.splitlines()
+        if ("CONSOLE" in ln and re.search(r"Uncaught|Error|error|Failed", ln)) or "Failed to load resource" in ln or "net::ERR_FILE_NOT_FOUND" in ln
+    ]
     src = project.read(page) or ""
-    links = [u for u in re.findall(r'(?:src|href)\s*=\s*["\']([^"\'#?]+)', src, re.I)
-             if not re.match(r"[a-z]+:|//|#|mailto:|tel:", u, re.I) and not u.startswith("data:")]
+    links = [
+        u
+        for u in re.findall(r'(?:src|href)\s*=\s*["\']([^"\'#?]+)', src, re.I)
+        if not re.match(r"[a-z]+:|//|#|mailto:|tel:", u, re.I) and not u.startswith("data:")
+    ]
     gone = [u for u in links if not (p.parent / u).exists()]  # the browser stays quiet about a missing local file: look ourselves
     text = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", out, flags=re.S)
     words = len(text.split())
@@ -111,8 +126,12 @@ def web(project, page):
         headless.png(p, shot, (1280, 900), wait_ms=2500, lane="code")
     except headless.RenderError:
         shot = None
-    return [_c(words >= 3, f"{page} loads with content ({words} words)", detail=out[:500]),
-            _c(not gone, f"{page}: every file it links to is there" + (f" (missing: {', '.join(gone[:4])})" if gone else ""),
-               detail="missing files the page links to: " + ", ".join(gone)),
-            _c(not errors, f"{page}: no errors in the browser console" + (f" ({len(errors)})" if errors else ""), detail="\n".join(errors)[:1500])] + \
-        ([_c(True, f"screenshot {shot.relative_to(project.folder).as_posix()}", "info")] if shot else [])
+    return [
+        _c(words >= 3, f"{page} loads with content ({words} words)", detail=out[:500]),
+        _c(
+            not gone,
+            f"{page}: every file it links to is there" + (f" (missing: {', '.join(gone[:4])})" if gone else ""),
+            detail="missing files the page links to: " + ", ".join(gone),
+        ),
+        _c(not errors, f"{page}: no errors in the browser console" + (f" ({len(errors)})" if errors else ""), detail="\n".join(errors)[:1500]),
+    ] + ([_c(True, f"screenshot {shot.relative_to(project.folder).as_posix()}", "info")] if shot else [])

@@ -7,13 +7,17 @@ the result against the original: each change asked for must be there (brightness
 
   'rawtherapee IMG_0042.CR2 brighter and vivid'   'rawtherapee photo.jpg black and white, sharpen, as tiff'
 """
+
 import os
 import re
 from pathlib import Path
 
 from ai_pc.core.config import ROOT
 
-NAME, LABEL = "rawtherapee", "RawTherapee: RAW (and JPEG/TIFF) photos developed from words (exposure, B&W, vivid, warm, sharpen, denoise); each change measured"
+NAME, LABEL = (
+    "rawtherapee",
+    "RawTherapee: RAW (and JPEG/TIFF) photos developed from words (exposure, B&W, vivid, warm, sharpen, denoise); each change measured",
+)
 EXAMPLES = ["rawtherapee IMG_0042.CR2 brighter and vivid", "rawtherapee photo.jpg black and white, sharpen, as tiff"]
 HOME = ROOT / "tools" / "rawtherapee"
 CLI = HOME / "rawtherapee-cli.exe"
@@ -28,12 +32,34 @@ STEPS = {  # word -> (pp3 sections, what to measure)
     "warmer": ({"White Balance": {"Enabled": "true", "Setting": "Custom", "Temperature": "8000", "Green": "1", "Equal": "1"}}, "warmer"),
     "cooler": ({"White Balance": {"Enabled": "true", "Setting": "Custom", "Temperature": "5200", "Green": "1", "Equal": "1"}}, "cooler"),
     "sharpen": ({"Sharpening": {"Enabled": "true", "Method": "usm", "Radius": "1.0", "Amount": "300", "Threshold": "20;80;2000;1200;"}}, "sharper"),
-    "denoise": ({"Directional Pyramid Denoising": {"Enabled": "true", "Enhance": "false", "Median": "false", "Luma": "60", "Ldetail": "30",
-                                                   "Chroma": "30", "Method": "Lab", "LMethod": "SLI", "CMethod": "MAN"}}, "smoother"),
+    "denoise": (
+        {
+            "Directional Pyramid Denoising": {
+                "Enabled": "true",
+                "Enhance": "false",
+                "Median": "false",
+                "Luma": "60",
+                "Ldetail": "30",
+                "Chroma": "30",
+                "Method": "Lab",
+                "LMethod": "SLI",
+                "CMethod": "MAN",
+            }
+        },
+        "smoother",
+    ),
 }
-WORDS = [("brighter", r"\bbright(?:er|en)\b|\blighter\b|\bexposure up\b"), ("darker", r"\bdark(?:er|en)\b"), ("auto", r"\bauto\b|\blevels\b|\bcontrast\b"),
-         ("bw", r"\bblack\s*(?:and|&)\s*white\b|\bb\s*&\s*w\b|\bmonochrome\b|\bgr[ae]yscale\b"), ("vivid", r"\bvivid\b|\bvibran\w*|\bcolou?rful\b|\bpop\b"),
-         ("warmer", r"\bwarm(?:er)?\b"), ("cooler", r"\bcool(?:er)?\b"), ("sharpen", r"\bsharp(?:en|er)?\b"), ("denoise", r"\bdenoise\b|\bnoise\b|\bgrain\b")]
+WORDS = [
+    ("brighter", r"\bbright(?:er|en)\b|\blighter\b|\bexposure up\b"),
+    ("darker", r"\bdark(?:er|en)\b"),
+    ("auto", r"\bauto\b|\blevels\b|\bcontrast\b"),
+    ("bw", r"\bblack\s*(?:and|&)\s*white\b|\bb\s*&\s*w\b|\bmonochrome\b|\bgr[ae]yscale\b"),
+    ("vivid", r"\bvivid\b|\bvibran\w*|\bcolou?rful\b|\bpop\b"),
+    ("warmer", r"\bwarm(?:er)?\b"),
+    ("cooler", r"\bcool(?:er)?\b"),
+    ("sharpen", r"\bsharp(?:en|er)?\b"),
+    ("denoise", r"\bdenoise\b|\bnoise\b|\bgrain\b"),
+]
 
 
 def env():
@@ -54,13 +80,19 @@ def pp3(steps):
 def measure(path):
     import numpy as np
     from PIL import Image
+
     im = Image.open(path).convert("RGB")
     im.thumbnail((1600, 1600))
     a = np.asarray(im, dtype=np.float32)
     lum = a @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
     lap = lum[1:-1, 1:-1] * 4 - lum[:-2, 1:-1] - lum[2:, 1:-1] - lum[1:-1, :-2] - lum[1:-1, 2:]
-    return {"mean": float(lum.mean()), "range": float(np.percentile(lum, 99.5) - np.percentile(lum, 0.5)), "sharp": float(lap.var()),
-            "sat": float((a.max(-1) - a.min(-1)).mean()), "warm": float(a[..., 0].mean() / max(1.0, a[..., 2].mean()))}
+    return {
+        "mean": float(lum.mean()),
+        "range": float(np.percentile(lum, 99.5) - np.percentile(lum, 0.5)),
+        "sharp": float(lap.var()),
+        "sat": float((a.max(-1) - a.min(-1)).mean()),
+        "warm": float(a[..., 0].mean() / max(1.0, a[..., 2].mean())),
+    }
 
 
 def judged(kind, a, b):
@@ -88,6 +120,7 @@ def judged(kind, a, b):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\braw\s*therapee\b|\brawtherapee\b", c):
         return None
@@ -101,16 +134,19 @@ def run(op, ctx):
     if not CLI.exists():
         return "RawTherapee is not in tools/rawtherapee."
     from ai_pc.core import hidden_desktop
+
     src = Path(op["file"]).resolve()
     out = (Path(ctx["out"]) / "rawtherapee").resolve()
     out.mkdir(parents=True, exist_ok=True)
     steps = list(dict.fromkeys(op["steps"]))
     profile = out / f"{src.stem}_look.pp3"
     profile.write_text(pp3(steps), encoding="utf-8")
-    dest = out / f"{src.stem}_developed.{ {'tiff': 'tif'}.get(op['format'], op['format'])}"  # RawTherapee writes TIFFs as .tif
+    dest = out / f"{src.stem}_developed.{ {'tiff': 'tif'}.get(op['format'], op['format']) }"  # RawTherapee writes TIFFs as .tif
     dest.unlink(missing_ok=True)
     fmt = {"jpg": ["-j95"], "tiff": ["-t"], "png": ["-n"]}[op["format"]]
-    rc, so, se, timed_out = hidden_desktop.run([str(CLI), "-o", str(dest), "-d", "-p", str(profile), *fmt, "-Y", "-c", str(src)], timeout=600, env=env())
+    rc, so, se, timed_out = hidden_desktop.run(
+        [str(CLI), "-o", str(dest), "-d", "-p", str(profile), *fmt, "-Y", "-c", str(src)], timeout=600, env=env()
+    )
     if not dest.exists():
         return f"RawTherapee could not develop {src.name}: " + (se or so).strip()[-300:]
     before_path = src
@@ -119,8 +155,11 @@ def run(op, ctx):
         hidden_desktop.run([str(CLI), "-o", str(before_path), "-d", "-j95", "-Y", "-c", str(src)], timeout=600, env=env())
     a, b = measure(before_path), measure(dest)
     from PIL import Image
+
     same_size = Image.open(dest).size == (Image.open(src).size if src.suffix.lower() not in RAWS else Image.open(before_path).size)
     checks = [judged(STEPS[s][1], a, b) for s in steps] + [("the same size as the original", same_size)]
     bad = [w for w, good in checks if not good]
-    return (f"RawTherapee developed {src.name} into {dest} with the profile {profile.name} ({', '.join(steps)}; load it in RawTherapee to use it again). " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + "."))
+    return (
+        f"RawTherapee developed {src.name} into {dest} with the profile {profile.name} ({', '.join(steps)}; load it in RawTherapee to use it again). "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + ".")
+    )

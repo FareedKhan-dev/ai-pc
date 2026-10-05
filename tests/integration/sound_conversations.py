@@ -6,6 +6,7 @@ script; and, with the model, requests the rules cannot read.
 
   .venv\\Scripts\\python.exe tests\\integration\\sound_conversations.py [--offline]
 """
+
 import re
 import shutil
 import subprocess
@@ -57,15 +58,22 @@ def run(name, c, turns):
         except Exception as e:  # noqa: BLE001
             good, why = False, f"{type(e).__name__}: {e}"
         RESULTS.append((name, msg, good))
-        print(f"{'ok  ' if good else 'FAIL'} [{time.perf_counter() - t0:4.1f}s] {msg}" + ("" if good else f"\n       why: {why}\n       reply: {reply[:500]}"))
+        print(
+            f"{'ok  ' if good else 'FAIL'} [{time.perf_counter() - t0:4.1f}s] {msg}"
+            + ("" if good else f"\n       why: {why}\n       reply: {reply[:500]}")
+        )
 
 
 def spoiled_voice():
     clean = OUT / "voice_clean.wav"
-    tts.speak("Hello and welcome to the channel. Today, um, we are going to talk about saving money on your electricity bill. [pause 2s] "
-              "First, uh, check your meter every month... and switch off the lights you are not using. [pause 1.5s] "
-              "Second, use energy saving bulbs. They cost a little more, but they last for years. [pause 2.5s] "
-              "That's it for today. Please like and subscribe.", clean, voice="zira")
+    tts.speak(
+        "Hello and welcome to the channel. Today, um, we are going to talk about saving money on your electricity bill. [pause 2s] "
+        "First, uh, check your meter every month... and switch off the lights you are not using. [pause 1.5s] "
+        "Second, use energy saving bulbs. They cost a little more, but they last for years. [pause 2.5s] "
+        "That's it for today. Please like and subscribe.",
+        clean,
+        voice="zira",
+    )
     y = M.load(clean, sr=44100)
     t = np.arange(len(y)) / 44100
     rng = np.random.default_rng(3)
@@ -76,8 +84,11 @@ def spoiled_voice():
     hum = sum((0.6 / k) * np.sin(2 * np.pi * 50 * k * t) for k in (1, 2, 3, 4))
     dirty = np.clip(y * 0.5 + 0.02 * brown + 0.009 * white + 0.025 * hum + 0.02 * np.sin(2 * np.pi * 22 * t), -1, 1).astype(np.float32)
     p = OUT / "interview.wav"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "-", "-c:a", "pcm_s16le", str(p)], input=dirty.tobytes(),
-                   creationflags=0x08000000)
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "-", "-c:a", "pcm_s16le", str(p)],
+        input=dirty.tobytes(),
+        creationflags=0x08000000,
+    )
     return p
 
 
@@ -90,8 +101,13 @@ def voice(planner):
     def cleaned(t):
         m = t.m()
         st["clean"] = m
-        return (t.ok() and m["snr_db"] >= base["snr_db"] + 15 and not m["hum"]["hz"] and abs(m["lufs"] + 16) <= 1,  # noise against the voice: levelling moves both
-                f"SNR {base['snr_db']} -> {m['snr_db']}, hum {m['hum']}, {m['lufs']}")
+        return (
+            t.ok()
+            and m["snr_db"] >= base["snr_db"] + 15
+            and not m["hum"]["hz"]
+            and abs(m["lufs"] + 16) <= 1,  # noise against the voice: levelling moves both
+            f"SNR {base['snr_db']} -> {m['snr_db']}, hum {m['hum']}, {m['lufs']}",
+        )
 
     def tightened(t):  # pauses measured against the same threshold as before the cut
         m = t.m()
@@ -115,30 +131,37 @@ def voice(planner):
     def mp3(t):
         p = t.last_export()
         pr = M.probe(p)
-        return (p.suffix == ".mp3" and p.stat().st_size <= 1024 * 1024 and abs(pr["duration"] - t.v["summary"]["duration"]) < 0.15, f"{p} {pr['duration']}")
+        return (
+            p.suffix == ".mp3" and p.stat().st_size <= 1024 * 1024 and abs(pr["duration"] - t.v["summary"]["duration"]) < 0.15,
+            f"{p} {pr['duration']}",
+        )
 
     def srt(t):
         p = t.last_export()
         s = p.read_text(encoding="utf-8")
         return (p.suffix == ".srt" and s.startswith("1\n") and "-->" in s and "electricity" in s.lower(), s[:120])
 
-    run("a spoiled voice recording", c, [
-        ("is it noisy?", lambda t: (t.says(r"50 Hz hum", r"background noise", r"long pauses"), "")),
-        ("clean it up", cleaned),
-        ("remove the long pauses", tightened),
-        ("cut the ums and uhs", lambda t: (t.ok() and t.says(r"Cut [12] filler"), "")),
-        ("normalize for youtube instead", youtube),
-        (f"add {MUSIC.name} under my voice", music),
-        ("make the music quieter", quieter),
-        ("add captions", lambda t: (t.ok() and t.v["captions"] and len(t.v["captions"]["cues"]) >= 5, "")),
-        ("save as mp3 under 1 MB", mp3),
-        ("save the srt", srt),
-        ("save the transcript as word", lambda t: (t.last_export().suffix == ".docx" and t.last_export().stat().st_size > 5000, "")),
-        ("how loud is it?", lambda t: (t.says(r"-1[3-5]\.\d LUFS"), "")),
-        ("compare with the original", lambda t: (t.says(r"hum 50 Hz .* -> none", r"longest pause"), "")),
-        ("undo", lambda t: (t.c.state["cur"] == t.c.state["versions"][-1]["parent"], "")),
-        ("go back to v1", lambda t: (t.c.state["cur"] == 1, "")),
-    ])
+    run(
+        "a spoiled voice recording",
+        c,
+        [
+            ("is it noisy?", lambda t: (t.says(r"50 Hz hum", r"background noise", r"long pauses"), "")),
+            ("clean it up", cleaned),
+            ("remove the long pauses", tightened),
+            ("cut the ums and uhs", lambda t: (t.ok() and t.says(r"Cut [12] filler"), "")),
+            ("normalize for youtube instead", youtube),
+            (f"add {MUSIC.name} under my voice", music),
+            ("make the music quieter", quieter),
+            ("add captions", lambda t: (t.ok() and t.v["captions"] and len(t.v["captions"]["cues"]) >= 5, "")),
+            ("save as mp3 under 1 MB", mp3),
+            ("save the srt", srt),
+            ("save the transcript as word", lambda t: (t.last_export().suffix == ".docx" and t.last_export().stat().st_size > 5000, "")),
+            ("how loud is it?", lambda t: (t.says(r"-1[3-5]\.\d LUFS"), "")),
+            ("compare with the original", lambda t: (t.says(r"hum 50 Hz .* -> none", r"longest pause"), "")),
+            ("undo", lambda t: (t.c.state["cur"] == t.c.state["versions"][-1]["parent"], "")),
+            ("go back to v1", lambda t: (t.c.state["cur"] == 1, "")),
+        ],
+    )
 
 
 def video(planner):
@@ -148,38 +171,72 @@ def video(planner):
         p = t.last_export()
         pr = M.probe(p)
         chk = t.c.state["exports"][-1].get("checks", [])
-        return (p.suffix == ".mp4" and pr["video"] and abs(pr["duration"] - t.v["summary"]["duration"]) < 0.25 and chk and all(x["ok"] for x in chk),
-                f"{pr['duration']} vs {t.v['summary']['duration']}; {[x['what'] for x in chk if not x['ok']]}")
+        return (
+            p.suffix == ".mp4" and pr["video"] and abs(pr["duration"] - t.v["summary"]["duration"]) < 0.25 and chk and all(x["ok"] for x in chk),
+            f"{pr['duration']} vs {t.v['summary']['duration']}; {[x['what'] for x in chk if not x['ok']]}",
+        )
 
-    run("a talking video", c, [
-        ("add word by word captions", lambda t: (t.ok() and t.v["captions"]["style"]["kind"] == "bold" and len(t.v["captions"]["cues"]) >= 8, "")),
-        ("change 'open router' to 'OpenRouter'", lambda t: (any("OPENROUTER" in x["text"].upper().replace(" ", "") for x in t.v["captions"]["cues"])
-                                                            and t.says(r"in 1 place"), "")),
-        ("make the captions yellow and at the top", lambda t: (t.v["captions"]["style"]["color"] == "yellow" and t.v["captions"]["style"]["position"] == "top", "")),
-        ("speed it up 1.25x", lambda t: (t.ok() and abs(t.v["summary"]["duration"] - 12.2 / 1.25) < 0.2 and t.says(r"Captions moved"), "")),
-        ("export the video", exported),
-        ("cut the first 2 seconds", lambda t: (t.ok() and abs(t.v["timeline"]["keep"][0][0] - 2.5) < 0.05, str(t.v["timeline"]))),
-        ("export the video", exported),
-    ])
+    run(
+        "a talking video",
+        c,
+        [
+            (
+                "add word by word captions",
+                lambda t: (t.ok() and t.v["captions"]["style"]["kind"] == "bold" and len(t.v["captions"]["cues"]) >= 8, ""),
+            ),
+            (
+                "change 'open router' to 'OpenRouter'",
+                lambda t: (any("OPENROUTER" in x["text"].upper().replace(" ", "") for x in t.v["captions"]["cues"]) and t.says(r"in 1 place"), ""),
+            ),
+            (
+                "make the captions yellow and at the top",
+                lambda t: (t.v["captions"]["style"]["color"] == "yellow" and t.v["captions"]["style"]["position"] == "top", ""),
+            ),
+            ("speed it up 1.25x", lambda t: (t.ok() and abs(t.v["summary"]["duration"] - 12.2 / 1.25) < 0.2 and t.says(r"Captions moved"), "")),
+            ("export the video", exported),
+            ("cut the first 2 seconds", lambda t: (t.ok() and abs(t.v["timeline"]["keep"][0][0] - 2.5) < 0.05, str(t.v["timeline"]))),
+            ("export the video", exported),
+        ],
+    )
 
 
 def voiceover(planner):
     c = SoundChat.start(None, chats_dir=OUT, planner=planner)
-    run("a voice-over", c, [
-        ("voice-over: Welcome to Khan Electronics. We are open from nine to nine, every day except Friday.", lambda t: (t.v and 4 < t.v["summary"]["duration"] < 15, "")),
-        ("make the voice deeper", lambda t: (t.ok() and t.says(r"Pitch -3"), "")),
-        ("fade in and out", lambda t: (t.ok(), "")),
-        ("save it for whatsapp", lambda t: (t.last_export().suffix == ".mp3" and M.probe(t.last_export())["audio"]["channels"] == 1, "")),
-    ])
+    run(
+        "a voice-over",
+        c,
+        [
+            (
+                "voice-over: Welcome to Khan Electronics. We are open from nine to nine, every day except Friday.",
+                lambda t: (t.v and 4 < t.v["summary"]["duration"] < 15, ""),
+            ),
+            ("make the voice deeper", lambda t: (t.ok() and t.says(r"Pitch -3"), "")),
+            ("fade in and out", lambda t: (t.ok(), "")),
+            ("save it for whatsapp", lambda t: (t.last_export().suffix == ".mp3" and M.probe(t.last_export())["audio"]["channels"] == 1, "")),
+        ],
+    )
 
 
 def with_model(planner):
     c = SoundChat.start(VIDEO, chats_dir=OUT, planner=planner)
-    run("read by the model", c, [
-        ("my voice sounds a bit far away and echoey, can you make it sound closer and more present", lambda t: (t.c.last_turn["llm"] and t.v["v"] >= 1 and t.ok(), t.reply[:200])),
-        ("add captions", lambda t: (t.ok() and t.v["captions"], "")),
-        ("export the video", lambda t: (all(x["ok"] for x in t.c.state["exports"][-1].get("checks", [])) and t.c.state["exports"][-1]["fmt"] == "mp4", t.reply[:300])),
-    ])
+    run(
+        "read by the model",
+        c,
+        [
+            (
+                "my voice sounds a bit far away and echoey, can you make it sound closer and more present",
+                lambda t: (t.c.last_turn["llm"] and t.v["v"] >= 1 and t.ok(), t.reply[:200]),
+            ),
+            ("add captions", lambda t: (t.ok() and t.v["captions"], "")),
+            (
+                "export the video",
+                lambda t: (
+                    all(x["ok"] for x in t.c.state["exports"][-1].get("checks", [])) and t.c.state["exports"][-1]["fmt"] == "mp4",
+                    t.reply[:300],
+                ),
+            ),
+        ],
+    )
 
 
 if __name__ == "__main__":
@@ -189,6 +246,7 @@ if __name__ == "__main__":
     planner = None
     if not offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     t0 = time.perf_counter()
     voice(planner)
@@ -198,5 +256,8 @@ if __name__ == "__main__":
         with_model(planner)
     bad = [(n, m) for n, m, g in RESULTS if not g]
     usd = planner.cost()[1] if planner is not None else 0.0
-    print(f"\n{len(RESULTS) - len(bad)}/{len(RESULTS)} turns right in {time.perf_counter() - t0:.0f} s (AI ${usd:.4f})" + ("" if not bad else "\nFAILED: " + "; ".join(f"{n}: {m}" for n, m in bad)))
+    print(
+        f"\n{len(RESULTS) - len(bad)}/{len(RESULTS)} turns right in {time.perf_counter() - t0:.0f} s (AI ${usd:.4f})"
+        + ("" if not bad else "\nFAILED: " + "; ".join(f"{n}: {m}" for n, m in bad))
+    )
     sys.exit(1 if bad else 0)

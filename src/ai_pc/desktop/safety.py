@@ -3,6 +3,7 @@ blocks dangerous targets, asks the user before risky steps, and provides a globa
 
 Screen text is untrusted data (prompt-injection defence): nothing a window says can lower these checks.
 """
+
 import ctypes
 import re
 import sys
@@ -12,16 +13,24 @@ from dataclasses import dataclass
 
 from ai_pc.core.config import BLOCKED_PROCS
 
-HIGH = re.compile(r"\b(delete|remove|erase|empty (the )?(recycle bin|trash|bin|cache|folder|basket)|"
-                  r"format (the )?(disk|drive|partition|[a-z]:)|uninstall|"
-                  r"reset (this )?(pc|computer|device|settings|password|all|everything)|wipe|purge|purchase|buy|pay|checkout|place order|"
-                  r"subscribe|send|submit|publish|post|sign out|log ?out|shut ?down|restart|install|overwrite|replace all|"
-                  r"discard|don'?t save|permanently|factory|clear (all|data|history|browsing)|disable (security|firewall|defender)|"
-                  r"transfer|withdraw|unsubscribe|deactivate|terminate|"
-                  r"sign in|log ?in|sign up|register|join pro|upgrade|go pro|free trial|try pro)\b", re.I)  # accounts & paywalls: the user decides
+HIGH = re.compile(
+    r"\b(delete|remove|erase|empty (the )?(recycle bin|trash|bin|cache|folder|basket)|"
+    r"format (the )?(disk|drive|partition|[a-z]:)|uninstall|"
+    r"reset (this )?(pc|computer|device|settings|password|all|everything)|wipe|purge|purchase|buy|pay|checkout|place order|"
+    r"subscribe|send|submit|publish|post|sign out|log ?out|shut ?down|restart|install|overwrite|replace all|"
+    r"discard|don'?t save|permanently|factory|clear (all|data|history|browsing)|disable (security|firewall|defender)|"
+    r"transfer|withdraw|unsubscribe|deactivate|terminate|"
+    r"sign in|log ?in|sign up|register|join pro|upgrade|go pro|free trial|try pro)\b",
+    re.I,
+)  # accounts & paywalls: the user decides
 MEDIUM = re.compile(r"\b(close|exit|quit|cancel|save as|share|upload|export|accept|agree|allow|grant|enable)\b", re.I)
-BAD_COMBOS = {("win", "r"), ("win", "x"), ("ctrl", "alt", "delete"), ("ctrl", "shift", "esc"),
-              ("ctrl", "alt", "q")}  # Ctrl+Alt+Q is the kill switch: an app shortcut on the same keys would abort the run
+BAD_COMBOS = {
+    ("win", "r"),
+    ("win", "x"),
+    ("ctrl", "alt", "delete"),
+    ("ctrl", "shift", "esc"),
+    ("ctrl", "alt", "q"),
+}  # Ctrl+Alt+Q is the kill switch: an app shortcut on the same keys would abort the run
 MEDIUM_COMBOS = {("alt", "f4"), ("ctrl", "w"), ("ctrl", "shift", "w"), ("delete",), ("ctrl", "q")}
 
 
@@ -39,7 +48,7 @@ class Declined(Exception):
 
 @dataclass
 class Verdict:
-    level: str          # low | medium | high | block
+    level: str  # low | medium | high | block
     reason: str = ""
     word: str = ""
 

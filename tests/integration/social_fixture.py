@@ -1,4 +1,5 @@
 """Test media for the social lane, made with FFmpeg and Pillow: shapes and lengths every platform has rules about."""
+
 import subprocess
 from pathlib import Path
 
@@ -19,14 +20,40 @@ def make(folder):
     def video(name, w, h, secs, fps=30, extra=()):
         p = folder / name
         if not p.exists():
-            _ff(["-f", "lavfi", "-i", f"testsrc2=size={w}x{h}:rate={fps}", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000",
-                 "-t", str(secs), "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", *extra, str(p)])
+            _ff(
+                [
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    f"testsrc2=size={w}x{h}:rate={fps}",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "sine=frequency=440:sample_rate=48000",
+                    "-t",
+                    str(secs),
+                    "-c:v",
+                    "libx264",
+                    "-preset",
+                    "veryfast",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "128k",
+                    *extra,
+                    str(p),
+                ]
+            )
         out[name] = str(p)
+
     video("landscape.mp4", 1920, 1080, 12)
     video("vertical.mp4", 1080, 1920, 8)
     video("tiny.mp4", 1080, 1920, 2)
     video("long.mp4", 320, 180, 16 * 60, fps=2, extra=("-crf", "40"))
     from PIL import Image, ImageDraw
+
     pics = {"panorama.jpg": (3000, 1000), "tall.jpg": (1000, 2500), "square.jpg": (1200, 1200), "wide.jpg": (2400, 1260)}
     for name, (w, h) in pics.items():
         p = folder / name

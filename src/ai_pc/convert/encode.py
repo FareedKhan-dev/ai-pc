@@ -7,6 +7,7 @@ looks to the original (VMAF, both pictures on one frame clock so frames are comp
   r = render(chain, sources, folder, name, log=print)
       -> {"outputs": [paths], "kind", "notes", "checks", "quality", "seconds", "size", "probe", "status": "ok" | "no_gain"}
 """
+
 import json
 import math
 import os
@@ -47,8 +48,26 @@ def caps():
         pass
     found = {}
     for enc in ("h264_qsv", "av1_qsv", "hevc_qsv", "vp9_qsv"):
-        c, _, _ = MD.run(["ffmpeg", "-hide_banner", "-v", "error", "-f", "lavfi", "-i", "testsrc2=s=320x240:r=30", "-frames:v", "8", "-c:v", enc,
-                          "-f", "null", "-"], timeout=60)
+        c, _, _ = MD.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=s=320x240:r=30",
+                "-frames:v",
+                "8",
+                "-c:v",
+                enc,
+                "-f",
+                "null",
+                "-",
+            ],
+            timeout=60,
+        )
         found[enc] = c == 0
     CAPS_FILE.parent.mkdir(parents=True, exist_ok=True)
     CAPS_FILE.write_text(json.dumps({"ffmpeg": ver, "caps": found}, indent=1), encoding="utf-8")
@@ -101,7 +120,9 @@ def command(job, out=None, passn=None):
         return args + ["-f", job["mux"], out]
     if kind == "vcopy":  # the picture copied, the sound through the graph
         text, _, al = P.graph(job, "encode")
-        return args + ["-filter_complex", text] + job["maps"] + ["-map", f"[{al}]"] + job["venc"] + job["aenc"] + job["opts"] + ["-f", job["mux"], out]
+        return (
+            args + ["-filter_complex", text] + job["maps"] + ["-map", f"[{al}]"] + job["venc"] + job["aenc"] + job["opts"] + ["-f", job["mux"], out]
+        )
     text, vl, al = P.graph(job, "ref" if passn == 1 else "encode")  # the measuring pass of two takes the picture only
     args += ["-filter_complex", text]
     if vl:
@@ -128,20 +149,32 @@ def _pre(job, log):
     cwd = job["folder"]
     if "stab" in job["pre"]:
         text, vl, _ = P.graph(job, "stab")
-        code, err = ff([x for i in job["inputs"] for x in i] + ["-filter_complex", text, "-map", f"[{vl}]", "-f", "null", "-"], cwd=cwd,
-                       timeout=_timeout(job), total=job["D"], log=log, label="finding the shake")
+        code, err = ff(
+            [x for i in job["inputs"] for x in i] + ["-filter_complex", text, "-map", f"[{vl}]", "-f", "null", "-"],
+            cwd=cwd,
+            timeout=_timeout(job),
+            total=job["D"],
+            log=log,
+            label="finding the shake",
+        )
         if code:
             raise EncodeError(f"shake detection failed: {err.strip()[-200:]}")
     if "loud" in job["pre"]:
         text, _, al = P.graph(job, "loud")
-        code, err = ff([x for i in job["inputs"] for x in i] + ["-filter_complex", text, "-map", f"[{al}]", "-f", "null", "-"], cwd=cwd,
-                       timeout=_timeout(job), level="info")
+        code, err = ff(
+            [x for i in job["inputs"] for x in i] + ["-filter_complex", text, "-map", f"[{al}]", "-f", "null", "-"],
+            cwd=cwd,
+            timeout=_timeout(job),
+            level="info",
+        )
         m = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", err, re.S)
         if code or not m:
             raise EncodeError("the loudness measure failed")
         d = json.loads(m.group(0))
-        ln = (f"loudnorm=I={job['loud_target']}:TP=-1.5:LRA=11:measured_I={d['input_i']}:measured_TP={d['input_tp']}:measured_LRA={d['input_lra']}"
-              f":measured_thresh={d['input_thresh']}:offset={d['target_offset']}:linear=true")
+        ln = (
+            f"loudnorm=I={job['loud_target']}:TP=-1.5:LRA=11:measured_I={d['input_i']}:measured_TP={d['input_tp']}:measured_LRA={d['input_lra']}"
+            f":measured_thresh={d['input_thresh']}:offset={d['target_offset']}:linear=true"
+        )
         job["asteps"] = [ln if s.startswith("loudnorm") else s for s in job["asteps"]]
         job["loud_before"] = float(d["input_i"])
 
@@ -160,8 +193,16 @@ def _make(job, log, out=None):
         code, err = ff(command(job, out, passn=1), cwd=cwd, timeout=_timeout(job), total=job["D"], log=log, label="measuring")
         if code:
             return code, err
-    code, err = ff(command(job, out, passn=2 if two else None), cwd=cwd, timeout=_timeout(job), total=job["D"], log=log,
-                   label={"encode": "encoding", "copy": "copying", "cutcopy": "copying", "audio": "saving the sound", "gif": "making the GIF"}.get(job["kind"], "working"))
+    code, err = ff(
+        command(job, out, passn=2 if two else None),
+        cwd=cwd,
+        timeout=_timeout(job),
+        total=job["D"],
+        log=log,
+        label={"encode": "encoding", "copy": "copying", "cutcopy": "copying", "audio": "saving the sound", "gif": "making the GIF"}.get(
+            job["kind"], "working"
+        ),
+    )
     for f in Path(cwd).glob("pass*.log*"):
         f.unlink(missing_ok=True)
     return code, err
@@ -180,9 +221,13 @@ def vmaf(job, out_path, a=None, b=None, ref_job=None):
     frames = (b - a if a is not None else job["D"]) * fps
     sub = max(1, int(frames / 240))
     down = ",scale=-2:1080:flags=bicubic" if (p.get("video") or {}).get("h", 0) > 1080 and (p.get("video") or {}).get("w", 0) > 1080 else ""
-    lav = (f"{text};[{vl}]setpts=PTS-STARTPTS,fps={fps:.5f},format=yuv420p{down}[r];"
-           f"[{di}:v:0]setpts=PTS-STARTPTS,fps={fps:.5f},format=yuv420p{down}[d];[d][r]libvmaf=n_subsample={sub}:n_threads={os.cpu_count() or 4}")
-    code, err = ff([x for i in rj["inputs"] for x in i] + out_in + ["-filter_complex", lav, "-f", "null", "-"], cwd=rj["folder"], timeout=900, level="info")
+    lav = (
+        f"{text};[{vl}]setpts=PTS-STARTPTS,fps={fps:.5f},format=yuv420p{down}[r];"
+        f"[{di}:v:0]setpts=PTS-STARTPTS,fps={fps:.5f},format=yuv420p{down}[d];[d][r]libvmaf=n_subsample={sub}:n_threads={os.cpu_count() or 4}"
+    )
+    code, err = ff(
+        [x for i in rj["inputs"] for x in i] + out_in + ["-filter_complex", lav, "-f", "null", "-"], cwd=rj["folder"], timeout=900, level="info"
+    )
     m = re.search(r"VMAF score:\s*([\d.]+)", err)
     return float(m.group(1)) if m else None
 
@@ -224,8 +269,16 @@ def _quality(job, out, S, sources, caps_, folder):
     fps = job.get("fps") or (MD.probe(out).get("video") or {}).get("r_fps")
     for k, (a, b) in enumerate(_windows(job["D"], fps=fps, starts=_starts(job))):
         S2 = dict(S, fade_in=0.0, fade_out=0.0, split=None, max_mb=None, percent=None, same=False)
-        rj = P.build(S2, P.window(job["pieces"], job["speed"], a, b), job["speed"], sources, tmp, caps_,
-                     {"encode": True, "q": 20, "dims": (job["w"], job["h"], job["fps"])}, name=f"r{k}")
+        rj = P.build(
+            S2,
+            P.window(job["pieces"], job["speed"], a, b),
+            job["speed"],
+            sources,
+            tmp,
+            caps_,
+            {"encode": True, "q": 20, "dims": (job["w"], job["h"], job["fps"])},
+            name=f"r{k}",
+        )
         v = vmaf(job, out, a, b, ref_job=rj)
         if v is not None:
             scores.append((v, b - a))
@@ -244,8 +297,13 @@ def verify(job, outputs):
     checks = []
     if job["kind"] == "frames":
         files = [Path(f) for f in outputs]
-        checks.append(_check("pictures", len(files) >= max(1, int(exp.get("images", 1) * 0.8)) and all(f.exists() and f.stat().st_size > 0 for f in files),
-                             f"{len(files)} saved (expected {exp.get('images')})"))
+        checks.append(
+            _check(
+                "pictures",
+                len(files) >= max(1, int(exp.get("images", 1) * 0.8)) and all(f.exists() and f.stat().st_size > 0 for f in files),
+                f"{len(files)} saved (expected {exp.get('images')})",
+            )
+        )
         if files and exp.get("w") and not job.get("sheet"):
             v = MD.probe(files[0]).get("video") or {}
             checks.append(_check("picture size", (v.get("w"), v.get("h")) == (exp["w"], exp["h"]), f"{v.get('w')}x{v.get('h')}", "warn"))
@@ -266,7 +324,9 @@ def verify(job, outputs):
             continue
         fps = (v or {}).get("fps") or 25
         tol = exp.get("tol") or (0.35 if job["kind"] in ("gif", "webp") else max(0.25, 2.5 / fps))
-        checks.append(_check("length", abs(p["duration"] - exp["duration"]) <= tol, f"{MD.mmss(p['duration'])} (expected {MD.mmss(exp['duration'])})"))
+        checks.append(
+            _check("length", abs(p["duration"] - exp["duration"]) <= tol, f"{MD.mmss(p['duration'])} (expected {MD.mmss(exp['duration'])})")
+        )
         if exp.get("video"):
             if not v:
                 checks.append(_check("picture", False, "no picture in the file"))
@@ -330,11 +390,13 @@ def search(S, pieces, speed, sources, folder, caps_, job, log):
             if log:
                 log(f"  quality {q}: looks {tried[q][0]:.1f}/100 at {tried[q][1]:.0f} kbps")
         return tried[q]
+
     def passes(q):
         v = at(q)[0]
         if v is None:
             raise EncodeError("the look of the samples could not be measured")
         return v >= SAME_VMAF
+
     q0 = table["good"]
     if passes(q0):
         a, b = q0, min(hi, q0 + 12)  # a passes: find the highest knob that still passes (VMAF falls as the knob rises)
@@ -366,7 +428,20 @@ def _split(out, sp, cap, log):
         times = P.split_times({"parts": n} if n else sp, D)
         for f in Path(out).parent.glob(f"{stem.name}_part*{ext}"):
             f.unlink(missing_ok=True)
-        args = ["-i", out, "-map", "0", "-c", "copy", "-f", "segment", "-segment_times", ",".join(f"{max(0.0, x - 0.01):.3f}" for x in times), "-reset_timestamps", "1"]
+        args = [
+            "-i",
+            out,
+            "-map",
+            "0",
+            "-c",
+            "copy",
+            "-f",
+            "segment",
+            "-segment_times",
+            ",".join(f"{max(0.0, x - 0.01):.3f}" for x in times),
+            "-reset_timestamps",
+            "1",
+        ]
         if ext in (".mp4", ".mov", ".m4a"):
             args += ["-segment_format", ext.lstrip("."), "-segment_format_options", "movflags=+faststart"]
         code, err = ff(args + [f"{stem}_part%02d{ext}"], timeout=600)
@@ -401,8 +476,19 @@ def render(chain, sources, folder, name, log=print, caps_=None):
         q, vm, kbps = search(S, pieces, speed, sources, folder, caps_, job, log)
         est = P.est_size(job["pieces"], speed, sources)
         if kbps and kbps * job["D"] / 8 * 1000 >= est * 0.93:
-            return {"outputs": [], "kind": "none", "notes": notes, "checks": [], "quality": vm, "seconds": round(time.time() - t0, 1), "size": None,
-                    "probe": None, "status": "no_gain", "predicted": kbps * job["D"] / 8 * 1000, "est": est}
+            return {
+                "outputs": [],
+                "kind": "none",
+                "notes": notes,
+                "checks": [],
+                "quality": vm,
+                "seconds": round(time.time() - t0, 1),
+                "size": None,
+                "probe": None,
+                "status": "no_gain",
+                "predicted": kbps * job["D"] / 8 * 1000,
+                "est": est,
+            }
         found = (q, vm)
         job = P.build(S, pieces, speed, sources, folder, caps_, {"q": q}, name)
         notes = list(job["notes"])
@@ -411,7 +497,9 @@ def render(chain, sources, folder, name, log=print, caps_=None):
         S2 = dict(S, max_mb=None, percent=None, mute=True, audio=None)
         q = QUALITY.get(job["venc_name"], {}).get("good")
         if q:
-            _, k_native = _sample(S2, pieces, speed, sources, folder, caps_, {"q": q, "nofit": True}, None, _windows(job["D"], length=4.0), measure=False)
+            _, k_native = _sample(
+                S2, pieces, speed, sources, folder, caps_, {"q": q, "nofit": True}, None, _windows(job["D"], length=4.0), measure=False
+            )
             job = P.build(S, pieces, speed, sources, folder, caps_, {"k_native": k_native}, name)
             notes = list(job["notes"])
     elif rate.get("kind") == "quality" and rate.get("cap") and job["kind"] == "encode" and job["D"] > 40:
@@ -450,8 +538,12 @@ def render(chain, sources, folder, name, log=print, caps_=None):
             g = S.get("gif") or {}
             long0 = job.get("_long") or int(g.get("width") or 480)
             fps0 = job.get("_fps") or float(job.get("fps") or 12)
-            over = {"gif_long": max(160, int(long0 * min(0.9, k))), "gif_fps": max(6.0, fps0 - (2 if k < 0.8 else 0)), "colors": 128 if k < 0.7 else 256,
-                    "webp_q": max(30, int(70 * k))}
+            over = {
+                "gif_long": max(160, int(long0 * min(0.9, k))),
+                "gif_fps": max(6.0, fps0 - (2 if k < 0.8 else 0)),
+                "colors": 128 if k < 0.7 else 256,
+                "webp_q": max(30, int(70 * k)),
+            }
             job2 = P.build(S, pieces, speed, sources, folder, caps_, over, name)
             job2["_long"], job2["_fps"] = over["gif_long"], over["gif_fps"]
         _pre(job2, log)
@@ -479,10 +571,20 @@ def render(chain, sources, folder, name, log=print, caps_=None):
         (folder / f).unlink(missing_ok=True)
     size = sum(Path(f).stat().st_size for f in outputs if Path(f).is_file())
     probe = MD.probe(outputs[0]) if outputs and job["kind"] != "frames" else None
-    return {"outputs": outputs, "kind": job["kind"], "notes": notes, "checks": checks, "quality": quality, "seconds": round(time.time() - t0, 1),
-            "size": size, "probe": probe, "status": status, "search": found, "job": {k: job.get(k) for k in ("D", "w", "h", "fps", "venc_name", "vcodec",
-                                                                                                                "acodec", "ext", "rate", "mode")},
-            "loud_before": job.get("loud_before")}
+    return {
+        "outputs": outputs,
+        "kind": job["kind"],
+        "notes": notes,
+        "checks": checks,
+        "quality": quality,
+        "seconds": round(time.time() - t0, 1),
+        "size": size,
+        "probe": probe,
+        "status": status,
+        "search": found,
+        "job": {k: job.get(k) for k in ("D", "w", "h", "fps", "venc_name", "vcodec", "acodec", "ext", "rate", "mode")},
+        "loud_before": job.get("loud_before"),
+    }
 
 
 def _why(err):

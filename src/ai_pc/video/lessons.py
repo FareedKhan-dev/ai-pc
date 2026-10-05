@@ -4,6 +4,7 @@ Sources: the fixer (a repair it had to make is a mistake not to plan again), the
 and the user's own follow-ups (a request to change something is a preference). Same rule twice = a higher count; the
 most frequent and most recent rules are shown first. Stored in kb/jianying/lessons.json.
 """
+
 import json
 import re
 import time
@@ -56,8 +57,12 @@ def from_fixes(changes, resolved):
         m = re.match(r"(\S+): moved to .* \(it hid (\S+)\)", c) or re.match(r"(\S+): removed, it hid (\S+)", c)
         if m:
             a, b = names.get(m.group(1), {}), names.get(m.group(2), {})
-            add(f"do not overlap a full-frame overlay effect ({a.get('en') or a.get('item', '?')}) with a face/eye effect "
-                f"({b.get('en') or b.get('item', '?')}): put them one after the other", "fixer", why=c)
+            add(
+                f"do not overlap a full-frame overlay effect ({a.get('en') or a.get('item', '?')}) with a face/eye effect "
+                f"({b.get('en') or b.get('item', '?')}): put them one after the other",
+                "fixer",
+                why=c,
+            )
             continue
         m = re.match(r"(\S+): (.+?) -> (.+?) \(", c)
         if m and "strength" not in c:
@@ -66,4 +71,4 @@ def from_fixes(changes, resolved):
 
 def from_feedback(request):
     """A follow-up request is a preference of this user."""
-    add(f"\"{request.strip()[:140]}\"", "user", kind="preference")
+    add(f'"{request.strip()[:140]}"', "user", kind="preference")

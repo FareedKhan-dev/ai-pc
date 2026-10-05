@@ -5,6 +5,7 @@ caption, a voice note, 'yes'; strangers ignored), finding 'my photo' on the PC, 
 
   .venv\\Scripts\\python.exe tests\\integration\\test_aipc.py
 """
+
 import json
 import shutil
 import sys
@@ -35,10 +36,15 @@ def slack_with_uploads():
     tr = TH.fakes()
     got = {}
     s = tr["slack"]
-    s.routes[("GET", "files.getUploadURLExternal")] = lambda r: (got.update(name=r["url"].split("filename=")[1].split("&")[0]) or 200,
-                                                                 {"ok": True, "upload_url": "https://files.slack.com/upload/v1/ABC", "file_id": "F123"})
+    s.routes[("GET", "files.getUploadURLExternal")] = lambda r: (
+        got.update(name=r["url"].split("filename=")[1].split("&")[0]) or 200,
+        {"ok": True, "upload_url": "https://files.slack.com/upload/v1/ABC", "file_id": "F123"},
+    )
     s.routes[("POST", "files.slack.com/upload")] = lambda r: (got.update(data=r["body"]) or 200, b"OK")
-    s.routes[("POST", "files.completeUploadExternal")] = (200, {"ok": True, "files": [{"id": "F123", "permalink": "https://khan.slack.com/files/F123"}]})
+    s.routes[("POST", "files.completeUploadExternal")] = (
+        200,
+        {"ok": True, "files": [{"id": "F123", "permalink": "https://khan.slack.com/files/F123"}]},
+    )
     return tr, got
 
 
@@ -121,11 +127,18 @@ def t_routing():
         if lane != want:
             wrong.append(f"{msg!r} -> {lane} (want {want})")
     check(f"routing: {len(CASES) - len(wrong)} of {len(CASES)} requests go to the right program (all 14 programs and named apps)", not wrong, wrong)
-    check("routing: a request in steps is split where a new action starts", router.split("add a glow effect to my video and then send it to slack #team")
-          == ["add a glow effect to my video", "send it to slack #team"] and router.split("make it black and white and send it to slack")
-          == ["make it black and white", "send it to slack"] and len(router.split("cut the first 5 seconds and make it under 10 MB")) == 1)
+    check(
+        "routing: a request in steps is split where a new action starts",
+        router.split("add a glow effect to my video and then send it to slack #team") == ["add a glow effect to my video", "send it to slack #team"]
+        and router.split("make it black and white and send it to slack") == ["make it black and white", "send it to slack"]
+        and len(router.split("cut the first 5 seconds and make it under 10 MB")) == 1,
+    )
     help_text = c.say("what can you do?")
-    check("help: lists every program with an example", all(l.label in help_text for l in c.lanes.values()) and help_text.count("\n- ") == len(c.lanes), help_text[:300])
+    check(
+        "help: lists every program with an example",
+        all(l.label in help_text for l in c.lanes.values()) and help_text.count("\n- ") == len(c.lanes),
+        help_text[:300],
+    )
 
 
 def t_references():
@@ -142,10 +155,14 @@ def t_references():
     a.add(folder / "notes.docx", "office", 4)
     nm = lambda hits: [h["name"] for h in hits]  # noqa: E731
     check("'it' is the newest thing made", nm(a.resolve("send it to slack")) == ["notes.docx"])
-    check("'the video' is the edited one; 'the original video' is the one you sent",
-          nm(a.resolve("send the video to ali")) == ["me_glow.mp4"] and nm(a.resolve("send the original video")) == ["me.mp4"])
-    check("'the plan' is its PDF (made with the drawing); a file's name finds it", nm(a.resolve("email the plan")) == ["plan.pdf"]
-          and nm(a.resolve("print me_glow.mp4")) == ["me_glow.mp4"])
+    check(
+        "'the video' is the edited one; 'the original video' is the one you sent",
+        nm(a.resolve("send the video to ali")) == ["me_glow.mp4"] and nm(a.resolve("send the original video")) == ["me.mp4"],
+    )
+    check(
+        "'the plan' is its PDF (made with the drawing); a file's name finds it",
+        nm(a.resolve("email the plan")) == ["plan.pdf"] and nm(a.resolve("print me_glow.mp4")) == ["me_glow.mp4"],
+    )
 
 
 # ---------------------------------------------------------------- the photo -> Slack hand-off
@@ -155,14 +172,23 @@ def t_photo_to_slack():
     photo = photo_in(folder)
     r = c.say("make my photo brighter", files=[photo])
     made = r.files
-    check("photo: 'make my photo brighter' with a photo goes to the photo program and a brighter version is made",
-          r.startswith("[Photos]") and "Brighter" in r and len(made) == 1 and Path(made[0]).exists(), r)
+    check(
+        "photo: 'make my photo brighter' with a photo goes to the photo program and a brighter version is made",
+        r.startswith("[Photos]") and "Brighter" in r and len(made) == 1 and Path(made[0]).exists(),
+        r,
+    )
     r = c.say("send it to slack #general")
-    check("hand-off: 'send it to slack' names the edited photo (a clear name, not v1.png) and waits for a yes",
-          "Ready to post car_edited.png to #general" in r and "data" not in got, r)
+    check(
+        "hand-off: 'send it to slack' names the edited photo (a clear name, not v1.png) and waits for a yes",
+        "Ready to post car_edited.png to #general" in r and "data" not in got,
+        r,
+    )
     r = c.say("yes")
-    check("hand-off: 'yes' uploads it; Slack got the edited photo byte for byte, not the original",
-          "Uploaded car_edited.png" in r and got.get("data") == Path(made[0]).read_bytes() and got["data"] != photo.read_bytes(), r)
+    check(
+        "hand-off: 'yes' uploads it; Slack got the edited photo byte for byte, not the original",
+        "Uploaded car_edited.png" in r and got.get("data") == Path(made[0]).read_bytes() and got["data"] != photo.read_bytes(),
+        r,
+    )
     r = c.say("make it darker")
     check("after Slack, 'make it darker' goes back to the photo (the program in use is remembered)", r.startswith("[Photos]") and "Darker" in r, r)
     got.clear()
@@ -179,21 +205,28 @@ def t_steps():
     photo = photo_in(folder)
     c.say("here is my photo", files=[photo])
     r = c.say("make it black and white and then send it to slack #general")
-    check("steps: 'make it black and white and then send it to slack' runs the photo step, then asks before sending",
-          "[Photos]" in r and "Ready to post" in r and "#general" in r, r)
+    check(
+        "steps: 'make it black and white and then send it to slack' runs the photo step, then asks before sending",
+        "[Photos]" in r and "Ready to post" in r and "#general" in r,
+        r,
+    )
     r = c.say("yes")
     check("steps: 'yes' sends the black and white version", "Uploaded" in r and got.get("data") is not None and got["data"] != photo.read_bytes(), r)
 
 
 def t_voice():
     from ai_pc.sound.tts import speak
+
     c, folder = new_chat("voice")
     photo = photo_in(folder)
     wav = folder / "note.wav"
     speak("Make my photo brighter please.", str(wav))
     r = c.say(files=[photo], voice=str(wav))
-    check("voice: a voice note is heard by the local Whisper and done like a typed request",
-          r.heard and "bright" in r.heard.lower() and r.startswith("[Photos]") and "Brighter" in r, f"heard={r.heard!r} reply={r[:200]}")
+    check(
+        "voice: a voice note is heard by the local Whisper and done like a typed request",
+        r.heard and "bright" in r.heard.lower() and r.startswith("[Photos]") and "Brighter" in r,
+        f"heard={r.heard!r} reply={r[:200]}",
+    )
 
 
 def t_find_on_pc():
@@ -217,8 +250,11 @@ def t_resume_and_secrets():
     check("secrets: a password typed in a request is hidden in the saved chat", "Lahore123" not in log and "[hidden]" in log)
     c2 = AIPCChat.load(cid, chats_dir=folder / "chats", planner=None, options=c.options)
     r = c2.say("make it darker")
-    check("a saved chat picks up where it was: 'it' is still the photo, its versions carry on", r.startswith("[Photos]") and "Darker" in r
-          and c2.state["active"] == "photo", r)
+    check(
+        "a saved chat picks up where it was: 'it' is still the photo, its versions carry on",
+        r.startswith("[Photos]") and "Darker" in r and c2.state["active"] == "photo",
+        r,
+    )
 
 
 # ---------------------------------------------------------------- your phone through the Telegram bot
@@ -244,46 +280,81 @@ def telegram_fake(photo_bytes, voice_bytes, rounds):
 
     def message(req):
         sent["texts"].append(req["body"]["text"])
-        return 200, {"ok": True, "result": {"message_id": 70 + len(sent["texts"]), "chat": {"id": req["body"]["chat_id"]}, "text": req["body"]["text"]}}
+        return 200, {
+            "ok": True,
+            "result": {"message_id": 70 + len(sent["texts"]), "chat": {"id": req["body"]["chat_id"]}, "text": req["body"]["text"]},
+        }
 
     def upload(req):
         sent["files"].append(req["url"].rsplit("/", 1)[-1])
         return 200, {"ok": True, "result": {"message_id": 99, "document": {"file_id": "D"}, "photo": [{"file_id": "P"}]}}
-    return FakeTransport({("POST", "/getUpdates"): updates, ("POST", "/getFile"): get_file, ("GET", "/file/bot"): download,
-                          ("POST", "/sendMessage"): message, ("POST", "/sendPhoto"): upload, ("POST", "/sendDocument"): upload,
-                          ("POST", "/sendChatAction"): lambda r: (sent.update(actions=sent["actions"] + 1) or 200, {"ok": True, "result": True})}), sent
+
+    return FakeTransport(
+        {
+            ("POST", "/getUpdates"): updates,
+            ("POST", "/getFile"): get_file,
+            ("GET", "/file/bot"): download,
+            ("POST", "/sendMessage"): message,
+            ("POST", "/sendPhoto"): upload,
+            ("POST", "/sendDocument"): upload,
+            ("POST", "/sendChatAction"): lambda r: (sent.update(actions=sent["actions"] + 1) or 200, {"ok": True, "result": True}),
+        }
+    ), sent
 
 
 def t_telegram():
     from ai_pc.assistant.telegram import Bridge
     from ai_pc.sound.tts import speak
+
     tr, got = slack_with_uploads()
     c, folder = new_chat("telegram", tr)
     photo = photo_in(folder)
     wav = folder / "send_it.wav"
     speak("Send it to Slack, general channel.", str(wav))
     me, stranger = {"id": 555, "type": "private"}, {"id": 777, "type": "private"}
-    rounds = [[{"update_id": 10, "message": {"message_id": 1, "chat": stranger, "text": "clean up my downloads"}},
-               {"update_id": 11, "message": {"message_id": 2, "chat": me, "caption": "make it brighter",
-                                             "photo": [{"file_id": "PHOTO0", "file_size": 10, "width": 90}, {"file_id": "PHOTO1", "file_size": 999, "width": 1200}]}}],
-              [{"update_id": 12, "message": {"message_id": 3, "chat": me, "voice": {"file_id": "VOICE1", "duration": 2}}}],
-              [{"update_id": 13, "message": {"message_id": 4, "chat": me, "text": "yes"}}]]
+    rounds = [
+        [
+            {"update_id": 10, "message": {"message_id": 1, "chat": stranger, "text": "clean up my downloads"}},
+            {
+                "update_id": 11,
+                "message": {
+                    "message_id": 2,
+                    "chat": me,
+                    "caption": "make it brighter",
+                    "photo": [{"file_id": "PHOTO0", "file_size": 10, "width": 90}, {"file_id": "PHOTO1", "file_size": 999, "width": 1200}],
+                },
+            },
+        ],
+        [{"update_id": 12, "message": {"message_id": 3, "chat": me, "voice": {"file_id": "VOICE1", "duration": 2}}}],
+        [{"update_id": 13, "message": {"message_id": 4, "chat": me, "text": "yes"}}],
+    ]
     ttr, sent = telegram_fake(photo.read_bytes(), wav.read_bytes(), rounds)
     tg = connector("telegram", {"bot_token": "123:SECRET-TELEGRAM", "chat_id": 555}, ttr)
     b = Bridge(c, tg=tg, log=lambda *a: None, typing=False)
     b.skip_backlog()
     check("telegram: messages sent before the bridge started are skipped", b.offset == 10)
     b.run(once=True)
-    check("telegram: a stranger's message is ignored (nothing done, no reply to them)",
-          not any(isinstance(x.get("body"), dict) and x["body"].get("chat_id") == 777 for x in ttr.sent) and c.state["active"] == "photo")
-    check("telegram: your photo with the caption 'make it brighter' is edited, the reply and the brighter photo come back to you",
-          any("Brighter" in t for t in sent["texts"]) and "sendPhoto" in sent["files"] + ["x"] and len(sent["files"]) == 1, sent)
+    check(
+        "telegram: a stranger's message is ignored (nothing done, no reply to them)",
+        not any(isinstance(x.get("body"), dict) and x["body"].get("chat_id") == 777 for x in ttr.sent) and c.state["active"] == "photo",
+    )
+    check(
+        "telegram: your photo with the caption 'make it brighter' is edited, the reply and the brighter photo come back to you",
+        any("Brighter" in t for t in sent["texts"]) and "sendPhoto" in sent["files"] + ["x"] and len(sent["files"]) == 1,
+        sent,
+    )
     b.run(once=True)
-    check("telegram: your voice note 'send it to Slack, general channel' is heard and asks before sending",
-          any(t.startswith("Heard:") and "Ready to post" in t and "_edited.png to #general" in t for t in sent["texts"]), sent["texts"][-1:])
+    check(
+        "telegram: your voice note 'send it to Slack, general channel' is heard and asks before sending",
+        any(t.startswith("Heard:") and "Ready to post" in t and "_edited.png to #general" in t for t in sent["texts"]),
+        sent["texts"][-1:],
+    )
     b.run(once=True)
-    check("telegram: your 'yes' sends the edited photo to Slack", any("Uploaded" in t and "_edited.png" in t for t in sent["texts"]) and got.get("data") is not None,
-          sent["texts"][-1:])
+    check(
+        "telegram: your 'yes' sends the edited photo to Slack",
+        any("Uploaded" in t and "_edited.png" in t for t in sent["texts"]) and got.get("data") is not None,
+        sent["texts"][-1:],
+    )
     check("telegram: the bot token never appears in what the chat saved", "SECRET-TELEGRAM" not in json.dumps(c.state))
 
 
@@ -294,11 +365,13 @@ def t_web():
     import uuid
 
     from ai_pc.assistant.web import serve
+
     c, folder = new_chat("web")
     photo = photo_in(folder)
     box = {}
-    th = threading.Thread(target=serve, args=(c,), kwargs={"port": 0, "ready": lambda url, token, srv: box.update(url=url, token=token, srv=srv)},
-                          daemon=True)
+    th = threading.Thread(
+        target=serve, args=(c,), kwargs={"port": 0, "ready": lambda url, token, srv: box.update(url=url, token=token, srv=srv)}, daemon=True
+    )
     th.start()
     for _ in range(100):
         if box:
@@ -306,12 +379,20 @@ def t_web():
         time.sleep(0.05)
     url, token = box["url"], box["token"]
     page = urllib.request.urlopen(url, timeout=10).read().decode()
-    check("web: the page is served on 127.0.0.1 with this run's secret", url.startswith("http://127.0.0.1:") and token in page and "Hold to talk" in page)
+    check(
+        "web: the page is served on 127.0.0.1 with this run's secret",
+        url.startswith("http://127.0.0.1:") and token in page and "Hold to talk" in page,
+    )
     b = uuid.uuid4().hex
     crlf = "\r\n"
-    body = (f"--{b}{crlf}Content-Disposition: form-data; name=\"message\"{crlf}{crlf}make my photo brighter{crlf}"
-            f"--{b}{crlf}Content-Disposition: form-data; name=\"files\"; filename=\"car.jpg\"{crlf}Content-Type: image/jpeg{crlf}{crlf}").encode() + \
-        photo.read_bytes() + f"{crlf}--{b}--{crlf}".encode()
+    body = (
+        (
+            f'--{b}{crlf}Content-Disposition: form-data; name="message"{crlf}{crlf}make my photo brighter{crlf}'
+            f'--{b}{crlf}Content-Disposition: form-data; name="files"; filename="car.jpg"{crlf}Content-Type: image/jpeg{crlf}{crlf}'
+        ).encode()
+        + photo.read_bytes()
+        + f"{crlf}--{b}--{crlf}".encode()
+    )
     hdr = {"Content-Type": f"multipart/form-data; boundary={b}"}
     try:
         urllib.request.urlopen(urllib.request.Request(url + "say", data=body, headers=hdr, method="POST"), timeout=60)
@@ -319,11 +400,18 @@ def t_web():
     except urllib.error.HTTPError as e:
         refused = e.code == 403
     check("web: a request without the secret is refused (another web page cannot drive the chat)", refused)
-    r = json.loads(urllib.request.urlopen(urllib.request.Request(url + "say", data=body, headers=dict(hdr, **{"X-AIPC-Token": token}), method="POST"),
-                                          timeout=120).read())
-    check("web: a message with a photo is done like any other ('make my photo brighter')", r["reply"].startswith("[Photos]") and "Brighter" in r["reply"]
-          and len(r["files"]) == 1, r)
+    r = json.loads(
+        urllib.request.urlopen(
+            urllib.request.Request(url + "say", data=body, headers=dict(hdr, **{"X-AIPC-Token": token}), method="POST"), timeout=120
+        ).read()
+    )
+    check(
+        "web: a message with a photo is done like any other ('make my photo brighter')",
+        r["reply"].startswith("[Photos]") and "Brighter" in r["reply"] and len(r["files"]) == 1,
+        r,
+    )
     import urllib.parse
+
     got = urllib.request.urlopen(f"{url}file?token={token}&path={urllib.parse.quote(r['files'][0])}", timeout=30).read()
     check("web: the file made can be opened from the page", got == Path(r["files"][0]).read_bytes())
     try:
@@ -342,6 +430,7 @@ def main():
             t()
         except Exception:  # noqa: BLE001 - one part failing does not hide the others
             import traceback
+
             check(f"{t.__name__}: ran without an error", False, traceback.format_exc()[-1200:])
     bad = [n for n, ok in RESULTS if not ok]
     print(f"\n{'ALL PASS' if not bad else f'{len(bad)} FAILED'}  ({len(RESULTS) - len(bad)}/{len(RESULTS)}, {time.time() - t0:.0f} s)")

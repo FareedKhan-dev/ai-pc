@@ -8,6 +8,7 @@ an intro, a build with a snare roll and a riser, a DROP at `drop_at` (the edit's
 returned is exact (beats, downbeats, sections, drop), so cuts and effects land on the music frame-accurately.
 Files: media/derived/music_<style>_<bpm>_<seconds>_<drop>.wav (made once).
 """
+
 import json
 import math
 import wave
@@ -26,10 +27,23 @@ STYLES = {
     "chill": {"bpm": 86, "drums": "lofi", "bass": "soft", "lead": "keys", "pad": "warm"},
     "cinematic": {"bpm": 84, "drums": "pulse", "bass": "soft", "lead": None, "pad": "strings"},
 }
-ALIASES = {"trap": "hype", "boss": "hype", "velocity": "hype", "drill": "hype", "trailer": "epic", "lofi": "chill", "lo-fi": "chill",
-           "upbeat": "pop", "dance": "pop", "travel": "pop", "ambient": "cinematic", "emotional": "cinematic", "aesthetic": "chill"}
+ALIASES = {
+    "trap": "hype",
+    "boss": "hype",
+    "velocity": "hype",
+    "drill": "hype",
+    "trailer": "epic",
+    "lofi": "chill",
+    "lo-fi": "chill",
+    "upbeat": "pop",
+    "dance": "pop",
+    "travel": "pop",
+    "ambient": "cinematic",
+    "emotional": "cinematic",
+    "aesthetic": "chill",
+}
 MINOR = [0, 2, 3, 5, 7, 8, 10]
-PROG = [(0, "m"), (5, "M"), (2, "M"), (6, "M")]   # i - VI - III - VII  (scale degrees)
+PROG = [(0, "m"), (5, "M"), (2, "M"), (6, "M")]  # i - VI - III - VII  (scale degrees)
 
 
 def _t(sec):
@@ -171,8 +185,8 @@ def _put(buf, x, at, gain=1.0, pan=0.0):
     if i >= buf.shape[0] or i < 0:
         return
     m = min(len(x), buf.shape[0] - i)
-    buf[i:i + m, 0] += x[:m] * gain * math.sqrt(0.5 * (1 - pan))
-    buf[i:i + m, 1] += x[:m] * gain * math.sqrt(0.5 * (1 + pan))
+    buf[i : i + m, 0] += x[:m] * gain * math.sqrt(0.5 * (1 - pan))
+    buf[i : i + m, 1] += x[:m] * gain * math.sqrt(0.5 * (1 + pan))
 
 
 def _reverb(x, rng, sec=1.4, mix=0.25):
@@ -183,11 +197,9 @@ def _reverb(x, rng, sec=1.4, mix=0.25):
     size = 1 << int(np.ceil(np.log2(len(x) + n)))
     out = np.empty_like(x)
     for c in range(2):
-        y = np.fft.irfft(np.fft.rfft(x[:, c], size) * np.fft.rfft(ir[:, c], size), size)[:len(x)]
+        y = np.fft.irfft(np.fft.rfft(x[:, c], size) * np.fft.rfft(ir[:, c], size), size)[: len(x)]
         out[:, c] = y / (np.abs(ir[:, c]).sum() ** 0.5 + 1e-9)
     return x * (1 - mix) + out * mix * 0.5
-
-
 
 
 ENERGY = {"intro": 0.3, "verse": 0.6, "build": 0.7, "drop": 1.0, "break": 0.35, "bridge": 0.45, "outro": 0.3}
@@ -197,8 +209,12 @@ def classic_sections(seconds, drop_at, bar):
     """intro - build - drop - outro around one drop (short edits)."""
     build_from = max(0.0, drop_at - bar)
     end_full = seconds - bar if seconds - drop_at > 2 * bar else seconds
-    out = [{"name": "intro", "start": 0.0, "end": build_from}, {"name": "build", "start": build_from, "end": drop_at},
-           {"name": "drop", "start": drop_at, "end": end_full}, {"name": "outro", "start": end_full, "end": seconds}]
+    out = [
+        {"name": "intro", "start": 0.0, "end": build_from},
+        {"name": "build", "start": build_from, "end": drop_at},
+        {"name": "drop", "start": drop_at, "end": end_full},
+        {"name": "outro", "start": end_full, "end": seconds},
+    ]
     return [x for x in out if x["end"] - x["start"] > 0.05]
 
 
@@ -224,7 +240,7 @@ def bed(style="hype", seconds=15.0, bpm=None, drop_at=None, seed=3, sections=Non
         secs = classic_sections(seconds, drop_at, bar)
     drops = [s["start"] for s in secs if s["name"] == "drop"]
     sig = "_".join(f"{s['name'][0]}{s['start']:.2f}" for s in secs)
-    tag = f"{style}_{bpm}_{seconds:.1f}_{abs(hash(sig)) % 10 ** 8}_{seed}"
+    tag = f"{style}_{bpm}_{seconds:.1f}_{abs(hash(sig)) % 10**8}_{seed}"
     path = OUT / f"music_{tag}.wav"
     grid_path = OUT / f"music_{tag}.json"
     if path.exists() and grid_path.exists():
@@ -242,6 +258,7 @@ def bed(style="hype", seconds=15.0, bpm=None, drop_at=None, seed=3, sections=Non
             if x["start"] - 1e-6 <= t < x["end"]:
                 return x
         return secs[-1]
+
     for i in range(n_beats):
         t = i * beat
         if t >= seconds:
@@ -353,7 +370,7 @@ def bed(style="hype", seconds=15.0, bpm=None, drop_at=None, seed=3, sections=Non
     if secs[-1]["name"] == "outro" and secs[-1]["start"] > 1:
         _put(dry, impact(rng) * 0.6, secs[-1]["start"], 0.6)
     mix = dry + _reverb(wet, rng, 1.6, 0.35)
-    mix = mix[:int(seconds * SR)]
+    mix = mix[: int(seconds * SR)]
     fade = int(min(1.5, seconds * 0.06) * SR)
     mix[-fade:] *= np.linspace(1, 0, fade)[:, None]
     mix = np.tanh(1.3 * mix / (np.percentile(np.abs(mix), 99.5) + 1e-9)) * 0.9  # soft limiter, ~ -1 dBFS peaks
@@ -365,8 +382,17 @@ def bed(style="hype", seconds=15.0, bpm=None, drop_at=None, seed=3, sections=Non
         w.setframerate(SR)
         w.writeframes(pcm.tobytes())
     beats = [round(i * beat, 4) for i in range(int(seconds / beat) + 1) if i * beat < seconds]
-    grid = {"source": "generated", "style": style, "bpm": bpm, "beat": round(beat, 5), "beats": beats, "downbeats": beats[::4],
-            "drop": round(drops[0], 4) if drops else None, "drops": [round(d, 4) for d in drops], "seconds": seconds,
-            "sections": [{"name": x["name"], "start": round(x["start"], 4), "end": round(x["end"], 4)} for x in secs]}
+    grid = {
+        "source": "generated",
+        "style": style,
+        "bpm": bpm,
+        "beat": round(beat, 5),
+        "beats": beats,
+        "downbeats": beats[::4],
+        "drop": round(drops[0], 4) if drops else None,
+        "drops": [round(d, 4) for d in drops],
+        "seconds": seconds,
+        "sections": [{"name": x["name"], "start": round(x["start"], 4), "end": round(x["end"], 4)} for x in secs],
+    }
     grid_path.write_text(json.dumps(grid), encoding="utf-8")
     return path, grid

@@ -16,6 +16,7 @@ Things to say: 'post "..." to #general', 'message @ali on slack: ...', 'what's n
 'add Sara Khan sara@x.com to hubspot', 'upload report.pdf to drive', 'create a zoom meeting tomorrow at 4 pm "Weekly sync"',
 'brief me', 'undo', 'what did you do today?'. Outward actions are shown first; say 'yes' (or 'send') to go ahead, 'no' to drop.
 """
+
 import argparse
 import getpass
 import sys
@@ -26,6 +27,7 @@ for _stream in (sys.stdout, sys.stderr):
 
 def steps(name=None):
     from ai_pc.hub.catalog import ORDER, SERVICES
+
     for n in [name] if name else ORDER:
         s = SERVICES[n]
         print(f"\n== {s['label']}  (ai-pc hub connect {n})")
@@ -41,6 +43,7 @@ def connect(name):
     from ai_pc.hub.catalog import SERVICES
     from ai_pc.hub.http import HubError
     from ai_pc.hub.services import connector
+
     if name not in SERVICES:
         sys.exit(f"unknown service {name}; one of: {', '.join(SERVICES)}")
     steps(name)
@@ -63,13 +66,16 @@ def connect(name):
         who = connector(name).whoami()
         print(f"\nConnected {SERVICES[name]['label']}: {who.get('who')} ({who.get('where')}). The key is stored encrypted for this Windows user.")
     except HubError as e:
-        print(f"\nThe key was saved, but the check failed: {e}\nFix it on the service's site and run 'ai-pc hub connect {name}' again, or 'ai-pc hub forget {name}'.")
+        print(
+            f"\nThe key was saved, but the check failed: {e}\nFix it on the service's site and run 'ai-pc hub connect {name}' again, or 'ai-pc hub forget {name}'."
+        )
 
 
 def status():
     from ai_pc.hub.catalog import ORDER, SERVICES
     from ai_pc.hub.http import HubError
     from ai_pc.hub.services import connected, connector
+
     have = set(connected())
     for n in ORDER:
         if n not in have:
@@ -105,15 +111,20 @@ def main(argv=None):
         return status()
     if a.cmd == "forget":
         from ai_pc.core import vault
+
         print("Removed." if vault.remove(a.service) else "It was not connected.")
         return
     from ai_pc.hub.hubchat import HubChat
+
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     hc = HubChat.start(planner=planner, files=a.extra)
-    print(f"Hub chat {hc.state['id']}. Connected: {', '.join(hc.services()) or 'nothing yet (ai-pc hub steps / ai-pc hub connect)'}. 'quit' to leave.")
+    print(
+        f"Hub chat {hc.state['id']}. Connected: {', '.join(hc.services()) or 'nothing yet (ai-pc hub steps / ai-pc hub connect)'}. 'quit' to leave."
+    )
     msgs = a.say
     if msgs:
         for m in msgs:

@@ -10,6 +10,7 @@ Safety (pyCapCut's create_draft(allow_replace=True) deletes a same-named folder 
 names are reduced to agent_[a-z0-9_-] (no path separators), and only folders whose name starts with agent_ are ever
 replaced. Media files are only read, and only from MEDIA_DIRS. Plans and logs stay inside this project.
 """
+
 import difflib
 import json
 import os
@@ -33,12 +34,15 @@ POSITION = {"top": 0.75, "upper": 0.4, "center": 0.0, "middle": 0.0, "lower": -0
 def _free_english(enum):
     """Free (non-Pro) catalogue items with English names: in CapCut 9.5 these loaded; Chinese-named animations
     from pyCapCut's JianYing-derived catalogue showed 'Animation loss'."""
-    return {m.name: m for m in enum if not getattr(m.value, "is_vip", False) and m.name.isascii()
-            and m.name.lower() != "undefined"}
+    return {m.name: m for m in enum if not getattr(m.value, "is_vip", False) and m.name.isascii() and m.name.lower() != "undefined"}
 
 
-CATALOG = {"filter": _free_english(cc.FilterType), "transition": _free_english(cc.TransitionType),
-           "effect": _free_english(cc.VideoSceneEffectType), "font": _free_english(cc.FontType)}
+CATALOG = {
+    "filter": _free_english(cc.FilterType),
+    "transition": _free_english(cc.TransitionType),
+    "effect": _free_english(cc.VideoSceneEffectType),
+    "font": _free_english(cc.FontType),
+}
 
 
 def _key(s):
@@ -79,9 +83,15 @@ def media_files():
                 else:
                     m = cc.VideoMaterial(str(p))
                     kind = "image" if ext in {".png", ".jpg", ".jpeg"} else "video"
-                    out.append({"file": p.name, "kind": kind,
-                                "seconds": 5.0 if kind == "image" else round(m.duration / SEC, 1),
-                                "size": f"{m.width}x{m.height}", "path": str(p)})
+                    out.append(
+                        {
+                            "file": p.name,
+                            "kind": kind,
+                            "seconds": 5.0 if kind == "image" else round(m.duration / SEC, 1),
+                            "size": f"{m.width}x{m.height}",
+                            "path": str(p),
+                        }
+                    )
             except Exception:  # noqa: BLE001  (unreadable or odd media is simply not offered)
                 continue
     return out
@@ -111,7 +121,7 @@ def _color(v, default=(1.0, 1.0, 1.0)):
     if not m:
         return default
     h = m.group(1)
-    return tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    return tuple(int(h[i : i + 2], 16) / 255 for i in (0, 2, 4))
 
 
 def draft_name(name):
@@ -160,8 +170,13 @@ def build(plan, files=None):
         if f["kind"] == "image":
             seg = cc.VideoSegment(mat, trange(cursor, round(dur * SEC)))
         else:
-            seg = cc.VideoSegment(mat, trange(cursor, round(dur * SEC)), source_timerange=trange(round(start * SEC), round(dur * speed * SEC)),
-                                  speed=speed, volume=_num(c.get("volume"), 0, 2, 1.0))
+            seg = cc.VideoSegment(
+                mat,
+                trange(cursor, round(dur * SEC)),
+                source_timerange=trange(round(start * SEC), round(dur * speed * SEC)),
+                speed=speed,
+                volume=_num(c.get("volume"), 0, 2, 1.0),
+            )
         flt, n = match("filter", c.get("filter"))
         notes += [n] if n else []
         if flt:
@@ -201,8 +216,7 @@ def build(plan, files=None):
         du = max(int(0.5 * SEC), min(du, total_us - st))
         font, n = match("font", t.get("font"))
         notes += [n] if n else []
-        style = cc.TextStyle(size=_num(t.get("size"), 4, 20, 8), bold=bool(t.get("bold")), color=_color(t.get("color")),
-                             align=1, auto_wrapping=True)
+        style = cc.TextStyle(size=_num(t.get("size"), 4, 20, 8), bold=bool(t.get("bold")), color=_color(t.get("color")), align=1, auto_wrapping=True)
         pos = POSITION.get(str(t.get("position") or "bottom").lower(), -0.75)
         seg = cc.TextSegment(text, trange(st, du), font=font, style=style, clip_settings=cc.ClipSettings(transform_y=pos))
         script.add_segment(seg)
@@ -216,8 +230,9 @@ def build(plan, files=None):
             try:
                 start = _num(mu.get("from"), 0, max(0, f["seconds"] - 1), 0)
                 du = min(total_us, round((f["seconds"] - start) * SEC))
-                aseg = cc.AudioSegment(f["path"], trange(0, du), source_timerange=trange(round(start * SEC), du),
-                                       volume=_num(mu.get("volume"), 0, 2, 0.6))
+                aseg = cc.AudioSegment(
+                    f["path"], trange(0, du), source_timerange=trange(round(start * SEC), du), volume=_num(mu.get("volume"), 0, 2, 0.6)
+                )
                 aseg.add_fade(round(_num(mu.get("fade_in"), 0, 5, 0) * SEC), round(_num(mu.get("fade_out"), 0, 5, 1) * SEC))
                 script.add_track(cc.TrackType.audio)
                 script.add_segment(aseg)
@@ -225,8 +240,7 @@ def build(plan, files=None):
                 notes.append(f"music: could not use {f['file']!r} ({type(e).__name__}); skipped")
 
     script.save()
-    return {"draft": name, "path": str(target), "seconds": round(total_us / SEC, 2), "notes": notes,
-            "ms": round((time.perf_counter() - t0) * 1000)}
+    return {"draft": name, "path": str(target), "seconds": round(total_us / SEC, 2), "notes": notes, "ms": round((time.perf_counter() - t0) * 1000)}
 
 
 PLAN_SYSTEM = """You plan video edits for CapCut. You never write code: you output ONE JSON object (the edit plan) and nothing else.
@@ -252,7 +266,8 @@ Rules:
 def plan_prompt(request, files):
     media = "\n".join(f"- {f['file']} ({f['kind']}, {f['seconds']} s{', ' + f['size'] if f.get('size') else ''})" for f in files)
     lists = {
-        "FILTERS": sorted(CATALOG["filter"]), "TRANSITIONS": sorted(CATALOG["transition"]),
+        "FILTERS": sorted(CATALOG["filter"]),
+        "TRANSITIONS": sorted(CATALOG["transition"]),
         "EFFECTS": sorted(CATALOG["effect"]),
         "FONTS": sorted(CATALOG["font"])[:60],
     }
@@ -264,14 +279,17 @@ def make_plan(request, planner, files=None):
     """One model call (fast tier, hedged) -> plan dict. `planner` is a ChatPlanner."""
     from ai_pc.core.util import parse_json
     from ai_pc.llm.planner import PlannerError
+
     files = files if files is not None else media_files()
     msgs = [{"role": "system", "content": PLAN_SYSTEM}, {"role": "user", "content": plan_prompt(request, files)}]
     t0 = time.perf_counter()
     r = planner._call("fast", msgs)
     plan = parse_json(r.text)
     if plan is None:
-        msgs += [{"role": "assistant", "content": r.text[:2000]},
-                 {"role": "user", "content": "That was not valid JSON. Reply with the plan JSON object only."}]
+        msgs += [
+            {"role": "assistant", "content": r.text[:2000]},
+            {"role": "user", "content": "That was not valid JSON. Reply with the plan JSON object only."},
+        ]
         r = planner._call("fast", msgs)
         plan = parse_json(r.text)
     if not isinstance(plan, dict):

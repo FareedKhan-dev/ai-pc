@@ -1,4 +1,5 @@
 """Fast screen capture (mss) and cheap change detection."""
+
 import threading
 
 import mss
@@ -51,6 +52,7 @@ def diff(a, b):
 
 def thumb_jpeg(img, width=1280, quality=80):
     import io
+
     if img.width > width:
         img = img.resize((width, round(img.height * width / img.width)))
     buf = io.BytesIO()

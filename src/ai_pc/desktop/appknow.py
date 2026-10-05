@@ -4,6 +4,7 @@ Many apps ship their keymap as a data file (CapCut: User Data/Config/Shortcut/*.
 importMedia=Ctrl+I, exportVideo=Ctrl+M). Pressing a known shortcut is instant and exact; finding the same button by
 vision costs seconds and can miss. Discovery runs once per app version (cached in state/appknow/).
 """
+
 import ctypes
 import json
 import os
@@ -13,16 +14,42 @@ from pathlib import Path
 
 from ai_pc.core.config import STATE
 
-COMBO = re.compile(r"^(?:(?:ctrl|control|shift|alt|cmd|command|meta|win|option)\+)*"
-                   r"(?:f\d{1,2}|[a-z0-9]|space|enter|return|escape|esc|tab|backspace|del|delete|home|end|up|down|left|"
-                   r"right|pageup|pagedown|insert|[`\-=\[\];',./+])$", re.I)
+COMBO = re.compile(
+    r"^(?:(?:ctrl|control|shift|alt|cmd|command|meta|win|option)\+)*"
+    r"(?:f\d{1,2}|[a-z0-9]|space|enter|return|escape|esc|tab|backspace|del|delete|home|end|up|down|left|"
+    r"right|pageup|pagedown|insert|[`\-=\[\];',./+])$",
+    re.I,
+)
 HINT = re.compile(r"shortcut|hotkey|keymap|key_?bind|keyboard|accelerator", re.I)
-SKIP_DIRS = re.compile(r"cache|log|temp|tmp|crash|dump|project|draft|media|thumb|effect|font|sticker|download|backup|"
-                       r"resource[s]?$|locale|lang|node_modules|\.git", re.I)
+SKIP_DIRS = re.compile(
+    r"cache|log|temp|tmp|crash|dump|project|draft|media|thumb|effect|font|sticker|download|backup|"
+    r"resource[s]?$|locale|lang|node_modules|\.git",
+    re.I,
+)
 EXTS = {".json", ".ini", ".cfg", ".conf", ".txt", ".xml", ""}
 RESERVED = {"ctrl+alt+q"}  # the harness kill switch
-FIRST = ("new", "open", "import", "export", "save", "render", "undo", "redo", "copy", "paste", "cut", "delete", "del",
-         "select", "play", "find", "search", "zoom", "split", "close")
+FIRST = (
+    "new",
+    "open",
+    "import",
+    "export",
+    "save",
+    "render",
+    "undo",
+    "redo",
+    "copy",
+    "paste",
+    "cut",
+    "delete",
+    "del",
+    "select",
+    "play",
+    "find",
+    "search",
+    "zoom",
+    "split",
+    "close",
+)
 last_source = ""
 
 
@@ -40,7 +67,7 @@ def exe_path(pid):
 
 def _combos(v):
     out = []
-    for x in (v if isinstance(v, list) else [v]):
+    for x in v if isinstance(v, list) else [v]:
         if isinstance(x, str):
             s = x.strip().replace(" ", "")
             if s and COMBO.match(s) and s.lower() not in RESERVED:
@@ -129,6 +156,7 @@ def discover(exe, budget_s=1.5, max_files=8000):
     def score(item):  # several schemes (e.g. Custom1..3, "Premiere Pro"): prefer the app's default one
         s = item[0].stem.lower()
         return (("default" in s) * 3 + (s.endswith("1") or "custom" in s) * 2 + len(item[1]) / 50, -len(s))
+
     src, keys = max(found, key=score)
     return str(src), keys
 
@@ -172,6 +200,8 @@ def shortcuts_text(pid, max_chars=1800):
             break
         items.append(s)
         size += len(s) + 2
-    return (f"APP SHORTCUTS (read from the app's own keymap file {Path(src).name}; exact and instant, so prefer them to "
-            "clicking when one fits. They need the app window focused and the right view open, e.g. editor shortcuts "
-            "need a project open): " + "; ".join(items))
+    return (
+        f"APP SHORTCUTS (read from the app's own keymap file {Path(src).name}; exact and instant, so prefer them to "
+        "clicking when one fits. They need the app window focused and the right view open, e.g. editor shortcuts "
+        "need a project open): " + "; ".join(items)
+    )

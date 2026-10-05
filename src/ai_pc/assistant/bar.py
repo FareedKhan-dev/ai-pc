@@ -12,6 +12,7 @@ Windows (off until you turn it on) and Quit.
   ai-pc bar --shortcut      make 'AI PC.lnk' here, to pin to Start or the taskbar
   out/aipc/bar.json           the combo and other settings
 """
+
 import json
 import os
 import queue
@@ -33,15 +34,54 @@ from ai_pc.core.config import ROOT
 
 HOME = ROOT / "out" / "aipc"
 CONFIG, ICON, LOG = HOME / "bar.json", HOME / "aipc.ico", HOME / "bar.log"
-DEFAULTS = {"hotkey": "ctrl+alt+space", "fallbacks": ["ctrl+alt+a", "ctrl+alt+q"], "hold_to_talk": 0.35, "resume_hours": 6, "notify": True,
-            "width": 700, "theme": "auto", "tray": True, "name": "AIPC"}
+DEFAULTS = {
+    "hotkey": "ctrl+alt+space",
+    "fallbacks": ["ctrl+alt+a", "ctrl+alt+q"],
+    "hold_to_talk": 0.35,
+    "resume_hours": 6,
+    "notify": True,
+    "width": 700,
+    "theme": "auto",
+    "tray": True,
+    "name": "AIPC",
+}
 CREATE_NO_WINDOW = 0x08000000
 # Segoe Fluent Icons / Segoe MDL2 Assets
-G = {"logo": "", "mic": "", "send": "", "attach": "", "close": "", "folder": "", "copy": "",
-     "video": "", "image": "", "audio": "", "music": "", "document": "", "pdf": "", "file": "",
-     "archive": "", "check": "", "pin": "", "pinned": "", "new": "", "warn": "", "folder2": ""}
-KIND_ICON = {"video": G["video"], "image": G["image"], "audio": G["audio"], "music": G["music"], "pdf": G["pdf"], "document": G["document"],
-             "slides": G["document"], "sheet": G["document"], "archive": G["archive"], "folder": G["folder2"]}
+G = {
+    "logo": "",
+    "mic": "",
+    "send": "",
+    "attach": "",
+    "close": "",
+    "folder": "",
+    "copy": "",
+    "video": "",
+    "image": "",
+    "audio": "",
+    "music": "",
+    "document": "",
+    "pdf": "",
+    "file": "",
+    "archive": "",
+    "check": "",
+    "pin": "",
+    "pinned": "",
+    "new": "",
+    "warn": "",
+    "folder2": "",
+}
+KIND_ICON = {
+    "video": G["video"],
+    "image": G["image"],
+    "audio": G["audio"],
+    "music": G["music"],
+    "pdf": G["pdf"],
+    "document": G["document"],
+    "slides": G["document"],
+    "sheet": G["document"],
+    "archive": G["archive"],
+    "folder": G["folder2"],
+}
 SUGGEST = {
     "video": ["add a glow effect", "add word by word captions", "make it ready for whatsapp", "send it to slack"],
     "image": ["remove the background", "make it brighter", "make a passport photo", "send it to slack"],
@@ -57,7 +97,7 @@ ABS = re.compile(r"[A-Za-z]:\\[^\r\n\"'<>|*?]*?\.[A-Za-z0-9]{1,5}(?![\w.])")
 
 # ---------------------------------------------------------------- look
 def _rgb(h):
-    return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+    return tuple(int(h[i : i + 2], 16) for i in (1, 3, 5))
 
 
 def _hex(c):
@@ -75,14 +115,34 @@ def lum(h):
 
 def palette(dark, accent=None):
     if dark:
-        p = {"bg": "#202020", "field": "#2c2c2c", "chip": "#333333", "chip_hi": "#3d3d3d", "line": "#3b3b3b", "text": "#f3f3f3",
-             "muted": "#a8a8a8", "faint": "#6e6e6e", "danger": "#ff6b6b", "ok": "#6ccb5f"}
+        p = {
+            "bg": "#202020",
+            "field": "#2c2c2c",
+            "chip": "#333333",
+            "chip_hi": "#3d3d3d",
+            "line": "#3b3b3b",
+            "text": "#f3f3f3",
+            "muted": "#a8a8a8",
+            "faint": "#6e6e6e",
+            "danger": "#ff6b6b",
+            "ok": "#6ccb5f",
+        }
         acc = accent or "#4cc2ff"
         while lum(acc) < 0.42:
             acc = mix(acc, "#ffffff", 0.25)
     else:
-        p = {"bg": "#f3f3f3", "field": "#ffffff", "chip": "#e6e6e6", "chip_hi": "#dadada", "line": "#d5d5d5", "text": "#1b1b1b",
-             "muted": "#5c5c5c", "faint": "#9a9a9a", "danger": "#c42b1c", "ok": "#0f7b0f"}
+        p = {
+            "bg": "#f3f3f3",
+            "field": "#ffffff",
+            "chip": "#e6e6e6",
+            "chip_hi": "#dadada",
+            "line": "#d5d5d5",
+            "text": "#1b1b1b",
+            "muted": "#5c5c5c",
+            "faint": "#9a9a9a",
+            "danger": "#c42b1c",
+            "ok": "#0f7b0f",
+        }
         acc = accent or "#005fb8"
         while lum(acc) > 0.45:
             acc = mix(acc, "#000000", 0.2)
@@ -97,12 +157,22 @@ def make_fonts(root):
 
     def pick(*names):
         return next((n for n in names if n in fams), "Segoe UI")
+
     text, disp = pick("Segoe UI Variable Text", "Segoe UI"), pick("Segoe UI Variable Display", "Segoe UI")
     semi = pick("Segoe UI Variable Text Semibold", "Segoe UI Semibold")
     icons = pick("Segoe Fluent Icons", "Segoe MDL2 Assets")
     F = lambda fam, size, **kw: tkfont.Font(root=root, family=fam, size=size, **kw)  # noqa: E731
-    return {"input": F(disp, 14), "body": F(text, 10), "small": F(text, 9), "badge": F(semi, 9), "who": F(semi, 9), "icon": F(icons, 12),
-            "icon_s": F(icons, 10), "icon_xs": F(icons, 8), "icon_l": F(icons, 15)}
+    return {
+        "input": F(disp, 14),
+        "body": F(text, 10),
+        "small": F(text, 9),
+        "badge": F(semi, 9),
+        "who": F(semi, 9),
+        "icon": F(icons, 12),
+        "icon_s": F(icons, 10),
+        "icon_xs": F(icons, 8),
+        "icon_l": F(icons, 15),
+    }
 
 
 def elide(text, f, maxpx):
@@ -127,11 +197,13 @@ def shown_text(text):
 def spark_image(size, color, bg):
     """The AI PC spark (the tray icon's shape), drawn smooth at any size."""
     from PIL import Image, ImageDraw, ImageTk
+
     n = size * 4
     im = Image.new("RGB", (n, n), bg)
     c, R, r = n / 2, n * 0.46, n * 0.11
-    ImageDraw.Draw(im).polygon([(c, c - R), (c + r, c - r), (c + R, c), (c + r, c + r), (c, c + R), (c - r, c + r), (c - R, c), (c - r, c - r)],
-                               fill=color)
+    ImageDraw.Draw(im).polygon(
+        [(c, c - R), (c + r, c - r), (c + R, c), (c + r, c + r), (c, c + R), (c - r, c + r), (c - R, c), (c - r, c - r)], fill=color
+    )
     return ImageTk.PhotoImage(im.resize((size, size), Image.LANCZOS))
 
 
@@ -146,10 +218,12 @@ class Shapes:
         img = self.cache.get(key)
         if img is None:
             from PIL import Image, ImageDraw, ImageTk
+
             k = 4
             im = Image.new("RGB", (max(1, w) * k, max(1, h) * k), bg)
-            ImageDraw.Draw(im).rounded_rectangle((0, 0, max(1, w) * k - 1, max(1, h) * k - 1), radius=max(0, r * k), fill=fill, outline=outline,
-                                                 width=k if outline else 0)
+            ImageDraw.Draw(im).rounded_rectangle(
+                (0, 0, max(1, w) * k - 1, max(1, h) * k - 1), radius=max(0, r * k), fill=fill, outline=outline, width=k if outline else 0
+            )
             if len(self.cache) > 400:
                 self.cache.clear()
             img = self.cache[key] = ImageTk.PhotoImage(im.resize((max(1, w), max(1, h)), Image.LANCZOS))
@@ -162,9 +236,13 @@ class Pill(tk.Canvas):
     def __init__(self, master, bar, text="", icon=None, style="chip", command=None, on_close=None, maxw=250, h=28, bg=None):
         P, s = bar.P, bar.s
         bg = bg or P["bg"]
-        self.fill_n, self.fill_h, fg = {"chip": (P["chip"], P["chip_hi"], P["text"]), "context": (P["ctx"], P["ctx_hi"], P["text"]),
-                                        "accent": (P["accent"], P["accent_hi"], P["on_accent"]), "outline": (bg, P["chip"], P["text"]),
-                                        "ghost": (bg, P["chip"], P["muted"])}[style]
+        self.fill_n, self.fill_h, fg = {
+            "chip": (P["chip"], P["chip_hi"], P["text"]),
+            "context": (P["ctx"], P["ctx_hi"], P["text"]),
+            "accent": (P["accent"], P["accent_hi"], P["on_accent"]),
+            "outline": (bg, P["chip"], P["text"]),
+            "ghost": (bg, P["chip"], P["muted"]),
+        }[style]
         self.outline = P["line"] if style in ("outline", "ghost") else None
         f, fi, fx = bar.f["body"], bar.f["icon_s"], bar.f["icon_xs"]
         H, pad, gap = round(h * s), round(11 * s), round(6 * s)
@@ -192,8 +270,9 @@ class Pill(tk.Canvas):
 
     def _hover(self, on):
         if self.enabled:
-            self.itemconfigure(self.bg_id, image=self.bar.shapes.rect(self.W, self.H, self.H // 2, self.fill_h if on else self.fill_n, self.bgc,
-                                                                      self.outline))
+            self.itemconfigure(
+                self.bg_id, image=self.bar.shapes.rect(self.W, self.H, self.H // 2, self.fill_h if on else self.fill_n, self.bgc, self.outline)
+            )
 
     def _click(self, e):
         if not self.enabled:
@@ -215,7 +294,16 @@ class IconButton(tk.Canvas):
     def __init__(self, master, bar, glyph, command, size=34, bg=None, tip="", font="icon"):
         S_ = round(size * bar.s)
         super().__init__(master, width=S_, height=S_, bg=bg or bar.P["bg"], highlightthickness=0, bd=0, cursor="hand2")
-        self.bar, self.command, self.S, self.bgc, self.tip, self.style, self.hover, self.glow = bar, command, S_, bg or bar.P["bg"], tip, "ghost", False, 0.0
+        self.bar, self.command, self.S, self.bgc, self.tip, self.style, self.hover, self.glow = (
+            bar,
+            command,
+            S_,
+            bg or bar.P["bg"],
+            tip,
+            "ghost",
+            False,
+            0.0,
+        )
         self.bg_id = self.create_image(0, 0, anchor="nw")
         self.g_id = self.create_text(S_ // 2, S_ // 2, text=glyph, font=bar.f[font])
         self.bind("<Enter>", lambda e: self._hov(True))
@@ -239,10 +327,12 @@ class IconButton(tk.Canvas):
 
     def paint(self):
         P = self.bar.P
-        fill, fg = {"ghost": (P["chip"] if self.hover else self.bgc, P["text"] if self.hover else P["muted"]),
-                    "accent": (P["accent_hi"] if self.hover else P["accent"], P["on_accent"]),
-                    "danger": (mix(P["danger"], "#ffffff", 0.45 * self.glow), "#ffffff"),
-                    "off": (self.bgc, P["faint"])}[self.style]
+        fill, fg = {
+            "ghost": (P["chip"] if self.hover else self.bgc, P["text"] if self.hover else P["muted"]),
+            "accent": (P["accent_hi"] if self.hover else P["accent"], P["on_accent"]),
+            "danger": (mix(P["danger"], "#ffffff", 0.45 * self.glow), "#ffffff"),
+            "off": (self.bgc, P["faint"]),
+        }[self.style]
         self.itemconfigure(self.bg_id, image=self.bar.shapes.rect(self.S, self.S, self.S // 2, fill, self.bgc))
         self.itemconfigure(self.g_id, fill=fg)
 
@@ -337,13 +427,29 @@ class Bar:
         self.field_bg = self.field.create_image(0, 0, anchor="nw")
         self.spark = spark_image(round(20 * s), P["accent"], P["field"])
         self.logo = self.field.create_image(round(24 * s), self.fh // 2, image=self.spark)
-        self.input = tk.Text(self.field, height=1, wrap="word", bd=0, highlightthickness=0, bg=P["field"], fg=P["text"], insertbackground=P["text"],
-                             insertwidth=max(1, round(1.5 * s)), font=self.f["input"], undo=True, padx=0, pady=0, selectbackground=P["accent"],
-                             selectforeground=P["on_accent"], relief="flat")
+        self.input = tk.Text(
+            self.field,
+            height=1,
+            wrap="word",
+            bd=0,
+            highlightthickness=0,
+            bg=P["field"],
+            fg=P["text"],
+            insertbackground=P["text"],
+            insertwidth=max(1, round(1.5 * s)),
+            font=self.f["input"],
+            undo=True,
+            padx=0,
+            pady=0,
+            selectbackground=P["accent"],
+            selectforeground=P["on_accent"],
+            relief="flat",
+        )
         self.tx = round(48 * s)
         self.btn_w = round(3 * 36 * s + 8 * s)
-        self.input_win = self.field.create_window(self.tx, self.fh // 2, window=self.input, anchor="w", width=self.inner - self.tx - self.btn_w,
-                                                  height=self.line)
+        self.input_win = self.field.create_window(
+            self.tx, self.fh // 2, window=self.input, anchor="w", width=self.inner - self.tx - self.btn_w, height=self.line
+        )
         self.ph = tk.Label(self.field, text="", bg=P["field"], fg=P["faint"], font=self.f["input"], anchor="w", cursor="xterm")
         self.ph_win = self.field.create_window(self.tx + round(3 * s), self.fh // 2, window=self.ph, anchor="w")
         self.ph.bind("<Button-1>", lambda e: self.input.focus_set())
@@ -363,9 +469,23 @@ class Bar:
         # the conversation
         self.convo_box = tk.Frame(self.card, bg=P["bg"], height=1)
         self.convo_box.pack_propagate(False)
-        self.convo = tk.Text(self.convo_box, wrap="word", bd=0, highlightthickness=0, bg=P["bg"], fg=P["text"], font=self.f["body"], padx=round(2 * s),
-                             pady=round(4 * s), cursor="arrow", relief="flat", selectbackground=P["accent"], selectforeground=P["on_accent"],
-                             spacing1=round(1 * s), spacing3=round(1 * s))
+        self.convo = tk.Text(
+            self.convo_box,
+            wrap="word",
+            bd=0,
+            highlightthickness=0,
+            bg=P["bg"],
+            fg=P["text"],
+            font=self.f["body"],
+            padx=round(2 * s),
+            pady=round(4 * s),
+            cursor="arrow",
+            relief="flat",
+            selectbackground=P["accent"],
+            selectforeground=P["on_accent"],
+            spacing1=round(1 * s),
+            spacing3=round(1 * s),
+        )
         self.scroll = ThinScroll(self.convo_box, self, self.convo)
         self.convo.configure(yscrollcommand=self.scroll.set)
         self.scroll.pack(side="right", fill="y")
@@ -410,8 +530,14 @@ class Bar:
         i.bind("<Control-v>", self._paste)
         i.bind("<Key>", self._key, add="+")
         i.bind("<KeyRelease>", lambda e: self._changed())
-        keys = (("<Escape>", lambda e: self._escape()), ("<Control-n>", lambda e: self.new_chat()), ("<Control-o>", lambda e: self.pick_files()),
-                ("<Control-m>", lambda e: self.mic_click()), ("<Alt-y>", lambda e: self.answer("yes")), ("<Alt-n>", lambda e: self.answer("no")))
+        keys = (
+            ("<Escape>", lambda e: self._escape()),
+            ("<Control-n>", lambda e: self.new_chat()),
+            ("<Control-o>", lambda e: self.pick_files()),
+            ("<Control-m>", lambda e: self.mic_click()),
+            ("<Alt-y>", lambda e: self.answer("yes")),
+            ("<Alt-n>", lambda e: self.answer("no")),
+        )
         for w in (self.input, self.convo, r):
             for k, fn in keys:
                 w.bind(k, lambda e, fn=fn: (fn(e), "break")[1])
@@ -538,6 +664,7 @@ class Bar:
 
     def pick_files(self):
         from tkinter import filedialog
+
         self.dialog = True
         try:
             got = filedialog.askopenfilenames(parent=self.root, title="Files for AI PC")
@@ -557,16 +684,24 @@ class Bar:
             self.chips.pack_forget()
         else:
             if self.context:
-                tk.Label(self.chips, text=f"From {self.where}:" if self.where else "Using:", bg=self.P["bg"], fg=self.P["muted"],
-                         font=self.f["small"]).pack(side="left", padx=(round(4 * s), round(6 * s)))
+                tk.Label(
+                    self.chips, text=f"From {self.where}:" if self.where else "Using:", bg=self.P["bg"], fg=self.P["muted"], font=self.f["small"]
+                ).pack(side="left", padx=(round(4 * s), round(6 * s)))
             shown = 0
             for p, ctx in items:
                 if shown == 4:
                     tk.Label(self.chips, text=f"+{len(items) - 4} more", bg=self.P["bg"], fg=self.P["muted"], font=self.f["small"]).pack(side="left")
                     break
                 lst = self.context if ctx else self.attach
-                Pill(self.chips, self, Path(p).name, icon=KIND_ICON.get(kind_of(p), G["file"]), style="context" if ctx else "chip", maxw=170,
-                     on_close=lambda p=p, lst=lst: (lst.remove(p), self._chips(), self._changed())).pack(side="left", padx=(0, round(6 * s)))
+                Pill(
+                    self.chips,
+                    self,
+                    Path(p).name,
+                    icon=KIND_ICON.get(kind_of(p), G["file"]),
+                    style="context" if ctx else "chip",
+                    maxw=170,
+                    on_close=lambda p=p, lst=lst: (lst.remove(p), self._chips(), self._changed()),
+                ).pack(side="left", padx=(0, round(6 * s)))
                 shown += 1
             if not self.chips.winfo_manager():
                 self.chips.pack(fill="x", pady=(round(8 * s), 0), after=self.prog)
@@ -587,7 +722,8 @@ class Bar:
                 w.destroy()
             for text in SUGGEST[key]:
                 Pill(self.sugg, self, text, style="outline", h=26, command=lambda t=text: (self._set_input(t), self.input.focus_set())).pack(
-                    side="left", padx=(0, round(6 * self.s)))
+                    side="left", padx=(0, round(6 * self.s))
+                )
             self._sugg_key = key
         if not self.sugg.winfo_manager():
             self.sugg.pack(fill="x", pady=(round(8 * self.s), 0), after=self.chips if self.chips.winfo_manager() else self.prog)
@@ -665,7 +801,7 @@ class Bar:
                 n = T.count("1.0", "end", "update", "ypixels")  # 'update': measured now, not estimated
                 n = (n[0] if isinstance(n, tuple) else n) or 0
             except tk.TclError:
-                n = 10 ** 4
+                n = 10**4
             other = self.card.winfo_reqheight() - (self.convo_box.winfo_reqheight() if self.convo_box.winfo_manager() else 0)
             h = max(round(60 * self.s), min(n + round(10 * self.s), self.maxh - other, round(520 * self.s)))
             if not self.convo_box.winfo_manager():
@@ -684,6 +820,7 @@ class Bar:
         """Files dragged from File Explorer onto the bar are attached (WM_DROPFILES on the bar's window)."""
         import ctypes
         from ctypes import wintypes
+
         try:
             shell32, u = ctypes.WinDLL("shell32"), S.user32
             WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
@@ -711,6 +848,7 @@ class Bar:
                         shell32.DragFinish(wp)
                     return 0
                 return u.CallWindowProcW(self._old_proc, hwnd, msg, wp, lp)
+
             self._proc = WNDPROC(proc)  # kept: Windows calls it for as long as the window lives
             self._old_proc = u.SetWindowLongPtrW(self.hwnd, -4, ctypes.cast(self._proc, ctypes.c_void_p))  # GWLP_WNDPROC
             shell32.DragAcceptFiles(self.hwnd, True)
@@ -736,6 +874,7 @@ class Bar:
                 rec = self.recorder_factory()
             else:
                 from ai_pc.assistant.mic import Recorder
+
                 rec = Recorder()
             rec.start()
         except Exception as e:  # noqa: BLE001 - said in the bar
@@ -746,10 +885,12 @@ class Bar:
         def preload():
             try:
                 from ai_pc.media import speech
+
                 if speech.available():
                     speech._load()
             except Exception:  # noqa: BLE001
                 pass
+
         threading.Thread(target=preload, daemon=True, name="aipc-whisper").start()
         self.b_mic.set(style="danger")
         self._placeholder()
@@ -884,8 +1025,15 @@ class Bar:
             row = tk.Frame(T, bg=P["bg"])
             pills = []
             for k, p in enumerate(d["choice"][:5], 1):
-                pl = Pill(row, self, f"{k}  {Path(p).name}", icon=KIND_ICON.get(kind_of(p), G["file"]), style="chip", maxw=200,
-                          command=lambda k=k: self.send(str(k)))
+                pl = Pill(
+                    row,
+                    self,
+                    f"{k}  {Path(p).name}",
+                    icon=KIND_ICON.get(kind_of(p), G["file"]),
+                    style="chip",
+                    maxw=200,
+                    command=lambda k=k: self.send(str(k)),
+                )
                 pl.pack(side="left", padx=(0, round(6 * s)), pady=round(4 * s))
                 pills.append(pl)
             T.window_create("end", window=row)
@@ -900,12 +1048,21 @@ class Bar:
 
     def _file_chip(self, master, p):
         f = tk.Frame(master, bg=self.P["bg"])
-        Pill(f, self, self.agent.nice_name(p), icon=KIND_ICON.get(kind_of(p), G["file"]), style="chip", maxw=220,
-             command=lambda: self._open(p)).pack(side="left")
-        IconButton(f, self, G["folder"], lambda: self._reveal(self.agent.nice_file(p)), size=28, tip="Show in folder",
-                   font="icon_s").pack(side="left", padx=(round(2 * self.s), 0))
-        IconButton(f, self, G["copy"], lambda: self._copy(self.agent.nice_file(p)), size=28, tip="Copy the file (then paste it anywhere: Ctrl+V)",
-                   font="icon_s").pack(side="left")
+        Pill(f, self, self.agent.nice_name(p), icon=KIND_ICON.get(kind_of(p), G["file"]), style="chip", maxw=220, command=lambda: self._open(p)).pack(
+            side="left"
+        )
+        IconButton(f, self, G["folder"], lambda: self._reveal(self.agent.nice_file(p)), size=28, tip="Show in folder", font="icon_s").pack(
+            side="left", padx=(round(2 * self.s), 0)
+        )
+        IconButton(
+            f,
+            self,
+            G["copy"],
+            lambda: self._copy(self.agent.nice_file(p)),
+            size=28,
+            tip="Copy the file (then paste it anywhere: Ctrl+V)",
+            font="icon_s",
+        ).pack(side="left")
         return f
 
     def _open(self, p):
@@ -929,6 +1086,7 @@ class Bar:
 
     def _rounded_photo(self, im):
         from PIL import Image, ImageDraw, ImageTk
+
         s = self.s
         im = im.convert("RGB")
         im.thumbnail((round(320 * s), round(180 * s)))
@@ -944,6 +1102,7 @@ class Bar:
     def _picture(self, p):
         try:
             from PIL import Image
+
             with Image.open(p) as im:
                 ph = self._rounded_photo(im)
         except Exception:  # noqa: BLE001
@@ -963,17 +1122,23 @@ class Bar:
         def grab():
             try:
                 out.parent.mkdir(parents=True, exist_ok=True)
-                subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", str(p), "-frames:v", "1", "-vf", "scale=640:-2", str(out)],
-                               capture_output=True, timeout=30, creationflags=CREATE_NO_WINDOW)
+                subprocess.run(
+                    ["ffmpeg", "-v", "error", "-y", "-ss", "1", "-i", str(p), "-frames:v", "1", "-vf", "scale=640:-2", str(out)],
+                    capture_output=True,
+                    timeout=30,
+                    creationflags=CREATE_NO_WINDOW,
+                )
                 if out.is_file():
                     self.q.put(("still", holder, str(out), p))
             except Exception:  # noqa: BLE001
                 pass
+
         threading.Thread(target=grab, daemon=True, name="aipc-still").start()
 
     def _show_still(self, holder, img_path, video):
         try:
             from PIL import Image
+
             with Image.open(img_path) as im:
                 ph = self._rounded_photo(im)
         except Exception:  # noqa: BLE001
@@ -1033,8 +1198,15 @@ class Bar:
 
     def _menu(self):
         combo = f"\t{self.combo}" if self.combo else ""
-        return [(1, f"Open AI PC{combo}", False), (2, "New chat", False), None, (3, "Start with Windows", S.starts_with_windows()),
-                (4, "Open the chats folder", False), None, (9, "Quit AI PC", False)]
+        return [
+            (1, f"Open AI PC{combo}", False),
+            (2, "New chat", False),
+            None,
+            (3, "Start with Windows", S.starts_with_windows()),
+            (4, "Open the chats folder", False),
+            None,
+            (9, "Quit AI PC", False),
+        ]
 
     def _menu_pick(self, mid):
         if mid == 1:
@@ -1181,6 +1353,7 @@ def make_icon(path=ICON):
     if path.is_file():
         return path
     from PIL import Image, ImageDraw
+
     path.parent.mkdir(parents=True, exist_ok=True)
     n = 256
     im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
@@ -1194,8 +1367,10 @@ def make_icon(path=ICON):
     im.paste(grad, (0, 0), mask)
     d = ImageDraw.Draw(im)
     cx, cy, R, r = n // 2, n // 2, 84, 18  # a four-point spark
-    d.polygon([(cx, cy - R), (cx + r, cy - r), (cx + R, cy), (cx + r, cy + r), (cx, cy + R), (cx - r, cy + r), (cx - R, cy), (cx - r, cy - r)],
-              fill=(255, 255, 255, 255))
+    d.polygon(
+        [(cx, cy - R), (cx + r, cy - r), (cx + R, cy), (cx + r, cy + r), (cx, cy + R), (cx - r, cy + r), (cx - R, cy), (cx - r, cy - r)],
+        fill=(255, 255, 255, 255),
+    )
     d.ellipse((cx + 50, cy - 86, cx + 82, cy - 54), fill=(255, 255, 255, 230))
     im.save(path, sizes=[(16, 16), (20, 20), (24, 24), (32, 32), (40, 40), (48, 48), (64, 64), (128, 128), (256, 256)])
     return path
@@ -1233,11 +1408,13 @@ def _logger(path=None):
                 f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + " ".join(str(x) for x in a) + "\n")
         except OSError:
             pass
+
     return log
 
 
 def main(argv=None):
     import argparse
+
     ap = argparse.ArgumentParser(prog="ai-pc bar", description="the AI PC command bar (press the combo anywhere)")
     ap.add_argument("--offline", action="store_true", help="rules only, no AI model")
     ap.add_argument("--shortcut", action="store_true", help="make 'AI PC.lnk' in the project folder, to pin to Start or the taskbar")
@@ -1263,9 +1440,15 @@ def main(argv=None):
         exe = Path(sys.executable).with_name("python.exe")
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path.with_name("bar.out.txt"), "wb") as out:  # what programs print; its own file (the log is written by lines)
-            subprocess.Popen([str(exe), "-m", "ai_pc", "bar", "--child"] + (["--offline"] if a.offline else []) + (["--startup"] if a.startup else []),
-                             cwd=str(ROOT),
-                             stdin=subprocess.DEVNULL, stdout=out, stderr=out, creationflags=CREATE_NO_WINDOW, close_fds=True)
+            subprocess.Popen(
+                [str(exe), "-m", "ai_pc", "bar", "--child"] + (["--offline"] if a.offline else []) + (["--startup"] if a.startup else []),
+                cwd=str(ROOT),
+                stdin=subprocess.DEVNULL,
+                stdout=out,
+                stderr=out,
+                creationflags=CREATE_NO_WINDOW,
+                close_fds=True,
+            )
         return
     log = _logger(log_path)
     mutex = S.single_instance(f"Local\\{cfg['name']}_Bar")
@@ -1278,6 +1461,7 @@ def main(argv=None):
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     windowless = not S.kernel32.GetConsoleWindow() and bool(S.kernel32.GetConsoleCP())  # a console (for the programs it runs), no window
     log(f"start (offline={a.offline}, {Path(sys.executable).name}, {'console with no window' if windowless else 'console window'})")
@@ -1292,8 +1476,11 @@ def main(argv=None):
     except ValueError:
         wanted = cfg["hotkey"]
     if not bar.combo:
-        bar.shell.notify("AI PC", f"{wanted} and the other combos AI PC tries are taken by other programs. Click this icon to open AI PC, "
-                                  f"or put another combo in {cfg_path}.")
+        bar.shell.notify(
+            "AI PC",
+            f"{wanted} and the other combos AI PC tries are taken by other programs. Click this icon to open AI PC, "
+            f"or put another combo in {cfg_path}.",
+        )
     elif bar.combo != wanted:
         bar.shell.notify("AI PC", f"{wanted} is taken by another program, so AI PC opens with {bar.combo}.")
     elif not a.startup:

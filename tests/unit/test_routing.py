@@ -1,4 +1,5 @@
 """Which program a request goes to: the one chat's rules, offline (no model), for every program and named app."""
+
 import pytest
 
 from ai_pc.assistant import router
@@ -79,8 +80,10 @@ def test_request_goes_to_the_right_program(chat, files, message, sent, active, w
 
 
 def test_a_request_in_steps_is_split_where_a_new_action_starts():
-    assert router.split("add a glow effect to my video and then send it to slack #team") == ["add a glow effect to my video",
-                                                                                              "send it to slack #team"]
+    assert router.split("add a glow effect to my video and then send it to slack #team") == [
+        "add a glow effect to my video",
+        "send it to slack #team",
+    ]
     assert router.split("make it black and white and send it to slack") == ["make it black and white", "send it to slack"]
     assert len(router.split("cut the first 5 seconds and make it under 10 MB")) == 1
 

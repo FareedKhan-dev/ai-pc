@@ -4,6 +4,7 @@ a temporary web address (Threads has no upload; see mediahost.py); permalink rea
 hidden; post insights (views, likes, replies, reposts, quotes, shares); deleting. The long-lived token (60 days) is
 renewed automatically before it runs out.
 """
+
 import time
 
 from ai_pc.social.base import Platform, SocialError
@@ -23,6 +24,7 @@ class Threads(Platform):
     def token(self):
         self.need("access_token")
         from ai_pc.social import auth
+
         return auth.fresh_token(self) if not self.transport else self.creds["access_token"]
 
     def tapi(self, timeout=120):
@@ -50,6 +52,7 @@ class Threads(Platform):
 
     def host(self):
         from ai_pc.social.mediahost import MediaHost
+
         return getattr(self, "_host_factory", lambda: MediaHost())()
 
     def _status(self, cid):
@@ -108,7 +111,9 @@ class Threads(Platform):
                         kids.append(self.call(self.tapi().post, f"{uid}/threads", json=p)["id"])
                     if not self._wait(kids, budget, t0):
                         raise SocialError("retry", "Threads took too long to fetch the slides; trying again")
-                    cid = self.call(self.tapi().post, f"{uid}/threads", json={"media_type": "CAROUSEL", "children": ",".join(kids), "text": text})["id"]
+                    cid = self.call(self.tapi().post, f"{uid}/threads", json={"media_type": "CAROUSEL", "children": ",".join(kids), "text": text})[
+                        "id"
+                    ]
                 self.checkpoint(job, container=cid)
                 r = job["remote"]
             if not self._wait([r["container"]], budget, t0):
@@ -144,13 +149,19 @@ class Threads(Platform):
     def metrics(self, job):
         js = self.call(self.tapi().get, f"{job['remote']['media_id']}/insights", params={"metric": "views,likes,replies,reposts,quotes,shares"})
         v = {d["name"]: (d.get("values") or [{}])[0].get("value") for d in js.get("data") or []}
-        return {"views": v.get("views"), "likes": v.get("likes"), "comments": v.get("replies"),
-                "shares": (v.get("reposts") or 0) + (v.get("quotes") or 0) + (v.get("shares") or 0)}
+        return {
+            "views": v.get("views"),
+            "likes": v.get("likes"),
+            "comments": v.get("replies"),
+            "shares": (v.get("reposts") or 0) + (v.get("quotes") or 0) + (v.get("shares") or 0),
+        }
 
     def comments(self, job, since=None):
         js = self.call(self.tapi().get, f"{job['remote']['media_id']}/replies", params={"fields": "id,text,username,timestamp"})
-        return [{"id": c["id"], "author": "@" + (c.get("username") or "someone"), "text": c.get("text", ""), "created": c.get("timestamp")}
-                for c in js.get("data") or []]
+        return [
+            {"id": c["id"], "author": "@" + (c.get("username") or "someone"), "text": c.get("text", ""), "created": c.get("timestamp")}
+            for c in js.get("data") or []
+        ]
 
     def reply(self, job, comment_id, text):
         uid = self.uid()

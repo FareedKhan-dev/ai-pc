@@ -7,6 +7,7 @@ tasks, debug configurations), and running commands in it with a time limit.
   p.run(["python", "main.py", "sample.txt"]) -> {"code", "out", "err", "seconds"}
   p.undo() / p.log() / p.diff()   p.apply_edits(text)  (search/replace blocks)   p.open_in_vscode("main.py", 12)
 """
+
 import json
 import os
 import re
@@ -17,8 +18,34 @@ from pathlib import Path
 
 NO_WINDOW = 0x08000000
 IGNORE = {".git", ".venv", "node_modules", "__pycache__", ".vscode", ".pytest_cache", "dist", "build", ".idea"}
-TEXT_EXT = {".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".json", ".html", ".htm", ".css", ".md", ".txt", ".csv", ".toml", ".yaml", ".yml", ".ini",
-            ".cfg", ".sql", ".sh", ".bat", ".ps1", ".xml", ".svg", ".env.example"}
+TEXT_EXT = {
+    ".py",
+    ".js",
+    ".mjs",
+    ".cjs",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".json",
+    ".html",
+    ".htm",
+    ".css",
+    ".md",
+    ".txt",
+    ".csv",
+    ".toml",
+    ".yaml",
+    ".yml",
+    ".ini",
+    ".cfg",
+    ".sql",
+    ".sh",
+    ".bat",
+    ".ps1",
+    ".xml",
+    ".svg",
+    ".env.example",
+}
 
 
 class ProjectError(Exception):
@@ -26,8 +53,15 @@ class ProjectError(Exception):
 
 
 def _git(cwd, *args, check=True):
-    r = subprocess.run(["git", "-c", "core.autocrlf=false", "-c", "user.name=AI PC", "-c", "user.email=ai-pc@localhost", *args], cwd=str(cwd),
-                       capture_output=True, text=True, encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
+    r = subprocess.run(
+        ["git", "-c", "core.autocrlf=false", "-c", "user.name=AI PC", "-c", "user.email=ai-pc@localhost", *args],
+        cwd=str(cwd),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        creationflags=NO_WINDOW,
+    )
     if check and r.returncode:
         raise ProjectError(f"git {' '.join(args[:2])}: {r.stderr.strip()[:300]}")
     return r.stdout
@@ -40,7 +74,7 @@ def edit_blocks(text):
     out, pos = [], 0
     for m in re.finditer(r"<<<<<<< SEARCH\n(.*?)\n?=======\n(.*?)\n?>>>>>>> REPLACE", text, re.S):
         old, new = m.group(1), m.group(2)
-        head = text[pos:m.start()]
+        head = text[pos : m.start()]
         if "<<<<<<< SEARCH\n" in old:  # a stray marker: the search is what follows the last one
             pre, old = old.rsplit("<<<<<<< SEARCH\n", 1)
             head += "\n" + pre
@@ -98,7 +132,9 @@ class Project:
         """A virtual environment inside the project (uv; the Python is the one uv already has, nothing downloaded)."""
         if (self.folder / ".venv" / "Scripts" / "python.exe").exists():
             return
-        r = subprocess.run(["uv", "venv", "--quiet", "--python", "3.12", str(self.folder / ".venv")], capture_output=True, text=True, creationflags=NO_WINDOW)
+        r = subprocess.run(
+            ["uv", "venv", "--quiet", "--python", "3.12", str(self.folder / ".venv")], capture_output=True, text=True, creationflags=NO_WINDOW
+        )
         if r.returncode:
             raise ProjectError(f"could not make the virtual environment: {r.stderr.strip()[:200]}")
 
@@ -111,18 +147,40 @@ class Project:
         v = self.folder / ".vscode"
         v.mkdir(exist_ok=True)
         if self.kind == "python":
-            settings = {"python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe", "python.testing.unittestEnabled": True,
-                        "python.testing.unittestArgs": ["-v", "-s", ".", "-p", "test_*.py"], "editor.formatOnSave": False, "files.eol": "\n"}
-            tasks = [{"label": "Run", "type": "shell", "command": "${workspaceFolder}/.venv/Scripts/python.exe", "args": ["main.py"], "group": "build"},
-                     {"label": "Test", "type": "shell", "command": "${workspaceFolder}/.venv/Scripts/python.exe", "args": ["-m", "unittest", "-v"],
-                      "group": {"kind": "test", "isDefault": True}}]
-            launch = [{"name": "Run main.py", "type": "debugpy", "request": "launch", "program": "${workspaceFolder}/main.py", "console": "integratedTerminal"},
-                      {"name": "Current file", "type": "debugpy", "request": "launch", "program": "${file}", "console": "integratedTerminal"}]
+            settings = {
+                "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+                "python.testing.unittestEnabled": True,
+                "python.testing.unittestArgs": ["-v", "-s", ".", "-p", "test_*.py"],
+                "editor.formatOnSave": False,
+                "files.eol": "\n",
+            }
+            tasks = [
+                {"label": "Run", "type": "shell", "command": "${workspaceFolder}/.venv/Scripts/python.exe", "args": ["main.py"], "group": "build"},
+                {
+                    "label": "Test",
+                    "type": "shell",
+                    "command": "${workspaceFolder}/.venv/Scripts/python.exe",
+                    "args": ["-m", "unittest", "-v"],
+                    "group": {"kind": "test", "isDefault": True},
+                },
+            ]
+            launch = [
+                {
+                    "name": "Run main.py",
+                    "type": "debugpy",
+                    "request": "launch",
+                    "program": "${workspaceFolder}/main.py",
+                    "console": "integratedTerminal",
+                },
+                {"name": "Current file", "type": "debugpy", "request": "launch", "program": "${file}", "console": "integratedTerminal"},
+            ]
             ext = ["ms-python.python", "ms-python.debugpy"]
         elif self.kind == "node":
             settings = {"files.eol": "\n"}
-            tasks = [{"label": "Run", "type": "shell", "command": "node", "args": ["index.js"], "group": "build"},
-                     {"label": "Test", "type": "shell", "command": "npm", "args": ["test"], "group": {"kind": "test", "isDefault": True}}]
+            tasks = [
+                {"label": "Run", "type": "shell", "command": "node", "args": ["index.js"], "group": "build"},
+                {"label": "Test", "type": "shell", "command": "npm", "args": ["test"], "group": {"kind": "test", "isDefault": True}},
+            ]
             launch = [{"name": "Run index.js", "type": "node", "request": "launch", "program": "${workspaceFolder}/index.js"}]
             ext = ["dbaeumer.vscode-eslint"]
         else:
@@ -246,12 +304,27 @@ class Project:
         env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
         t0 = time.perf_counter()
         try:
-            r = subprocess.run(cmd, cwd=str(self.folder), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout,
-                               input=stdin, env=env, creationflags=NO_WINDOW, shell=False)
+            r = subprocess.run(
+                cmd,
+                cwd=str(self.folder),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                input=stdin,
+                env=env,
+                creationflags=NO_WINDOW,
+                shell=False,
+            )
             return {"code": r.returncode, "out": r.stdout[-6000:], "err": r.stderr[-6000:], "seconds": round(time.perf_counter() - t0, 2)}
         except subprocess.TimeoutExpired as e:
-            return {"code": -1, "out": (e.stdout or "")[-3000:] if isinstance(e.stdout, str) else "", "err": f"stopped after {timeout} s (it did not finish)",
-                    "seconds": timeout}
+            return {
+                "code": -1,
+                "out": (e.stdout or "")[-3000:] if isinstance(e.stdout, str) else "",
+                "err": f"stopped after {timeout} s (it did not finish)",
+                "seconds": timeout,
+            }
         except FileNotFoundError as e:
             return {"code": -2, "out": "", "err": f"not found: {e}", "seconds": 0}
 

@@ -5,6 +5,7 @@ request (utm_source=<platform>).
 
   fit(text, platform, fmt, limits, title=None, link=None) -> {"text", "title", "parts", "tags", "problems", "notes"}
 """
+
 import re
 import unicodedata
 import urllib.parse
@@ -81,9 +82,26 @@ def linkedin_escape(text):
     return "".join(out)
 
 
-def add_utm(text, platform, campaign=None, skip=("facebook.com", "instagram.com", "youtube.com", "youtu.be", "tiktok.com", "linkedin.com", "x.com",
-                                                 "twitter.com", "threads.net", "wa.me", "whatsapp.com")):
+def add_utm(
+    text,
+    platform,
+    campaign=None,
+    skip=(
+        "facebook.com",
+        "instagram.com",
+        "youtube.com",
+        "youtu.be",
+        "tiktok.com",
+        "linkedin.com",
+        "x.com",
+        "twitter.com",
+        "threads.net",
+        "wa.me",
+        "whatsapp.com",
+    ),
+):
     """Tag your own links so your website's analytics can tell which platform sent each visitor."""
+
     def tag(m):
         u = m.group(0)
         trail = ""
@@ -98,6 +116,7 @@ def add_utm(text, platform, campaign=None, skip=("facebook.com", "instagram.com"
             if v and k not in have:
                 q.append((k, v))
         return urllib.parse.urlunsplit((p.scheme, p.netloc, p.path, urllib.parse.urlencode(q), p.fragment)) + trail
+
     return URL.sub(tag, text)
 
 

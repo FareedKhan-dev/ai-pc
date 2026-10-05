@@ -16,6 +16,7 @@ Each sheet: header styled from the theme, frozen header row, filters, number for
 charts are native Excel charts. The checks list holds totals computed here in Python, for verify to compare with what
 Excel computes.
 """
+
 import copy
 import datetime as dt
 import re
@@ -31,8 +32,15 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from ai_pc.office import themes
 from ai_pc.office.docplan import number
 
-FORMATS = {"money": '#,##0;[Red]-#,##0', "money2": '#,##0.00;[Red]-#,##0.00', "number": "#,##0.##", "integer": "#,##0", "percent": "0.0%",
-           "date": "dd-mmm-yyyy", "text": "@"}
+FORMATS = {
+    "money": "#,##0;[Red]-#,##0",
+    "money2": "#,##0.00;[Red]-#,##0.00",
+    "number": "#,##0.##",
+    "integer": "#,##0",
+    "percent": "0.0%",
+    "date": "dd-mmm-yyyy",
+    "text": "@",
+}
 FN = {"sum": "SUM", "average": "AVERAGE", "avg": "AVERAGE", "mean": "AVERAGE", "count": "COUNTA", "max": "MAX", "min": "MIN"}
 IFS = {"sum": "SUMIFS", "average": "AVERAGEIFS", "avg": "AVERAGEIFS", "mean": "AVERAGEIFS", "count": "COUNTIFS", "max": "MAXIFS", "min": "MINIFS"}
 
@@ -41,12 +49,14 @@ def py_value(expr, row):
     """The value of an arithmetic formula ("[Qty] * [Price] - [Discount]") for one row, computed in Python to check
     Excel's; None when the formula uses anything beyond numbers, columns, + - * / and brackets."""
     import ast
+
     names = {}
 
     def sub(m):
         k = f"c{len(names)}"
         names[k] = m.group(1).strip().lower()
         return k
+
     try:
         tree = ast.parse(re.sub(r"\[([^\]]+)\]", sub, str(expr).strip().lstrip("=")), mode="eval")
     except SyntaxError:
@@ -69,6 +79,7 @@ def py_value(expr, row):
             a, b = ev(n.left), ev(n.right)
             return a + b if isinstance(n.op, ast.Add) else a - b if isinstance(n.op, ast.Sub) else a * b if isinstance(n.op, ast.Mult) else a / b
         raise ValueError
+
     try:
         return ev(tree)
     except (ValueError, ZeroDivisionError):
@@ -129,8 +140,16 @@ def resolve_book(book):
             for c in s.get("columns") or []:
                 c = c if isinstance(c, dict) else {"name": str(c)}
                 typ = str(c.get("type") or "text").lower()
-                typ = {"currency": "money", "amount": "money", "float": "number", "decimal": "number", "int": "integer", "pct": "percent",
-                       "percentage": "percent", "string": "text"}.get(typ, typ)
+                typ = {
+                    "currency": "money",
+                    "amount": "money",
+                    "float": "number",
+                    "decimal": "number",
+                    "int": "integer",
+                    "pct": "percent",
+                    "percentage": "percent",
+                    "string": "text",
+                }.get(typ, typ)
                 cols.append({**c, "name": str(c.get("name") or f"Column {len(cols) + 1}").strip(), "type": typ if typ in FORMATS else "text"})
             if not cols:
                 continue
@@ -175,6 +194,7 @@ class _Book:
             if name not in lower:
                 raise KeyError(m.group(1))
             return f"{lower[name]}{row}"
+
         f = re.sub(r"\[([^\]]+)\]", sub, str(expr).strip().lstrip("="))
         parts = re.split(r'("[^"]*")', f)  # Excel's own style, "=B2*C2": no spaces around operators (text in quotes untouched)
         f = "".join(p if i % 2 else re.sub(r"\s*([-+*/^&=<>,()])\s*", r"\1", p) for i, p in enumerate(parts))
@@ -234,8 +254,9 @@ class _Book:
                 cell = ws.cell(tr, list(letters).index(key) + 1, f"={f}({L}{first}:{L}{last})")
                 cell.font = Font(name=self.th["body"], bold=True)
                 cell.number_format = self._fmt(next(c["type"] for c in cols if c["name"] == key), [x[list(letters).index(key)] for x in rows])
-                cell.border = Border(top=Side(style="thin", color=self.th["table"]["header_fill"]),
-                                     bottom=Side(style="double", color=self.th["table"]["header_fill"]))
+                cell.border = Border(
+                    top=Side(style="thin", color=self.th["table"]["header_fill"]), bottom=Side(style="double", color=self.th["table"]["header_fill"])
+                )
                 j = list(letters).index(key)
                 vals = [x[j] for x in s["_calc"] if isinstance(x[j], (int, float)) and not isinstance(x[j], bool)]
                 if vals and len(vals) == len(rows):
@@ -261,17 +282,34 @@ class _Book:
                 val = f'"{v}"' if not isinstance(v, (int, float)) and number(v) is None else str(number(v)[0] if number(v) else v)
                 ws.conditional_formatting.add(rng, CellIsRule(operator=ops[rule], formula=[val], fill=red if rule in ("<", "<=") else green))
             elif rule == "scale":
-                ws.conditional_formatting.add(rng, ColorScaleRule(start_type="min", start_color="F8696B", mid_type="percentile", mid_value=50,
-                                                                  mid_color="FFEB84", end_type="max", end_color="63BE7B"))
+                ws.conditional_formatting.add(
+                    rng,
+                    ColorScaleRule(
+                        start_type="min",
+                        start_color="F8696B",
+                        mid_type="percentile",
+                        mid_value=50,
+                        mid_color="FFEB84",
+                        end_type="max",
+                        end_color="63BE7B",
+                    ),
+                )
             elif rule == "bar":
                 ws.conditional_formatting.add(rng, DataBarRule(start_type="min", end_type="max", color=self.th["accent"]))
             elif rule in ("top", "bottom"):
                 k = int(h.get("value") or 3)
                 fn = "LARGE" if rule == "top" else "SMALL"
-                ws.conditional_formatting.add(rng, FormulaRule(formula=[f"{letters[key]}{first}>={fn}(${letters[key]}${first}:${letters[key]}${last},{k})"
-                                                                        if rule == "top" else
-                                                                        f"{letters[key]}{first}<={fn}(${letters[key]}${first}:${letters[key]}${last},{k})"],
-                                                               fill=green if rule == "top" else red))
+                ws.conditional_formatting.add(
+                    rng,
+                    FormulaRule(
+                        formula=[
+                            f"{letters[key]}{first}>={fn}(${letters[key]}${first}:${letters[key]}${last},{k})"
+                            if rule == "top"
+                            else f"{letters[key]}{first}<={fn}(${letters[key]}${first}:${letters[key]}${last},{k})"
+                        ],
+                        fill=green if rule == "top" else red,
+                    ),
+                )
         ws.freeze_panes = "A2"
         if rows:
             ws.auto_filter.ref = f"A1:{get_column_letter(len(cols))}{last}"
@@ -286,11 +324,21 @@ class _Book:
                 width = max(width, 12)
             ws.column_dimensions[get_column_letter(j + 1)].width = max(8, min(48, width))
         ws.sheet_view.showGridLines = False
-        calc_ok = {c["name"] for j, c in enumerate(cols) if all(isinstance(x[j], (int, float)) or x[j] is None for x in s["_calc"])
-                   and (not c.get("formula") or all(x[j] is not None for x in s["_calc"]))}
-        self.tables[s["name"]] = {"cols": letters, "first": first, "last": last, "types": {c["name"]: c["type"] for c in cols},
-                                  "rows": s["_calc"], "colnames": [c["name"] for c in cols],
-                                  "formulas": {c["name"] for c in cols if c.get("formula") and c["name"] not in calc_ok}}
+        calc_ok = {
+            c["name"]
+            for j, c in enumerate(cols)
+            if all(isinstance(x[j], (int, float)) or x[j] is None for x in s["_calc"])
+            and (not c.get("formula") or all(x[j] is not None for x in s["_calc"]))
+        }
+        self.tables[s["name"]] = {
+            "cols": letters,
+            "first": first,
+            "last": last,
+            "types": {c["name"]: c["type"] for c in cols},
+            "rows": s["_calc"],
+            "colnames": [c["name"] for c in cols],
+            "formulas": {c["name"] for c in cols if c.get("formula") and c["name"] not in calc_ok},
+        }
         return bad
 
     def summary(self, s):
@@ -317,6 +365,7 @@ class _Book:
             L = t["cols"][key]
             q = f"'{src}'" if re.search(r"\W", src) else src
             return f"{q}!${L}${t['first']}:${L}${t['last']}", key, t
+
         for m in s.get("metrics") or []:
             src = m.get("source") if m.get("source") in self.tables else default_src
             fn = str(m.get("fn") or "sum").lower()
@@ -339,15 +388,21 @@ class _Book:
             ws.cell(row, 1, str(m.get("label") or f"{fn} of {key}")).font = Font(name=th["body"], size=12, color=th["muted"])
             c = ws.cell(row, 2, f)
             c.font = Font(name=th["head"], size=14, bold=True, color=th["accent"])
-            c.number_format = FORMATS["integer"] if fn == "count" else self._fmt(m.get("format") or t["types"].get(key, "number"),
-                                                                                   [r[t["colnames"].index(key)] for r in t["rows"]])
+            c.number_format = (
+                FORMATS["integer"]
+                if fn == "count"
+                else self._fmt(m.get("format") or t["types"].get(key, "number"), [r[t["colnames"].index(key)] for r in t["rows"]])
+            )
             c.alignment = Alignment(horizontal="right")
             if key not in t["formulas"]:
                 jk = t["colnames"].index(key)
 
                 def keep(r):
-                    return all(str(r[t["colnames"].index(next(c for c in t["colnames"] if c.lower() == str(wc).lower()))]) == str(wv)
-                               for wc, wv in where.items())
+                    return all(
+                        str(r[t["colnames"].index(next(c for c in t["colnames"] if c.lower() == str(wc).lower()))]) == str(wv)
+                        for wc, wv in where.items()
+                    )
+
                 vals = [r[jk] for r in t["rows"] if keep(r) and (fn == "count" and r[jk] not in (None, "") or isinstance(r[jk], (int, float)))]
                 if vals:
                     e = _agg(FN.get(fn, "SUM"), vals)
@@ -371,8 +426,12 @@ class _Book:
             except KeyError as e:
                 bad.append(f"group '{g.get('title')}': no column {e}")
                 continue
-            vals_spec = [v for v in g.get("values") or [{"of": next((c for c in t["colnames"] if t["types"][c] in ("money", "number", "integer")), None), "fn": "sum"}]
-                         if isinstance(v, dict) and v.get("of")]
+            vals_spec = [
+                v
+                for v in g.get("values")
+                or [{"of": next((c for c in t["colnames"] if t["types"][c] in ("money", "number", "integer")), None), "fn": "sum"}]
+                if isinstance(v, dict) and v.get("of")
+            ]
             j_by = t["colnames"].index(by_key)
             groups = list(dict.fromkeys(str(r[j_by]) for r in t["rows"] if r[j_by] not in (None, "")))
             if not groups:
@@ -395,14 +454,16 @@ class _Book:
                         bad.append(f"group value: no column {e}")
                         continue
                     fn = str(v.get("fn") or "sum").lower()
-                    f = f'=COUNTIFS({by_rng}, A{r_})' if fn == "count" else f"={IFS.get(fn, 'SUMIFS')}({rng}, {by_rng}, A{r_})"
+                    f = f"=COUNTIFS({by_rng}, A{r_})" if fn == "count" else f"={IFS.get(fn, 'SUMIFS')}({rng}, {by_rng}, A{r_})"
                     c = ws.cell(r_, 2 + j, f)
                     c.font = self.body_font
                     c.number_format = self._fmt(t["types"].get(key, "number"), [x[t["colnames"].index(key)] for x in t["rows"]])
                     if fn == "sum" and key not in t["formulas"]:
                         jj = t["colnames"].index(key)
                         e = sum(x[jj] for x in t["rows"] if str(x[j_by]) == gv and isinstance(x[jj], (int, float)))
-                        self.checks.append({"sheet": s["name"], "cell": f"{get_column_letter(2 + j)}{r_}", "expect": round(e, 6), "what": f"{key} for {gv}"})
+                        self.checks.append(
+                            {"sheet": s["name"], "cell": f"{get_column_letter(2 + j)}{r_}", "expect": round(e, 6), "what": f"{key} for {gv}"}
+                        )
             last = row + len(groups)
             if g.get("chart") and vals_spec:
                 kind = str(g["chart"]).lower()
@@ -431,6 +492,7 @@ class _Book:
                     ch.legend = None if len(vals_spec) == 1 else ch.legend
                     try:
                         from openpyxl.chart.shapes import GraphicalProperties
+
                         ch.series[0].graphicalProperties = GraphicalProperties(solidFill=th["accent"])
                     except Exception:  # noqa: BLE001
                         pass
@@ -471,8 +533,9 @@ class _Book:
             if key not in t["formulas"]:
                 vals = [x[jk] for x in t["rows"] if isinstance(x[jk], (int, float)) and not isinstance(x[jk], bool)]
                 if vals:
-                    self.checks.append({"sheet": ws.title, "cell": f"B{r_}", "expect": round(_agg(FN.get(fn, "AVERAGE"), vals), 6),
-                                        "what": f"{fn} of {key}"})
+                    self.checks.append(
+                        {"sheet": ws.title, "cell": f"B{r_}", "expect": round(_agg(FN.get(fn, "AVERAGE"), vals), 6), "what": f"{fn} of {key}"}
+                    )
         last = row + len(cols)
         if g.get("chart", "column"):
             kind = str(g.get("chart") or "column").lower()
@@ -492,6 +555,7 @@ class _Book:
                 ch.legend = None
                 try:
                     from openpyxl.chart.shapes import GraphicalProperties
+
                     ch.series[0].graphicalProperties = GraphicalProperties(solidFill=th["accent"])
                 except Exception:  # noqa: BLE001
                     pass
@@ -511,8 +575,12 @@ class _Book:
         self.wb.properties.title = str(self.b.get("title") or "")[:250]
         self.wb.properties.creator = "AI PC document agent"
         self.wb.save(str(path))
-        return {"path": str(path), "checks": self.checks, "problems": problems,
-                "sheets": [{"name": s["name"], "kind": s["kind"], "rows": len(s.get("rows") or [])} for s in self.b["sheets"]]}
+        return {
+            "path": str(path),
+            "checks": self.checks,
+            "problems": problems,
+            "sheets": [{"name": s["name"], "kind": s["kind"], "rows": len(s.get("rows") or [])} for s in self.b["sheets"]],
+        }
 
 
 def build_book(book, path):

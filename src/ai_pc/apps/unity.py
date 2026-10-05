@@ -9,6 +9,7 @@ on this PC, the game is also built in batch mode (no window) to a Windows .exe a
 Checks without Unity: every script's class matches its file name (Unity's rule), braces balance, the settings file and
 package list are valid JSON, and the builder knows every setting.
 """
+
 import json
 import re
 import shutil
@@ -17,12 +18,51 @@ from pathlib import Path
 
 NAME, LABEL = "unity", "Unity games: a playable 3D project by code, built in batch mode when Unity is installed"
 EXAMPLES = ["unity game: coin collector called 'Coin Run', 12 coins, red player, speed 7, 60 seconds", "build the unity game"]
-COLORS = {"red": "#E53935", "green": "#43A047", "blue": "#1E88E5", "yellow": "#FDD835", "orange": "#FB8C00", "purple": "#8E24AA", "pink": "#D81B60",
-          "white": "#FAFAFA", "black": "#212121", "grey": "#9E9E9E", "gray": "#9E9E9E", "gold": "#FFC107", "brown": "#6D4C41", "cyan": "#00ACC1"}
-DEFAULT = {"title": "Coin Run", "coins": 10, "speed": 6.0, "jump": 5.0, "arena": 30.0, "seconds": 60, "player_color": "#1E88E5", "coin_color": "#FFC107",
-           "ground_color": "#7CB342"}
-MODULES = ["ai", "animation", "audio", "imageconversion", "imgui", "jsonserialize", "particlesystem", "physics", "physics2d", "screencapture", "terrain",
-           "terrainphysics", "ui", "uielements", "unitywebrequest", "video"]
+COLORS = {
+    "red": "#E53935",
+    "green": "#43A047",
+    "blue": "#1E88E5",
+    "yellow": "#FDD835",
+    "orange": "#FB8C00",
+    "purple": "#8E24AA",
+    "pink": "#D81B60",
+    "white": "#FAFAFA",
+    "black": "#212121",
+    "grey": "#9E9E9E",
+    "gray": "#9E9E9E",
+    "gold": "#FFC107",
+    "brown": "#6D4C41",
+    "cyan": "#00ACC1",
+}
+DEFAULT = {
+    "title": "Coin Run",
+    "coins": 10,
+    "speed": 6.0,
+    "jump": 5.0,
+    "arena": 30.0,
+    "seconds": 60,
+    "player_color": "#1E88E5",
+    "coin_color": "#FFC107",
+    "ground_color": "#7CB342",
+}
+MODULES = [
+    "ai",
+    "animation",
+    "audio",
+    "imageconversion",
+    "imgui",
+    "jsonserialize",
+    "particlesystem",
+    "physics",
+    "physics2d",
+    "screencapture",
+    "terrain",
+    "terrainphysics",
+    "ui",
+    "uielements",
+    "unitywebrequest",
+    "video",
+]
 
 PLAYER = """using UnityEngine;
 
@@ -311,8 +351,13 @@ namespace AIPC
     }
 }
 """
-SCRIPTS = {"Assets/Scripts/PlayerController.cs": PLAYER, "Assets/Scripts/CameraFollow.cs": CAMERA, "Assets/Scripts/Coin.cs": COIN,
-           "Assets/Scripts/GameManager.cs": MANAGER, "Assets/Editor/AIPCBuilder.cs": BUILDER}
+SCRIPTS = {
+    "Assets/Scripts/PlayerController.cs": PLAYER,
+    "Assets/Scripts/CameraFollow.cs": CAMERA,
+    "Assets/Scripts/Coin.cs": COIN,
+    "Assets/Scripts/GameManager.cs": MANAGER,
+    "Assets/Editor/AIPCBuilder.cs": BUILDER,
+}
 
 
 def editor():
@@ -335,8 +380,9 @@ def write(folder, cfg):
         scene.unlink()
         Path(str(scene) + ".meta").unlink(missing_ok=True)
     (folder / "Packages").mkdir(exist_ok=True)
-    (folder / "Packages" / "manifest.json").write_text(json.dumps({"dependencies": {f"com.unity.modules.{m}": "1.0.0" for m in MODULES}}, indent=2),
-                                                        encoding="utf-8")
+    (folder / "Packages" / "manifest.json").write_text(
+        json.dumps({"dependencies": {f"com.unity.modules.{m}": "1.0.0" for m in MODULES}}, indent=2), encoding="utf-8"
+    )
     (folder / "ProjectSettings").mkdir(exist_ok=True)
     pv = folder / "ProjectSettings" / "ProjectVersion.txt"
     if not pv.exists():
@@ -344,7 +390,8 @@ def write(folder, cfg):
     (folder / "README.txt").write_text(
         f"{cfg['title']}: a Unity project made by AI PC.\n\nOpen it in Unity Hub (Add > Add project from disk > this folder). The scene is built "
         "the first time it opens (menu: AI PC > Rebuild scene to build it again). Press Play: WASD or arrows to move, Space to jump, R to restart.\n",
-        encoding="utf-8")
+        encoding="utf-8",
+    )
     return folder
 
 
@@ -375,8 +422,24 @@ def build(folder, timeout=1800):
         return None
     log = Path(folder) / "Logs" / "aipc_build.log"
     log.parent.mkdir(parents=True, exist_ok=True)
-    r = subprocess.run([str(exe), "-batchmode", "-nographics", "-quit", "-projectPath", str(folder), "-executeMethod", "AIPC.Builder.BuildWindows", "-logFile",
-                        str(log)], capture_output=True, text=True, timeout=timeout, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    r = subprocess.run(
+        [
+            str(exe),
+            "-batchmode",
+            "-nographics",
+            "-quit",
+            "-projectPath",
+            str(folder),
+            "-executeMethod",
+            "AIPC.Builder.BuildWindows",
+            "-logFile",
+            str(log),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
     game = Path(folder) / "Builds" / "Windows" / "Game.exe"
     return {"ok": r.returncode == 0 and game.exists(), "exe": game, "log": log}
 
@@ -434,8 +497,10 @@ def run(op, ctx):
             return "Make a Unity game first, e.g. 'unity game: coin collector, 12 coins'."
         r = build(last["folder"])
         if r is None:
-            return (f"No Unity editor on this PC, so it can't be built here. Open {last['folder']} in Unity Hub (Add project from disk); the scene builds itself, "
-                    "then File > Build Profiles > Build. (Unity Personal is free; Unity Hub installs the editor.)")
+            return (
+                f"No Unity editor on this PC, so it can't be built here. Open {last['folder']} in Unity Hub (Add project from disk); the scene builds itself, "
+                "then File > Build Profiles > Build. (Unity Personal is free; Unity Hub installs the editor.)"
+            )
         return f"Built {r['exe']} (checked: the .exe exists)." if r["ok"] else f"The Unity build failed: see {r['log']}."
     cfg = read(op["words"], last["cfg"] if (last and op["op"] == "edit") else None)
     folder = Path(last["folder"]) if (last and op["op"] == "edit") else Path(ctx["out"]) / "unity" / re.sub(r"[^\w-]+", "_", cfg["title"])
@@ -444,9 +509,15 @@ def run(op, ctx):
     write(folder, cfg)
     memo["unity"] = {"folder": str(folder), "cfg": cfg}
     bad = [w for w, ok in check(folder) if not ok]
-    what = (f"'{cfg['title']}': {cfg['coins']} coins in a {cfg['arena']:g} m arena, player speed {cfg['speed']:g}, jump {cfg['jump']:g}, "
-            + (f"{cfg['seconds']} s to collect them" if cfg["seconds"] else "no time limit"))
-    return (f"Unity project {'updated' if op['op'] == 'edit' else 'made'}: {folder} ({what}). " +
-            ("Checked: scripts, settings and packages. " if not bad else "NOT right: " + ", ".join(bad) + ". ") +
-            ("Unity is on this PC: say 'build the unity game' for the .exe." if editor() else
-             "Open it in Unity Hub (Add project from disk); the scene builds itself; press Play (WASD/arrows, Space to jump)."))
+    what = f"'{cfg['title']}': {cfg['coins']} coins in a {cfg['arena']:g} m arena, player speed {cfg['speed']:g}, jump {cfg['jump']:g}, " + (
+        f"{cfg['seconds']} s to collect them" if cfg["seconds"] else "no time limit"
+    )
+    return (
+        f"Unity project {'updated' if op['op'] == 'edit' else 'made'}: {folder} ({what}). "
+        + ("Checked: scripts, settings and packages. " if not bad else "NOT right: " + ", ".join(bad) + ". ")
+        + (
+            "Unity is on this PC: say 'build the unity game' for the .exe."
+            if editor()
+            else "Open it in Unity Hub (Add project from disk); the scene builds itself; press Play (WASD/arrows, Space to jump)."
+        )
+    )

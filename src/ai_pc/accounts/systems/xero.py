@@ -12,6 +12,7 @@ before a new try (an answer lost after Xero saved it).
 Sign-in: http://localhost:3009/callback (Xero refuses 127.0.0.1), PKCE S256; access tokens last 30 minutes, refresh
 tokens 60 days and rotate (each new one is kept at once); Xero-tenant-id on every call.
 """
+
 import base64
 import hashlib
 import re
@@ -32,56 +33,99 @@ CONNECTIONS = "https://api.xero.com/connections"
 AUTH = "https://login.xero.com/identity/connect/authorize"
 TOKEN = "https://identity.xero.com/connect/token"
 PORT, PATH = 3009, "/callback"
-SCOPES = ["openid", "offline_access", "accounting.invoices", "accounting.payments", "accounting.banktransactions", "accounting.contacts",
-          "accounting.settings", "accounting.reports.profitandloss.read", "accounting.reports.balancesheet.read",
-          "accounting.reports.trialbalance.read", "accounting.reports.aged.read"]
+SCOPES = [
+    "openid",
+    "offline_access",
+    "accounting.invoices",
+    "accounting.payments",
+    "accounting.banktransactions",
+    "accounting.contacts",
+    "accounting.settings",
+    "accounting.reports.profitandloss.read",
+    "accounting.reports.balancesheet.read",
+    "accounting.reports.trialbalance.read",
+    "accounting.reports.aged.read",
+]
 # accounts made in the organisation when missing: role -> (name, type, code)
-MADE = {"further_tax": ("Further Tax Payable", "CURRLIAB", "2110"), "wht": ("Income Tax Deducted by Customers", "CURRASSET", "1310"),
-        "wht_payable": ("Income Tax Withheld from Suppliers", "CURRLIAB", "2200")}
+MADE = {
+    "further_tax": ("Further Tax Payable", "CURRLIAB", "2110"),
+    "wht": ("Income Tax Deducted by Customers", "CURRASSET", "1310"),
+    "wht_payable": ("Income Tax Withheld from Suppliers", "CURRLIAB", "2200"),
+}
 APP = {
-    "label": "Xero", "fields": [("client_id", "Client id of your Xero app", False)],
-    "steps": ["Open https://developer.xero.com/app/manage and sign in with your Xero login; click 'New app'.",
-              "Choose 'Auth code with PKCE' (a desktop app: no secret), name it AI PC, Company or application URL: any page of yours, "
-              "Redirect URI: http://localhost:3009/callback",
-              "Copy the app's Client id, then run 'ai-pc accounts connect xero': a Xero sign-in opens once; pick your organisation and allow.",
-              "Sales tax is set up in Xero as 'Sales Tax 18%' the first time an invoice goes (Pakistan organisations use Xero's global edition)."],
+    "label": "Xero",
+    "fields": [("client_id", "Client id of your Xero app", False)],
+    "steps": [
+        "Open https://developer.xero.com/app/manage and sign in with your Xero login; click 'New app'.",
+        "Choose 'Auth code with PKCE' (a desktop app: no secret), name it AI PC, Company or application URL: any page of yours, "
+        "Redirect URI: http://localhost:3009/callback",
+        "Copy the app's Client id, then run 'ai-pc accounts connect xero': a Xero sign-in opens once; pick your organisation and allow.",
+        "Sales tax is set up in Xero as 'Sales Tax 18%' the first time an invoice goes (Pakistan organisations use Xero's global edition).",
+    ],
     "notes": "Free for your own organisation (Xero's Starter developer tier: 1,000 calls a day). Xero's own Ignite/Starter plans cap how many "
-             "invoices you can approve a month; Grow and above do not.",
+    "invoices you can approve a month; Grow and above do not.",
 }
 
 
 def connect(values, open_url=webbrowser.open, show=print, transport=None, timeout=300, store=None):
     from ai_pc.accounts.systems.loop import loopback_localhost
+
     verifier = secrets.token_urlsafe(64)[:96]
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
 
     def build(redirect, state):
-        return AUTH + "?" + urllib.parse.urlencode({"response_type": "code", "client_id": values["client_id"], "redirect_uri": redirect,
-                                                    "scope": " ".join(SCOPES), "state": state, "code_challenge": challenge,
-                                                    "code_challenge_method": "S256"})
+        return (
+            AUTH
+            + "?"
+            + urllib.parse.urlencode(
+                {
+                    "response_type": "code",
+                    "client_id": values["client_id"],
+                    "redirect_uri": redirect,
+                    "scope": " ".join(SCOPES),
+                    "state": state,
+                    "code_challenge": challenge,
+                    "code_challenge_method": "S256",
+                }
+            )
+        )
+
     got, redirect = loopback_localhost(build, PORT, PATH, show=show, open_url=open_url, timeout=timeout, who="Xero")
     return finish(values["client_id"], got["code"], redirect, verifier, transport, store)
 
 
 def finish(client_id, code, redirect, verifier, transport=None, store=None):
     """The sign-in's code -> tokens -> the organisation it allowed; kept encrypted (or given to `store`)."""
-    tok = _token({"grant_type": "authorization_code", "client_id": client_id, "code": code, "redirect_uri": redirect, "code_verifier": verifier},
-                 transport)
-    conns = Api(CONNECTIONS, headers={"Authorization": f"Bearer {tok['access_token']}"}, service="xero", transport=transport).request("GET", CONNECTIONS)
+    tok = _token(
+        {"grant_type": "authorization_code", "client_id": client_id, "code": code, "redirect_uri": redirect, "code_verifier": verifier}, transport
+    )
+    conns = Api(CONNECTIONS, headers={"Authorization": f"Bearer {tok['access_token']}"}, service="xero", transport=transport).request(
+        "GET", CONNECTIONS
+    )
     orgs = [c for c in conns if c.get("tenantType") == "ORGANISATION"] if isinstance(conns, list) else []
     if not orgs:
         raise SyncError("Xero gave access to no organisation: connect again and tick your organisation", "auth")
-    creds = {"client_id": client_id, "access_token": tok["access_token"], "refresh_token": tok.get("refresh_token", ""),
-             "expires_at": time.time() + int(tok.get("expires_in") or 1800) - 60, "tenant": orgs[0]["tenantId"], "tenant_name": orgs[0].get("tenantName"),
-             "tenants": {o["tenantName"]: o["tenantId"] for o in orgs}}
+    creds = {
+        "client_id": client_id,
+        "access_token": tok["access_token"],
+        "refresh_token": tok.get("refresh_token", ""),
+        "expires_at": time.time() + int(tok.get("expires_in") or 1800) - 60,
+        "tenant": orgs[0]["tenantId"],
+        "tenant_name": orgs[0].get("tenantName"),
+        "tenants": {o["tenantName"]: o["tenantId"] for o in orgs},
+    }
     (store or (lambda c: vault.put("xero", c)))(creds)
-    return {"who": orgs[0].get("tenantName"), "where": "Xero" + (f"; also allowed: {', '.join(o['tenantName'] for o in orgs[1:])}" if len(orgs) > 1 else "")}
+    return {
+        "who": orgs[0].get("tenantName"),
+        "where": "Xero" + (f"; also allowed: {', '.join(o['tenantName'] for o in orgs[1:])}" if len(orgs) > 1 else ""),
+    }
 
 
 def _token(form, transport=None):
     try:
-        return Api(TOKEN, service="xero sign-in", transport=transport).request("POST", TOKEN, data=urllib.parse.urlencode(form).encode(),
-                                                                           headers={"Content-Type": "application/x-www-form-urlencoded"}, retries=1)
+        return Api(TOKEN, service="xero sign-in", transport=transport).request(
+            "POST", TOKEN, data=urllib.parse.urlencode(form).encode(), headers={"Content-Type": "application/x-www-form-urlencoded"}, retries=1
+        )
     except HubError as e:
         raise SyncError(f"Xero refused the sign-in ({e}); run 'ai-pc accounts connect xero' again", "auth") from e
 
@@ -113,8 +157,11 @@ class System(Connector):
         if c.get("access_token") and c.get("expires_at", 0) > time.time() + 60:
             return c["access_token"]
         tok = _token({"grant_type": "refresh_token", "client_id": c["client_id"], "refresh_token": c["refresh_token"]}, self.transport)
-        c.update(access_token=tok["access_token"], refresh_token=tok.get("refresh_token") or c["refresh_token"],  # Xero's refresh tokens rotate
-                 expires_at=time.time() + int(tok.get("expires_in") or 1800) - 60)
+        c.update(
+            access_token=tok["access_token"],
+            refresh_token=tok.get("refresh_token") or c["refresh_token"],  # Xero's refresh tokens rotate
+            expires_at=time.time() + int(tok.get("expires_in") or 1800) - 60,
+        )
         if self.from_vault:
             vault.put("xero", {k: c[k] for k in ("access_token", "refresh_token", "expires_at")})
         return c["access_token"]
@@ -122,8 +169,12 @@ class System(Connector):
     def call(self, method, path, body=None, params=None, idem=False):
         self.calls += 1
         h = {"Idempotency-Key": uuid.uuid4().hex} if idem else None  # the same key on every retry of this call
-        api = Api(API, headers={"Authorization": f"Bearer {self.token()}", "Xero-tenant-id": self.creds.get("tenant", "")}, service="xero",
-                  transport=self.transport)
+        api = Api(
+            API,
+            headers={"Authorization": f"Bearer {self.token()}", "Xero-tenant-id": self.creds.get("tenant", "")},
+            service="xero",
+            transport=self.transport,
+        )
         try:
             return api.request(method, path, params=params, json_body=body, headers=h)
         except HubError as e:
@@ -169,6 +220,7 @@ class System(Connector):
             if party.get("address"):
                 c["Addresses"] = [{"AddressType": "STREET", "AddressLine1": party["address"]}]
             return self.call("PUT", "Contacts", {"Contacts": [c]}, idem=True)["Contacts"][0]["ContactID"]
+
         return once(b, self.name, "party", party["id"], make)
 
     def tax_type(self, b, rate):
@@ -178,12 +230,23 @@ class System(Connector):
 
         def make():
             for t in self.call("GET", "TaxRates").get("TaxRates") or []:
-                if t.get("Status") == "ACTIVE" and Decimal(str(t.get("EffectiveRate", t.get("DisplayTaxRate", -1)))) == want and \
-                        t.get("CanApplyToRevenue") is not False and t.get("CanApplyToExpenses") is not False:
+                if (
+                    t.get("Status") == "ACTIVE"
+                    and Decimal(str(t.get("EffectiveRate", t.get("DisplayTaxRate", -1)))) == want
+                    and t.get("CanApplyToRevenue") is not False
+                    and t.get("CanApplyToExpenses") is not False
+                ):
                     return t["TaxType"]
-            body = {"TaxRates": [{"Name": f"Sales Tax {want.normalize()}%", "TaxComponents": [{"Name": "Sales Tax", "Rate": float(want), "IsCompound": False,
-                                                                                                 "IsNonRecoverable": False}]}]}
+            body = {
+                "TaxRates": [
+                    {
+                        "Name": f"Sales Tax {want.normalize()}%",
+                        "TaxComponents": [{"Name": "Sales Tax", "Rate": float(want), "IsCompound": False, "IsNonRecoverable": False}],
+                    }
+                ]
+            }
             return self.call("PUT", "TaxRates", body, idem=True)["TaxRates"][0]["TaxType"]
+
         return once(b, self.name, "tax", f"sales tax {want.normalize()}", make)
 
     def accounts(self, fresh=False):
@@ -193,6 +256,7 @@ class System(Connector):
 
     def account(self, b, role):
         """The organisation's account for a role: by Code for lines, by AccountID for a bank account; made when missing."""
+
         def of(t, rx=None):
             return [a for a in self.accounts() if a.get("Type") in t and (not rx or re.search(rx, a.get("Name") or "", re.I))]
 
@@ -209,8 +273,11 @@ class System(Connector):
                 return hit["Code"]
             if role in ("bank", "cash"):
                 banks = of(("BANK",))
-                pick = [a for a in banks if re.search(r"cash", a.get("Name") or "", re.I)] if role == "cash" else \
-                    [a for a in banks if not re.search(r"cash", a.get("Name") or "", re.I)]
+                pick = (
+                    [a for a in banks if re.search(r"cash", a.get("Name") or "", re.I)]
+                    if role == "cash"
+                    else [a for a in banks if not re.search(r"cash", a.get("Name") or "", re.I)]
+                )
                 pick = pick or banks
                 if not pick:
                     raise SyncError("Xero: add your bank account in Xero first (Accounting > Bank accounts)")
@@ -220,18 +287,26 @@ class System(Connector):
                 if not code:
                     raise SyncError("Xero: the organisation has no expense account")
                 return code
-            pick = {"sales": of(("REVENUE", "SALES"), r"sales") or of(("REVENUE", "SALES")),
-                    "services": of(("REVENUE", "SALES"), r"service") or of(("REVENUE", "SALES"), r"sales") or of(("REVENUE", "SALES")),
-                    "purchases": of(("DIRECTCOSTS",), r"purchase") or of(("DIRECTCOSTS",))}[role]
+            pick = {
+                "sales": of(("REVENUE", "SALES"), r"sales") or of(("REVENUE", "SALES")),
+                "services": of(("REVENUE", "SALES"), r"service") or of(("REVENUE", "SALES"), r"sales") or of(("REVENUE", "SALES")),
+                "purchases": of(("DIRECTCOSTS",), r"purchase") or of(("DIRECTCOSTS",)),
+            }[role]
             pick = [a for a in pick if a.get("Code")]
             if not pick:
                 raise SyncError(f"Xero: the organisation has no {role} account")
             return pick[0]["Code"]
+
         return once(b, self.name, "account", role, make)
 
     def _line(self, b, ln, acct):
-        row = {"Description": ln["description"], "Quantity": float(Decimal(ln["qty"])), "UnitAmount": ln["rate"] / 100, "AccountCode": acct,
-               "TaxType": self.tax_type(b, ln.get("tax_rate"))}
+        row = {
+            "Description": ln["description"],
+            "Quantity": float(Decimal(ln["qty"])),
+            "UnitAmount": ln["rate"] / 100,
+            "AccountCode": acct,
+            "TaxType": self.tax_type(b, ln.get("tax_rate")),
+        }
         if ln.get("discount"):
             d = str(ln["discount"]).replace(" ", "")
             if d.endswith("%"):
@@ -250,50 +325,92 @@ class System(Connector):
                 acct = self.account(b, "services" if ln.get("kind") == "service" else "sales")
             out.append(self._line(b, ln, acct))
         if (doc.get("totals") or {}).get("further_tax"):
-            out.append({"Description": "Further tax (buyer without sales tax registration)", "Quantity": 1, "UnitAmount": doc["totals"]["further_tax"] / 100,
-                        "AccountCode": self.account(b, "further_tax"), "TaxType": "NONE"})
+            out.append(
+                {
+                    "Description": "Further tax (buyer without sales tax registration)",
+                    "Quantity": 1,
+                    "UnitAmount": doc["totals"]["further_tax"] / 100,
+                    "AccountCode": self.account(b, "further_tax"),
+                    "TaxType": "NONE",
+                }
+            )
         return out
 
     # ---------------------------------------------------------------- creating, reading, cancelling
     def create(self, b, doc):
         k, p, n = doc["kind"], doc.get("party"), doc["number"]
         if k in ("invoice", "bill"):
+
             def make():
-                inv = {"Type": "ACCREC" if k == "invoice" else "ACCPAY", "Contact": {"ContactID": self.contact(b, p)}, "Date": doc["date"],
-                       "DueDate": doc.get("due") or doc["date"], "LineAmountTypes": "Exclusive", "Status": "AUTHORISED",
-                       "InvoiceNumber": n if k == "invoice" else (doc.get("ref") or n), "Reference": n if k == "bill" else (doc.get("ref") or ""),
-                       "LineItems": self._lines(b, doc, purchase=k == "bill")}
+                inv = {
+                    "Type": "ACCREC" if k == "invoice" else "ACCPAY",
+                    "Contact": {"ContactID": self.contact(b, p)},
+                    "Date": doc["date"],
+                    "DueDate": doc.get("due") or doc["date"],
+                    "LineAmountTypes": "Exclusive",
+                    "Status": "AUTHORISED",
+                    "InvoiceNumber": n if k == "invoice" else (doc.get("ref") or n),
+                    "Reference": n if k == "bill" else (doc.get("ref") or ""),
+                    "LineItems": self._lines(b, doc, purchase=k == "bill"),
+                }
                 el = self.call("POST", "Invoices", {"Invoices": [inv]}, params={"summarizeErrors": "false"}, idem=True)["Invoices"][0]
                 if el.get("HasErrors") or el.get("StatusAttributeString") == "ERROR":
                     raise SyncError("Xero: " + "; ".join(v.get("Message", "") for v in el.get("ValidationErrors") or []))
                 return el["InvoiceID"]
-            look = (lambda: self._one("Invoices", {"InvoiceNumbers": n}, "InvoiceID", lambda x: x.get("Type") == "ACCREC")) if k == "invoice" else \
-                (lambda: self._one("Invoices", {"where": f'Type=="ACCPAY" AND Reference=="{n}"'}, "InvoiceID"))
+
+            look = (
+                (lambda: self._one("Invoices", {"InvoiceNumbers": n}, "InvoiceID", lambda x: x.get("Type") == "ACCREC"))
+                if k == "invoice"
+                else (lambda: self._one("Invoices", {"where": f'Type=="ACCPAY" AND Reference=="{n}"'}, "InvoiceID"))
+            )
             return self.step(b, doc, "made", make, look)
         if k == "quote":
+
             def make():
-                q = {"Contact": {"ContactID": self.contact(b, p)}, "Date": doc["date"], "ExpiryDate": doc.get("due"), "QuoteNumber": n,
-                     "LineAmountTypes": "Exclusive", "Status": "SENT", "LineItems": self._lines(b, doc)}
+                q = {
+                    "Contact": {"ContactID": self.contact(b, p)},
+                    "Date": doc["date"],
+                    "ExpiryDate": doc.get("due"),
+                    "QuoteNumber": n,
+                    "LineAmountTypes": "Exclusive",
+                    "Status": "SENT",
+                    "LineItems": self._lines(b, doc),
+                }
                 return self.call("PUT", "Quotes", {"Quotes": [q]}, idem=True)["Quotes"][0]["QuoteID"]
+
             return self.step(b, doc, "made", make, lambda: self._one("Quotes", {"QuoteNumber": n}, "QuoteID"))
         if k == "credit_note":
             inv = b.doc_by_number(doc["invoice"])
             target = linked(b, inv["id"], self.name)
 
             def make():
-                cn = {"Type": "ACCRECCREDIT", "Contact": {"ContactID": self.contact(b, p)}, "Date": doc["date"], "CreditNoteNumber": n,
-                      "Reference": inv["number"], "LineAmountTypes": "Exclusive", "Status": "AUTHORISED", "LineItems": self._lines(b, doc)}
+                cn = {
+                    "Type": "ACCRECCREDIT",
+                    "Contact": {"ContactID": self.contact(b, p)},
+                    "Date": doc["date"],
+                    "CreditNoteNumber": n,
+                    "Reference": inv["number"],
+                    "LineAmountTypes": "Exclusive",
+                    "Status": "AUTHORISED",
+                    "LineItems": self._lines(b, doc),
+                }
                 return self.call("PUT", "CreditNotes", {"CreditNotes": [cn]}, idem=True)["CreditNotes"][0]["CreditNoteID"]
+
             cid = self.step(b, doc, "made", make, lambda: self._one("CreditNotes", {"where": f'CreditNoteNumber=="{n}"'}, "CreditNoteID"))
 
             def allocate():
-                self.call("PUT", f"CreditNotes/{cid}/Allocations", {"Allocations": [{"Invoice": {"InvoiceID": target}, "Amount": doc["total"] / 100,
-                                                                                     "Date": doc["date"]}]}, idem=True)
+                self.call(
+                    "PUT",
+                    f"CreditNotes/{cid}/Allocations",
+                    {"Allocations": [{"Invoice": {"InvoiceID": target}, "Amount": doc["total"] / 100, "Date": doc["date"]}]},
+                    idem=True,
+                )
                 return "allocated"
 
             def allocated():
                 x = (self.call("GET", f"CreditNotes/{cid}").get("CreditNotes") or [{}])[0]
                 return "allocated" if any((a.get("Invoice") or {}).get("InvoiceID") == target for a in x.get("Allocations") or []) else None
+
             self.step(b, doc, "allocated", allocate, allocated)
             return cid
         if k in ("receipt", "payment"):
@@ -303,27 +420,65 @@ class System(Connector):
             for i, (doc_id, cash, wht) in enumerate(parts, 1):
                 target = linked(b, doc_id, self.name)
                 if cash:
-                    ids.append(self.step(b, doc, f"payment {i}", lambda: self._pay(target, {"AccountID": self.account(b, src)}, cash, doc, n),
-                                         lambda: self._paid(target, cash, n)))
+                    ids.append(
+                        self.step(
+                            b,
+                            doc,
+                            f"payment {i}",
+                            lambda: self._pay(target, {"AccountID": self.account(b, src)}, cash, doc, n),
+                            lambda: self._paid(target, cash, n),
+                        )
+                    )
                 if wht:
                     acct = self.account(b, "wht" if k == "receipt" else "wht_payable")
-                    ids.append(self.step(b, doc, f"tax withheld {i}", lambda: self._pay(target, {"Code": acct}, wht, doc, f"{n} WHT"),
-                                         lambda: self._paid(target, wht, f"{n} WHT")))
+                    ids.append(
+                        self.step(
+                            b,
+                            doc,
+                            f"tax withheld {i}",
+                            lambda: self._pay(target, {"Code": acct}, wht, doc, f"{n} WHT"),
+                            lambda: self._paid(target, wht, f"{n} WHT"),
+                        )
+                    )
             if advance > 0:
-                ids.append("P" + self.step(b, doc, "advance", lambda: self._prepay(b, doc, advance, src),
-                                           lambda: self._one("BankTransactions", {"where": f'Reference=="{n} ADVANCE"'}, "BankTransactionID")))
+                ids.append(
+                    "P"
+                    + self.step(
+                        b,
+                        doc,
+                        "advance",
+                        lambda: self._prepay(b, doc, advance, src),
+                        lambda: self._one("BankTransactions", {"where": f'Reference=="{n} ADVANCE"'}, "BankTransactionID"),
+                    )
+                )
             if not ids:
                 raise SyncError(f"{n} settles nothing that can go to Xero")
             return ",".join(ids)
         if k == "expense":
+
             def make():
                 who = self.contact(b, p) if p else self.contact(b, {"id": "expenses", "name": "Expenses (paid at once)"})
-                line = {"Description": doc.get("what"), "Quantity": 1, "UnitAmount": doc["amount"] / 100,
-                        "AccountCode": self.account(b, f"expense:{doc.get('account') or '6090'}"), "TaxType": self.tax_type(b, rate_of(doc["amount"], doc.get("tax")))}
-                bt = {"Type": "SPEND", "Contact": {"ContactID": who}, "Date": doc["date"], "LineAmountTypes": "Exclusive", "Reference": n,
-                      "BankAccount": {"AccountID": self.account(b, "bank" if doc.get("paid_from") == "bank" else "cash")}, "LineItems": [line]}
+                line = {
+                    "Description": doc.get("what"),
+                    "Quantity": 1,
+                    "UnitAmount": doc["amount"] / 100,
+                    "AccountCode": self.account(b, f"expense:{doc.get('account') or '6090'}"),
+                    "TaxType": self.tax_type(b, rate_of(doc["amount"], doc.get("tax"))),
+                }
+                bt = {
+                    "Type": "SPEND",
+                    "Contact": {"ContactID": who},
+                    "Date": doc["date"],
+                    "LineAmountTypes": "Exclusive",
+                    "Reference": n,
+                    "BankAccount": {"AccountID": self.account(b, "bank" if doc.get("paid_from") == "bank" else "cash")},
+                    "LineItems": [line],
+                }
                 return self.call("PUT", "BankTransactions", {"BankTransactions": [bt]}, idem=True)["BankTransactions"][0]["BankTransactionID"]
-            return self.step(b, doc, "made", make, lambda: self._one("BankTransactions", {"where": f'Reference=="{n}" AND Type=="SPEND"'}, "BankTransactionID"))
+
+            return self.step(
+                b, doc, "made", make, lambda: self._one("BankTransactions", {"where": f'Reference=="{n}" AND Type=="SPEND"'}, "BankTransactionID")
+            )
         raise SyncError(f"Xero: a {k} is not sent")
 
     def _pay(self, target, account, amount, doc, ref):
@@ -331,15 +486,32 @@ class System(Connector):
         return self.call("PUT", "Payments", body, idem=True)["Payments"][0]["PaymentID"]
 
     def _paid(self, target, amount, ref):
-        return self._one("Payments", {"where": f'Reference=="{ref}"'}, "PaymentID",
-                         lambda x: (x.get("Invoice") or {}).get("InvoiceID") == target and _cents(x.get("Amount")) == amount)
+        return self._one(
+            "Payments",
+            {"where": f'Reference=="{ref}"'},
+            "PaymentID",
+            lambda x: (x.get("Invoice") or {}).get("InvoiceID") == target and _cents(x.get("Amount")) == amount,
+        )
 
     def _prepay(self, b, doc, amount, src):
         rec = doc["kind"] == "receipt"
-        bt = {"Type": "RECEIVE-PREPAYMENT" if rec else "SPEND-PREPAYMENT", "Contact": {"ContactID": self.contact(b, doc["party"])}, "Date": doc["date"],
-              "LineAmountTypes": "NoTax", "Reference": f"{doc['number']} ADVANCE", "BankAccount": {"AccountID": self.account(b, src)},
-              "LineItems": [{"Description": f"Advance ({doc['number']})", "Quantity": 1, "UnitAmount": amount / 100,
-                             "AccountCode": self.account(b, "sales" if rec else "purchases"), "TaxType": "NONE"}]}
+        bt = {
+            "Type": "RECEIVE-PREPAYMENT" if rec else "SPEND-PREPAYMENT",
+            "Contact": {"ContactID": self.contact(b, doc["party"])},
+            "Date": doc["date"],
+            "LineAmountTypes": "NoTax",
+            "Reference": f"{doc['number']} ADVANCE",
+            "BankAccount": {"AccountID": self.account(b, src)},
+            "LineItems": [
+                {
+                    "Description": f"Advance ({doc['number']})",
+                    "Quantity": 1,
+                    "UnitAmount": amount / 100,
+                    "AccountCode": self.account(b, "sales" if rec else "purchases"),
+                    "TaxType": "NONE",
+                }
+            ],
+        }
         return self.call("PUT", "BankTransactions", {"BankTransactions": [bt]}, idem=True)["BankTransactions"][0]["BankTransactionID"]
 
     def read(self, b, doc, remote):

@@ -7,6 +7,7 @@ Checked: every place is in the map and the project, the PDF has its page, and ea
 
   'qgis map of shops.csv'   'qgis buffer 5 km around shops.csv'   'qgis convert shops.kml to geopackage'
 """
+
 import csv
 import json
 import math
@@ -21,10 +22,18 @@ EXAMPLES = ["qgis map of shops.csv", "qgis buffer 5 km around shops.csv", "qgis 
 HOME = ROOT / "tools" / "qgis"
 QROOT = HOME / "QGIS 4.2.3"
 TABLES = {".csv", ".xlsx", ".geojson", ".json", ".kml", ".gpkg", ".shp", ".gpx"}
-FORMATS = {"geojson": ("GeoJSON", ".geojson"), "kml": ("KML", ".kml"), "shapefile": ("ESRI Shapefile", ".shp"), "shp": ("ESRI Shapefile", ".shp"),
-           "geopackage": ("GPKG", ".gpkg"), "gpkg": ("GPKG", ".gpkg"), "gpx": ("GPX", ".gpx"), "csv": ("CSV", ".csv")}
+FORMATS = {
+    "geojson": ("GeoJSON", ".geojson"),
+    "kml": ("KML", ".kml"),
+    "shapefile": ("ESRI Shapefile", ".shp"),
+    "shp": ("ESRI Shapefile", ".shp"),
+    "geopackage": ("GPKG", ".gpkg"),
+    "gpkg": ("GPKG", ".gpkg"),
+    "gpx": ("GPX", ".gpx"),
+    "csv": ("CSV", ".csv"),
+}
 
-MAP_SCRIPT = r'''
+MAP_SCRIPT = r"""
 import json, os, sys
 from qgis.core import (QgsApplication, QgsProject, QgsVectorLayer, QgsCoordinateReferenceSystem, QgsMapSettings, QgsMapRendererSequentialJob,
                        QgsRectangle, QgsPalLayerSettings, QgsVectorLayerSimpleLabeling, QgsTextFormat, QgsTextBufferSettings, QgsMarkerSymbol,
@@ -77,7 +86,7 @@ project.setFileName(job["qgz"]); ok = project.write()
 print("AIPC_REPORT " + json.dumps({"places": places.featureCount(), "layers": [l.name() for l in project.mapLayers().values()],
       "pdf": res == QgsLayoutExporter.Success, "saved": ok, "valid": [countries.isValid(), provinces.isValid(), places.isValid()]}))
 app.exitQgis()
-'''
+"""
 
 
 def env():
@@ -89,8 +98,13 @@ def env():
     if "[cache]" not in text:  # QGIS's network cache inside the project, not in AppData
         ini.write_text(text + f"\n[cache]\ndirectory={cache.as_posix()}\n", encoding="utf-8")
     # offscreen Qt has no font list of its own: without QT_QPA_FONTDIR every label is drawn as boxes
-    return dict(os.environ, QGIS_CUSTOM_CONFIG_PATH=str(home.resolve()), QGIS_AUTH_DB_DIR_PATH=str(home.resolve()), QT_QPA_PLATFORM="offscreen",
-                QT_QPA_FONTDIR=str(Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"))
+    return dict(
+        os.environ,
+        QGIS_CUSTOM_CONFIG_PATH=str(home.resolve()),
+        QGIS_AUTH_DB_DIR_PATH=str(home.resolve()),
+        QT_QPA_PLATFORM="offscreen",
+        QT_QPA_FONTDIR=str(Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts"),
+    )
 
 
 def qrun(args, timeout=600):
@@ -98,6 +112,7 @@ def qrun(args, timeout=600):
     import shutil
 
     from ai_pc.core import hidden_desktop
+
     local = Path(os.environ["LOCALAPPDATA"]) / "QGIS"
     had = local.exists()
     try:
@@ -112,10 +127,14 @@ def places_from(path):
     p = Path(path)
     if p.suffix.lower() in (".geojson", ".json"):
         gj = json.loads(p.read_text(encoding="utf-8"))
-        return [(str((f.get("properties") or {}).get("name", f"place {i + 1}")), f["geometry"]["coordinates"][1], f["geometry"]["coordinates"][0])
-                for i, f in enumerate(gj["features"]) if f["geometry"]["type"] == "Point"]
+        return [
+            (str((f.get("properties") or {}).get("name", f"place {i + 1}")), f["geometry"]["coordinates"][1], f["geometry"]["coordinates"][0])
+            for i, f in enumerate(gj["features"])
+            if f["geometry"]["type"] == "Point"
+        ]
     if p.suffix.lower() == ".xlsx":
         from openpyxl import load_workbook
+
         wb = load_workbook(p, read_only=True, data_only=True)
         rows = [[("" if c is None else str(c)).strip() for c in r] for r in wb.active.iter_rows(values_only=True)]
         wb.close()
@@ -136,14 +155,24 @@ def places_from(path):
 
 
 def geojson(places, path):
-    Path(path).write_text(json.dumps({"type": "FeatureCollection", "features": [
-        {"type": "Feature", "properties": {"name": n}, "geometry": {"type": "Point", "coordinates": [lon, lat]}} for n, lat, lon in places]}), encoding="utf-8")
+    Path(path).write_text(
+        json.dumps(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {"type": "Feature", "properties": {"name": n}, "geometry": {"type": "Point", "coordinates": [lon, lat]}} for n, lat, lon in places
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def red_marks(png):
     """How many separate red marker blobs the rendered map has."""
     import numpy as np
     from PIL import Image
+
     a = np.asarray(Image.open(png).convert("RGB")).astype(int)
     mask = (a[..., 0] > 200) & (a[..., 1] < 90) & (a[..., 2] < 90)
     seen, blobs = np.zeros_like(mask), 0
@@ -163,6 +192,7 @@ def red_marks(png):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bqgis\b|\bgis\b|\bshapefile\b|\bgeopackage\b", c):
         return None
@@ -201,8 +231,9 @@ def run(op, ctx):
         n_out = sum(int(x) for x in re.findall(r"Feature Count: (\d+)", info))
         n_in = sum(int(x) for x in re.findall(r"Feature Count: (\d+)", info_src))
         ok = dest.exists() and n_out == n_in and n_in > 0
-        return (f"QGIS (GDAL) converted {src.name} to {dest} ({op['format']}). " +
-                (f"Checked: all {n_in} features are in it." if ok else f"NOT right: {n_out} of {n_in} features. {(se or so)[-200:]}"))
+        return f"QGIS (GDAL) converted {src.name} to {dest} ({op['format']}). " + (
+            f"Checked: all {n_in} features are in it." if ok else f"NOT right: {n_out} of {n_in} features. {(se or so)[-200:]}"
+        )
     places = places_from(src)
     if not places:
         return f"No places with latitude and longitude in {src.name}."
@@ -215,23 +246,40 @@ def run(op, ctx):
         utm, buf = out / f"{stem}_utm.geojson", out / f"{stem}_buffer_{op['metres']:g}m.geojson"
         bat = QROOT / "bin" / "qgis_process-qgis.bat"
         qrun([bat, "run", "native:reprojectlayer", "--", f"INPUT={pts}", f"TARGET_CRS=EPSG:{epsg}", f"OUTPUT={utm}"])
-        rc, so, se, _ = qrun([bat, "run", "native:buffer", "--", f"INPUT={utm}", f"DISTANCE={op['metres']}", "SEGMENTS=36", "DISSOLVE=false", f"OUTPUT={buf}"])
+        rc, so, se, _ = qrun(
+            [bat, "run", "native:buffer", "--", f"INPUT={utm}", f"DISTANCE={op['metres']}", "SEGMENTS=36", "DISSOLVE=false", f"OUTPUT={buf}"]
+        )
         from shapely.geometry import shape
+
         feats = json.loads(buf.read_text(encoding="utf-8"))["features"] if buf.exists() else []
         areas = [shape(f["geometry"]).area for f in feats]
         want = math.pi * op["metres"] ** 2
         ok = len(areas) == len(places) and all(abs(a - want) / want < 0.01 for a in areas)
-        return (f"QGIS buffered {len(places)} places by {op['metres'] / 1000:g} km (in metres, UTM zone EPSG:{epsg}): {buf} "
-                f"(each about {want / 1e6:.2f} km2). " +
-                (f"Checked: one buffer per place, each pi r^2 within 1% (measured {min(areas) / 1e6:.3f}-{max(areas) / 1e6:.3f} km2)." if ok
-                 else f"NOT right: {len(areas)} buffers for {len(places)} places. {(se or so)[-300:]}"))
+        return (
+            f"QGIS buffered {len(places)} places by {op['metres'] / 1000:g} km (in metres, UTM zone EPSG:{epsg}): {buf} "
+            f"(each about {want / 1e6:.2f} km2). "
+            + (
+                f"Checked: one buffer per place, each pi r^2 within 1% (measured {min(areas) / 1e6:.3f}-{max(areas) / 1e6:.3f} km2)."
+                if ok
+                else f"NOT right: {len(areas)} buffers for {len(places)} places. {(se or so)[-300:]}"
+            )
+        )
     title = op.get("title") or f"Map of {src.stem.replace('_', ' ').title()}"
     files = {k: out / f"{stem}_map.{k}" for k in ("png", "pdf", "qgz")}
     for p in files.values():
         p.unlink(missing_ok=True)
     job = out / f"{stem}_map_job.json"
-    job.write_text(json.dumps({"title": title, "world": (QROOT / "apps" / "qgis" / "resources" / "data" / "world_map.gpkg").as_posix(),
-                               "points": pts.as_posix(), **{k: v.as_posix() for k, v in files.items()}}), encoding="utf-8")
+    job.write_text(
+        json.dumps(
+            {
+                "title": title,
+                "world": (QROOT / "apps" / "qgis" / "resources" / "data" / "world_map.gpkg").as_posix(),
+                "points": pts.as_posix(),
+                **{k: v.as_posix() for k, v in files.items()},
+            }
+        ),
+        encoding="utf-8",
+    )
     script = out / "aipc_qgis_map.py"
     script.write_text(MAP_SCRIPT, encoding="utf-8")
     rc, so, se, timed_out = qrun([QROOT / "bin" / "python-qgis.bat", script, job])
@@ -242,17 +290,23 @@ def run(op, ctx):
     if files["png"].exists():  # Windows OCR reads the rendered labels (boxes instead of letters would read as nothing)
         try:
             from ai_pc.apps import ocr
+
             seen = re.sub(r"\s+", " ", ocr.read_picture(files["png"], work=out / "_ocr")["text"].lower())
             read_names = sum(1 for n, _, _ in places if n.lower() in seen)
         except Exception:  # noqa: BLE001 - no OCR: the label check reports it
             read_names = -1
     from pypdf import PdfReader
+
     pages = len(PdfReader(str(files["pdf"])).pages) if files["pdf"].exists() else 0
-    checks = [("QGIS loaded the world map and the places", rep.get("valid") == [True, True, True] and rep.get("places") == len(places)),
-              (f"every place is drawn on the map ({marks} markers for {len(places)} places)", marks >= len(places) or (len(places) > 15 and marks > 0)),
-              (f"the labels are readable (Windows OCR reads {max(read_names, 0)} of {len(places)} names)", read_names >= max(1, (len(places) * 2) // 3)),
-              ("the QGIS project saved (opens in QGIS with its layers)", rep.get("saved") and files["qgz"].exists()),
-              ("the PDF map (title, legend, scale bar) has its page", bool(rep.get("pdf")) and pages >= 1)]
+    checks = [
+        ("QGIS loaded the world map and the places", rep.get("valid") == [True, True, True] and rep.get("places") == len(places)),
+        (f"every place is drawn on the map ({marks} markers for {len(places)} places)", marks >= len(places) or (len(places) > 15 and marks > 0)),
+        (f"the labels are readable (Windows OCR reads {max(read_names, 0)} of {len(places)} names)", read_names >= max(1, (len(places) * 2) // 3)),
+        ("the QGIS project saved (opens in QGIS with its layers)", rep.get("saved") and files["qgz"].exists()),
+        ("the PDF map (title, legend, scale bar) has its page", bool(rep.get("pdf")) and pages >= 1),
+    ]
     bad = [w for w, ok in checks if not ok]
-    return (f"QGIS map '{title}' with {len(places)} places: {files['qgz']} (QGIS project), {files['png'].name}, {files['pdf'].name}. Made by QGIS itself "
-            "(hidden). " + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f" {(se or so)[-400:]}"))
+    return (
+        f"QGIS map '{title}' with {len(places)} places: {files['qgz']} (QGIS project), {files['png'].name}, {files['pdf'].name}. Made by QGIS itself "
+        "(hidden). " + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f" {(se or so)[-400:]}")
+    )

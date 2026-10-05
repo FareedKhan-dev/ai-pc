@@ -5,6 +5,7 @@ order given (opened in any browser; no key).
 
   'map of: Shop 12 Hall Road Lahore; Liberty Market Lahore; Emporium Mall Lahore'   'distance from Lahore to Islamabad'
 """
+
 import html
 import json
 import math
@@ -39,7 +40,8 @@ def geocode(place, cache=None):
         time.sleep(wait)  # Nominatim's rule: at most one request a second
     _last[0] = time.time()
     r = Api("https://nominatim.openstreetmap.org", headers=UA, service="nominatim", transport=TRANSPORT).get(
-        "search", params={"q": place, "format": "jsonv2", "limit": 1})
+        "search", params={"q": place, "format": "jsonv2", "limit": 1}
+    )
     if not r:
         raise ValueError(f"'{place}' was not found on OpenStreetMap: add the city, e.g. '{place}, Lahore'")
     hit = (float(r[0]["lat"]), float(r[0]["lon"]), r[0].get("display_name", place))
@@ -67,20 +69,43 @@ def make(places, out, name="places", cache=None):
     pts = [geocode(p, cache) for p in places]
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
-    marks = "".join(f"<Placemark><name>{html.escape(n)}</name><description>{html.escape(p[2])}</description><Point><coordinates>{p[1]:.6f},{p[0]:.6f},0"
-                    f"</coordinates></Point></Placemark>" for n, p in zip(places, pts))
-    route = "" if len(pts) < 2 else ("<Placemark><name>Route (in order)</name><LineString><tessellate>1</tessellate><coordinates>" +
-                                     " ".join(f"{p[1]:.6f},{p[0]:.6f},0" for p in pts) + "</coordinates></LineString></Placemark>")
-    (out / f"{name}.kml").write_text(f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>{html.escape(name)}'
-                                     f"</name>{marks}{route}</Document></kml>", encoding="utf-8")
+    marks = "".join(
+        f"<Placemark><name>{html.escape(n)}</name><description>{html.escape(p[2])}</description><Point><coordinates>{p[1]:.6f},{p[0]:.6f},0"
+        f"</coordinates></Point></Placemark>"
+        for n, p in zip(places, pts)
+    )
+    route = (
+        ""
+        if len(pts) < 2
+        else (
+            "<Placemark><name>Route (in order)</name><LineString><tessellate>1</tessellate><coordinates>"
+            + " ".join(f"{p[1]:.6f},{p[0]:.6f},0" for p in pts)
+            + "</coordinates></LineString></Placemark>"
+        )
+    )
+    (out / f"{name}.kml").write_text(
+        f'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>{html.escape(name)}'
+        f"</name>{marks}{route}</Document></kml>",
+        encoding="utf-8",
+    )
     wpts = "".join(f'<wpt lat="{p[0]:.6f}" lon="{p[1]:.6f}"><name>{html.escape(n)}</name></wpt>' for n, p in zip(places, pts))
-    trk = "" if len(pts) < 2 else "<trk><name>Route</name><trkseg>" + "".join(f'<trkpt lat="{p[0]:.6f}" lon="{p[1]:.6f}"/>' for p in pts) + "</trkseg></trk>"
-    (out / f"{name}.gpx").write_text(f'<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="AI PC" xmlns="http://www.topografix.com/GPX/1/1">'
-                                     f"{wpts}{trk}</gpx>", encoding="utf-8")
-    feats = [{"type": "Feature", "properties": {"name": n, "found_as": p[2]}, "geometry": {"type": "Point", "coordinates": [p[1], p[0]]}}
-             for n, p in zip(places, pts)]
+    trk = (
+        ""
+        if len(pts) < 2
+        else "<trk><name>Route</name><trkseg>" + "".join(f'<trkpt lat="{p[0]:.6f}" lon="{p[1]:.6f}"/>' for p in pts) + "</trkseg></trk>"
+    )
+    (out / f"{name}.gpx").write_text(
+        f'<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="AI PC" xmlns="http://www.topografix.com/GPX/1/1">{wpts}{trk}</gpx>',
+        encoding="utf-8",
+    )
+    feats = [
+        {"type": "Feature", "properties": {"name": n, "found_as": p[2]}, "geometry": {"type": "Point", "coordinates": [p[1], p[0]]}}
+        for n, p in zip(places, pts)
+    ]
     if len(pts) > 1:
-        feats.append({"type": "Feature", "properties": {"name": "Route"}, "geometry": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in pts]}})
+        feats.append(
+            {"type": "Feature", "properties": {"name": "Route"}, "geometry": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in pts]}}
+        )
     (out / f"{name}.geojson").write_text(json.dumps({"type": "FeatureCollection", "features": feats}, ensure_ascii=False, indent=1), encoding="utf-8")
     legs = [km(a, b) for a, b in zip(pts, pts[1:])]
     return pts, legs, [out / f"{name}.{e}" for e in ("kml", "gpx", "geojson")], gmaps_link(places, pts) if len(pts) > 1 else None
@@ -88,6 +113,7 @@ def make(places, out, name="places", cache=None):
 
 def check(places, files):
     from lxml import etree
+
     k = etree.parse(str(files[0]))
     n_k = len(k.findall(".//{http://www.opengis.net/kml/2.2}Point"))
     g = etree.parse(str(files[1]))
@@ -111,10 +137,18 @@ def parse(text, ctx):
 def run(op, ctx):
     if op["op"] == "distance":
         a, b = (geocode(p) for p in op["places"])
-        return (f"{op['places'][0]} to {op['places'][1]}: {km(a, b):,.1f} km in a straight line (the road is longer). Directions: "
-                f"{gmaps_link(op['places'], [a, b])}")
+        return (
+            f"{op['places'][0]} to {op['places'][1]}: {km(a, b):,.1f} km in a straight line (the road is longer). Directions: "
+            f"{gmaps_link(op['places'], [a, b])}"
+        )
     pts, legs, files, link = make(op["places"], Path(ctx["out"]) / "maps", re.sub(r"[^\w-]+", "_", op.get("name", "places")))
     bad = [w for w, ok in check(op["places"], files) if not ok]
-    return (f"{len(pts)} places mapped" + (f", {sum(legs):,.1f} km in straight lines in this order" if legs else "") + ": " + ", ".join(str(f) for f in files) +
-            (" (checked)" if not bad else " NOT right: " + ", ".join(bad)) + (f". Route in Google Maps: {link}" if link else "") +
-            ". Open the KML in Google Earth or import it into Google My Maps.")
+    return (
+        f"{len(pts)} places mapped"
+        + (f", {sum(legs):,.1f} km in straight lines in this order" if legs else "")
+        + ": "
+        + ", ".join(str(f) for f in files)
+        + (" (checked)" if not bad else " NOT right: " + ", ".join(bad))
+        + (f". Route in Google Maps: {link}" if link else "")
+        + ". Open the KML in Google Earth or import it into Google My Maps."
+    )

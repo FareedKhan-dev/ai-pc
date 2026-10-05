@@ -5,6 +5,7 @@ API needs Odoo's Custom plan; a self-hosted Odoo has no such limit. A draft invo
 
   'odoo products'   'odoo orders to invoice'   'odoo invoice for Ayesha Khan: 2 LS-01 at 2,500, 1 delivery at 300'
 """
+
 import itertools
 import re
 
@@ -15,12 +16,20 @@ from ai_pc.hub.http import Api, HubError
 NAME, LABEL = "odoo", "Odoo: products, orders to invoice, draft invoices"
 EXAMPLES = ["odoo products", "odoo orders to invoice", "odoo invoice for Ayesha Khan: 2 LS-01 at 2,500"]
 OUTWARD = {"invoice"}
-APP = {"label": "Odoo",
-       "fields": [("url", "Your Odoo address (https://yourco.odoo.com)", False), ("db", "Database name (often the same as the subdomain)", False),
-                  ("login", "Your login (email)", False), ("key", "API key", True)],
-       "steps": ["In Odoo: your avatar > Preferences (My Profile) > Account Security / Security > New API Key: a description, then copy it (shown once).",
-                 "Run 'ai-pc apps connect odoo' with the address, database, login and key."],
-       "notes": "On Odoo Online the external API needs the Custom plan; self-hosted Odoo Community needs nothing extra. API keys can expire (90 days on Odoo 19)."}
+APP = {
+    "label": "Odoo",
+    "fields": [
+        ("url", "Your Odoo address (https://yourco.odoo.com)", False),
+        ("db", "Database name (often the same as the subdomain)", False),
+        ("login", "Your login (email)", False),
+        ("key", "API key", True),
+    ],
+    "steps": [
+        "In Odoo: your avatar > Preferences (My Profile) > Account Security / Security > New API Key: a description, then copy it (shown once).",
+        "Run 'ai-pc apps connect odoo' with the address, database, login and key.",
+    ],
+    "notes": "On Odoo Online the external API needs the Custom plan; self-hosted Odoo Community needs nothing extra. API keys can expire (90 days on Odoo 19).",
+}
 _ids = itertools.count(1)
 
 
@@ -31,8 +40,16 @@ class Client:
     def rpc(self, service, method, *args):
         try:
             r = Api(self.c["url"].rstrip("/"), service="odoo", transport=self.transport).request(
-                "POST", "jsonrpc", json_body={"jsonrpc": "2.0", "method": "call", "id": next(_ids), "params": {"service": service, "method": method, "args": list(args)}},
-                retries=0 if method == "execute_kw" and args and args[4] in ("create", "write", "unlink", "action_post") else 3)
+                "POST",
+                "jsonrpc",
+                json_body={
+                    "jsonrpc": "2.0",
+                    "method": "call",
+                    "id": next(_ids),
+                    "params": {"service": service, "method": method, "args": list(args)},
+                },
+                retries=0 if method == "execute_kw" and args and args[4] in ("create", "write", "unlink", "action_post") else 3,
+            )
         except HubError as e:
             raise RuntimeError(f"Odoo: {e}") from e
         if r.get("error"):
@@ -48,11 +65,20 @@ class Client:
         return self.rpc("object", "execute_kw", self.c["db"], self.uid, self.c["key"], model, method, args, kw or {})
 
     def products(self):
-        return self.x("product.product", "search_read", [[["sale_ok", "=", True]]], {"fields": ["name", "default_code", "lst_price", "qty_available"], "limit": 80})
+        return self.x(
+            "product.product",
+            "search_read",
+            [[["sale_ok", "=", True]]],
+            {"fields": ["name", "default_code", "lst_price", "qty_available"], "limit": 80},
+        )
 
     def orders(self):
-        return self.x("sale.order", "search_read", [[["state", "=", "sale"], ["invoice_status", "=", "to invoice"]]],
-                      {"fields": ["name", "partner_id", "amount_total", "date_order"], "limit": 50})
+        return self.x(
+            "sale.order",
+            "search_read",
+            [[["state", "=", "sale"], ["invoice_status", "=", "to invoice"]]],
+            {"fields": ["name", "partner_id", "amount_total", "date_order"], "limit": 50},
+        )
 
     def partner(self, name):
         hit = self.x("res.partner", "search_read", [[["name", "=ilike", name]]], {"fields": ["id", "name"], "limit": 1})
@@ -116,23 +142,36 @@ def parse(text, ctx):
 
 def preview(op, ctx):
     total = sum(ln["qty"] * float(ln["price"]) for ln in op["lines"])
-    return f"Ready to make a DRAFT invoice in Odoo for {op['customer']}: " + "; ".join(f"{ln['qty']:g} x {ln['item']} at Rs {float(ln['price']):,.2f}"
-                                                                                     for ln in op["lines"]) + f" (before tax Rs {total:,.2f})."
+    return (
+        f"Ready to make a DRAFT invoice in Odoo for {op['customer']}: "
+        + "; ".join(f"{ln['qty']:g} x {ln['item']} at Rs {float(ln['price']):,.2f}" for ln in op["lines"])
+        + f" (before tax Rs {total:,.2f})."
+    )
 
 
 def run(op, ctx):
     c = client(ctx)
     if op["op"] == "products":
         ps = c.products()
-        return "\n".join(f"- {p.get('default_code') or '-'}: {p['name']}, Rs {p.get('lst_price', 0):,.2f}, {p.get('qty_available', 0):g} in stock" for p in ps) \
+        return (
+            "\n".join(
+                f"- {p.get('default_code') or '-'}: {p['name']}, Rs {p.get('lst_price', 0):,.2f}, {p.get('qty_available', 0):g} in stock" for p in ps
+            )
             or "No products in Odoo."
+        )
     if op["op"] == "orders":
         os_ = c.orders()
-        return "\n".join(f"- {o['name']}: {o['partner_id'][1] if o.get('partner_id') else ''}, Rs {o['amount_total']:,.2f}" for o in os_) or "No orders waiting for an invoice."
+        return (
+            "\n".join(f"- {o['name']}: {o['partner_id'][1] if o.get('partner_id') else ''}, Rs {o['amount_total']:,.2f}" for o in os_)
+            or "No orders waiting for an invoice."
+        )
     if not op.get("confirmed"):
         return preview(op, ctx)
     mid, back = c.invoice(op["customer"], op["lines"])
     want = sum(ln["qty"] * float(ln["price"]) for ln in op["lines"])
     ok = abs(float(back["amount_untaxed"]) - want) < 0.01 and back["state"] == "draft"
-    return f"Draft invoice {mid} in Odoo for {op['customer']}: before tax Rs {float(back['amount_untaxed']):,.2f}, total Rs {float(back['amount_total']):,.2f} " + \
-        ("(read back: a draft with these lines)" if ok else "(NOT as asked when read back)") + ". Confirm it in Odoo when it is right."
+    return (
+        f"Draft invoice {mid} in Odoo for {op['customer']}: before tax Rs {float(back['amount_untaxed']):,.2f}, total Rs {float(back['amount_total']):,.2f} "
+        + ("(read back: a draft with these lines)" if ok else "(NOT as asked when read back)")
+        + ". Confirm it in Odoo when it is right."
+    )

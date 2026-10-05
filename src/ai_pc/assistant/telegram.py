@@ -7,6 +7,7 @@ others will see still waits for your 'yes'. Bots may download files up to 20 MB 
 
   Bridge(AIPCChat.start()).run()        (ai-pc telegram)
 """
+
 import threading
 import time
 from pathlib import Path
@@ -20,11 +21,14 @@ class Bridge:
     def __init__(self, chat, tg=None, log=print, typing=True):
         if tg is None:
             from ai_pc.hub.services import connector
+
             tg = connector("telegram")
         self.chat, self.tg, self.log, self.typing = chat, tg, log, typing
         self.owner = tg.creds.get("chat_id")
         if not self.owner:
-            raise HubError("Telegram is not set up for you yet: open your bot in Telegram, send it any message, then run 'ai-pc hub connect telegram'")
+            raise HubError(
+                "Telegram is not set up for you yet: open your bot in Telegram, send it any message, then run 'ai-pc hub connect telegram'"
+            )
         self.inbox = Path(chat.folder) / "inbox"
         self.offset = chat.state.get("tg_offset")
 
@@ -62,7 +66,7 @@ class Bridge:
 
     def send_text(self, text):
         for i in range(0, len(text), 3900):
-            self.tg.send(text[i:i + 3900], chat=self.owner)
+            self.tg.send(text[i : i + 3900], chat=self.owner)
 
     def _typing(self, stop):
         while not stop.is_set():
@@ -82,8 +86,13 @@ class Bridge:
         if msg.get("photo"):
             best = max(msg["photo"], key=lambda p: p.get("file_size") or p.get("width", 0))
             files.append(self.download(best["file_id"], f"photo_{uid}.jpg"))
-        for key, default in (("video", f"video_{uid}.mp4"), ("document", f"file_{uid}"), ("audio", f"audio_{uid}.mp3"),
-                             ("video_note", f"videonote_{uid}.mp4"), ("animation", f"animation_{uid}.mp4")):
+        for key, default in (
+            ("video", f"video_{uid}.mp4"),
+            ("document", f"file_{uid}"),
+            ("audio", f"audio_{uid}.mp3"),
+            ("video_note", f"videonote_{uid}.mp4"),
+            ("animation", f"animation_{uid}.mp4"),
+        ):
             if msg.get(key):
                 d = msg[key]
                 files.append(self.download(d["file_id"], d.get("file_name") or default))
@@ -110,7 +119,7 @@ class Bridge:
             reply = self.chat.say(text, files=files, voice=voice)
         finally:
             stop.set()
-        out = (f"Heard: \"{reply.heard}\"\n" if reply.heard else "") + str(reply)
+        out = (f'Heard: "{reply.heard}"\n' if reply.heard else "") + str(reply)
         self.send_text(out)
         for f in reply.files:
             p = Path(f)

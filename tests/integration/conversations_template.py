@@ -3,6 +3,7 @@ asks to change it (length, pacing) are refused with the reason.
 
   .venv\\Scripts\\python.exe tests\\integration\\conversations_template.py <session draft of a template edit> [--offline]
 """
+
 import importlib.util
 import json
 import sys
@@ -43,7 +44,9 @@ if __name__ == "__main__":
     planner = None
     if "--offline" not in sys.argv:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     summary, rows = T.run(["template"], planner)
-    (T.ROOT / "out" / "video" / "chats" / "template_chat_report.json").write_text(json.dumps({"summary": summary, "turns": rows}, ensure_ascii=False, indent=1),
-                                                                               encoding="utf-8")
+    (T.ROOT / "out" / "video" / "chats" / "template_chat_report.json").write_text(
+        json.dumps({"summary": summary, "turns": rows}, ensure_ascii=False, indent=1), encoding="utf-8"
+    )

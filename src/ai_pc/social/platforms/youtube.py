@@ -9,6 +9,7 @@ Videos uploaded through an unaudited Google project are kept PRIVATE by YouTube:
 back private, that lock is reported plainly (YouTube gives no flag for it). Vertical or square videos up to 3 minutes
 become Shorts by themselves.
 """
+
 import datetime as dt
 import json
 import uuid
@@ -19,8 +20,17 @@ from ai_pc.social.base import Platform, SocialError
 API = "https://www.googleapis.com/youtube/v3"
 UPLOAD = "https://www.googleapis.com/upload/youtube/v3"
 CHUNK = 32 * 256 * 1024  # 8 MiB
-COST = {"videos.list": 1, "commentThreads.list": 1, "channels.list": 1, "videos.update": 50, "videos.delete": 50, "thumbnails.set": 50,
-        "comments.insert": 50, "comments.setModerationStatus": 50, "captions.insert": 400}
+COST = {
+    "videos.list": 1,
+    "commentThreads.list": 1,
+    "channels.list": 1,
+    "videos.update": 50,
+    "videos.delete": 50,
+    "thumbnails.set": 50,
+    "comments.insert": 50,
+    "comments.setModerationStatus": 50,
+    "captions.insert": 400,
+}
 
 
 def pacific_day(now=None):
@@ -50,6 +60,7 @@ class YouTube(Platform):
     def token(self):
         self.need("access_token")
         from ai_pc.social import auth
+
         return auth.fresh_token(self) if not self.transport else self.creds["access_token"]
 
     def yapi(self, base=API, timeout=60):
@@ -62,10 +73,12 @@ class YouTube(Platform):
 
     def classify(self, e):
         body = e.body if isinstance(getattr(e, "body", None), dict) else {}
-        errs = ((body.get("error") or {}).get("errors") or [{}])
+        errs = (body.get("error") or {}).get("errors") or [{}]
         reason = errs[0].get("reason") if errs else None
         if reason == "quotaExceeded":
-            return SocialError("limit", "YouTube: today's API allowance is used up (it renews at midnight Pacific time)", retry_after=seconds_to_reset())
+            return SocialError(
+                "limit", "YouTube: today's API allowance is used up (it renews at midnight Pacific time)", retry_after=seconds_to_reset()
+            )
         if reason == "uploadLimitExceeded":
             return SocialError("limit", "YouTube: this channel's daily upload limit is reached", retry_after=seconds_to_reset())
         if reason == "youtubeSignupRequired":
@@ -105,17 +118,29 @@ class YouTube(Platform):
     # ---------------------------------------------------------------- publishing
     def _resource(self, post, prepared, fmt):
         priv = post.get("privacy") or "public"
-        status = {"privacyStatus": priv, "selfDeclaredMadeForKids": bool(post.get("kids")), "containsSyntheticMedia": bool(post.get("ai")),
-                  "embeddable": True}
+        status = {
+            "privacyStatus": priv,
+            "selfDeclaredMadeForKids": bool(post.get("kids")),
+            "containsSyntheticMedia": bool(post.get("ai")),
+            "embeddable": True,
+        }
         if post.get("when"):
             t = dt.datetime.fromisoformat(post["when"]).astimezone(dt.UTC)
             status.update(privacyStatus="private", publishAt=t.strftime("%Y-%m-%dT%H:%M:%SZ"))
         tags = [t for t in (prepared.get("tags") or [])][:30]
-        return {"snippet": {"title": prepared.get("title") or "Video", "description": prepared.get("text") or "", "tags": tags,
-                            "categoryId": str(post.get("category") or 22)}, "status": status}
+        return {
+            "snippet": {
+                "title": prepared.get("title") or "Video",
+                "description": prepared.get("text") or "",
+                "tags": tags,
+                "categoryId": str(post.get("category") or 22),
+            },
+            "status": status,
+        }
 
     def publish(self, job, post, prepared, budget=120):
         import time
+
         r = job.get("remote") or {}
         media = prepared.get("media") or []
         if not media:
@@ -127,17 +152,30 @@ class YouTube(Platform):
                 res = self._resource(post, prepared, job.get("format"))
                 body = json.dumps(res).encode("utf-8")
                 st, h, content = self.yapi(UPLOAD).request(
-                    "POST", "videos", params={"uploadType": "resumable", "part": "snippet,status", "notifySubscribers": "true" if not post.get("when") else "false"},
-                    data=body, raw=True, headers={"Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Length": str(total),
-                                                  "X-Upload-Content-Type": "video/mp4"})
+                    "POST",
+                    "videos",
+                    params={"uploadType": "resumable", "part": "snippet,status", "notifySubscribers": "true" if not post.get("when") else "false"},
+                    data=body,
+                    raw=True,
+                    headers={
+                        "Content-Type": "application/json; charset=UTF-8",
+                        "X-Upload-Content-Length": str(total),
+                        "X-Upload-Content-Type": "video/mp4",
+                    },
+                )
                 if st >= 400:
                     raise self._raw_error(st, content)
                 loc = (h or {}).get("Location") or (h or {}).get("location")
                 if not loc:
                     raise SocialError("retry", "YouTube did not open an upload session")
                 self._use("videos.insert")
-                self.checkpoint(job, session=loc, sent=0, requested=res["status"].get("publishAt") and "scheduled" or res["status"]["privacyStatus"],
-                                publish_at=res["status"].get("publishAt"))
+                self.checkpoint(
+                    job,
+                    session=loc,
+                    sent=0,
+                    requested=res["status"].get("publishAt") and "scheduled" or res["status"]["privacyStatus"],
+                    publish_at=res["status"].get("publishAt"),
+                )
                 r = job["remote"]
             up = self.api(UPLOAD, {"Authorization": f"Bearer {self.token()}"}, 300)
             sent = r.get("sent", 0)
@@ -150,8 +188,14 @@ class YouTube(Platform):
                     data = f.read(CHUNK)
                     last = sent + len(data) - 1
                     try:
-                        st, h, content = up.request("PUT", r["session"], data=data, raw=True, retries=0,
-                                                    headers={"Content-Type": "video/mp4", "Content-Range": f"bytes {sent}-{last}/{total}"})
+                        st, h, content = up.request(
+                            "PUT",
+                            r["session"],
+                            data=data,
+                            raw=True,
+                            retries=0,
+                            headers={"Content-Type": "video/mp4", "Content-Range": f"bytes {sent}-{last}/{total}"},
+                        )
                     except Exception as e:  # noqa: BLE001  (a dropped connection: resume from what YouTube confirms)
                         self.checkpoint(job, interrupted=True)
                         raise SocialError("retry", f"YouTube upload interrupted at {sent // 1048576} MB ({type(e).__name__}); it resumes") from e
@@ -192,8 +236,10 @@ class YouTube(Platform):
         wanted = r.get("requested")
         notes = []
         if wanted in ("public", "unlisted", "scheduled") and s.get("privacyStatus") == "private" and not s.get("publishAt"):
-            notes.append("YouTube kept it PRIVATE: uploads from an unaudited Google project are locked private until the project passes YouTube's "
-                         "API audit (https://support.google.com/youtube/contact/yt_api_form)")
+            notes.append(
+                "YouTube kept it PRIVATE: uploads from an unaudited Google project are locked private until the project passes YouTube's "
+                "API audit (https://support.google.com/youtube/contact/yt_api_form)"
+            )
         if s.get("publishAt") and not notes:
             return {"status": "scheduled", "id": vid, "publish_at": r.get("publish_at"), "permalink": link}
         return {"status": "published", "id": vid, "permalink": link, "verified": True, "notes": notes + (r.get("extras_notes") or [])}
@@ -209,6 +255,7 @@ class YouTube(Platform):
 
     def _raw_error(self, status, content):
         from ai_pc.hub.http import HubError
+
         try:
             body = json.loads(content.decode("utf-8"))
         except (ValueError, UnicodeDecodeError, AttributeError):
@@ -230,19 +277,35 @@ class YouTube(Platform):
         if prepared.get("cover") and job.get("format") != "short":
             try:
                 data = Path(prepared["cover"]).read_bytes()
-                self.call(self.yapi(UPLOAD).request, "POST", "thumbnails/set", params={"videoId": vid}, data=data, headers={"Content-Type": "image/jpeg"})
+                self.call(
+                    self.yapi(UPLOAD).request, "POST", "thumbnails/set", params={"videoId": vid}, data=data, headers={"Content-Type": "image/jpeg"}
+                )
                 self._use("thumbnails.set")
             except SocialError as e:
-                notes.append("the custom thumbnail was refused (YouTube needs the channel's phone verified)" if "forbidden" in str(e).lower() or
-                             "not allowed" in str(e).lower() else f"the thumbnail was not set ({e})")
+                notes.append(
+                    "the custom thumbnail was refused (YouTube needs the channel's phone verified)"
+                    if "forbidden" in str(e).lower() or "not allowed" in str(e).lower()
+                    else f"the thumbnail was not set ({e})"
+                )
         if post.get("captions") and Path(post["captions"]).exists():
             try:
                 b = uuid.uuid4().hex
                 meta = json.dumps({"snippet": {"videoId": vid, "language": post.get("language") or "en", "name": "Captions", "isDraft": False}})
-                body = (f"--{b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n--{b}\r\nContent-Type: application/octet-stream\r\n\r\n").encode() + \
-                    Path(post["captions"]).read_bytes() + f"\r\n--{b}--".encode()
-                self.call(self.yapi(UPLOAD).request, "POST", "captions", params={"part": "snippet", "uploadType": "multipart"}, data=body,
-                          headers={"Content-Type": f"multipart/related; boundary={b}"})
+                body = (
+                    (
+                        f"--{b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{meta}\r\n--{b}\r\nContent-Type: application/octet-stream\r\n\r\n"
+                    ).encode()
+                    + Path(post["captions"]).read_bytes()
+                    + f"\r\n--{b}--".encode()
+                )
+                self.call(
+                    self.yapi(UPLOAD).request,
+                    "POST",
+                    "captions",
+                    params={"part": "snippet", "uploadType": "multipart"},
+                    data=body,
+                    headers={"Content-Type": f"multipart/related; boundary={b}"},
+                )
                 self._use("captions.insert")
             except SocialError as e:
                 notes.append(f"the captions were not added ({e})")
@@ -275,17 +338,29 @@ class YouTube(Platform):
         for t in js.get("items") or []:
             c = t["snippet"]["topLevelComment"]
             sn = c["snippet"]
-            out.append({"id": c["id"], "author": sn.get("authorDisplayName"), "text": sn.get("textOriginal") or sn.get("textDisplay"),
-                        "created": sn.get("publishedAt")})
+            out.append(
+                {
+                    "id": c["id"],
+                    "author": sn.get("authorDisplayName"),
+                    "text": sn.get("textOriginal") or sn.get("textDisplay"),
+                    "created": sn.get("publishedAt"),
+                }
+            )
         return out
 
     def reply(self, job, comment_id, text):
-        js = self.call(self.yapi().post, "comments", params={"part": "snippet"}, json={"snippet": {"parentId": comment_id, "textOriginal": text}}, retries=0)
+        js = self.call(
+            self.yapi().post, "comments", params={"part": "snippet"}, json={"snippet": {"parentId": comment_id, "textOriginal": text}}, retries=0
+        )
         self._use("comments.insert")
         return {"id": js.get("id"), "verified": (js.get("snippet") or {}).get("textOriginal") == text}
 
     def hide(self, job, comment_id, hidden=True):
-        self.call(self.yapi().request, "POST", "comments/setModerationStatus",
-                  params={"id": comment_id, "moderationStatus": "heldForReview" if hidden else "published"})
+        self.call(
+            self.yapi().request,
+            "POST",
+            "comments/setModerationStatus",
+            params={"id": comment_id, "moderationStatus": "heldForReview" if hidden else "published"},
+        )
         self._use("comments.setModerationStatus")
         return {"hidden": hidden}

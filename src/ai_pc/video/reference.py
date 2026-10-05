@@ -11,6 +11,7 @@ describe() writes the designer's sheet. Fingerprints are cached per file.
   fp = fingerprint(path, planner)   prof = profile(fp)   text = describe(fp, prof)
   merge([fp1, fp2]) for several samples of one style.
 """
+
 import hashlib
 import json
 import time
@@ -85,7 +86,7 @@ def fingerprint(path, planner=None, log=print, use_cache=True):
     td = _robust_threshold(d1[1:], 6, 0.07)
     flashes = []
     for i in range(1, n):
-        prev = float(np.median(bright[max(0, i - 4):i]))
+        prev = float(np.median(bright[max(0, i - 4) : i]))
         if bright[i] - prev > 0.22 and any(bright[j] - prev < 0.12 for j in range(i + 1, min(n, i + 5))):
             flashes.append(i)  # a short brightness spike that comes back down
     # shot changes: the content half a second apart differs (whatever hides the cut: a flash, a glitch, a dissolve).
@@ -102,7 +103,7 @@ def fingerprint(path, planner=None, log=print, use_cache=True):
     for i in range(w, n - w):
         a, b = i - w, i + w
         D[i] = 0.65 * float(cv2.compareHist(hh[a], hh[b], cv2.HISTCMP_BHATTACHARYYA)) + 0.35 * float(np.mean(np.abs(thumbs[a] - thumbs[b]))) / 255 * 3
-    base = np.array([np.percentile(D[max(0, i - 18):i + 18], 30) for i in range(n)])
+    base = np.array([np.percentile(D[max(0, i - 18) : i + 18], 30) for i in range(n)])
     hd = np.array([0.0] + [float(cv2.compareHist(hh[i - 1], hh[i], cv2.HISTCMP_BHATTACHARYYA)) for i in range(1, n)])
     th = _robust_threshold(hd[1:], 6, 0.12)
     near_flash = {f + o for f in flashes for o in (-1, 0, 1)}
@@ -112,7 +113,7 @@ def fingerprint(path, planner=None, log=print, use_cache=True):
             hard.append(i)
     soft = []  # 2. changes hidden by a transition: content differs half a second apart, no hard cut nearby
     for i in range(w, n - w):
-        if D[i] < max(0.28, 2.0 * base[i]) or D[i] < D[max(0, i - 2):i + 3].max():
+        if D[i] < max(0.28, 2.0 * base[i]) or D[i] < D[max(0, i - 2) : i + 3].max():
             continue
         around = [D[j] for j in (i - 7, i + 7) if 0 <= j < n]
         if around and D[i] < 1.6 * max(around):  # a transition comes and goes within ~0.5 s; a slow pan or glide does not
@@ -152,7 +153,7 @@ def fingerprint(path, planner=None, log=print, use_cache=True):
     div = np.array(div)
     sx = np.array([s[0] for s in shifts])
     sy = np.array([s[1] for s in shifts])
-    jit = np.abs(np.diff(sx, 2, prepend=0, append=0))[:len(sx)] + np.abs(np.diff(sy, 2, prepend=0, append=0))[:len(sy)]
+    jit = np.abs(np.diff(sx, 2, prepend=0, append=0))[: len(sx)] + np.abs(np.diff(sy, 2, prepend=0, append=0))[: len(sy)]
     zt = _robust_threshold(np.abs(div), 8, 0.035)
     punches, k = 0, 0
     while k < len(div):  # a burst of strong expansion or contraction lasting under half a second
@@ -185,8 +186,15 @@ def fingerprint(path, planner=None, log=print, use_cache=True):
     sat = float(hsv[:, y0:y1, :, 1].mean())
     blacks = float(np.mean([np.percentile(x[..., 0], 5) / 255 for x in lab]))
     h_, w_ = pic.shape[1:]
-    centre = pic[:, h_ // 4:3 * h_ // 4, w_ // 4:3 * w_ // 4].mean()
-    corners = np.mean([pic[:, :h_ // 6, :w_ // 6].mean(), pic[:, :h_ // 6, -w_ // 6:].mean(), pic[:, -h_ // 6:, :w_ // 6].mean(), pic[:, -h_ // 6:, -w_ // 6:].mean()])
+    centre = pic[:, h_ // 4 : 3 * h_ // 4, w_ // 4 : 3 * w_ // 4].mean()
+    corners = np.mean(
+        [
+            pic[:, : h_ // 6, : w_ // 6].mean(),
+            pic[:, : h_ // 6, -w_ // 6 :].mean(),
+            pic[:, -h_ // 6 :, : w_ // 6].mean(),
+            pic[:, -h_ // 6 :, -w_ // 6 :].mean(),
+        ]
+    )
     vignette = float(corners / max(1e-3, centre))
     noise = float(np.mean([np.std(p.astype(np.float32) - cv2.GaussianBlur(p, (3, 3), 0)) for p in pic[::6]]))
     # sound: music or speech, tempo, and whether the cuts land on its beats
@@ -200,33 +208,55 @@ def fingerprint(path, planner=None, log=print, use_cache=True):
     bpm = (snd or {}).get("bpm")
     if bpm and bpm < 95 and len(cuts) / mins > 0.45 * bpm:  # cutting that fast means the beat was heard at half tempo
         bpm = round(bpm * 2, 1)
-    fp = {"file": path.name, "seconds": round(dur, 2), "aspect": f"{info.get('width')}x{info.get('height')}",
-          "portrait": (info.get("height") or 0) > (info.get("width") or 0),
-          "cuts": len(cuts), "cuts_per_min": round(len(cuts) / mins, 1),
-          "shot_median": round(float(np.median(shots)), 2) if shots else dur, "shot_p25": round(float(np.percentile(shots, 25)), 2) if shots else dur,
-          "shot_p75": round(float(np.percentile(shots, 75)), 2) if shots else dur,
-          "flashes_per_min": round(len(flashes) / mins, 1), "dissolves_per_min": round(dissolves / mins, 1),
-          "punches_per_min": round(punches / mins, 1), "shakes_per_min": round(shakes / mins, 1), "slow_push_share": round(slow_push, 2),
-          "brightness": round(float(bright.mean()), 3), "contrast": round(contrast, 3), "saturation": round(sat, 3),
-          "warmth": round(warmth, 3), "blacks": round(blacks, 3), "letterbox": round(bars, 3) if bars > 0.04 else 0.0,
-          "vignette": round(vignette, 2), "grain": round(noise, 2),
-          "sound": (snd or {}).get("kind"), "speech": (snd or {}).get("kind") == "speech", "bpm": bpm,
-          "flash_cuts": flash_cuts,
-          "cuts_on_beat": round(on_beat, 2) if on_beat is not None else None, "measured_s": round(time.perf_counter() - t0, 1)}
+    fp = {
+        "file": path.name,
+        "seconds": round(dur, 2),
+        "aspect": f"{info.get('width')}x{info.get('height')}",
+        "portrait": (info.get("height") or 0) > (info.get("width") or 0),
+        "cuts": len(cuts),
+        "cuts_per_min": round(len(cuts) / mins, 1),
+        "shot_median": round(float(np.median(shots)), 2) if shots else dur,
+        "shot_p25": round(float(np.percentile(shots, 25)), 2) if shots else dur,
+        "shot_p75": round(float(np.percentile(shots, 75)), 2) if shots else dur,
+        "flashes_per_min": round(len(flashes) / mins, 1),
+        "dissolves_per_min": round(dissolves / mins, 1),
+        "punches_per_min": round(punches / mins, 1),
+        "shakes_per_min": round(shakes / mins, 1),
+        "slow_push_share": round(slow_push, 2),
+        "brightness": round(float(bright.mean()), 3),
+        "contrast": round(contrast, 3),
+        "saturation": round(sat, 3),
+        "warmth": round(warmth, 3),
+        "blacks": round(blacks, 3),
+        "letterbox": round(bars, 3) if bars > 0.04 else 0.0,
+        "vignette": round(vignette, 2),
+        "grain": round(noise, 2),
+        "sound": (snd or {}).get("kind"),
+        "speech": (snd or {}).get("kind") == "speech",
+        "bpm": bpm,
+        "flash_cuts": flash_cuts,
+        "cuts_on_beat": round(on_beat, 2) if on_beat is not None else None,
+        "measured_s": round(time.perf_counter() - t0, 1),
+    }
     if planner is not None:  # one look at the frames for what numbers cannot say: the typography and the effects
         try:
             from ai_pc.llm.vlm import ask
+
             idx = np.linspace(0, n - 1, 12).astype(int)
             full = F.frames_at(str(path), [i / FPS for i in idx], width=360)
             sheet = F.sheet([f for f in full if f is not None], [f"{i / FPS:.1f}s" for i, f in zip(idx, full) if f is not None], cols=4, cell_w=240)
-            d, s = ask(planner, TEXT_SYSTEM, f"A {fp['seconds']} s edit, {fp['aspect']}, {fp['cuts_per_min']} cuts per minute.", [sheet], tier="caption")
+            d, s = ask(
+                planner, TEXT_SYSTEM, f"A {fp['seconds']} s edit, {fp['aspect']}, {fp['cuts_per_min']} cuts per minute.", [sheet], tier="caption"
+            )
             fp["vision"] = d if isinstance(d, dict) else None
         except Exception as e:  # noqa: BLE001  (the measured numbers already describe most of the style)
             log(f"  reference vision read failed: {type(e).__name__}: {e}")
     CACHE.mkdir(parents=True, exist_ok=True)
     cp.write_text(json.dumps(fp, ensure_ascii=False, indent=1), encoding="utf-8")
-    log(f"  reference {path.name}: {fp['cuts_per_min']} cuts/min, median shot {fp['shot_median']} s, "
-        f"{fp['punches_per_min']} zooms/min, {fp['flashes_per_min']} flashes/min ({fp['measured_s']} s)")
+    log(
+        f"  reference {path.name}: {fp['cuts_per_min']} cuts/min, median shot {fp['shot_median']} s, "
+        f"{fp['punches_per_min']} zooms/min, {fp['flashes_per_min']} flashes/min ({fp['measured_s']} s)"
+    )
     return fp
 
 
@@ -264,9 +294,12 @@ def profile(fp):
 
     def beats(sec):
         return int(max(1, min(8, round(sec / beat))))
+
     if fp.get("speech"):
         style = "talking"
-    elif fp["cuts_per_min"] >= 42 or (fp["cuts_per_min"] >= 25 and (fp["flashes_per_min"] >= 3 or fp["punches_per_min"] >= 6 or fp["brightness"] < 0.32)):
+    elif fp["cuts_per_min"] >= 42 or (
+        fp["cuts_per_min"] >= 25 and (fp["flashes_per_min"] >= 3 or fp["punches_per_min"] >= 6 or fp["brightness"] < 0.32)
+    ):
         style = "hype"
     elif fp["cuts_per_min"] >= 16:
         style = "montage"
@@ -276,8 +309,16 @@ def profile(fp):
         style = "cinematic"
     recipes = []
     if fp["punches_per_min"] >= 3:
-        recipes.append({"use": "zoom_punch", "on": "beats", "every": max(1, round(60.0 / max(fp["punches_per_min"], 1) / beat)),
-                        "sections": ["build", "drop"], "strength": 1.15, "blur": fp["punches_per_min"] >= 8})
+        recipes.append(
+            {
+                "use": "zoom_punch",
+                "on": "beats",
+                "every": max(1, round(60.0 / max(fp["punches_per_min"], 1) / beat)),
+                "sections": ["build", "drop"],
+                "strength": 1.15,
+                "blur": fp["punches_per_min"] >= 8,
+            }
+        )
     else:
         recipes.append({"use": "zoom_punch", "off": True})
     if fp["shakes_per_min"] >= 2:
@@ -296,37 +337,62 @@ def profile(fp):
     elif fp["flashes_per_min"] >= 3:
         trans = {"use": "transitions", "family": "flash", "at": "sections"}
     recipes.append(trans)
-    recipes.append({"use": "grade", "look": look_words(fp), "grain": fp["grain"] >= 2.5, "vignette": fp["vignette"] < 0.8,
-                    "letterbox": bool(fp["letterbox"])})
+    recipes.append(
+        {"use": "grade", "look": look_words(fp), "grain": fp["grain"] >= 2.5, "vignette": fp["vignette"] < 0.8, "letterbox": bool(fp["letterbox"])}
+    )
     # the sample's AVERAGE shot length sets the pace (percentiles over-react to a few flash-cut frames); sections
     # breathe around it the way a real edit does: tighter in the build and drop, longer in the intro, break and outro
     avg = 60.0 / max(1.0, fp["cuts_per_min"]) if fp["cuts_per_min"] else fp["shot_median"]
-    bps = {"intro": beats(avg * 1.5), "verse": beats(avg), "build": beats(avg * 0.85), "drop": beats(avg * 0.8),
-           "break": beats(avg * 1.6), "outro": beats(avg * 1.6)}
+    bps = {
+        "intro": beats(avg * 1.5),
+        "verse": beats(avg),
+        "build": beats(avg * 0.85),
+        "drop": beats(avg * 0.8),
+        "break": beats(avg * 1.6),
+        "outro": beats(avg * 1.6),
+    }
     vis = fp.get("vision") or {}
-    music = None if fp.get("speech") else {"generate": {"hype": "hype", "montage": "pop", "cinematic": "cinematic", "tour": "cinematic"}.get(style, "pop"),
-                                           "bpm": int(round(bpm))}
-    return {"style": style, "beats_per_shot": bps, "recipes": recipes, "music": music, "canvas": "9:16" if fp.get("portrait") else "16:9",
-            "text": vis.get("text"), "effects": vis.get("effects"), "summary": vis.get("summary"), "look": look_words(fp),
-            "target_look": {"brightness": fp["brightness"], "contrast": fp["contrast"], "saturation": fp["saturation"]}}
+    music = (
+        None
+        if fp.get("speech")
+        else {"generate": {"hype": "hype", "montage": "pop", "cinematic": "cinematic", "tour": "cinematic"}.get(style, "pop"), "bpm": int(round(bpm))}
+    )
+    return {
+        "style": style,
+        "beats_per_shot": bps,
+        "recipes": recipes,
+        "music": music,
+        "canvas": "9:16" if fp.get("portrait") else "16:9",
+        "text": vis.get("text"),
+        "effects": vis.get("effects"),
+        "summary": vis.get("summary"),
+        "look": look_words(fp),
+        "target_look": {"brightness": fp["brightness"], "contrast": fp["contrast"], "saturation": fp["saturation"]},
+    }
 
 
 def describe(fp, prof):
     """The designer's sheet: match this style."""
     t = prof.get("text") or {}
-    lines = [f"REFERENCE STYLE (the client's sample {fp['file']}, {fp['seconds']} s; MATCH ITS RHYTHM AND LOOK):",
-             f"  rhythm: {fp['cuts_per_min']} cuts/min (shots: median {fp['shot_median']} s, short {fp['shot_p25']} s, long {fp['shot_p75']} s)"
-             + (f", {fp['cuts_on_beat'] * 100:.0f}% of cuts on the beat" if fp.get("cuts_on_beat") is not None else "")
-             + (f", music at {fp['bpm']} BPM" if fp.get("bpm") else ""),
-             f"  moves: {fp['punches_per_min']} zoom punches/min, {fp['shakes_per_min']} shakes/min, slow push on "
-             f"{fp['slow_push_share'] * 100:.0f}% of frames",
-             f"  light and transitions: {fp['flashes_per_min']} flashes/min, {fp['dissolves_per_min']} dissolves/min"
-             + ("; otherwise hard cuts" if fp["dissolves_per_min"] < 2 else ""),
-             f"  look: {prof['look']}" + (", letterbox bars" if fp["letterbox"] else "") + (", grain" if fp["grain"] >= 2.5 else "")
-             + (", vignette" if fp["vignette"] < 0.8 else "")]
+    lines = [
+        f"REFERENCE STYLE (the client's sample {fp['file']}, {fp['seconds']} s; MATCH ITS RHYTHM AND LOOK):",
+        f"  rhythm: {fp['cuts_per_min']} cuts/min (shots: median {fp['shot_median']} s, short {fp['shot_p25']} s, long {fp['shot_p75']} s)"
+        + (f", {fp['cuts_on_beat'] * 100:.0f}% of cuts on the beat" if fp.get("cuts_on_beat") is not None else "")
+        + (f", music at {fp['bpm']} BPM" if fp.get("bpm") else ""),
+        f"  moves: {fp['punches_per_min']} zoom punches/min, {fp['shakes_per_min']} shakes/min, slow push on "
+        f"{fp['slow_push_share'] * 100:.0f}% of frames",
+        f"  light and transitions: {fp['flashes_per_min']} flashes/min, {fp['dissolves_per_min']} dissolves/min"
+        + ("; otherwise hard cuts" if fp["dissolves_per_min"] < 2 else ""),
+        f"  look: {prof['look']}"
+        + (", letterbox bars" if fp["letterbox"] else "")
+        + (", grain" if fp["grain"] >= 2.5 else "")
+        + (", vignette" if fp["vignette"] < 0.8 else ""),
+    ]
     if t:
-        lines.append(f"  text: {t.get('case', '')} {t.get('weight', '')} {t.get('font_style', '')}, {t.get('size', '')}, "
-                     f"{t.get('position', '')}" + (f", {t.get('extras')}" if t.get("extras") else ""))
+        lines.append(
+            f"  text: {t.get('case', '')} {t.get('weight', '')} {t.get('font_style', '')}, {t.get('size', '')}, "
+            f"{t.get('position', '')}" + (f", {t.get('extras')}" if t.get("extras") else "")
+        )
     if prof.get("effects"):
         lines.append(f"  visible effects: {', '.join(map(str, prof['effects'][:8]))}")
     if prof.get("summary"):

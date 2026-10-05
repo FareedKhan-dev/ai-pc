@@ -4,6 +4,7 @@ found among the ones given (--with) or by path.
 
   c = AppsChat.start(files=["receipt.jpg"]); c.say("read the text in receipt.jpg")
 """
+
 import datetime as dt
 import json
 import re
@@ -14,7 +15,9 @@ from ai_pc.apps import all_modules
 from ai_pc.core.config import ROOT
 
 CHATS = ROOT / "out" / "apps" / "chats"
-YES = re.compile(r"^\s*(?:yes|yeah|yep|y|ok|okay|sure|go|go ahead|do it|confirm|install it|print it)\b(?:[\s,]+(?:it|please|now|ahead|thanks))*[\s.!]*$", re.I)
+YES = re.compile(
+    r"^\s*(?:yes|yeah|yep|y|ok|okay|sure|go|go ahead|do it|confirm|install it|print it)\b(?:[\s,]+(?:it|please|now|ahead|thanks))*[\s.!]*$", re.I
+)
 NO = re.compile(r"^\s*(?:no|nope|n|stop|cancel|don'?t|never mind|forget it)\b", re.I)
 
 
@@ -29,13 +32,21 @@ class AppsChat:
         cid = f"apps_{time.strftime('%Y%m%d_%H%M%S')}"
         folder = Path(chats_dir or CHATS) / cid
         folder.mkdir(parents=True, exist_ok=True)
-        st = {"id": cid, "folder": str(folder), "turns": [], "pending": None, "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in files},
-              "extra": dict(extra or {})}
+        st = {
+            "id": cid,
+            "folder": str(folder),
+            "turns": [],
+            "pending": None,
+            "files": {Path(f).name.lower(): str(Path(f).resolve()) for f in files},
+            "extra": dict(extra or {}),
+        }
         return cls(st, modules)
 
     def ctx(self):
         # memo: what a program remembers across the turns of this chat (the last campaign sent, the last post made)
-        return dict(self.state.get("extra") or {}, files=self.state["files"], out=self.folder, now=dt.datetime.now(), memo=self.state.setdefault("memo", {}))
+        return dict(
+            self.state.get("extra") or {}, files=self.state["files"], out=self.folder, now=dt.datetime.now(), memo=self.state.setdefault("memo", {})
+        )
 
     def save(self):
         (self.folder / "chat.json").write_text(json.dumps(redact(self.state), ensure_ascii=False, indent=1, default=str), encoding="utf-8")
@@ -81,7 +92,10 @@ class AppsChat:
 
 
 SECRET_KEYS = {"password", "master", "secret", "token", "api_key", "passphrase"}
-SECRET_TEXT = [re.compile(r"(?i)(\b(?:master\s+)?pass(?:word|phrase|code)\b\s*(?:is\s*)?[:=]?\s*)(\S+)"), re.compile(r"(Password from KeePassXC: )(\S+)")]
+SECRET_TEXT = [
+    re.compile(r"(?i)(\b(?:master\s+)?pass(?:word|phrase|code)\b\s*(?:is\s*)?[:=]?\s*)(\S+)"),
+    re.compile(r"(Password from KeePassXC: )(\S+)"),
+]
 
 
 def redact(value):

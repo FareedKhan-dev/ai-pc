@@ -1,4 +1,5 @@
 """S-expressions as KiCad writes them (.kicad_sym, .kicad_sch, netlists): read into nested lists, written back."""
+
 import re
 
 TOKEN = re.compile(r'\s*(?:(\()|(\))|"((?:[^"\\]|\\.)*)"|([^\s()"]+))')

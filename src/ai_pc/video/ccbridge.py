@@ -8,6 +8,7 @@ property of each item, learned like any other (jyres.py: downloaded / proven / m
 Keys: CapCut-only items live in the merged catalogue as "<category>:cc:<name>" so they never collide with JianYing's
 own "<category>:<name>" (many share a Chinese name but are different resources).
 """
+
 import json
 from functools import lru_cache
 
@@ -50,6 +51,7 @@ def jy_member(key):
     """A pyJianYingDraft enum member that carries the CapCut item's metadata (passes the library's type checks)."""
     import pycapcut as cc
     import pyJianYingDraft as jy
+
     it = items()[key]
     enum_name = CATEGORIES[it["category"]][0]
     meta = getattr(getattr(cc, enum_name), it["name"]).value

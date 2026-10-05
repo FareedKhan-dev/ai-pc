@@ -6,6 +6,7 @@ given is linted and tested the same way, each problem with its file and line. ph
 
   "php website called 'Shop'"   'xampp php project called Stock'   'php test C:\\code\\site\\composer.json'
 """
+
 import os
 import re
 import shutil
@@ -238,6 +239,7 @@ def php_files(folder):
 
 def php(*args, cwd, timeout=300):
     from ai_pc.core import hidden_desktop
+
     rc, out, err, timed_out = hidden_desktop.run([str(PHP), "-n", *map(str, args)], timeout=timeout, cwd=str(cwd), env=env())
     return rc == 0 and not timed_out, out + err
 
@@ -256,6 +258,7 @@ def lint(folder):
 def serve(folder, docroot="public"):
     """Start PHP's web server for the folder on 127.0.0.1 (a free port): (process, url) once it answers."""
     from ai_pc.core import hidden_desktop
+
     s = socket.socket()
     s.bind(("127.0.0.1", 0))
     port = s.getsockname()[1]
@@ -274,6 +277,7 @@ def serve(folder, docroot="public"):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bphp\b|\bxampp\b|\blaravel\b|\bphpstorm\b|\bcomposer\.json\b", c):
         return None
@@ -292,7 +296,13 @@ def run(op, ctx):
         bad = lint(folder)
         tests = folder / "tests" / "run.php"
         unit = folder / "vendor" / "phpunit" / "phpunit" / "phpunit"
-        ok_t, out = php(str(tests.relative_to(folder)), cwd=folder) if tests.exists() else php(str(unit.relative_to(folder)), cwd=folder) if unit.exists() else (True, "")
+        ok_t, out = (
+            php(str(tests.relative_to(folder)), cwd=folder)
+            if tests.exists()
+            else php(str(unit.relative_to(folder)), cwd=folder)
+            if unit.exists()
+            else (True, "")
+        )
         fails = [ln.strip() for ln in out.splitlines() if ln.startswith("FAIL")]
         if bad or not ok_t:
             return f"PHP project {folder.name} FAILED: " + "; ".join((bad + fails)[:8] or [out.strip()[-300:]]) + "."
@@ -303,8 +313,15 @@ def run(op, ctx):
     out = (Path(ctx["out"]) / "php" / name).resolve()
     if out.exists():
         shutil.rmtree(out, ignore_errors=True)
-    files = {"composer.json": COMPOSER.format(slug=slug), "src/Product.php": PRODUCT, "src/Inventory.php": INVENTORY, "src/bootstrap.php": BOOTSTRAP,
-             "public/index.php": INDEX.replace("__NAME__", name), "tests/run.php": TESTS, ".gitignore": "vendor/\n.idea/\n"}
+    files = {
+        "composer.json": COMPOSER.format(slug=slug),
+        "src/Product.php": PRODUCT,
+        "src/Inventory.php": INVENTORY,
+        "src/bootstrap.php": BOOTSTRAP,
+        "public/index.php": INDEX.replace("__NAME__", name),
+        "tests/run.php": TESTS,
+        ".gitignore": "vendor/\n.idea/\n",
+    }
     for rel, text in files.items():
         (out / rel).parent.mkdir(parents=True, exist_ok=True)
         (out / rel).write_text(text, encoding="utf-8", newline="\n")
@@ -312,13 +329,22 @@ def run(op, ctx):
     ok_t, tests = php("tests/run.php", cwd=out)
     proc, url, status, page = serve(out)
     proc.stop()
-    checks = [(f"php -l finds no syntax errors in its {len(php_files(out))} files", not bad),
-              ("its tests: 5 of 5 passed", ok_t and "5 of 5 tests passed" in tests),
-              (f"PHP's web server (127.0.0.1 only) serves the page (HTTP {status}) with the stock's value (Rs 22,000)",
-               status == 200 and "Total value: Rs 22,000" in page and "Ceiling fan" in page)]
+    checks = [
+        (f"php -l finds no syntax errors in its {len(php_files(out))} files", not bad),
+        ("its tests: 5 of 5 passed", ok_t and "5 of 5 tests passed" in tests),
+        (
+            f"PHP's web server (127.0.0.1 only) serves the page (HTTP {status}) with the stock's value (Rs 22,000)",
+            status == 200 and "Total value: Rs 22,000" in page and "Ceiling fan" in page,
+        ),
+    ]
     bad_checks = [w for w, good in checks if not good]
     ctx.setdefault("memo", {})["project"] = str(out)
-    return (f"PHP {version()} website {out} (src/ classes, public/index.php, tests/run.php, composer.json; open the folder in VS Code or PhpStorm; "
-            f"run it with php -S 127.0.0.1:8000 -t public, or put it in XAMPP's htdocs). " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad_checks else "NOT right: " + "; ".join(bad_checks) + ". " + "; ".join(bad[:5]) +
-             " " + tests.strip()[-300:]))
+    return (
+        f"PHP {version()} website {out} (src/ classes, public/index.php, tests/run.php, composer.json; open the folder in VS Code or PhpStorm; "
+        f"run it with php -S 127.0.0.1:8000 -t public, or put it in XAMPP's htdocs). "
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad_checks
+            else "NOT right: " + "; ".join(bad_checks) + ". " + "; ".join(bad[:5]) + " " + tests.strip()[-300:]
+        )
+    )

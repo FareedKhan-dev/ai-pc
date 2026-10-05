@@ -20,6 +20,7 @@ Each file keeps its own chat (Word, PowerPoint or Excel: versions, checks, its o
 - PDFs: a pack of several files with a cover, bookmarks, page numbers and a watermark; compress, split, pages;
 - one history for the whole project: undo / redo / go to vN move every file back together.
 """
+
 import hashlib
 import json
 import re
@@ -41,30 +42,52 @@ from ai_pc.office.docchat import FILLER, GOTO, HISTORY, POLITE, QUESTION, REDO, 
 PROJECTS = ROOT / "out" / "docs" / "projects"
 KINDS = {".xlsx": "xlsx", ".xlsm": "xlsx", ".docx": "docx", ".pptx": "pptx"}
 CHAT = {"xlsx": BookChat, "docx": DocChat, "pptx": DeckChat}
-ROLE = {"xlsx": r"workbook|spreadsheet|excel|xlsx|sheet", "docx": r"report|document|doc|docx|word file|memo|essay|proposal|handout",
-        "pptx": r"deck|slides?|presentation|powerpoint|pptx|ppt"}
+ROLE = {
+    "xlsx": r"workbook|spreadsheet|excel|xlsx|sheet",
+    "docx": r"report|document|doc|docx|word file|memo|essay|proposal|handout",
+    "pptx": r"deck|slides?|presentation|powerpoint|pptx|ppt",
+}
 NAMES = {"xlsx": "workbook", "docx": "report", "pptx": "deck"}
 
 INSERT = re.compile(r"\b(?:put|insert|add|copy|paste|bring|include|place|drop|show)\b")
 DATA = re.compile(r"\b(?:pivot(?: table)?|tables?|summary|summaries|charts?|graphs?|figures|numbers|data|totals?|breakdown)\b")
-INTO = re.compile(r"\b(?:into|in|to|on|onto|inside)\s+(?:the\s+|a\s+new\s+|a\s+|our\s+|my\s+)?(report|document|doc|word file|memo|handout|deck|slides?|presentation|slide\s+\d+)\b")
+INTO = re.compile(
+    r"\b(?:into|in|to|on|onto|inside)\s+(?:the\s+|a\s+new\s+|a\s+|our\s+|my\s+)?(report|document|doc|word file|memo|handout|deck|slides?|presentation|slide\s+\d+)\b"
+)
 REFRESH = re.compile(r"\b(?:refresh|update|sync|re-?pull|bring\b.*\bup to date)\b")
-DECK_FROM = re.compile(r"\b(?:make|create|build|turn|generate|prepare|do)\b.*\b(?:deck|presentation|slides)\b.*\b(?:from|out of|based on|of|summari[sz]ing)\s+(?:the\s+|this\s+|my\s+)?(report|document|doc)\b|"
-                       r"\bturn\s+(?:the\s+)?(report|document)\s+into\s+(?:a\s+)?(?:\d+[- ]slide\s+)?(?:deck|presentation|slides)\b")
-REPORT_FROM = re.compile(r"\b(?:write|make|create|draft|prepare|produce)\b.*\b(?:report|memo|brief|summary document|document)\b.*\b(?:from|using|based on|out of)\s+(?:the\s+|this\s+|my\s+)?"
-                         r"(?:workbook|data|spreadsheet|figures|numbers|sheet|sales|excel)\b|\b(?:write|make|create|draft|prepare)\b\s+(?:a\s+)?(?:\d+[- ]page\s+)?report\s+on\b")
+DECK_FROM = re.compile(
+    r"\b(?:make|create|build|turn|generate|prepare|do)\b.*\b(?:deck|presentation|slides)\b.*\b(?:from|out of|based on|of|summari[sz]ing)\s+(?:the\s+|this\s+|my\s+)?(report|document|doc)\b|"
+    r"\bturn\s+(?:the\s+)?(report|document)\s+into\s+(?:a\s+)?(?:\d+[- ]slide\s+)?(?:deck|presentation|slides)\b"
+)
+REPORT_FROM = re.compile(
+    r"\b(?:write|make|create|draft|prepare|produce)\b.*\b(?:report|memo|brief|summary document|document)\b.*\b(?:from|using|based on|out of)\s+(?:the\s+|this\s+|my\s+)?"
+    r"(?:workbook|data|spreadsheet|figures|numbers|sheet|sales|excel)\b|\b(?:write|make|create|draft|prepare)\b\s+(?:a\s+)?(?:\d+[- ]page\s+)?report\s+on\b"
+)
 HANDOUT = re.compile(r"\bhandouts?\b")
-PACK = re.compile(r"\b(?:export|save|combine|merge|bundle|make|put|turn|print|join)\b.*\b(?:everything|all|both|whole|project|pack|the (?:report|deck|files|documents)(?: and the (?:report|deck|handout))?)\b.*\bpdf\b|"
-                  r"\bpdf pack\b|\b(?:one|single|a combined)\s+pdf\b")
+PACK = re.compile(
+    r"\b(?:export|save|combine|merge|bundle|make|put|turn|print|join)\b.*\b(?:everything|all|both|whole|project|pack|the (?:report|deck|files|documents)(?: and the (?:report|deck|handout))?)\b.*\bpdf\b|"
+    r"\bpdf pack\b|\b(?:one|single|a combined)\s+pdf\b"
+)
 COMPRESS = re.compile(r"\b(?:compress|shrink)\b|\bmake (?:it|the pdf|the pack) smaller\b|\breduce (?:the )?(?:pdf |file )?size\b")
 SPLIT = re.compile(r"\bsplit\b.*\bpdf\b|\bsplit (?:it|the pack)\b")
 PAGES = re.compile(r"\b(extract|keep|delete|remove|drop|rotate)\s+(?:only\s+)?pages?\s+((?:\d+\s*(?:-|to)?\s*\d*\s*(?:,|and)?\s*)+|the last)\b")
-WATERMARK = re.compile(r"\b(?:a|an)\s+['\"]?([A-Za-z][\w ]{1,20}?)['\"]?\s+watermark\b|\bwatermark(?:ed)?(?:\s+(?:it|them|the pdf|the pack))?\s+(?:with|saying|reading|that says)\s+['\"]?([\w ]{2,20}?)['\"]?(?=$|,|\s+and\b)|"
-                       r"\bstamp(?:ed)?\s+(?:it\s+|them\s+)?(?:as\s+|with\s+)?['\"]?(draft|confidential|final|internal|copy)\b", re.I)
-PROJECT_Q = re.compile(r"\bwhat(?:'s| is)? in (?:the |this |my )?project\b|\bwhat files\b|\blist (?:the |all )?files\b|\bshow (?:me )?(?:the )?files\b|\bwhich files\b", re.I)
+WATERMARK = re.compile(
+    r"\b(?:a|an)\s+['\"]?([A-Za-z][\w ]{1,20}?)['\"]?\s+watermark\b|\bwatermark(?:ed)?(?:\s+(?:it|them|the pdf|the pack))?\s+(?:with|saying|reading|that says)\s+['\"]?([\w ]{2,20}?)['\"]?(?=$|,|\s+and\b)|"
+    r"\bstamp(?:ed)?\s+(?:it\s+|them\s+)?(?:as\s+|with\s+)?['\"]?(draft|confidential|final|internal|copy)\b",
+    re.I,
+)
+PROJECT_Q = re.compile(
+    r"\bwhat(?:'s| is)? in (?:the |this |my )?project\b|\bwhat files\b|\blist (?:the |all )?files\b|\bshow (?:me )?(?:the )?files\b|\bwhich files\b",
+    re.I,
+)
 STALE_Q = re.compile(r"\b(?:up to date|out of date|stale|in sync|current)\b", re.I)
 ROUTE_PREFIX = re.compile(r"^\s*(?:in|on|for|to|with)\s+(?:the\s+|my\s+|our\s+)?(?:" + "|".join(ROLE.values()) + r")\s*(?:file)?\s*[,:]?\s*", re.I)
-ROUTE_ONLY = re.compile(r"^\s*(?:(?:and|then|also)\s+)?(?:in|on|for|to|with|inside)\s+(?:the\s+|my\s+|our\s+)?(" + "|".join(ROLE.values()) + r")\s*(?:file)?\s*[,:.]?\s*$", re.I)
+ROUTE_ONLY = re.compile(
+    r"^\s*(?:(?:and|then|also)\s+)?(?:in|on|for|to|with|inside)\s+(?:the\s+|my\s+|our\s+)?("
+    + "|".join(ROLE.values())
+    + r")\s*(?:file)?\s*[,:.]?\s*$",
+    re.I,
+)
 ROUTE_SUFFIX = re.compile(r"\s+(?:in|on|of|for|to)\s+(?:the\s+|my\s+)?(?:" + "|".join(ROLE.values()) + r")\s*\.?\s*$", re.I)
 
 PROJECT_SYSTEM = """You route a client's request in a project of several office files to the one file it is about, rewritten as a request
@@ -111,13 +134,32 @@ class ProjectChat:
         nm = slug(name or Path(files[0]).stem, 24) or "project"
         folder = Path(projects_dir or PROJECTS) / f"proj_{nm}_{time.strftime('%H%M%S')}"
         folder.mkdir(parents=True, exist_ok=True)
-        state = {"id": folder.name, "name": name or nm, "folder": str(folder), "files": {}, "links": {}, "pdfs": [], "versions": [], "cur": 0,
-                 "focus": None, "turns": []}
+        state = {
+            "id": folder.name,
+            "name": name or nm,
+            "folder": str(folder),
+            "files": {},
+            "links": {},
+            "pdfs": [],
+            "versions": [],
+            "cur": 0,
+            "focus": None,
+            "turns": [],
+        }
         pc = cls(state, **kw)
         for f in files:
             pc._add_file(f)
-        state["versions"].append({"v": 0, "parent": None, "files": {k: pc.chat(k).state["cur"] for k in state["files"]}, "links": {}, "pdfs": 0,
-                                  "said": None, "done": ["the files as given"]})
+        state["versions"].append(
+            {
+                "v": 0,
+                "parent": None,
+                "files": {k: pc.chat(k).state["cur"] for k in state["files"]},
+                "links": {},
+                "pdfs": 0,
+                "said": None,
+                "done": ["the files as given"],
+            }
+        )
         pc.save()
         return pc
 
@@ -171,7 +213,9 @@ class ProjectChat:
         for k in files:  # a file named by its name or its role ("the report", "sales.xlsx")
             f = self.state["files"][k]
             stem = re.sub(r"[_\-]+", " ", Path(f["label"]).stem.lower())
-            if re.search(r"(?<!\w)" + re.escape(f["label"].lower()) + r"(?!\w)", low) or (len(stem) > 3 and re.search(r"(?<!\w)" + re.escape(stem) + r"(?!\w)", low)):
+            if re.search(r"(?<!\w)" + re.escape(f["label"].lower()) + r"(?!\w)", low) or (
+                len(stem) > 3 and re.search(r"(?<!\w)" + re.escape(stem) + r"(?!\w)", low)
+            ):
                 return k
         hits = []
         for kind, rx in ROLE.items():
@@ -285,7 +329,9 @@ class ProjectChat:
         for kind, payload in merged:
             if kind == "meta":
                 what, n = payload
-                out.append(self.undo() if what == "undo" else self.redo() if what == "redo" else self.goto(n) if what == "goto" else self.history_text())
+                out.append(
+                    self.undo() if what == "undo" else self.redo() if what == "redo" else self.goto(n) if what == "goto" else self.history_text()
+                )
                 turn["intents"].append(what)
             elif kind == "say":
                 out.append(payload)
@@ -296,6 +342,7 @@ class ProjectChat:
                     out.append(self.run_cross(payload, message))
                 except Exception as e:  # noqa: BLE001
                     import traceback
+
                     traceback.print_exc()
                     out.append(f"Couldn't {payload['op'].replace('_', ' ')}: {type(e).__name__}: {str(e)[:200]}")
             elif kind == "unknown":
@@ -336,12 +383,25 @@ class ProjectChat:
             self.state["files"][k]["made_in"] = len(self.state["versions"])
         cur = self.version
         n_pdfs = len(self.state["pdfs"]) if self._pdf_added else cur["pdfs"]
-        if files == cur["files"] and n_pdfs == cur["pdfs"] and json.dumps(self.state["links"], sort_keys=True) == json.dumps(cur.get("links") or {}, sort_keys=True):
+        if (
+            files == cur["files"]
+            and n_pdfs == cur["pdfs"]
+            and json.dumps(self.state["links"], sort_keys=True) == json.dumps(cur.get("links") or {}, sort_keys=True)
+        ):
             return False
         n = len(self.state["versions"])
         done = [re.sub(r"\s+Checked:.*$", "", x.split("\n")[0])[:160] for x in out if x and not x.startswith(("Undone", "Redone", "Now at"))]
-        self.state["versions"].append({"v": n, "parent": self.state["cur"], "files": files, "links": json.loads(json.dumps(self.state["links"])),
-                                       "pdfs": n_pdfs, "said": said, "done": done})
+        self.state["versions"].append(
+            {
+                "v": n,
+                "parent": self.state["cur"],
+                "files": files,
+                "links": json.loads(json.dumps(self.state["links"])),
+                "pdfs": n_pdfs,
+                "said": said,
+                "done": done,
+            }
+        )
         self.state["cur"] = n
         return True
 
@@ -363,8 +423,11 @@ class ProjectChat:
         was = self.state["cur"]
         self._restore(parent)
         gone = [k for k in self.state["versions"][was]["files"] if k not in self.version["files"]]
-        return f"Undone: the project is back at v{parent} (v{was} was: {'; '.join(self.state['versions'][was]['done'])[:200]})" + \
-            (f"; {', '.join(self.label(k) for k in gone)} set aside" if gone else "") + "."
+        return (
+            f"Undone: the project is back at v{parent} (v{was} was: {'; '.join(self.state['versions'][was]['done'])[:200]})"
+            + (f"; {', '.join(self.label(k) for k in gone)} set aside" if gone else "")
+            + "."
+        )
 
     def redo(self):
         kids = [v for v in self.state["versions"] if v.get("parent") == self.state["cur"]]
@@ -389,9 +452,11 @@ class ProjectChat:
             f = self.state["files"][k]
             c = self.chat(k)
             n_links = sum(1 for L in self.state["links"].values() if L["dst"] == k)
-            out.append(f"{self.label(k)}: {f['kind']}, at v{c.state['cur']}" + (f", {n_links} table(s)/chart(s) linked to a workbook" if n_links else ""))
-        if self.state["pdfs"][:self.version["pdfs"]]:
-            out.append("PDFs: " + ", ".join(Path(p["path"]).name for p in self.state["pdfs"][:self.version["pdfs"]]))
+            out.append(
+                f"{self.label(k)}: {f['kind']}, at v{c.state['cur']}" + (f", {n_links} table(s)/chart(s) linked to a workbook" if n_links else "")
+            )
+        if self.state["pdfs"][: self.version["pdfs"]]:
+            out.append("PDFs: " + ", ".join(Path(p["path"]).name for p in self.state["pdfs"][: self.version["pdfs"]]))
         return "Project files: " + "; ".join(out) + "."
 
     # ------------------------------------------------------------------ data links
@@ -426,8 +491,13 @@ class ProjectChat:
             by.setdefault(L["dst"], []).append(f"{L['kind']} '{L['title']}'")
         for dst, what, old, new in figs:
             by.setdefault(dst, []).append(f"the text says {old} for {what} (now {new})")
-        return "Out of date since the workbook changed: " + "; ".join(f"{self.label(k)}: {', '.join(v)}" for k, v in by.items()) + \
-            ". Say 'refresh " + (" and ".join("the " + self.state["files"][k]["role"] for k in by) if len(by) <= 2 else "everything") + "' to bring them up to date."
+        return (
+            "Out of date since the workbook changed: "
+            + "; ".join(f"{self.label(k)}: {', '.join(v)}" for k, v in by.items())
+            + ". Say 'refresh "
+            + (" and ".join("the " + self.state["files"][k]["role"] for k in by) if len(by) <= 2 else "everything")
+            + "' to bring them up to date."
+        )
 
     def grab(self, wb_key, specs):
         """Tables or pivots from the workbook's current version exactly as Excel shows them (pivots refreshed first)."""
@@ -465,27 +535,42 @@ class ProjectChat:
         datec = next((x for x in t["cols"] if x["kind"] == "date"), None)
         if bym and re.search(r"\bmonth", bym.group(1)) and datec and datec not in bys:
             bys.append(datec)
-        vals = [x for x in BP.cols_in(d[:bym.start()] if bym else d, main) if x["kind"] in ("number", "money", "percent") and x not in bys] or \
-            ([BP.metric(t, additive=True)] if BP.metric(t, additive=True) else [])
+        vals = [x for x in BP.cols_in(d[: bym.start()] if bym else d, main) if x["kind"] in ("number", "money", "percent") and x not in bys] or (
+            [BP.metric(t, additive=True)] if BP.metric(t, additive=True) else []
+        )
         pivots = [s for s in m["sheets"] if s["kind"] == "pivot" and s.get("table")]
         if bys:  # a pivot or summary that is already there: its first column is the 'by', its numbers the value
             for s in pivots + [s for s in m["sheets"] if s["kind"] == "table" and s["name"] != m["main"] and s.get("table")]:
                 head = [prettify(c_["name"]).lower() for c_ in s["table"]["cols"]]
                 if head and head[0] == bys[0]["name"].lower() and (not vals or any(vals[0]["name"].lower() in h for h in head)) and len(bys) == 1:
-                    return {"sheet": s["name"], "what": "pivot" if s["kind"] == "pivot" else "table", "title": f"{vals[0]['name'] if vals else 'Rows'} by {bys[0]['name']}"}, None
+                    return {
+                        "sheet": s["name"],
+                        "what": "pivot" if s["kind"] == "pivot" else "table",
+                        "title": f"{vals[0]['name'] if vals else 'Rows'} by {bys[0]['name']}",
+                    }, None
             rows = [x for x in bys if x["kind"] != "date"][:1] or bys[:1]
             cols = [x for x in bys if x is not rows[0]][:1]
             rname = "month" if rows[0]["kind"] == "date" else rows[0]["name"]
-            op = {"op": "pivot", "sheet": main["name"], "rows": [rows[0]["name"]], **({"columns": [cols[0]["name"]]} if cols else {}),
-                  "values": [vals[0]["name"]] if vals else [], "fn": "sum", **({"period": "month"} if any(x["kind"] == "date" for x in bys) else {}),
-                  "name": f"{(vals[0]['name'] + ' ') if vals else ''}by {rname}" + (f" and {('month' if cols[0]['kind'] == 'date' else cols[0]['name'])}" if cols else "")}
+            op = {
+                "op": "pivot",
+                "sheet": main["name"],
+                "rows": [rows[0]["name"]],
+                **({"columns": [cols[0]["name"]]} if cols else {}),
+                "values": [vals[0]["name"]] if vals else [],
+                "fn": "sum",
+                **({"period": "month"} if any(x["kind"] == "date" for x in bys) else {}),
+                "name": f"{(vals[0]['name'] + ' ') if vals else ''}by {rname}"
+                + (f" and {('month' if cols[0]['kind'] == 'date' else cols[0]['name'])}" if cols else ""),
+            }
             before = set(m["names"])
             msg = c._change([op], f"(for the project) {desc}", {"ops": []})
             c.save()
             new = [n for n in c.map()["names"] if n not in before]
             if not new:
                 raise RuntimeError(f"the workbook could not make that pivot: {msg}")
-            title = f"{vals[0]['name'] if vals else 'Rows'} by {rname}" + (f" and {'month' if cols[0]['kind'] == 'date' else cols[0]['name']}" if cols else "")
+            title = f"{vals[0]['name'] if vals else 'Rows'} by {rname}" + (
+                f" and {'month' if cols[0]['kind'] == 'date' else cols[0]['name']}" if cols else ""
+            )
             return {"sheet": new[0], "what": "pivot", "title": title}, f"[{self.label(wb_key)}] {msg}"
         if pivots and re.search(r"\bpivot\b", d):
             return {"sheet": pivots[-1]["name"], "what": "pivot", "title": pivots[-1]["name"]}, None
@@ -499,14 +584,14 @@ class ProjectChat:
         books, docs, decks = self.active("xlsx"), self.active("docx"), self.active("pptx")
         if PACK.search(low) or (re.search(r"\bpdf\b", low) and re.search(r"\b(?:cover|bookmarks?|page numbers)\b", low)):
             return {"op": "pdf_pack", "text": low, "raw": raw}
-        if WATERMARK.search(raw) and (self.state["pdfs"][:self.version["pdfs"]] or re.search(r"\bpdf\b", low)):
+        if WATERMARK.search(raw) and (self.state["pdfs"][: self.version["pdfs"]] or re.search(r"\bpdf\b", low)):
             return {"op": "pdf_watermark", "text": low, "raw": raw}
-        if COMPRESS.search(low) and self.state["pdfs"][:self.version["pdfs"]]:
+        if COMPRESS.search(low) and self.state["pdfs"][: self.version["pdfs"]]:
             return {"op": "pdf_compress"}
-        if SPLIT.search(low) and self.state["pdfs"][:self.version["pdfs"]]:
+        if SPLIT.search(low) and self.state["pdfs"][: self.version["pdfs"]]:
             return {"op": "pdf_split"}
         mp = PAGES.search(low)
-        if mp and (re.search(r"\bpdf\b|\bpack\b", low) or (self.state["pdfs"][:self.version["pdfs"]] and not docs and not decks)):
+        if mp and (re.search(r"\bpdf\b|\bpack\b", low) or (self.state["pdfs"][: self.version["pdfs"]] and not docs and not decks)):
             return {"op": "pdf_pages", "verb": mp.group(1), "pages": mp.group(2), "text": low}
         if HANDOUT.search(low) and decks:
             return {"op": "handout", "deck": self.route_kind(low, "pptx"), "notes": not re.search(r"\bwithout (?:the )?notes\b", low)}
@@ -515,10 +600,23 @@ class ProjectChat:
         if REPORT_FROM.search(low) and books and not re.search(r"\b(?:into|in|to)\s+(?:the\s+)?(?:report|document)\b", low):
             return {"op": "report_from_book", "book": books[0], "text": c}
         if REFRESH.search(low) and (self.state["links"] or self.state.get("facts")):
-            tg = [k for k in self.active() if self.state["files"][k]["kind"] in ("docx", "pptx") and (
-                re.search(r"\b(?:" + ROLE[self.state["files"][k]["kind"]] + r")\b", low) or re.search(r"\b(?:everything|all|links|figures|numbers)\b", low))]
-            return {"op": "refresh", "targets": tg or sorted({L["dst"] for L in self.state["links"].values() if L["dst"] in self.active()} |
-                                                           {k for k in (self.state.get("facts") or {}) if k in self.active()})}
+            tg = [
+                k
+                for k in self.active()
+                if self.state["files"][k]["kind"] in ("docx", "pptx")
+                and (
+                    re.search(r"\b(?:" + ROLE[self.state["files"][k]["kind"]] + r")\b", low)
+                    or re.search(r"\b(?:everything|all|links|figures|numbers)\b", low)
+                )
+            ]
+            return {
+                "op": "refresh",
+                "targets": tg
+                or sorted(
+                    {L["dst"] for L in self.state["links"].values() if L["dst"] in self.active()}
+                    | {k for k in (self.state.get("facts") or {}) if k in self.active()}
+                ),
+            }
         if books and (docs or decks) and INSERT.search(low) and DATA.search(low):
             mi = INTO.search(low)
             if mi:
@@ -557,17 +655,28 @@ class ProjectChat:
         """'put the pivot of amount by city into the report after the introduction, with a chart of it'."""
         low, dst, wb = x["text"], x["dst"], x["book"]
         kind = self.state["files"][dst]["kind"]
-        head = low[:x["into"].start()]
+        head = low[: x["into"].start()]
         chart = bool(re.search(r"\b(?:charts?|graphs?|plot)\b", low))
-        chart_only = bool(re.search(r"\b(?:put|insert|add|copy|paste|bring|include|place|drop|show)\s+(?:me\s+)?(?:a|an|the)?\s*(?:\w+\s+)?(?:chart|graph|plot)\b", head))
+        chart_only = bool(
+            re.search(
+                r"\b(?:put|insert|add|copy|paste|bring|include|place|drop|show)\s+(?:me\s+)?(?:a|an|the)?\s*(?:\w+\s+)?(?:chart|graph|plot)\b", head
+            )
+        )
         table = not chart_only or bool(re.search(r"\b(?:tables?|figures|numbers|totals?|breakdown)\b", head))
-        what = re.sub(r"\b(?:put|insert|add|copy|paste|bring|include|place|drop|show)\b", " ", low[:x["into"].start()])
-        what = re.sub(r"\b(?:the|a|an|of|it|and|with|from|workbook|excel|sheet|table|tables|chart|charts|graph|figures|numbers|data|pivot table)\b", " ", what) if not \
-            re.search(r"\bby\b", low[:x["into"].start()]) else low[:x["into"].start()]
+        what = re.sub(r"\b(?:put|insert|add|copy|paste|bring|include|place|drop|show)\b", " ", low[: x["into"].start()])
+        what = (
+            re.sub(
+                r"\b(?:the|a|an|of|it|and|with|from|workbook|excel|sheet|table|tables|chart|charts|graph|figures|numbers|data|pivot table)\b",
+                " ",
+                what,
+            )
+            if not re.search(r"\bby\b", low[: x["into"].start()])
+            else low[: x["into"].start()]
+        )
         desc = what if re.search(r"\bby\b", what) else ("pivot" if re.search(r"\bpivot\b", low) else what)
         spec, note = self.source(wb, desc if desc.strip() else "pivot")
         data = self.grab(wb, [spec])[0]
-        rest = low[x["into"].end():]
+        rest = low[x["into"].end() :]
         c = self.chat(dst)
         ops = []
         mk = re.search(r"\b(pie|bar|column|line|doughnut)\b", low)
@@ -577,12 +686,27 @@ class ProjectChat:
             if t is None and re.search(r"\b(?:introduction|intro|overview|summary|opening|beginning)\b", rest) and m["sections"]:
                 first = next((sec for sec in m["sections"] if sec.get("level", 1) == 1), m["sections"][0])
                 t = {"kind": "section", "name": re.sub(r"^\d+(\.\d+)*\.?\s+", "", first["title"])}  # the report's own opening section
-            wh = "before" if re.search(r"\bbefore\b|\babove\b", rest) else "after" if t else ("start" if re.search(r"\bat the (?:start|beginning|top)\b", rest) else "end")
+            wh = (
+                "before"
+                if re.search(r"\bbefore\b|\babove\b", rest)
+                else "after"
+                if t
+                else ("start" if re.search(r"\bat the (?:start|beginning|top)\b", rest) else "end")
+            )
             place = {"anchor": t, "where": wh} if t else {"where": wh}
             if table:
                 ops.append({"op": "data_table", "data": data, "link": self._new_link(), **place, "caption": data["title"]})
             if chart:
-                ops.append({"op": "data_chart", "data": data, "link": self._new_link(), **place, "caption": data["title"], **({"chart": mk.group(1)} if mk else {})})
+                ops.append(
+                    {
+                        "op": "data_chart",
+                        "data": data,
+                        "link": self._new_link(),
+                        **place,
+                        "caption": data["title"],
+                        **({"chart": mk.group(1)} if mk else {}),
+                    }
+                )
             if table and chart and t:  # the chart goes under the table, not above it
                 ops[1]["anchor"], ops[1]["where"] = t, "after"
         else:
@@ -591,18 +715,43 @@ class ProjectChat:
             closing = bool(dm["slides"]) and bool(re.search(r"thank|question|contact", dm["slides"][-1]["title"], re.I))
             after = (int(ma.group(1)) if ma.group(1) else int(ma.group(2) or ma.group(3)) - 1) if ma else (dm["count"] - 1 if closing else "end")
             if chart or not table:
-                ops.append({"op": "data_slide", "kind": "chart", "data": data, "link": self._new_link(), "after": after, "title": data["title"], **({"chart": mk.group(1)} if mk else {})})
+                ops.append(
+                    {
+                        "op": "data_slide",
+                        "kind": "chart",
+                        "data": data,
+                        "link": self._new_link(),
+                        "after": after,
+                        "title": data["title"],
+                        **({"chart": mk.group(1)} if mk else {}),
+                    }
+                )
             if table:
-                ops.append({"op": "data_slide", "kind": "table", "data": data, "link": self._new_link(), "after": (after + len(ops)) if isinstance(after, int) else after,
-                            "title": data["title"]})
+                ops.append(
+                    {
+                        "op": "data_slide",
+                        "kind": "table",
+                        "data": data,
+                        "link": self._new_link(),
+                        "after": (after + len(ops)) if isinstance(after, int) else after,
+                        "title": data["title"],
+                    }
+                )
         msg = c._change(ops, message, {"ops": []})
         c.save()
         self.state["focus"] = dst
         head = self.chat(wb)
         for o in ops:
-            self.state["links"][o["link"]] = {"src": wb, "spec": spec, "dst": dst, "kind": "chart" if o["op"] == "data_chart" or o.get("kind") == "chart" else "table",
-                                              "op": {k: v for k, v in o.items() if k not in ("data", "op", "link")}, "src_v": head.state["cur"],
-                                              "main_hash": self.main_hash(wb, spec.get("sheet")), "title": data["title"]}
+            self.state["links"][o["link"]] = {
+                "src": wb,
+                "spec": spec,
+                "dst": dst,
+                "kind": "chart" if o["op"] == "data_chart" or o.get("kind") == "chart" else "table",
+                "op": {k: v for k, v in o.items() if k not in ("data", "op", "link")},
+                "src_v": head.state["cur"],
+                "main_hash": self.main_hash(wb, spec.get("sheet")),
+                "title": data["title"],
+            }
         self._prune_links(dst)  # an edit the file refused leaves no link behind
         return (note + "\n" if note else "") + f"[{self.label(dst)}] {msg}"
 
@@ -614,11 +763,13 @@ class ProjectChat:
                 from docx import Document
 
                 from ai_pc.office.docx_data import links as dlinks
+
                 have = set(dlinks(Document(str(c.path()))))
             else:
                 from pptx import Presentation
 
                 from ai_pc.office.pptx_ops import data_links
+
                 have = set(data_links(Presentation(str(c.path()))))
         except Exception:  # noqa: BLE001
             return
@@ -694,7 +845,7 @@ class ProjectChat:
             tot = sum(float(r[col["name"]]) for r in recs if isinstance(r.get(col["name"]), (int, float)))
             lines.append(f"Total {col['name']}: {_fmt(tot, col)}")
             pairs.append({"label": f"total {col['name']}", "value": _fmt(tot, col)})
-            for g in [c_ for c_ in t["cols"] if c_["kind"] == "text" and 2 <= len({str(r[c_['name']]) for r in recs if r[c_['name']]}) <= 12][:4]:
+            for g in [c_ for c_ in t["cols"] if c_["kind"] == "text" and 2 <= len({str(r[c_["name"]]) for r in recs if r[c_["name"]]}) <= 12][:4]:
                 sums = {}
                 for r in recs:
                     if isinstance(r.get(col["name"]), (int, float)) and r.get(g["name"]):
@@ -710,8 +861,15 @@ class ProjectChat:
                     if re.match(r"\d{4}-\d{2}", d) and isinstance(r.get(col["name"]), (int, float)):
                         sums[d] = sums.get(d, 0) + float(r[col["name"]])
                 import datetime as _dt
-                lines.append(f"{col['name']} by month: " + "; ".join(f"{_dt.date(int(k[:4]), int(k[5:7]), 1).strftime('%B %Y')} {_fmt(v, col)}" for k, v in sorted(sums.items())))
-                pairs += [{"label": f"{col['name']} in {_dt.date(int(k[:4]), int(k[5:7]), 1).strftime('%B %Y')}", "value": _fmt(v, col)} for k, v in sorted(sums.items())]
+
+                lines.append(
+                    f"{col['name']} by month: "
+                    + "; ".join(f"{_dt.date(int(k[:4]), int(k[5:7]), 1).strftime('%B %Y')} {_fmt(v, col)}" for k, v in sorted(sums.items()))
+                )
+                pairs += [
+                    {"label": f"{col['name']} in {_dt.date(int(k[:4]), int(k[5:7]), 1).strftime('%B %Y')}", "value": _fmt(v, col)}
+                    for k, v in sorted(sums.items())
+                ]
         self._pairs = pairs
         return "\n".join(x for x in lines if x)
 
@@ -723,10 +881,12 @@ class ProjectChat:
         c = self.chat(key)
         if self.state["files"][key]["kind"] == "docx":
             from docx import Document
+
             d = Document(str(c.path()))
             return "\n".join([p.text for p in d.paragraphs] + [cell.text for t in d.tables for row in t.rows for cell in row.cells])
         if self.state["files"][key]["kind"] == "pptx":
             from pptx import Presentation
+
             prs = Presentation(str(c.path()))
             out = []
             for sl in prs.slides:
@@ -757,6 +917,7 @@ class ProjectChat:
 
     def report_from_book(self, wb_key, text, message):
         from ai_pc.office.studio import DocStudio
+
         facts = self.facts(wb_key)
         fpath = self.folder / "facts.md"
         fpath.write_text(f"FACTS (exact, computed from {self.state['files'][wb_key]['label']}):\n{facts}\n", encoding="utf-8")
@@ -764,8 +925,10 @@ class ProjectChat:
         mp = re.search(r"\b(\d+|one|two|three|four|five)[- ]pages?\b", text.lower())
         if mp:
             pages = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}.get(mp.group(1)) or int(mp.group(1))
-        req = (f"{text}. Write it from the FACTS file only and quote only those figures, exactly as written there. Do not add tables or charts of "
-               f"figures: the program adds exact ones from the workbook.")
+        req = (
+            f"{text}. Write it from the FACTS file only and quote only those figures, exactly as written there. Do not add tables or charts of "
+            f"figures: the program adds exact ones from the workbook."
+        )
         st = DocStudio(planner=self.planner, log=self.log, look=False, fix_rounds=1)
         sess = st.new(req, files=[str(fpath)], pages=pages, kind="docx")
         dst = self.folder / "files" / Path(sess["docx"]).name
@@ -777,20 +940,23 @@ class ProjectChat:
         self.state.setdefault("facts", {})[key] = {"src": wb_key, "pairs": self.fact_pairs(wb_key), "src_v": self.chat(wb_key).state["cur"]}
         self.state["focus"] = key
         c = sess["checks"]["counts"]
-        found = (sess.get("client_data") or {})
-        return (f"[{self.label(key)}] new: {sess.get('body_pages') or sess.get('pages')} page(s) written from {self.label(wb_key)}'s figures "
-                f"({c.get('pass', 0)} checks pass, {c.get('warn', 0)} warn, {c.get('fail', 0)} fail" +
-                (f"; {found.get('found')}/{found.get('checked')} of the figures quoted exactly" if found else "") + ").")
+        found = sess.get("client_data") or {}
+        return (
+            f"[{self.label(key)}] new: {sess.get('body_pages') or sess.get('pages')} page(s) written from {self.label(wb_key)}'s figures "
+            f"({c.get('pass', 0)} checks pass, {c.get('warn', 0)} warn, {c.get('fail', 0)} fail"
+            + (f"; {found.get('found')}/{found.get('checked')} of the figures quoted exactly" if found else "")
+            + ")."
+        )
 
     def deck_from_report(self, doc_key, text, message):
         from ai_pc.office.studio import DocStudio
+
         c = self.chat(doc_key)
         n = None
         mp = re.search(r"\b(\d+)[- ]slides?\b", text.lower())
         if mp:
             n = int(mp.group(1))
-        req = (f"{text}. Use only what the report says. Do not draw charts or tables of figures: the program adds exact ones "
-               f"from the workbook.")
+        req = f"{text}. Use only what the report says. Do not draw charts or tables of figures: the program adds exact ones from the workbook."
         st = DocStudio(planner=self.planner, log=self.log, look=False, fix_rounds=1)
         sess = st.new_deck(req, files=[str(c.path())], slides=n)
         dst = self.folder / "files" / Path(sess["pptx"]).name
@@ -802,8 +968,10 @@ class ProjectChat:
         if (self.state.get("facts") or {}).get(doc_key):  # its text comes from the report's: the same figures
             self.state["facts"][key] = json.loads(json.dumps(self.state["facts"][doc_key]))
         self.state["focus"] = key
-        out = [f"[{self.label(key)}] new: {sess.get('body_pages') or sess.get('pages')} slides from {self.label(doc_key)} "
-               f"({sess['checks']['counts'].get('pass', 0)} checks pass, {sess['checks']['counts'].get('fail', 0)} fail)."]
+        out = [
+            f"[{self.label(key)}] new: {sess.get('body_pages') or sess.get('pages')} slides from {self.label(doc_key)} "
+            f"({sess['checks']['counts'].get('pass', 0)} checks pass, {sess['checks']['counts'].get('fail', 0)} fail)."
+        ]
         dk0 = self.chat(key)
         if dk0.version.get("overflow"):  # text PowerPoint measured as too big for its box: fitted by that measure before it is handed over
             out.append(f"[{self.label(key)}] {dk0.say('fix any text that does not fit')}")
@@ -817,9 +985,23 @@ class ProjectChat:
             for i, (lid, L) in enumerate(charts):
                 data = self.grab(L["src"], [L["spec"]])[0]
                 nl = self._new_link()
-                ops.append({"op": "data_slide", "kind": "chart", "data": data, "link": nl, "after": pos + i, "title": data["title"], **({"chart": L["op"]["chart"]} if L["op"].get("chart") else {})})
-                self.state["links"][nl] = {**json.loads(json.dumps(L)), "dst": key, "src_v": self.chat(L["src"]).state["cur"],
-                                           "main_hash": self.main_hash(L["src"], L["spec"].get("sheet"))}
+                ops.append(
+                    {
+                        "op": "data_slide",
+                        "kind": "chart",
+                        "data": data,
+                        "link": nl,
+                        "after": pos + i,
+                        "title": data["title"],
+                        **({"chart": L["op"]["chart"]} if L["op"].get("chart") else {}),
+                    }
+                )
+                self.state["links"][nl] = {
+                    **json.loads(json.dumps(L)),
+                    "dst": key,
+                    "src_v": self.chat(L["src"]).state["cur"],
+                    "main_hash": self.main_hash(L["src"], L["spec"].get("sheet")),
+                }
             msg = dk._change(ops, message, {"ops": []})
             dk.save()
             out.append(f"[{self.label(key)}] {msg}")
@@ -831,6 +1013,7 @@ class ProjectChat:
 
         from ai_pc.office import docplan as DPL
         from ai_pc.office import docx_build as DB
+
         c = self.chat(deck_key)
         png = self.folder / f"_handout_png_{deck_key}"
         shutil.rmtree(png, ignore_errors=True)
@@ -853,8 +1036,18 @@ class ProjectChat:
             if i % 2 == 0 and i < len(m["slides"]):
                 blocks.append({"type": "page_break"})
         title = f"{m['title']} - handout"
-        plan = DPL.resolve({"doctype": "report", "title": title, "subtitle": f"{len(m['slides'])} slides" + (" with speaker notes" if notes else ""),
-                            "theme": "corporate", "blocks": blocks, "cover": False, "toc": False, "footer": {"page_numbers": True}})
+        plan = DPL.resolve(
+            {
+                "doctype": "report",
+                "title": title,
+                "subtitle": f"{len(m['slides'])} slides" + (" with speaker notes" if notes else ""),
+                "theme": "corporate",
+                "blocks": blocks,
+                "cover": False,
+                "toc": False,
+                "footer": {"page_numbers": True},
+            }
+        )
         dst = self.folder / "files" / f"{slug(m['title'] or 'deck', 30)}_handout.docx"
         dst.parent.mkdir(parents=True, exist_ok=True)
         DB.build(plan, str(dst))
@@ -863,13 +1056,17 @@ class ProjectChat:
         self.state["files"][key]["from"] = deck_key
         h = self.chat(key)
         from docx import Document
+
         hd = Document(str(h.path()))
         pics = len(hd.inline_shapes)
         body = " ".join(" ".join(p.text.split()) for p in hd.paragraphs)
         noted = sum(1 for s in m["slides"] if s.get("notes") and " ".join(s["notes"].split())[:40] in body)
         ok_pics = pics == len(m["slides"])
-        return (f"[{self.label(key)}] new: {len(m['slides'])} slide pictures" + (f" and {noted} slides' speaker notes" if notes else "") +
-                f", {h.version.get('pages') or '?'} page(s). Checked: {'every slide is in it' if ok_pics else f'{pics} pictures for {len(m['slides'])} slides'}.")
+        return (
+            f"[{self.label(key)}] new: {len(m['slides'])} slide pictures"
+            + (f" and {noted} slides' speaker notes" if notes else "")
+            + f", {h.version.get('pages') or '?'} page(s). Checked: {'every slide is in it' if ok_pics else f'{pics} pictures for {len(m["slides"])} slides'}."
+        )
 
     # ------------------------------------------------------------------ PDFs
     def _pdf_of(self, key):
@@ -881,19 +1078,34 @@ class ProjectChat:
         out.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.folder / f"_pdf_{key}{Path(v['file']).suffix}"
         shutil.copy(v["file"], tmp)
-        r = c._job({"app": {"xlsx": "excel", "docx": "word", "pptx": "powerpoint"}[self.state["files"][key]["kind"]], "src": str(tmp.resolve()), "pdf": str(out.resolve())}) \
-            if hasattr(c, "_job") else RN.office({"app": {"docx": "word", "pptx": "powerpoint"}[self.state["files"][key]["kind"]], "src": str(tmp.resolve()), "pdf": str(out.resolve())})
+        r = (
+            c._job(
+                {
+                    "app": {"xlsx": "excel", "docx": "word", "pptx": "powerpoint"}[self.state["files"][key]["kind"]],
+                    "src": str(tmp.resolve()),
+                    "pdf": str(out.resolve()),
+                }
+            )
+            if hasattr(c, "_job")
+            else RN.office(
+                {
+                    "app": {"docx": "word", "pptx": "powerpoint"}[self.state["files"][key]["kind"]],
+                    "src": str(tmp.resolve()),
+                    "pdf": str(out.resolve()),
+                }
+            )
+        )
         tmp.unlink(missing_ok=True)
         if not r.get("ok") or not out.exists():
             raise RuntimeError(f"no PDF of {self.label(key)}: {r.get('error')}")
         return str(out)
 
     def _last_pdf(self):
-        pdfs = self.state["pdfs"][:self.version["pdfs"]]
+        pdfs = self.state["pdfs"][: self.version["pdfs"]]
         return pdfs[-1] if pdfs else None
 
     def _add_pdf(self, path, kind, made_from, extra=None):
-        self.state["pdfs"] = self.state["pdfs"][:self.version["pdfs"]] + [{"path": str(path), "kind": kind, "from": made_from, **(extra or {})}]
+        self.state["pdfs"] = self.state["pdfs"][: self.version["pdfs"]] + [{"path": str(path), "kind": kind, "from": made_from, **(extra or {})}]
         self._pdf_added = True
 
     def pdf(self, x, message):
@@ -908,17 +1120,31 @@ class ProjectChat:
                 opts = dict(last.get("options") or {})
                 keys = last["from"]
             else:
-                named = [k for k in self.active() if self.state["files"][k]["kind"] in ("docx", "pptx") and
-                         (re.search(r"\b" + re.escape(self.state["files"][k]["role"]) + r"\b", low) or Path(self.state["files"][k]["label"]).stem.lower() in low)]
+                named = [
+                    k
+                    for k in self.active()
+                    if self.state["files"][k]["kind"] in ("docx", "pptx")
+                    and (
+                        re.search(r"\b" + re.escape(self.state["files"][k]["role"]) + r"\b", low)
+                        or Path(self.state["files"][k]["label"]).stem.lower() in low
+                    )
+                ]
                 everything = bool(re.search(r"\b(?:everything|all|both|whole|project)\b", low))
                 keys = [k for k in self.active() if self.state["files"][k]["kind"] in ("docx", "pptx")] if everything or not named else named
                 order = {"report": 0, "deck": 1, "handout": 2}
                 keys.sort(key=lambda k: order.get(self.state["files"][k]["role"], 3))
                 opts = {}
-                cm = re.search(r"\bcover(?:\s+page)?\s+(?:called|titled|named|saying|reading|with the title)\s+['\"]?(.+?)['\"]?(?=\s*,|\s+(?:and|with)\s+(?:page|a|an|the)\b|\s*$)", raw, re.I)
+                cm = re.search(
+                    r"\bcover(?:\s+page)?\s+(?:called|titled|named|saying|reading|with the title)\s+['\"]?(.+?)['\"]?(?=\s*,|\s+(?:and|with)\s+(?:page|a|an|the)\b|\s*$)",
+                    raw,
+                    re.I,
+                )
                 if cm or re.search(r"\bcover\b", low):
-                    opts["cover"] = {"title": cm.group(1).strip(" .'\"") if cm else self.state["name"], "subtitle": self.state["name"] if cm else None,
-                                     "lines": [f"{len(keys)} document(s): " + ", ".join(self.state["files"][k]["label"] for k in keys)]}
+                    opts["cover"] = {
+                        "title": cm.group(1).strip(" .'\"") if cm else self.state["name"],
+                        "subtitle": self.state["name"] if cm else None,
+                        "lines": [f"{len(keys)} document(s): " + ", ".join(self.state["files"][k]["label"] for k in keys)],
+                    }
                 if re.search(r"\bpage numbers?\b|\bnumbered\b|\bnumber the pages\b", low):
                     opts["numbers"] = True
             wm = WATERMARK.search(raw)
@@ -932,10 +1158,15 @@ class ProjectChat:
             r = PF.pack(parts, out, cover=opts.get("cover"), numbers=opts.get("numbers"), watermark=opts.get("watermark"), server=self.server)
             self._add_pdf(out, "pack", keys, {"options": opts, "pages": r["pages"]})
             bad = [ch for ch in r["checks"] if not ch["ok"]]
-            return (f"[pdf] {out.name}: {r['pages']} pages ({' + '.join(t for t, _ in parts)}" + (", a cover" if opts.get("cover") else "") +
-                    (", page numbers" if opts.get("numbers") else "") + (f", a {opts['watermark']} watermark" if opts.get("watermark") else "") +
-                    f"), {r['kb']} KB. Checked: {len(r['checks']) - len(bad)}/{len(r['checks'])} OK" +
-                    (" (" + "; ".join(f"{ch['op']}: {ch['what']}" for ch in bad) + ")" if bad else f" ({'; '.join(ch['what'] for ch in r['checks'])})") + ".")
+            return (
+                f"[pdf] {out.name}: {r['pages']} pages ({' + '.join(t for t, _ in parts)}"
+                + (", a cover" if opts.get("cover") else "")
+                + (", page numbers" if opts.get("numbers") else "")
+                + (f", a {opts['watermark']} watermark" if opts.get("watermark") else "")
+                + f"), {r['kb']} KB. Checked: {len(r['checks']) - len(bad)}/{len(r['checks'])} OK"
+                + (" (" + "; ".join(f"{ch['op']}: {ch['what']}" for ch in bad) + ")" if bad else f" ({'; '.join(ch['what'] for ch in r['checks'])})")
+                + "."
+            )
         last = self._last_pdf()
         if not last:
             raise RuntimeError("there is no PDF yet; say e.g. 'export everything as one pdf'")
@@ -982,8 +1213,16 @@ class ProjectChat:
                 what = ""
             lines.append(f"- {k}: {f['kind']} {f['label']} ({f['role']}); {what}")
         try:
-            r = self.planner._call("fast", [{"role": "system", "content": PROJECT_SYSTEM},
-                                            {"role": "user", "content": "FILES:\n" + "\n".join(lines) + f"\nLAST FILE: {self.state.get('focus')}\nMESSAGE: {message}\nREQUEST: {clause}"}])
+            r = self.planner._call(
+                "fast",
+                [
+                    {"role": "system", "content": PROJECT_SYSTEM},
+                    {
+                        "role": "user",
+                        "content": "FILES:\n" + "\n".join(lines) + f"\nLAST FILE: {self.state.get('focus')}\nMESSAGE: {message}\nREQUEST: {clause}",
+                    },
+                ],
+            )
             return parse_json(r.text) or {}
         except Exception as e:  # noqa: BLE001
             return {"ask": f"I could not work out which file that is about ({type(e).__name__})."}

@@ -8,6 +8,7 @@ is cut from the page's own picture when one is given, so it still looks right.
   tree, images, notes = load("design.pptx", pages=[1], pictures={1: "page1.png"}, work=folder)
   tree: {"document": {"type": "DOCUMENT", "children": [{"type": "CANVAS", "children": [frame]}]}}
 """
+
 import hashlib
 import io
 import math
@@ -19,8 +20,24 @@ from ai_pc.coding.design2code import family_weight
 EMU_PX = 9525.0  # 914400 EMU an inch, 96 px an inch
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-THEME_KEYS = {1: "dk1", 2: "lt1", 3: "dk2", 4: "lt2", 5: "accent1", 6: "accent2", 7: "accent3", 8: "accent4", 9: "accent5", 10: "accent6",
-              11: "hlink", 12: "folHlink", 13: "dk1", 14: "lt1", 15: "dk2", 16: "lt2"}
+THEME_KEYS = {
+    1: "dk1",
+    2: "lt1",
+    3: "dk2",
+    4: "lt2",
+    5: "accent1",
+    6: "accent2",
+    7: "accent3",
+    8: "accent4",
+    9: "accent5",
+    10: "accent6",
+    11: "hlink",
+    12: "folHlink",
+    13: "dk1",
+    14: "lt1",
+    15: "dk2",
+    16: "lt2",
+}
 
 
 def _px(v):
@@ -45,6 +62,7 @@ class Reader:
         try:
             from lxml import etree
             from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+
             root = etree.fromstring(self.prs.slide_master.part.part_related_by(RT.THEME).blob)
             for el in root.iter(A + "clrScheme"):
                 for c in el:
@@ -110,9 +128,17 @@ class Reader:
             ang = int(lin.get("ang", "0")) / 60000.0 if lin is not None else 90.0  # clockwise from left-to-right
             dx, dy = math.cos(math.radians(ang)), math.sin(math.radians(ang))
             if stops:
-                return [{"type": "GRADIENT_LINEAR", "gradientStops": sorted(stops, key=lambda s: s["position"]),
-                         "gradientHandlePositions": [{"x": 0.5 - dx / 2, "y": 0.5 - dy / 2}, {"x": 0.5 + dx / 2, "y": 0.5 + dy / 2},
-                                                     {"x": 0.5 - dy / 2, "y": 0.5 + dx / 2}]}]
+                return [
+                    {
+                        "type": "GRADIENT_LINEAR",
+                        "gradientStops": sorted(stops, key=lambda s: s["position"]),
+                        "gradientHandlePositions": [
+                            {"x": 0.5 - dx / 2, "y": 0.5 - dy / 2},
+                            {"x": 0.5 + dx / 2, "y": 0.5 + dy / 2},
+                            {"x": 0.5 - dy / 2, "y": 0.5 + dx / 2},
+                        ],
+                    }
+                ]
             return []
         bf = sppr.find(A + "blipFill")
         if bf is not None and shape is not None:
@@ -150,10 +176,15 @@ class Reader:
     @staticmethod
     def _crop(blob, crop):
         from PIL import Image
+
         im = Image.open(io.BytesIO(blob))
         w, h = im.size
-        box = (int(round(w * max(0, crop["l"]))), int(round(h * max(0, crop["t"]))), int(round(w * (1 - max(0, crop["r"])))),
-               int(round(h * (1 - max(0, crop["b"])))))
+        box = (
+            int(round(w * max(0, crop["l"]))),
+            int(round(h * max(0, crop["t"]))),
+            int(round(w * (1 - max(0, crop["r"])))),
+            int(round(h * (1 - max(0, crop["b"])))),
+        )
         if box[2] - box[0] < 2 or box[3] - box[1] < 2:
             return blob
         out = io.BytesIO()
@@ -164,6 +195,7 @@ class Reader:
     @staticmethod
     def _repng(blob):
         from PIL import Image
+
         try:
             im = Image.open(io.BytesIO(blob))
             out = io.BytesIO()
@@ -216,6 +248,7 @@ class Reader:
 
     def shape(self, sh, tf):
         from pptx.enum.shapes import MSO_SHAPE_TYPE
+
         el = sh._element
         sppr, xf = self.xfrm(el)
         if sh.left is None or sh.width is None:
@@ -241,8 +274,13 @@ class Reader:
             elif geom is not None and geom.get("prst") == "roundRect":
                 node["cornerRadius"] = self._round(geom, w, h)
             return [node]
-        if st in (MSO_SHAPE_TYPE.TABLE, MSO_SHAPE_TYPE.CHART, MSO_SHAPE_TYPE.MEDIA, MSO_SHAPE_TYPE.EMBEDDED_OLE_OBJECT, MSO_SHAPE_TYPE.DIAGRAM) or \
-                el.tag.endswith("graphicFrame"):
+        if st in (
+            MSO_SHAPE_TYPE.TABLE,
+            MSO_SHAPE_TYPE.CHART,
+            MSO_SHAPE_TYPE.MEDIA,
+            MSO_SHAPE_TYPE.EMBEDDED_OLE_OBJECT,
+            MSO_SHAPE_TYPE.DIAGRAM,
+        ) or el.tag.endswith("graphicFrame"):
             return self.art(base, name)
         out = []
         geom = sppr.find(A + "prstGeom") if sppr is not None else None
@@ -252,8 +290,14 @@ class Reader:
         strokes, weight = self.line(sppr)
         style = el.find("{http://schemas.openxmlformats.org/presentationml/2006/main}style")
         if style is not None:  # the theme's look, for a shape that does not set its own
-            if not fills and (sppr is None or sppr.find(A + "noFill") is None) and sppr is not None and sppr.find(A + "solidFill") is None \
-                    and sppr.find(A + "gradFill") is None and sppr.find(A + "blipFill") is None:
+            if (
+                not fills
+                and (sppr is None or sppr.find(A + "noFill") is None)
+                and sppr is not None
+                and sppr.find(A + "solidFill") is None
+                and sppr.find(A + "gradFill") is None
+                and sppr.find(A + "blipFill") is None
+            ):
                 fr = style.find(A + "fillRef")
                 if fr is not None and fr.get("idx", "0") != "0":
                     c = self.color_el(fr)
@@ -275,8 +319,14 @@ class Reader:
             return out
         if fills or strokes:
             if prst in ("rect", "roundRect", "ellipse", "snip1Rect", "flowChartProcess", "flowChartAlternateProcess"):
-                node = dict(base, type="ELLIPSE" if prst == "ellipse" else "RECTANGLE", fills=fills, strokes=strokes, strokeWeight=weight,
-                            strokeAlign="CENTER")
+                node = dict(
+                    base,
+                    type="ELLIPSE" if prst == "ellipse" else "RECTANGLE",
+                    fills=fills,
+                    strokes=strokes,
+                    strokeWeight=weight,
+                    strokeAlign="CENTER",
+                )
                 if prst in ("roundRect", "flowChartAlternateProcess"):
                     node["cornerRadius"] = self._round(geom, w, h)
                 out.append(node)
@@ -358,12 +408,19 @@ class Reader:
 
         def inner(x, y, w, h):  # child coordinates -> the group's place on the slide, then the parents' mapping
             return tf(gx + (x - cx0) * kx, gy + (y - cy0) * ky, w * kx, h * ky)
+
         kids = self.shapes(sh.shapes, inner)
         X, Y, W, H = tf(gx, gy, gw, gh)
         if float(getattr(sh, "rotation", 0) or 0):
             self.note(f"'{name}': a turned group is shown unturned")
-        return {"id": self.nid(), "name": name, "type": "GROUP", "visible": True, "children": kids,
-                "absoluteBoundingBox": {"x": X, "y": Y, "width": W, "height": H}}
+        return {
+            "id": self.nid(),
+            "name": name,
+            "type": "GROUP",
+            "visible": True,
+            "children": kids,
+            "absoluteBoundingBox": {"x": X, "y": Y, "width": W, "height": H},
+        }
 
     def art(self, base, name, why="it"):
         """Something with no web equivalent: cut from the page's picture, so it still looks right."""
@@ -374,8 +431,12 @@ class Reader:
         b = base["absoluteBoundingBox"]
         W, H = self.page_size
         sx, sy = img.size[0] / W, img.size[1] / H
-        box = (max(0, int(b["x"] * sx)), max(0, int(b["y"] * sy)), min(img.size[0], int(math.ceil((b["x"] + b["width"]) * sx))),
-               min(img.size[1], int(math.ceil((b["y"] + b["height"]) * sy))))
+        box = (
+            max(0, int(b["x"] * sx)),
+            max(0, int(b["y"] * sy)),
+            min(img.size[0], int(math.ceil((b["x"] + b["width"]) * sx))),
+            min(img.size[1], int(math.ceil((b["y"] + b["height"]) * sy))),
+        )
         if box[2] - box[0] < 2 or box[3] - box[1] < 2:
             return []
         out = io.BytesIO()
@@ -388,15 +449,23 @@ class Reader:
         self.images[ref] = str(p)
         self.note(f"'{name}': {why} has no web equivalent, so it is a picture cut from the design")
         X0, Y0 = box[0] / sx, box[1] / sy
-        return [{"id": base["id"], "name": name or "artwork", "type": "RECTANGLE", "visible": True,
-                 "absoluteBoundingBox": {"x": X0, "y": Y0, "width": (box[2] - box[0]) / sx, "height": (box[3] - box[1]) / sy},
-                 "fills": [{"type": "IMAGE", "imageRef": ref, "scaleMode": "STRETCH"}]}]
+        return [
+            {
+                "id": base["id"],
+                "name": name or "artwork",
+                "type": "RECTANGLE",
+                "visible": True,
+                "absoluteBoundingBox": {"x": X0, "y": Y0, "width": (box[2] - box[0]) / sx, "height": (box[3] - box[1]) / sy},
+                "fills": [{"type": "IMAGE", "imageRef": ref, "scaleMode": "STRETCH"}],
+            }
+        ]
 
     def page_picture(self):
         if self.page not in self.page_img:
             p = self.pictures.get(self.page)
             if p and Path(p).exists():
                 from PIL import Image
+
                 self.page_img[self.page] = Image.open(p).convert("RGBA")
             else:
                 self.page_img[self.page] = None
@@ -405,10 +474,13 @@ class Reader:
     # ---------------------------------------------------------------- text
     def text(self, sh, base, x, y, w, h, rot, fh, fv):
         from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+
         tf = sh.text_frame
         body = tf._txBody.find(A + "bodyPr")
-        ins = {k: _px(body.get(k)) if body is not None and body.get(k) is not None else d
-               for k, d in (("lIns", 9.6), ("tIns", 4.8), ("rIns", 9.6), ("bIns", 4.8))}
+        ins = {
+            k: _px(body.get(k)) if body is not None and body.get(k) is not None else d
+            for k, d in (("lIns", 9.6), ("tIns", 4.8), ("rIns", 9.6), ("bIns", 4.8))
+        }
         scale = 1.0
         if body is not None:
             na = body.find(A + "normAutofit")
@@ -461,9 +533,17 @@ class Reader:
         bx, by = x + ins["lIns"], y + ins["tIns"]
         bw, bh = max(1.0, w - ins["lIns"] - ins["rIns"]), max(1.0, h - ins["tIns"] - ins["bIns"])
         base0 = table[0] if 0 in table else first
-        style = {"fontFamily": base0["fontFamily"], "fontWeight": base0["fontWeight"], "italic": base0["italic"], "fontSize": base0["fontSize"],
-                 "lineHeightPx": lh, "letterSpacing": base0.get("letterSpacing", 0), "textAlignHorizontal": align, "textAlignVertical": anchor,
-                 "textAutoResize": "NONE" if wrap else "WIDTH_AND_HEIGHT"}
+        style = {
+            "fontFamily": base0["fontFamily"],
+            "fontWeight": base0["fontWeight"],
+            "italic": base0["italic"],
+            "fontSize": base0["fontSize"],
+            "lineHeightPx": lh,
+            "letterSpacing": base0.get("letterSpacing", 0),
+            "textAlignHorizontal": align,
+            "textAlignVertical": anchor,
+            "textAutoResize": "NONE" if wrap else "WIDTH_AND_HEIGHT",
+        }
         if base0.get("textCase"):
             style["textCase"] = base0["textCase"]
         if base0.get("textDecoration"):
@@ -478,10 +558,19 @@ class Reader:
             if st.get("hyperlink"):
                 d["hyperlink"] = {"type": "URL", "url": st["hyperlink"]}
             over[sid] = d
-        node = {"id": self.nid(), "name": text.strip().split("\n")[0][:40] or sh.name or "Text", "type": "TEXT", "visible": True, "characters": text,
-                "style": style,
-                "fills": [{"type": "SOLID", "color": base0["color"]}], "characterStyleOverrides": ov if over else [],
-                "styleOverrideTable": over, "lineTypes": types, **self.node_box(bx, by, bw, bh, rot, fh, fv)}
+        node = {
+            "id": self.nid(),
+            "name": text.strip().split("\n")[0][:40] or sh.name or "Text",
+            "type": "TEXT",
+            "visible": True,
+            "characters": text,
+            "style": style,
+            "fills": [{"type": "SOLID", "color": base0["color"]}],
+            "characterStyleOverrides": ov if over else [],
+            "styleOverrideTable": over,
+            "lineTypes": types,
+            **self.node_box(bx, by, bw, bh, rot, fh, fv),
+        }
         if base0.get("hyperlink"):
             node["style"]["hyperlink"] = {"type": "URL", "url": base0["hyperlink"]}
         return node
@@ -498,8 +587,13 @@ class Reader:
         col = None
         if rpr is not None:
             col = self.color_el(rpr.find(A + "solidFill"))
-        st = {"fontFamily": fam, "fontWeight": wt, "italic": bool(f.italic), "fontSize": round(size_pt * 96 / 72 * scale, 2),
-              "color": col or {"r": 0, "g": 0, "b": 0, "a": 1}}
+        st = {
+            "fontFamily": fam,
+            "fontWeight": wt,
+            "italic": bool(f.italic),
+            "fontSize": round(size_pt * 96 / 72 * scale, 2),
+            "color": col or {"r": 0, "g": 0, "b": 0, "a": 1},
+        }
         if rpr is not None and rpr.get("spc"):
             st["letterSpacing"] = int(rpr.get("spc")) / 100.0 * 96 / 72
         if rpr is not None and rpr.get("cap") == "all":
@@ -546,14 +640,23 @@ class Reader:
         W, H = _px(self.prs.slide_width), _px(self.prs.slide_height)
         self.page_size = (W, H)
         kids = self.shapes(slide.shapes)
-        return {"id": f"{no}:0", "name": title, "type": "FRAME", "visible": True, "clipsContent": True,
-                "absoluteBoundingBox": {"x": 0.0, "y": 0.0, "width": W, "height": H}, "fills": self.background(slide, W, H), "children": kids}
+        return {
+            "id": f"{no}:0",
+            "name": title,
+            "type": "FRAME",
+            "visible": True,
+            "clipsContent": True,
+            "absoluteBoundingBox": {"x": 0.0, "y": 0.0, "width": W, "height": H},
+            "fills": self.background(slide, W, H),
+            "children": kids,
+        }
 
 
 def load(path, pages=None, pictures=None, work=None, title=None):
     """-> (tree in Figma's shape, images {ref: file}, notes). pages: [1, 2] (1-based) or None for all; several pages are
     stacked top to bottom as sections of one page."""
     from pptx import Presentation
+
     prs = Presentation(str(path))
     work = Path(work or Path(path).with_suffix("")).resolve()
     rd = Reader(prs, work, pictures)
@@ -572,8 +675,16 @@ def load(path, pages=None, pictures=None, work=None, title=None):
             _shift(f, 0.0, y)
             f["name"] = f"Section {f['id'].split(':')[0]}"
             y += f["absoluteBoundingBox"]["height"]
-        root = {"id": "0:0", "name": name, "type": "FRAME", "visible": True, "clipsContent": True, "children": frames,
-                "absoluteBoundingBox": {"x": 0.0, "y": 0.0, "width": W, "height": y}, "fills": [{"type": "SOLID", "color": _hex("FFFFFF")}]}
+        root = {
+            "id": "0:0",
+            "name": name,
+            "type": "FRAME",
+            "visible": True,
+            "clipsContent": True,
+            "children": frames,
+            "absoluteBoundingBox": {"x": 0.0, "y": 0.0, "width": W, "height": y},
+            "fills": [{"type": "SOLID", "color": _hex("FFFFFF")}],
+        }
     doc = {"document": {"id": "0:doc", "type": "DOCUMENT", "children": [{"id": "0:page", "type": "CANVAS", "name": name, "children": [root]}]}}
     return doc, rd.images, rd.notes
 

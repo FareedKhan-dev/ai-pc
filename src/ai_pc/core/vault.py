@@ -4,6 +4,7 @@ user, or a copy of the file on another PC, cannot read them. Keys are typed by t
 
   put("slack", {"bot_token": "xoxb-..."})   get("slack") -> dict | None   names() -> ["slack", ...]   remove("slack")
 """
+
 import json
 import threading
 
@@ -18,12 +19,14 @@ def _load():
     if not FILE.exists():
         return {}
     import win32crypt
+
     raw = win32crypt.CryptUnprotectData(FILE.read_bytes(), _ENTROPY, None, None, 0)[1]
     return json.loads(raw.decode("utf-8"))
 
 
 def _save(d):
     import win32crypt
+
     FILE.parent.mkdir(parents=True, exist_ok=True)
     blob = win32crypt.CryptProtectData(json.dumps(d).encode("utf-8"), "AI PC hub keys", _ENTROPY, None, None, 0)
     tmp = FILE.with_suffix(".tmp")

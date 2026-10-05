@@ -1,5 +1,6 @@
 """WhatsApp Business through Meta's Cloud API (a business number, e.g. the free test number): a text to someone who wrote
 to the business in the last 24 hours, or an approved template to anyone; a personal WhatsApp account has no API."""
+
 import re
 
 from ai_pc.hub.http import Api, HubError
@@ -32,8 +33,10 @@ class WhatsApp(Base):
         return {"who": p.get("verified_name"), "where": p.get("display_phone_number")}
 
     def send(self, to, text):
-        js = self.api().post(f"{self.creds['phone_number_id']}/messages", json={"messaging_product": "whatsapp", "to": number(to), "type": "text",
-                                                                                 "text": {"body": text, "preview_url": False}})
+        js = self.api().post(
+            f"{self.creds['phone_number_id']}/messages",
+            json={"messaging_product": "whatsapp", "to": number(to), "type": "text", "text": {"body": text, "preview_url": False}},
+        )
         mid = (js.get("messages") or [{}])[0].get("id")
         return {"id": mid, "where": f"WhatsApp +{number(to)}", "verified": bool(mid), "undo": None}
 
@@ -41,7 +44,8 @@ class WhatsApp(Base):
         tpl = {"name": template, "language": {"code": lang}}
         if params:
             tpl["components"] = [{"type": "body", "parameters": [{"type": "text", "text": str(p)} for p in params]}]
-        js = self.api().post(f"{self.creds['phone_number_id']}/messages", json={"messaging_product": "whatsapp", "to": number(to), "type": "template",
-                                                                                 "template": tpl})
+        js = self.api().post(
+            f"{self.creds['phone_number_id']}/messages", json={"messaging_product": "whatsapp", "to": number(to), "type": "template", "template": tpl}
+        )
         mid = (js.get("messages") or [{}])[0].get("id")
         return {"id": mid, "where": f"WhatsApp +{number(to)}", "verified": bool(mid), "undo": None}

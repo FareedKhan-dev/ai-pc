@@ -5,6 +5,7 @@ against the design again and undone; a Canva sale page whose button text is chan
   .venv\\Scripts\\python.exe tests\\integration\\design2code_conversations.py [--offline]
 About two minutes. The Figma and Canva servers are the test suite's fakes (no account needed); the model is real.
 """
+
 import re
 import sys
 import time
@@ -71,6 +72,7 @@ def main():
     planner = None
     if "--offline" not in sys.argv:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     TD.rmtree(OUT)
     OUT.mkdir(parents=True)
@@ -83,6 +85,7 @@ def main():
         from ai_pc.coding import design2code as D
         from ai_pc.coding import designcheck as DC
         from ai_pc.office import render
+
         doc, nid = landing()
         imgs = pictures(OUT / "pics")
         ref_proj = OUT / "reference_page"
@@ -118,13 +121,18 @@ def main():
         def undone(c, r):
             h = (Path(c.state["project"]) / "index.html").read_text(encoding="utf-8")
             return "Best prices in town" in h and "Took back" in r, r[:200]
-        run("a Figma landing page, then changes", c, [
-            (f"make a website from this figma design {link}", made),
-            ("make the call now button green", green),
-            ("change the main heading to 'Lowest prices in Lahore'", heading),
-            ("does it still match the design?", measured),
-            ("undo", undone),
-        ])
+
+        run(
+            "a Figma landing page, then changes",
+            c,
+            [
+                (f"make a website from this figma design {link}", made),
+                ("make the call now button green", green),
+                ("change the main heading to 'Lowest prices in Lahore'", heading),
+                ("does it still match the design?", measured),
+                ("undo", undone),
+            ],
+        )
 
         c = CodeChat.start(planner=planner, chats_dir=OUT / "chats", projects_dir=OUT / "projects", connectors={"figma": f, "canva": cv})
 
@@ -135,10 +143,15 @@ def main():
         def order_now(c, r):
             h = (Path(c.state["project"]) / "index.html").read_text(encoding="utf-8")
             return "Order now" in h and "Shop now" not in h and loads(c), re.findall(r"<span[^>]*>[^<]*now[^<]*</span>", h, re.I)
-        run("a Canva sale page, then a change", c, [
-            ("turn my canva design 'Eid sale' into a web page", canva_made),
-            ("make the shop now button say 'Order now'", order_now),
-        ])
+
+        run(
+            "a Canva sale page, then a change",
+            c,
+            [
+                ("turn my canva design 'Eid sale' into a web page", canva_made),
+                ("make the shop now button say 'Order now'", order_now),
+            ],
+        )
     finally:
         FG.CACHE, CV.EXPORTS, FD.WORK = olds
     ok = sum(1 for *_, g in RESULTS if g)

@@ -8,6 +8,7 @@ back, settings, the history, undo and redo.
   .venv\\Scripts\\python.exe tests\\integration\\win_conversations.py [--offline]
 --offline: rules only (the turns that need the model are skipped).
 """
+
 import datetime as dt
 import json
 import re
@@ -53,12 +54,14 @@ class W:
 
 def _width(p):
     from PIL import Image
+
     with Image.open(p) as im:
         return im.size[0]
 
 
 def _pages(p):
     from pypdf import PdfReader
+
     return len(PdfReader(str(p)).pages)
 
 
@@ -67,29 +70,75 @@ CLEANED = ["big-file.zip.part", "python-3.12.4-amd64.exe", "vlc-3.0.21-win64.exe
 TURNS = [  # (message, the intent expected, a check, needs the model)
     ("what's in my downloads?", "summary", lambda w: w.says(r"23 files", r"1 empty folder", r"7 photos", r"2 unfinished downloads"), False),
     ("what's taking space?", "find", lambda w: w.says(r"Your folders: Downloads", r"Biggest files", r"Electricity bill Aug")),
-    ("find my CV and move it to documents", "move",
-     lambda w: (w.docs / "CV - Fareed Hassan.docx").exists() and not (w.dl / "CV - Fareed Hassan.docx").exists() and w.says(r"nothing lost: (\d+) before, \1 after")),
-    ("clean up my downloads", "cleanup",
-     lambda w: w.c.state["pending"] and all((w.dl / n).exists() for n in CLEANED) and w.says(r"6 items to the Recycle Bin", r"Left alone: movie\.mp4\.crdownload",
-                                                                                           r"ZoomInstaller\.exe")),
-    ("yes", "confirm", lambda w: not any((w.dl / n).exists() for n in CLEANED) and not (w.dl / "New folder").exists() and (w.dl / "movie.mp4.crdownload").exists()
-     and (w.dl / "ZoomInstaller.exe").exists() and (w.dl / f"IMG_{Y}0812_101500.jpg").exists() and w.says(r"Checked: 6/6 OK")),
+    (
+        "find my CV and move it to documents",
+        "move",
+        lambda w: (
+            (w.docs / "CV - Fareed Hassan.docx").exists()
+            and not (w.dl / "CV - Fareed Hassan.docx").exists()
+            and w.says(r"nothing lost: (\d+) before, \1 after")
+        ),
+    ),
+    (
+        "clean up my downloads",
+        "cleanup",
+        lambda w: (
+            w.c.state["pending"]
+            and all((w.dl / n).exists() for n in CLEANED)
+            and w.says(r"6 items to the Recycle Bin", r"Left alone: movie\.mp4\.crdownload", r"ZoomInstaller\.exe")
+        ),
+    ),
+    (
+        "yes",
+        "confirm",
+        lambda w: (
+            not any((w.dl / n).exists() for n in CLEANED)
+            and not (w.dl / "New folder").exists()
+            and (w.dl / "movie.mp4.crdownload").exists()
+            and (w.dl / "ZoomInstaller.exe").exists()
+            and (w.dl / f"IMG_{Y}0812_101500.jpg").exists()
+            and w.says(r"Checked: 6/6 OK")
+        ),
+    ),
     ("what's in the recycle bin?", "bin_list", lambda w: w.says(r"6 items from your folders", r"big-file\.zip\.part", r"New folder")),
     ("undo", "undo", lambda w: all((w.dl / n).exists() for n in CLEANED) and (w.dl / "New folder").is_dir() and w.says(r"Checked: 6/6 OK")),
     ("organize my downloads", "organize", lambda w: w.c.state["pending"] and len(w.loose()) == 22 and w.says(r"sort 21 files", r"Photos \(7\)")),
-    ("yes", "confirm", lambda w: w.loose() == ["movie.mp4.crdownload"] and len(w.names(w.dl / "Photos")) == 7 and len(w.names(w.dl / "PDFs")) == 3 and
-     w.says(r"nothing lost: (\d+) before, \1 after")),
+    (
+        "yes",
+        "confirm",
+        lambda w: (
+            w.loose() == ["movie.mp4.crdownload"]
+            and len(w.names(w.dl / "Photos")) == 7
+            and len(w.names(w.dl / "PDFs")) == 3
+            and w.says(r"nothing lost: (\d+) before, \1 after")
+        ),
+    ),
     ("find the photos from august", "find", lambda w: w.says(r"^4 found", r"WhatsApp Image") and len(w.c.state["focus"]) == 4),
     ("copy them to pictures", "copy", lambda w: len(w.names(w.pics)) == 4 and len(w.names(w.dl / "Photos")) == 7),
-    ("rename them by the date they were taken", "rename",
-     lambda w: w.names(w.pics) == sorted([f"{Y}-08-12 10.15.00.jpg", f"{Y}-08-12 10.15.00 (2).jpg", f"{Y}-08-19 18.30.00.jpg", f"{Y}-08-25 20.11.03.jpeg"])),
+    (
+        "rename them by the date they were taken",
+        "rename",
+        lambda w: (
+            w.names(w.pics)
+            == sorted([f"{Y}-08-12 10.15.00.jpg", f"{Y}-08-12 10.15.00 (2).jpg", f"{Y}-08-19 18.30.00.jpg", f"{Y}-08-25 20.11.03.jpeg"])
+        ),
+    ),
     ("make it my wallpaper", "ask", lambda w: w.says(r"Which one\?", r"1\. ") and Path(w.setting("wallpaper")).parent != w.pics),
     ("make the second one my wallpaper", "wallpaper", lambda w: Path(w.setting("wallpaper")).name == f"{Y}-08-12 10.15.00 (2).jpg"),
-    ("resize them to 800 pixels wide", "resize", lambda w: len(w.names(w.pics / "Resized")) == 4 and all(_width(p) == 800 for p in (w.pics / "Resized").iterdir())),
+    (
+        "resize them to 800 pixels wide",
+        "resize",
+        lambda w: len(w.names(w.pics / "Resized")) == 4 and all(_width(p) == 800 for p in (w.pics / "Resized").iterdir()),
+    ),
     ("zip the PDFs folder", "zip", lambda w: (w.dl / "PDFs.zip").exists() and w.says(r"3 file\(s\)", r"every file reads back")),
-    ("merge the pdfs in the PDFs folder into one", "merge_pdfs",
-     lambda w: (w.dl / "PDFs" / "Merged.pdf").exists() and _pages(w.dl / "PDFs" / "Merged.pdf") == sum(
-         _pages(p) for p in (w.dl / "PDFs").iterdir() if p.name != "Merged.pdf")),
+    (
+        "merge the pdfs in the PDFs folder into one",
+        "merge_pdfs",
+        lambda w: (
+            (w.dl / "PDFs" / "Merged.pdf").exists()
+            and _pages(w.dl / "PDFs" / "Merged.pdf") == sum(_pages(p) for p in (w.dl / "PDFs").iterdir() if p.name != "Merged.pdf")
+        ),
+    ),
     ("convert the word documents in documents to pdf", "convert", lambda w: (w.docs / "CV - Fareed Hassan.pdf").exists() and w.says(r"1 page")),
     ("extract the audio from the clip", "audio", lambda w: (w.dl / "Videos" / "clip from phone.mp3").exists() and w.says(r"3\.\d s of sound")),
     ("delete the new folder", "trash", lambda w: not (w.dl / "New folder").exists()),
@@ -109,8 +158,12 @@ TURNS = [  # (message, the intent expected, a check, needs the model)
     ("undo the last two", "undo", lambda w: w.startup("spotify") is True and w.setting("file_extensions") is False),
     ("redo", "redo", lambda w: w.setting("file_extensions") is True and w.startup("spotify") is True),
     ("tell me about the biggest video I have", None, lambda w: w.says(r"clip from phone\.mp4"), True),
-    ("I'd love it if the screenshot was a jpg instead", None, lambda w: any(p.suffix == ".jpg" and p.stem.startswith("Screenshot")
-                                                                          for p in (w.dl / "Photos").iterdir()), True),
+    (
+        "I'd love it if the screenshot was a jpg instead",
+        None,
+        lambda w: any(p.suffix == ".jpg" and p.stem.startswith("Screenshot") for p in (w.dl / "Photos").iterdir()),
+        True,
+    ),
 ]
 
 
@@ -119,7 +172,9 @@ def run(planner):
     sb = win_sandbox.build(BASE / "sandbox")
     places = {"downloads": sb["downloads"], "documents": sb["documents"], "pictures": sb["pictures"]}
     Fake.wipe()
-    c = WinChat.start(places=places, roots=[BASE / "sandbox"], chats_dir=BASE / "chats", settings=Settings(Fake(folder=BASE / "startup")), planner=planner)
+    c = WinChat.start(
+        places=places, roots=[BASE / "sandbox"], chats_dir=BASE / "chats", settings=Settings(Fake(folder=BASE / "startup")), planner=planner
+    )
     rows = []
     try:
         for row in TURNS:
@@ -143,8 +198,21 @@ def run(planner):
             except Exception as e:  # noqa: BLE001
                 check_ok, err = False, err or f"check {type(e).__name__}: {e}"
             ok = intent_ok and check_ok and not err
-            rows.append({"msg": msg, "ok": ok, "intents": intents, "seconds": round(secs, 2), "llm": bool(c.last_turn.get("llm")), "reply": reply[:900], "error": err})
-            print(f"{'OK ' if ok else 'BAD'} [{','.join(intents)}{'+llm' if c.last_turn.get('llm') else ''}] {secs:5.2f}s  {msg}\n      {reply[:400]}", flush=True)
+            rows.append(
+                {
+                    "msg": msg,
+                    "ok": ok,
+                    "intents": intents,
+                    "seconds": round(secs, 2),
+                    "llm": bool(c.last_turn.get("llm")),
+                    "reply": reply[:900],
+                    "error": err,
+                }
+            )
+            print(
+                f"{'OK ' if ok else 'BAD'} [{','.join(intents)}{'+llm' if c.last_turn.get('llm') else ''}] {secs:5.2f}s  {msg}\n      {reply[:400]}",
+                flush=True,
+            )
             if not ok:
                 print(f"      intent_ok={intent_ok} check_ok={check_ok} {err or ''}")
     finally:
@@ -156,8 +224,10 @@ def run(planner):
     clean = not [it for it in fs.bin_items() if str(BASE).lower() in it["orig"].lower()]
     n, ok = len(rows), sum(r["ok"] for r in rows)
     usd = planner.cost()[1] if planner is not None else 0.0
-    print(f"\n{ok}/{n} turns OK; {sum(r['seconds'] for r in rows):.1f} s of turns; {time.perf_counter() - t_all:.0f} s in all; ${usd:.4f}; "
-          f"Recycle Bin {'clean' if clean else 'NOT clean'} after")
+    print(
+        f"\n{ok}/{n} turns OK; {sum(r['seconds'] for r in rows):.1f} s of turns; {time.perf_counter() - t_all:.0f} s in all; ${usd:.4f}; "
+        f"Recycle Bin {'clean' if clean else 'NOT clean'} after"
+    )
     (BASE / "report.json").write_text(json.dumps({"ok": ok, "turns": n, "rows": rows}, ensure_ascii=False, indent=1), encoding="utf-8")
     return ok, n, clean
 
@@ -166,6 +236,7 @@ if __name__ == "__main__":
     planner = None
     if "--offline" not in sys.argv:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     ok, n, clean = run(planner)
     sys.exit(0 if ok == n and clean else 1)

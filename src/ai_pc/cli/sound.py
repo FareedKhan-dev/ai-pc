@@ -19,6 +19,7 @@ the start', 'add echo', 'telephone effect', 'add captions', 'word by word captio
 'save the transcript as word', 'save as mp3 under 5 MB', 'for whatsapp', 'how loud is it?', 'is it noisy?',
 'what does it say?', 'compare', 'normalize for podcast instead', 'undo', 'go back to v2', 'history'.
 """
+
 import argparse
 import sys
 import time
@@ -51,26 +52,35 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     from ai_pc.sound.soundchat import SoundChat
+
     if a.cmd == "look":
         from ai_pc.sound import measure as M
+
         m = M.describe(a.file)
         hum = f"{m['hum']['hz']} Hz hum ({m['hum']['db']:.0f} dB)" if (m.get("hum") or {}).get("hz") else "no hum"
-        print(f"{Path(a.file).name}: {m['duration']:.1f} s, {m['audio']['codec']} {m['audio']['sr']} Hz {m['audio']['channels']} ch"
-              + (f", video {m['video']['w']}x{m['video']['h']}" if m.get("video") else "") +
-              f"\n  loudness {m['lufs']:.1f} LUFS, true peak {m['true_peak']} dBTP; voice {m['speech_db']:.0f} dB, noise between words {m['noise_db']:.0f} dB "
-              f"(SNR {m['snr_db']:.0f} dB); {hum}; rumble {m['rumble_db']:.0f} dB; clipped {m['clipped']:.3%}; {len(m['pauses'])} pauses "
-              f"(longest {m['longest_pause']:.1f} s)" + (f"; voice pitch {m['pitch_hz']:.0f} Hz" if m.get("pitch_hz") else ""))
+        print(
+            f"{Path(a.file).name}: {m['duration']:.1f} s, {m['audio']['codec']} {m['audio']['sr']} Hz {m['audio']['channels']} ch"
+            + (f", video {m['video']['w']}x{m['video']['h']}" if m.get("video") else "")
+            + f"\n  loudness {m['lufs']:.1f} LUFS, true peak {m['true_peak']} dBTP; voice {m['speech_db']:.0f} dB, noise between words {m['noise_db']:.0f} dB "
+            f"(SNR {m['snr_db']:.0f} dB); {hum}; rumble {m['rumble_db']:.0f} dB; clipped {m['clipped']:.3%}; {len(m['pauses'])} pauses "
+            f"(longest {m['longest_pause']:.1f} s)" + (f"; voice pitch {m['pitch_hz']:.0f} Hz" if m.get("pitch_hz") else "")
+        )
         return
     planner = None
     if not a.offline:
         from ai_pc.llm.planner import ChatPlanner
+
         planner = ChatPlanner()
     if a.cmd == "talk":
         if a.chat:
             c = SoundChat.load(a.chat, planner=planner)
         else:
             c = SoundChat.start(a.file, planner=planner, files=a.extra)
-        print(f"Chat {c.state['id']}" + (f" about {Path(c.state['src']).name}" if c.state.get("src") else "") + f" (now v{c.state['cur']}). 'quit' to leave.")
+        print(
+            f"Chat {c.state['id']}"
+            + (f" about {Path(c.state['src']).name}" if c.state.get("src") else "")
+            + f" (now v{c.state['cur']}). 'quit' to leave."
+        )
         msgs = a.say
         if msgs:
             for msg in msgs:
@@ -113,7 +123,12 @@ def main(argv=None):
             dst = out / Path(saved).name
             dst.write_bytes(Path(saved).read_bytes())
         ok += good
-        print(f"{'ok ' if good else 'BAD'} {f.name}: " + " | ".join(x.splitlines()[0][:100] for x in replies) + f" -> {Path(saved).name if saved else 'not saved'}", flush=True)
+        print(
+            f"{'ok ' if good else 'BAD'} {f.name}: "
+            + " | ".join(x.splitlines()[0][:100] for x in replies)
+            + f" -> {Path(saved).name if saved else 'not saved'}",
+            flush=True,
+        )
     print(f"\n{ok}/{len(files)} done in {time.perf_counter() - t0:.0f} s; copies in {out}")
 
 

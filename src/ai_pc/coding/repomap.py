@@ -1,5 +1,6 @@
 """What a project holds, short enough to give the model: every file, and for code the classes and functions with
 their arguments (Python by its syntax tree, JavaScript by pattern), plus the files a request is about in full."""
+
 import ast
 import re
 
@@ -19,8 +20,15 @@ def symbols(project, rel):
                 out.append(f"class {n.name}: " + ", ".join(m.name for m in n.body if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef))))
         return out
     if rel.endswith((".js", ".mjs", ".cjs", ".ts")):
-        return [m.group(0).strip()[:80] for m in re.finditer(r"^(?:export\s+)?(?:async\s+)?function\s+\w+\s*\([^)]*\)|^(?:export\s+)?class\s+\w+|"
-                                                               r"^(?:export\s+)?const\s+\w+\s*=\s*(?:async\s*)?\([^)]*\)\s*=>", src, re.M)]
+        return [
+            m.group(0).strip()[:80]
+            for m in re.finditer(
+                r"^(?:export\s+)?(?:async\s+)?function\s+\w+\s*\([^)]*\)|^(?:export\s+)?class\s+\w+|"
+                r"^(?:export\s+)?const\s+\w+\s*=\s*(?:async\s*)?\([^)]*\)\s*=>",
+                src,
+                re.M,
+            )
+        ]
     if rel.endswith((".html", ".htm")):
         ids = re.findall(r'id="([^"]+)"', src)
         return [f"ids: {', '.join(ids[:20])}"] if ids else []
@@ -36,8 +44,38 @@ def repomap(project, limit=60):
     return "\n".join(lines)
 
 
-STOP = {"make", "made", "change", "please", "should", "would", "want", "need", "them", "this", "that", "with", "from", "into", "more", "less",
-        "bigger", "smaller", "larger", "colour", "color", "also", "some", "have", "they", "there", "their", "page", "site", "website"}
+STOP = {
+    "make",
+    "made",
+    "change",
+    "please",
+    "should",
+    "would",
+    "want",
+    "need",
+    "them",
+    "this",
+    "that",
+    "with",
+    "from",
+    "into",
+    "more",
+    "less",
+    "bigger",
+    "smaller",
+    "larger",
+    "colour",
+    "color",
+    "also",
+    "some",
+    "have",
+    "they",
+    "there",
+    "their",
+    "page",
+    "site",
+    "website",
+}
 
 
 def css_excerpt(css, request, html=""):

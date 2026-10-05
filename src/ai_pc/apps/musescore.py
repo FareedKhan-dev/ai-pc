@@ -6,6 +6,7 @@ Checked by MuseScore's own report on the score (notes, measures, length), the PD
 
   'musescore: C4 D4 E4 F4 G4/2 G4/2 at 100 bpm on piano'   'sheet music pdf of song.musicxml'   'musescore it'
 """
+
 import json
 import re
 import subprocess
@@ -19,8 +20,16 @@ EXAMPLES = ["musescore 'Little Song': C4 D4 E4 F4 G4/2 G4/2 at 100 bpm on piano"
 HOME = ROOT / "tools" / "musescore-portable"
 EXE = HOME / "App" / "MuseScore" / "bin" / "MuseScore4.exe"
 SCORES = {".musicxml", ".mxl", ".xml", ".mid", ".midi", ".mscz"}
-USER_DIRS = {"myPlugins": "Plugins", "mySoundfonts": "SoundFonts", "myStyles": "Styles", "myTemplates": "Templates", "myScores": "Scores",
-             "myMusicFonts": "MusicFonts", "myVSTs": "VST", "userInstruments": "Instruments"}
+USER_DIRS = {
+    "myPlugins": "Plugins",
+    "mySoundfonts": "SoundFonts",
+    "myStyles": "Styles",
+    "myTemplates": "Templates",
+    "myScores": "Scores",
+    "myMusicFonts": "MusicFonts",
+    "myVSTs": "VST",
+    "userInstruments": "Instruments",
+}
 
 
 def setup():
@@ -38,13 +47,18 @@ def setup():
 
 def musescore(*args, timeout=180):
     from ai_pc.core import hidden_desktop
+
     setup()
     return hidden_desktop.run([str(EXE), *map(str, args)], timeout=timeout)
 
 
 def mp3_seconds(path):
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)], capture_output=True, text=True,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+        capture_output=True,
+        text=True,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
     try:
         return float(r.stdout.strip())
     except ValueError:
@@ -53,6 +67,7 @@ def mp3_seconds(path):
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\bmuse\s*score\b|\bsheet\s+music\b|\bnotation\b", c):
         return None
@@ -62,6 +77,7 @@ def parse(text, ctx):
     m = re.match(r"^\s*(?:muse\s*score|sheet\s+music)\s*(?:'([^']*)')?\s*:\s*(.+)$", text, re.I | re.S)
     if m:
         from ai_pc.apps import music
+
         op = music.parse(f"melody{(' ' + repr(m.group(1))) if m.group(1) else ''}: {m.group(2)}", ctx)
         if op:
             return {"op": "score", "melody": op}
@@ -79,6 +95,7 @@ def run(op, ctx):
     want_secs = want_notes = None
     if op.get("melody"):
         from ai_pc.apps import music
+
         mel = op["melody"]
         notes = music.read(mel["notes"])
         inst = mel["instrument"] if mel["instrument"] in music.PROGRAMS else "piano"
@@ -108,12 +125,13 @@ def run(op, ctx):
     job.unlink(missing_ok=True)
     rc, meta_out, _, _ = musescore("--score-meta", files["mscz"], timeout=120)
     try:
-        meta = json.loads(meta_out[meta_out.find("{"):]) if "{" in meta_out else {}
+        meta = json.loads(meta_out[meta_out.find("{") :]) if "{" in meta_out else {}
     except ValueError:
         meta = {}
     meta = meta.get("metadata", meta)
     pngs = sorted(out.glob(f"{stem}-*.png")) or ([files["png"]] if files["png"].exists() else [])
     from pypdf import PdfReader
+
     pdf_pages = len(PdfReader(str(files["pdf"])).pages) if files["pdf"].exists() else 0
     pdf_text = re.sub(r"\s+", " ", " ".join(p.extract_text() or "" for p in PdfReader(str(files["pdf"])).pages)) if pdf_pages else ""
     secs = mp3_seconds(files["mp3"]) if files["mp3"].exists() else None
@@ -122,8 +140,13 @@ def run(op, ctx):
         with zipfile.ZipFile(files["mscz"]) as z:
             mscx = next((n for n in z.namelist() if n.endswith(".mscx")), None)
             notes_in_score = z.read(mscx).decode("utf-8", "replace").count("<Note>") if mscx else None
-    checks = [("MuseScore made all four files (.mscz, PDF, MP3, PNG), unseen", not problems and all(p.exists() for p in (files["mscz"], files["pdf"], files["mp3"])) and bool(pngs)),
-              ("the sheet music PDF has its pages and the title", pdf_pages >= 1 and (title.lower() in pdf_text.lower() if op.get("melody") else True))]
+    checks = [
+        (
+            "MuseScore made all four files (.mscz, PDF, MP3, PNG), unseen",
+            not problems and all(p.exists() for p in (files["mscz"], files["pdf"], files["mp3"])) and bool(pngs),
+        ),
+        ("the sheet music PDF has its pages and the title", pdf_pages >= 1 and (title.lower() in pdf_text.lower() if op.get("melody") else True)),
+    ]
     if want_notes is not None:
         checks.append((f"MuseScore's score holds all {want_notes} notes", notes_in_score == want_notes))
     if want_secs:
@@ -133,8 +156,23 @@ def run(op, ctx):
     memo["musescore"] = {"mscz": str(files["mscz"]), "pdf": str(files["pdf"]), "mp3": str(files["mp3"])}
     info = []
     if meta:
-        info.append(f"{meta.get('measures', '?')} measures, {meta.get('pages', pdf_pages)} page(s)" + (f", {meta['duration']} s by MuseScore" if meta.get("duration") else ""))
-    return (f"MuseScore score '{title}': {files['mscz'].name} (opens in MuseScore), {files['pdf'].name} (sheet music, {pdf_pages} page(s)), "
-            f"{files['mp3'].name} ({secs:.1f} s)" if secs else f"MuseScore score '{title}': {files['mscz'].name}, {files['pdf'].name}") + \
-           (f", {len(pngs)} PNG page(s)" if pngs else "") + f" in {out}. " + (" ".join(info) + ". " if info else "") + \
-           ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + (" " + "; ".join(problems) if problems else "") + ".")
+        info.append(
+            f"{meta.get('measures', '?')} measures, {meta.get('pages', pdf_pages)} page(s)"
+            + (f", {meta['duration']} s by MuseScore" if meta.get("duration") else "")
+        )
+    return (
+        (
+            f"MuseScore score '{title}': {files['mscz'].name} (opens in MuseScore), {files['pdf'].name} (sheet music, {pdf_pages} page(s)), "
+            f"{files['mp3'].name} ({secs:.1f} s)"
+            if secs
+            else f"MuseScore score '{title}': {files['mscz'].name}, {files['pdf'].name}"
+        )
+        + (f", {len(pngs)} PNG page(s)" if pngs else "")
+        + f" in {out}. "
+        + (" ".join(info) + ". " if info else "")
+        + (
+            "Checked: " + "; ".join(w for w, _ in checks) + "."
+            if not bad
+            else "NOT right: " + "; ".join(bad) + (" " + "; ".join(problems) if problems else "") + "."
+        )
+    )

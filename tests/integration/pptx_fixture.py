@@ -2,6 +2,7 @@
 shape itself): a cropped photo, titles in a Google font named the PowerPoint way ('Montserrat Bold'), mixed text runs, a
 rounded button with centred text, an oval, a group, a line, a freeform triangle, bullets, letter spacing, capitals, a
 link, and a chart (which has no web equivalent and must be cut from the page's picture)."""
+
 from pathlib import Path
 
 PX = 9525  # EMU per px
@@ -64,8 +65,14 @@ def make(path, photo):
     pic = s1.shapes.add_picture(str(photo), px(0), px(0), px(1920), px(420))
     pic.crop_top, pic.crop_bottom = 0.1, 0.1
     box(s1, 160, 470, 1600, 110, [([("Eid Mubarak Sale", "Montserrat Bold", 66, "7C2D12", None)], PP_ALIGN.CENTER, 1.0)])
-    box(s1, 260, 600, 1400, 50, [([("Up to 40% off on ", "Montserrat", 24, "9A3412", None),
-                                    ("all phones", "Montserrat Bold", 24, "EA580C", None)], PP_ALIGN.CENTER, 1.0)])
+    box(
+        s1,
+        260,
+        600,
+        1400,
+        50,
+        [([("Up to 40% off on ", "Montserrat", 24, "9A3412", None), ("all phones", "Montserrat Bold", 24, "EA580C", None)], PP_ALIGN.CENTER, 1.0)],
+    )
     btn = s1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, px(810), px(690), px(300), px(80))
     btn.fill.solid()
     btn.fill.fore_color.rgb = RGBColor.from_string("EA580C")
@@ -101,9 +108,18 @@ def make(path, photo):
     tri.fill.solid()
     tri.fill.fore_color.rgb = RGBColor.from_string("9A3412")
     tri.line.fill.background()
-    lst = box(s1, 500, 850, 700, 150, [([("Free delivery in Lahore", "Arial", 18, "431407", None)], PP_ALIGN.LEFT, None),
-                                        ([("Cash on delivery", "Arial", 18, "431407", None)], PP_ALIGN.LEFT, None),
-                                        ([("Visit our shop", "Arial", 18, "C2410C", {"u": "sng", "link": "https://example.com/shop"})], PP_ALIGN.LEFT, None)])
+    lst = box(
+        s1,
+        500,
+        850,
+        700,
+        150,
+        [
+            ([("Free delivery in Lahore", "Arial", 18, "431407", None)], PP_ALIGN.LEFT, None),
+            ([("Cash on delivery", "Arial", 18, "431407", None)], PP_ALIGN.LEFT, None),
+            ([("Visit our shop", "Arial", 18, "C2410C", {"u": "sng", "link": "https://example.com/shop"})], PP_ALIGN.LEFT, None),
+        ],
+    )
     for p in list(lst.text_frame.paragraphs)[:2]:
         ppr = p._p.get_or_add_pPr()
         ppr.set("marL", str(px(28)))
@@ -117,7 +133,14 @@ def make(path, photo):
     cd.categories = ["Phones", "Laptops", "TVs"]
     cd.add_series("Sold", (120, 80, 45))
     s2.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, px(160), px(260), px(900), px(600), cd)
-    box(s2, 1140, 280, 620, 300, [([("Phones lead our sales this month, with laptops close behind.", "Arial", 24, "374151", None)], PP_ALIGN.LEFT, 1.2)])
+    box(
+        s2,
+        1140,
+        280,
+        620,
+        300,
+        [([("Phones lead our sales this month, with laptops close behind.", "Arial", 24, "374151", None)], PP_ALIGN.LEFT, 1.2)],
+    )
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(path))
     return path

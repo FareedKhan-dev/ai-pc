@@ -6,6 +6,7 @@ geometry builds, and the IFC schema validator finds nothing wrong.
 
   'revit model of a 7 marla double story house with 3 bedrooms'   'ifc model from house.plan.json'
 """
+
 import json
 import re
 from pathlib import Path
@@ -36,10 +37,17 @@ def build(lay, path, title="House"):
 
     from ai_pc.cad import draft as DR
     from ai_pc.three.house import _rect_minus
+
     f = api.project.create_file(version="IFC4")
     project = api.root.create_entity(f, ifc_class="IfcProject", name=title)
-    api.unit.assign_unit(f, units=[api.unit.add_si_unit(f, unit_type="LENGTHUNIT"), api.unit.add_si_unit(f, unit_type="AREAUNIT"),
-                                   api.unit.add_si_unit(f, unit_type="VOLUMEUNIT")])
+    api.unit.assign_unit(
+        f,
+        units=[
+            api.unit.add_si_unit(f, unit_type="LENGTHUNIT"),
+            api.unit.add_si_unit(f, unit_type="AREAUNIT"),
+            api.unit.add_si_unit(f, unit_type="VOLUMEUNIT"),
+        ],
+    )
     model = api.context.add_context(f, context_type="Model")
     body = api.context.add_context(f, context_type="Model", context_identifier="Body", target_view="MODEL_VIEW", parent=model)
     site = api.root.create_entity(f, ifc_class="IfcSite", name="Plot")
@@ -69,7 +77,9 @@ def build(lay, path, title="House"):
         storey = api.root.create_entity(f, ifc_class="IfcBuildingStorey", name=label)
         storey.Elevation = z * M
         api.aggregate.assign_object(f, products=[storey], relating_object=building)
-        opens = [(DR._opening(fl, d), "door", d) for d in fl["doors"]] + [(DR._opening(fl, w), w.get("kind", "window"), w) for w in fl.get("windows", [])]
+        opens = [(DR._opening(fl, d), "door", d) for d in fl["doors"]] + [
+            (DR._opening(fl, w), w.get("kind", "window"), w) for w in fl.get("windows", [])
+        ]
         for k, r in enumerate(_rect_minus(DR._wall_rects(fl), [o[0] for o in opens])):
             element("IfcWall", f"Wall {k + 1}", storey, (r[0], r[1], z, r[2], r[3], z + CLEAR_H))
             counts["walls"] += 1
@@ -81,12 +91,24 @@ def build(lay, path, title="House"):
                 element("IfcWall", f"Sill {k + 1}", storey, (r[0], r[1], z, r[2], r[3], z + base))
             width = (o["b"] - o["a"]) * M
             if kind == "door":
-                element("IfcDoor", f"Door {o.get('from', '')}-{o.get('to', '')}".strip("-") or f"Door {k + 1}", storey, (r[0], r[1], z + base, r[2], r[3], z + head),
-                        OverallHeight=(head - base) * M, OverallWidth=width)
+                element(
+                    "IfcDoor",
+                    f"Door {o.get('from', '')}-{o.get('to', '')}".strip("-") or f"Door {k + 1}",
+                    storey,
+                    (r[0], r[1], z + base, r[2], r[3], z + head),
+                    OverallHeight=(head - base) * M,
+                    OverallWidth=width,
+                )
                 counts["doors"] += 1
             else:
-                element("IfcWindow", f"{'Ventilator' if kind != 'window' else 'Window'} {o.get('room', k + 1)}", storey,
-                        (r[0], r[1], z + base, r[2], r[3], z + head), OverallHeight=(head - base) * M, OverallWidth=width)
+                element(
+                    "IfcWindow",
+                    f"{'Ventilator' if kind != 'window' else 'Window'} {o.get('room', k + 1)}",
+                    storey,
+                    (r[0], r[1], z + base, r[2], r[3], z + head),
+                    OverallHeight=(head - base) * M,
+                    OverallWidth=width,
+                )
                 counts["windows"] += 1
         env = fl["envelope"]
         element("IfcSlab", f"{label} slab", storey, (env[0], env[1], z + CLEAR_H, env[2], env[3], z + CLEAR_H + SLAB), PredefinedType="FLOOR")
@@ -107,9 +129,15 @@ def check(path, counts, plot, floors):
     import ifcopenshell
     import ifcopenshell.geom
     import ifcopenshell.validate
+
     f = ifcopenshell.open(str(path))
-    got = {"walls": len(f.by_type("IfcWall")) - sum(1 for w in f.by_type("IfcWall") if w.Name.startswith(("Lintel", "Sill"))), "doors": len(f.by_type("IfcDoor")),
-           "windows": len(f.by_type("IfcWindow")), "spaces": len(f.by_type("IfcSpace")), "slabs": len(f.by_type("IfcSlab"))}
+    got = {
+        "walls": len(f.by_type("IfcWall")) - sum(1 for w in f.by_type("IfcWall") if w.Name.startswith(("Lintel", "Sill"))),
+        "doors": len(f.by_type("IfcDoor")),
+        "windows": len(f.by_type("IfcWindow")),
+        "spaces": len(f.by_type("IfcSpace")),
+        "slabs": len(f.by_type("IfcSlab")),
+    }
     settings = ifcopenshell.geom.settings()
     settings.set("use-world-coords", True)
     lo, hi = [9e9] * 3, [-9e9] * 3
@@ -120,14 +148,24 @@ def check(path, counts, plot, floors):
     top = floors * (CLEAR_H + SLAB) * M
     log = ifcopenshell.validate.json_logger()
     ifcopenshell.validate.validate(f, log)
-    return [("opened again: walls, doors, windows, rooms and slabs as planned", got == counts),
-            ("every wall and slab builds as solid geometry, standing on the plot from the ground to the roof",
-             lo[0] >= -0.01 and lo[1] >= -0.01 and hi[0] <= plot[0] * M + 0.01 and hi[1] <= plot[1] * M + 0.01 and abs(lo[2]) < 0.01 and abs(hi[2] - top) < 0.01),
-            ("the IFC schema validator finds nothing wrong", not log.statements)], log.statements[:3]
+    return [
+        ("opened again: walls, doors, windows, rooms and slabs as planned", got == counts),
+        (
+            "every wall and slab builds as solid geometry, standing on the plot from the ground to the roof",
+            lo[0] >= -0.01
+            and lo[1] >= -0.01
+            and hi[0] <= plot[0] * M + 0.01
+            and hi[1] <= plot[1] * M + 0.01
+            and abs(lo[2]) < 0.01
+            and abs(hi[2] - top) < 0.01,
+        ),
+        ("the IFC schema validator finds nothing wrong", not log.statements),
+    ], log.statements[:3]
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     c = text.lower()
     if not re.search(r"\brevit\b|\bifc\b|\bbim\b|\barchicad\b", c):
         return None
@@ -141,6 +179,7 @@ def parse(text, ctx):
 
 def run(op, ctx):
     from ai_pc.cad import cadparse, floorplan
+
     if op.get("plan"):
         lay = json.loads(Path(op["plan"]).read_text(encoding="utf-8"))
         title = Path(op["plan"]).stem.replace(".plan", "")
@@ -157,7 +196,9 @@ def run(op, ctx):
     per = {}
     for storey, name, a in rooms:
         per.setdefault(storey, []).append(f"{name} {a * 10.7639:.0f} sq ft")
-    return (f"BIM model {path}: {len(per)} storey(s), {counts['walls']} wall pieces, {counts['doors']} doors, {counts['windows']} windows, {counts['spaces']} rooms. " +
-            " ".join(f"{s}: {', '.join(v)}." for s, v in per.items()) +
-            " Revit: File > Open > IFC (or Insert > Link IFC); ArchiCAD: File > Open. " +
-            ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f" {problems}"))
+    return (
+        f"BIM model {path}: {len(per)} storey(s), {counts['walls']} wall pieces, {counts['doors']} doors, {counts['windows']} windows, {counts['spaces']} rooms. "
+        + " ".join(f"{s}: {', '.join(v)}." for s, v in per.items())
+        + " Revit: File > Open > IFC (or Insert > Link IFC); ArchiCAD: File > Open. "
+        + ("Checked: " + "; ".join(w for w, _ in checks) + "." if not bad else "NOT right: " + "; ".join(bad) + f" {problems}")
+    )

@@ -18,6 +18,7 @@ A template here is LEARNED from a video of it (a CapCut template preview, a tren
 Template effects are mapped to items that work here (CapCut-only effects cannot be loaded by JianYing); what could
 only be approximated is listed in info["approximations"].
 """
+
 import hashlib
 import json
 import re
@@ -55,7 +56,7 @@ def _local_median(x, half):
     out = np.zeros(n, np.float32)
     for i in range(n):
         a, b = max(0, i - half), min(n, i + half + 1)
-        w = np.concatenate([x[a:i], x[i + 1:b]]) if b - a > 1 else x[a:b]
+        w = np.concatenate([x[a:i], x[i + 1 : b]]) if b - a > 1 else x[a:b]
         out[i] = float(np.median(w)) if len(w) else 0.0
     return out
 
@@ -112,12 +113,31 @@ def _ncc(a, b):
 def decode_gray(path, seconds, fps, width=200):
     """Every frame in grey at `width` px (for the scene test): one ffmpeg pass, ~70 KB a frame."""
     import subprocess
+
     info = F.probe(str(path))
     height = int(round(width * info["height"] / info["width"] / 2) * 2)
-    r = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-t", f"{seconds:.3f}", "-an", "-vf", f"fps={fps},scale={width}:{height}",
-                        "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True)
+    r = subprocess.run(
+        [
+            "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(path),
+            "-t",
+            f"{seconds:.3f}",
+            "-an",
+            "-vf",
+            f"fps={fps},scale={width}:{height}",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "gray",
+            "-",
+        ],
+        capture_output=True,
+    )
     k = len(r.stdout) // (width * height)
-    return np.frombuffer(r.stdout, np.uint8)[:k * width * height].reshape(k, height, width)
+    return np.frombuffer(r.stdout, np.uint8)[: k * width * height].reshape(k, height, width)
 
 
 def detect_cuts(fr, fps, gray_big=None, beats=None):
@@ -146,6 +166,7 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
         if grid is None:
             return 0.0
         return float(np.min(np.abs(grid - frame / fps))) - slack
+
     gray = np.stack([cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) for f in fr]).astype(np.float32)
     if gray_big is None or len(gray_big) < n:
         gray_big = [cv2.resize(g.astype(np.uint8), (200, max(8, round(g.shape[0] * 200 / g.shape[1])))) for g in gray]
@@ -213,17 +234,19 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
     flashes = []
     i = 1
     while i < n:
-        pre = float(np.median(bright[max(0, i - 4):i]))
-        pre_s = float(np.median(sat[max(0, i - 4):i]))
+        pre = float(np.median(bright[max(0, i - 4) : i]))
+        pre_s = float(np.median(sat[max(0, i - 4) : i]))
         if bright[i] - pre > 0.14 and bright[i] > 0.6:
             j = i
             while j + 1 < n and j - i < int(fps * 0.7) and bright[j + 1] - pre > 0.06:
                 j += 1
             back = j + 1 < n and bright[j + 1] - pre <= 0.06 or j + 1 >= n
-            peak = i + int(np.argmax(bright[i:j + 1]))
-            white = sat[peak] < max(0.12, 0.6 * pre_s) or vstd[peak] < 0.6 * float(np.median(vstd[max(0, i - 4):i]) or 1)
+            peak = i + int(np.argmax(bright[i : j + 1]))
+            white = sat[peak] < max(0.12, 0.6 * pre_s) or vstd[peak] < 0.6 * float(np.median(vstd[max(0, i - 4) : i]) or 1)
             if back and j - i < int(fps * 0.7) and white:
-                flashes.append({"t": round(peak / fps, 3), "frame": peak, "lo": i, "hi": j, "start": round(i / fps, 3), "end": round((j + 1) / fps, 3)})
+                flashes.append(
+                    {"t": round(peak / fps, 3), "frame": peak, "lo": i, "hi": j, "start": round(i / fps, 3), "end": round((j + 1) / fps, 3)}
+                )
                 i = j + 2
                 continue
         i += 1
@@ -233,8 +256,8 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
     for i in range(1, n - 1):
         if i in flash_frames:
             continue
-        nb = max(c[max(1, i - 2):i].max(initial=0), c[i + 1:min(n, i + 3)].max(initial=0))
-        if c[i] > max(0.06, 2.6 * base[i]) and c[i] >= nb * 1.3 and c[i] == c[max(1, i - 2):min(n, i + 3)].max():
+        nb = max(c[max(1, i - 2) : i].max(initial=0), c[i + 1 : min(n, i + 3)].max(initial=0))
+        if c[i] > max(0.06, 2.6 * base[i]) and c[i] >= nb * 1.3 and c[i] == c[max(1, i - 2) : min(n, i + 3)].max():
             cands.append({"frame": i, "lo": i, "hi": i, "kind": "cut", "score": float(c[i] / max(base[i], 0.01))})
     for f in flashes:
         cands.append({"frame": f["frame"], "lo": f["lo"], "hi": f["hi"], "kind": "flash", "score": 5.0, "flash": f})
@@ -242,14 +265,16 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
         k = max(3, int(round(fps * secs)))
         D = np.zeros(n, np.float32)
         for i in range(k, n - k):
-            D[i] = max(0.6 * _bd(H[i - k], H[i + k]) + 0.4 * 3 * float(np.mean(np.abs(thumbs[i - k] - thumbs[i + k]))) / 255,
-                       0.9 * (1 - _ncc(thumbs[i - k], thumbs[i + k])))
+            D[i] = max(
+                0.6 * _bd(H[i - k], H[i + k]) + 0.4 * 3 * float(np.mean(np.abs(thumbs[i - k] - thumbs[i + k]))) / 255,
+                0.9 * (1 - _ncc(thumbs[i - k], thumbs[i + k])),
+            )
         Dbase = _local_median(D, int(fps * 1.5))
         for i in range(k, n - k):
-            if D[i] < max(0.22, 1.6 * Dbase[i]) or D[i] < D[max(0, i - k):i + k + 1].max():
+            if D[i] < max(0.22, 1.6 * Dbase[i]) or D[i] < D[max(0, i - k) : i + k + 1].max():
                 continue
-            left = D[max(0, i - 3 * k):i - k // 2 + 1].min(initial=D[i])
-            right = D[i + k // 2:min(n, i + 3 * k + 1)].min(initial=D[i])
+            left = D[max(0, i - 3 * k) : i - k // 2 + 1].min(initial=D[i])
+            right = D[i + k // 2 : min(n, i + 3 * k + 1)].min(initial=D[i])
             if D[i] < 1.25 * max(left, right, 0.04):
                 continue
             lo, hi = i, i
@@ -296,20 +321,31 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
                 grid = phase + half * np.arange(0, int(n / fps / half) + 2)
     cuts, rejected = [], []
     for k_, x in enumerate(picked):
-        prev_b = picked[k_ - 1]["hi"] if k_ else -10 ** 6
-        next_b = picked[k_ + 1]["lo"] if k_ + 1 < len(picked) else 10 ** 6
-        prev_b = max(prev_b, (cuts[-1]["frame"] if cuts else -10 ** 6))
+        prev_b = picked[k_ - 1]["hi"] if k_ else -(10**6)
+        next_b = picked[k_ + 1]["lo"] if k_ + 1 < len(picked) else 10**6
+        prev_b = max(prev_b, (cuts[-1]["frame"] if cuts else -(10**6)))
         lo, hi = (x["lo"], x["hi"]) if x["kind"] != "cut" else (x["frame"], x["frame"])
         # off the beat (when the music has one): only strong evidence makes it a cut
         slack = (x["hi"] - x["lo"]) / 2 / fps if x["kind"] != "cut" else 0.0
         offb = off_beat(x["frame"], slack) > 0.09
-        ok = is_cut(lo - (1 if x["kind"] == "cut" else 0), hi + (1 if x["kind"] == "cut" else 0), max(prev_b, 0), min(next_b, n - 1),
-                    strict=x["kind"] == "soft" or (offb and not (x["kind"] == "cut" and x["score"] >= 6)))
+        ok = is_cut(
+            lo - (1 if x["kind"] == "cut" else 0),
+            hi + (1 if x["kind"] == "cut" else 0),
+            max(prev_b, 0),
+            min(next_b, n - 1),
+            strict=x["kind"] == "soft" or (offb and not (x["kind"] == "cut" and x["score"] >= 6)),
+        )
         if x["kind"] == "flash":
             x["flash"]["hides_cut"] = bool(ok)
         if not ok:  # kept: when the template's page says how many clips it has, the strongest of these may be cuts after all
-            rejected.append({"frame": int(x["frame"]), "kind": x["kind"], "score": round(float(x["score"]), 3),
-                             "dur": round((x["hi"] - x["lo"] + 1) / fps, 3) if x["kind"] != "cut" else 0.0})
+            rejected.append(
+                {
+                    "frame": int(x["frame"]),
+                    "kind": x["kind"],
+                    "score": round(float(x["score"]), 3),
+                    "dur": round((x["hi"] - x["lo"] + 1) / fps, 3) if x["kind"] != "cut" else 0.0,
+                }
+            )
             continue
         sc = round(float(x["score"]), 3)
         if x["kind"] == "soft":
@@ -328,12 +364,16 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
     for x in cuts:
         if out and x["frame"] - out[-1]["frame"] <= int(fps * 0.3):
             a, b = out[-1]["frame"], x["frame"]
-            mid = c[a + 2:b - 1] if b - a > 3 else np.array([1.0])
-            steady = len(mid) >= 3 and float(np.median(mid)) < max(0.05, 2.0 * float(np.median(base[a:b + 1])))
+            mid = c[a + 2 : b - 1] if b - a > 3 else np.array([1.0])
+            steady = len(mid) >= 3 and float(np.median(mid)) < max(0.05, 2.0 * float(np.median(base[a : b + 1])))
             if not steady:
                 kind = out[-1]["kind"] if out[-1]["kind"] in ("flash", "dissolve", "motion") else ("motion" if x["kind"] == "cut" else x["kind"])
-                out[-1] = {"frame": (a + b) // 2, "kind": kind, "dur": round(max(out[-1]["dur"], x["dur"], (b - a + 1) / fps), 3),
-                           "score": max(out[-1].get("score", 0), x.get("score", 0))}
+                out[-1] = {
+                    "frame": (a + b) // 2,
+                    "kind": kind,
+                    "dur": round(max(out[-1]["dur"], x["dur"], (b - a + 1) / fps), 3),
+                    "score": max(out[-1].get("score", 0), x.get("score", 0)),
+                }
                 continue
         out.append(x)
     cuts = out
@@ -344,6 +384,7 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
     def steady(a, b):
         inner = range(a + 1, b) if b - a >= 2 else range(a, b + 1)
         return min(inner, key=lambda i: c[i] + (0.5 if i in flash_frames else 0)) if len(inner) else a
+
     k_ = 0
     while k_ < len(cuts):
         x = cuts[k_]
@@ -363,8 +404,12 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
         wc = wide_colour(max(left[0], left[1] - 10), left[1] + 1, right[0], min(right[1], right[0] + 10) + 1)
         own = min(1.0, x.get("score", 0) / 12) if x["kind"] == "cut" else 0.7 if x["kind"] == "flash" else min(1.0, x.get("score", 0) / 3)
         x["conf"] = round((1.0 if s is False else 0.4) + min(1.0, wc / 0.25) + own, 3)
-        x["evidence"] = {"orb_differs": s is False, "colour": round(float(wc), 3), "own": round(float(own), 3),
-                         "gap": round(min(x["frame"] - a0 + 1, b1 - x["frame"] + 1) / fps, 3)}
+        x["evidence"] = {
+            "orb_differs": s is False,
+            "colour": round(float(wc), 3),
+            "own": round(float(own), 3),
+            "gap": round(min(x["frame"] - a0 + 1, b1 - x["frame"] + 1) / fps, 3),
+        }
         k_ += 1
     if grid is not None:  # on the beat: snap to it (the exact frame a template's cut sits on)
         for x in cuts:
@@ -380,8 +425,11 @@ def detect_cuts(fr, fps, gray_big=None, beats=None):
         x["t"] = round(x["frame"] / fps, 3)
     for x in rejected:
         x["t"] = round(x["frame"] / fps, 3)
-    return cuts, flashes, {"bright": bright, "sat": sat, "d1": d1, "c": c, "gray": gray, "effects": effects, "rejected": rejected,
-                           "grid": grid, "step": step}
+    return (
+        cuts,
+        flashes,
+        {"bright": bright, "sat": sat, "d1": d1, "c": c, "gray": gray, "effects": effects, "rejected": rejected, "grid": grid, "step": step},
+    )
 
 
 def constrain_cuts(cuts, want, rejected, n, fps, beats=None, split=True):
@@ -409,8 +457,9 @@ def constrain_cuts(cuts, want, rejected, n, fps, beats=None, split=True):
             f = int(r["frame"])
             if f < gap or f > n - gap or any(abs(f - c["frame"]) < gap for c in cuts):
                 continue
-            cuts.append({"frame": f, "t": round(f / fps, 3), "kind": r["kind"], "dur": r.get("dur", 0.0), "score": r["score"], "conf": 0.0,
-                         "restored": True})
+            cuts.append(
+                {"frame": f, "t": round(f / fps, 3), "kind": r["kind"], "dur": r.get("dur", 0.0), "score": r["score"], "conf": 0.0, "restored": True}
+            )
             back += 1
         cuts.sort(key=lambda c: c["frame"])
         if back:
@@ -465,14 +514,14 @@ def _segment_merge(cands, flashes, n, fps, c, base, gray, scene, wide_colour, st
     if n - cur >= 2:
         pieces.append([cur, n - 1])
     else:
-        bounds = bounds[:len(pieces) - 1] if pieces else []
+        bounds = bounds[: len(pieces) - 1] if pieces else []
     if len(bounds) >= len(pieces):
-        bounds = bounds[:max(0, len(pieces) - 1)]
+        bounds = bounds[: max(0, len(pieces) - 1)]
 
     def rep(p):
         a, b = p
         inner = range(a + 1, b) if b - a >= 2 else range(a, b + 1)
-        return min(inner, key=lambda i: c[i] + (0.5 if abs(bright[i] - np.median(bright[a:b + 1])) > 0.15 else 0))
+        return min(inner, key=lambda i: c[i] + (0.5 if abs(bright[i] - np.median(bright[a : b + 1])) > 0.15 else 0))
 
     def same(p, q, between):
         s = scene(rep(p), rep(q))
@@ -487,8 +536,7 @@ def _segment_merge(cands, flashes, n, fps, c, base, gray, scene, wide_colour, st
         lo, hi, xs = bounds[k]
         p, q = pieces[k], pieces[k + 1]
         if same(p, q, (lo, hi)):  # one scene on both sides: an effect, not a cut; the two pieces become one
-            effects.append({"t": round((lo + hi) / 2 / fps, 3), "dur": round((hi - lo + 1) / fps, 3),
-                            "kinds": sorted({x["kind"] for x in xs})})
+            effects.append({"t": round((lo + hi) / 2 / fps, 3), "dur": round((hi - lo + 1) / fps, 3), "kinds": sorted({x["kind"] for x in xs})})
             pieces[k] = [p[0], q[1]]
             del pieces[k + 1]
             del bounds[k]
@@ -588,8 +636,8 @@ def _drop(snd, slots, seconds):
         rise = 0.0
         if len(energy) > 4:
             a, b = int(t), int(t)
-            before = energy[max(0, a - 4):a]
-            after = energy[b:min(len(energy), b + 4)]
+            before = energy[max(0, a - 4) : a]
+            after = energy[b : min(len(energy), b + 4)]
             if len(before) and len(after):
                 rise = float(after.mean() - before.mean()) / 6.0  # dB: 6 dB louder counts as 1
         dens_b = sum(1 for x in slots if t - 4 <= x["start"] < t) / 4.0
@@ -636,8 +684,14 @@ def learn(path, planner=None, name=None, log=print, use_cache=True, meta=None):
         fr = fr[:keep]
         cuts = [c for c in cuts if c["frame"] < keep - 2]
         flashes = [f for f in flashes if f["frame"] < keep]
-        sig = {**sig, "gray": sig["gray"][:keep], "d1": sig["d1"][:keep], "bright": sig["bright"][:keep], "sat": sig["sat"][:keep],
-               "rejected": [r for r in sig.get("rejected") or [] if r["frame"] < keep - 2]}
+        sig = {
+            **sig,
+            "gray": sig["gray"][:keep],
+            "d1": sig["d1"][:keep],
+            "bright": sig["bright"][:keep],
+            "sat": sig["sat"][:keep],
+            "rejected": [r for r in sig.get("rejected") or [] if r["frame"] < keep - 2],
+        }
         notes.append(f"the preview runs {dur:.1f} s; the template is {page_s:.1f} s (an end card was left out)")
     n = len(fr)
     if clips:
@@ -654,11 +708,18 @@ def learn(path, planner=None, name=None, log=print, use_cache=True, meta=None):
         ia, ib = int(round(a * fps)), int(round(b * fps))
         inner = list(range(min(n - 1, ia + 2), max(ia + 3, ib - 2)))
         inner = [i for i in inner if 0 <= i < n] or [min(n - 1, ia)]
-        s = {"n": k + 1, "start": round(a, 3), "end": round(b, 3), "dur": round(b - a, 3),
-             "motion": round(float(np.mean(sig["d1"][inner])), 4), "brightness": round(float(np.mean(sig["bright"][inner])), 3),
-             "saturation": round(float(np.mean(sig["sat"][inner])), 3),
-             "zoom": round(float(np.mean(div[inner])), 4),
-             "into": cuts[k - 1]["kind"] if k else "start", "into_dur": cuts[k - 1]["dur"] if k else 0.0}
+        s = {
+            "n": k + 1,
+            "start": round(a, 3),
+            "end": round(b, 3),
+            "dur": round(b - a, 3),
+            "motion": round(float(np.mean(sig["d1"][inner])), 4),
+            "brightness": round(float(np.mean(sig["bright"][inner])), 3),
+            "saturation": round(float(np.mean(sig["sat"][inner])), 3),
+            "zoom": round(float(np.mean(div[inner])), 4),
+            "into": cuts[k - 1]["kind"] if k else "start",
+            "into_dur": cuts[k - 1]["dur"] if k else 0.0,
+        }
         if k and cuts[k - 1].get("guessed"):
             s["guessed"] = True  # the preview does not show this cut: placed on a beat
         if bt is not None and len(bt):
@@ -685,15 +746,35 @@ def learn(path, planner=None, name=None, log=print, use_cache=True, meta=None):
     for s in slots:
         s["section"] = "drop" if drop is not None and s["start"] >= drop - 0.05 else ("intro" if s["n"] == 1 else "verse")
     on_beat = [s.get("on_beat") for s in slots[1:] if s.get("on_beat") is not None]
-    tpl = {"name": name or path.stem[:40], "source": str(path), "seconds": round(n / fps, 3), "fps": fps,
-           "aspect": f"{info.get('width')}x{info.get('height')}", "portrait": (info.get("height") or 0) > (info.get("width") or 0),
-           "bpm": bpm, "beats": [round(x, 3) for x in beats[:600]], "drop": drop,
-           "cuts_on_beat": round(sum(on_beat) / len(on_beat), 2) if on_beat else None,
-           "slots": slots, "flashes": flashes, "punches": punches, "shakes": shakes, "accents": sig.get("effects") or [],
-           "counts": {"slots": len(slots), "cuts": sum(1 for c in cuts if c["kind"] == "cut"), "flash_cuts": sum(1 for c in cuts if c["kind"] == "flash"),
-                      "dissolves": sum(1 for c in cuts if c["kind"] == "dissolve"), "motion_transitions": sum(1 for c in cuts if c["kind"] == "motion"),
-                      "flashes": len(flashes), "punches": len(punches), "shakes": len(shakes)}}
+    tpl = {
+        "name": name or path.stem[:40],
+        "source": str(path),
+        "seconds": round(n / fps, 3),
+        "fps": fps,
+        "aspect": f"{info.get('width')}x{info.get('height')}",
+        "portrait": (info.get("height") or 0) > (info.get("width") or 0),
+        "bpm": bpm,
+        "beats": [round(x, 3) for x in beats[:600]],
+        "drop": drop,
+        "cuts_on_beat": round(sum(on_beat) / len(on_beat), 2) if on_beat else None,
+        "slots": slots,
+        "flashes": flashes,
+        "punches": punches,
+        "shakes": shakes,
+        "accents": sig.get("effects") or [],
+        "counts": {
+            "slots": len(slots),
+            "cuts": sum(1 for c in cuts if c["kind"] == "cut"),
+            "flash_cuts": sum(1 for c in cuts if c["kind"] == "flash"),
+            "dissolves": sum(1 for c in cuts if c["kind"] == "dissolve"),
+            "motion_transitions": sum(1 for c in cuts if c["kind"] == "motion"),
+            "flashes": len(flashes),
+            "punches": len(punches),
+            "shakes": len(shakes),
+        },
+    }
     from ai_pc.video import reference as RF  # the overall look: grade, letterbox, grain, vignette
+
     try:
         fp = RF.fingerprint(path, None, lambda *a: None)
         tpl["look"] = {k: fp.get(k) for k in ("brightness", "contrast", "saturation", "warmth", "letterbox", "vignette", "grain")}
@@ -710,14 +791,17 @@ def learn(path, planner=None, name=None, log=print, use_cache=True, meta=None):
         tpl = _with_meta(tpl, meta, planner)
     if name:
         save(tpl, name)
-    log(f"  template {tpl['name']}: {len(slots)} slots in {tpl['seconds']} s ({tpl['counts']}), {bpm} BPM, learned in {tpl['learned_s']} s"
-        + (f"; {'; '.join(notes)}" if notes else ""))
+    log(
+        f"  template {tpl['name']}: {len(slots)} slots in {tpl['seconds']} s ({tpl['counts']}), {bpm} BPM, learned in {tpl['learned_s']} s"
+        + (f"; {'; '.join(notes)}" if notes else "")
+    )
     return tpl
 
 
 def _with_meta(tpl, meta, planner=None):
     """A learned template with what its page says: the page's fields and the techniques of its title and hashtags."""
     from ai_pc.video import trends as TR
+
     tpl = {**tpl, "meta": meta}
     tpl["techniques"] = TR.techniques(meta.get("title") or "", meta.get("tags") or [], planner=planner)
     if meta.get("title") and tpl.get("vision") is not None:
@@ -736,6 +820,7 @@ def from_meta(meta, name=None, planner=None, log=print):
     techniques. Not exact: the template's own cut frames, texts and effects are unknown until a video of it is learned
     (template add <link> --video <preview>)."""
     from ai_pc.video import trends as TR
+
     tech = TR.techniques(meta.get("title") or "", meta.get("tags") or [], planner=planner)
     st = tech["settings"]
     bpm = float(st.get("bpm") or 120)
@@ -769,11 +854,25 @@ def from_meta(meta, name=None, planner=None, log=print):
     for k in range(n):
         a = round(starts[k], 3)
         b = round(starts[k] + lens[k] * unit, 3) if k < n - 1 else round(seconds, 3)
-        s = {"n": k + 1, "start": a, "end": b, "dur": round(b - a, 3), "motion": None, "brightness": None, "saturation": None, "zoom": 0.0,
-             "into": "start" if k == 0 else (cut_kind[0] if cut_kind else "cut"),
-             "into_dur": 0.0 if k == 0 or not cut_kind else round(min(cut_kind[1], (b - a) / 3, (starts[k] - starts[k - 1]) / 3), 3),
-             "on_beat": True, "punches": [], "shakes": [], "flashes": [], "face": None, "size": None,
-             "section": "drop" if drop is not None and a >= drop - 0.05 else ("intro" if k == 0 else "verse")}
+        s = {
+            "n": k + 1,
+            "start": a,
+            "end": b,
+            "dur": round(b - a, 3),
+            "motion": None,
+            "brightness": None,
+            "saturation": None,
+            "zoom": 0.0,
+            "into": "start" if k == 0 else (cut_kind[0] if cut_kind else "cut"),
+            "into_dur": 0.0 if k == 0 or not cut_kind else round(min(cut_kind[1], (b - a) / 3, (starts[k] - starts[k - 1]) / 3), 3),
+            "on_beat": True,
+            "punches": [],
+            "shakes": [],
+            "flashes": [],
+            "face": None,
+            "size": None,
+            "section": "drop" if drop is not None and a >= drop - 0.05 else ("intro" if k == 0 else "verse"),
+        }
         after_drop = drop is None or a >= drop - 0.05
         if st.get("punch") and after_drop and (k or drop is not None):
             s["punches"].append({"t": a, "dur": 0.12, "dir": "in"})
@@ -795,18 +894,43 @@ def from_meta(meta, name=None, planner=None, log=print):
     size = meta.get("size") or {"9:16": [720, 1280], "16:9": [1280, 720], "1:1": [1080, 1080], "4:5": [1080, 1350]}.get(aspect, [720, 1280])
     look_words = st.get("look") or "natural"
     fallback = f"capcut_{meta['id']}" if meta.get("id") else _slug(" ".join((meta.get("tags") or [])[:3]) + f" {n} clips", f"template_{n}_clips")
-    tpl = {"name": name or _slug(meta.get("title"), fallback), "source": meta.get("url") or meta.get("image") or "text",
-           "exact": False, "meta": meta, "techniques": tech, "seconds": round(seconds, 3), "fps": 30.0, "aspect": f"{size[0]}x{size[1]}",
-           "portrait": size[1] > size[0], "bpm": round(bpm, 1), "beats": [round(i * beat, 3) for i in range(int(seconds / beat) + 1)],
-           "drop": drop, "cuts_on_beat": 1.0, "slots": slots, "flashes": [], "punches": punches, "shakes": shakes, "accents": [],
-           "counts": {"slots": n, "cuts": (n - 1) if not cut_kind else 0, "flash_cuts": (n - 1) if cut_kind and cut_kind[0] == "flash" else 0,
-                      "dissolves": (n - 1) if cut_kind and cut_kind[0] == "dissolve" else 0,
-                      "motion_transitions": (n - 1) if cut_kind and cut_kind[0] in ("motion", "glitch") else 0,
-                      "flashes": 0, "punches": len(punches), "shakes": len(shakes)},
-           "look": {"letterbox": bool(st.get("letterbox")), "grain": 3.0 if st.get("grain") else 0.0, "vignette": 1.0},
-           "look_words": look_words, "vision": {"slots": {}, "theme": meta.get("shows") or meta.get("title")},
-           "notes": [f"made from the template's page ({n} clips, {seconds:.1f} s{', ' + ' '.join('#' + t for t in meta.get('tags') or []) if meta.get('tags') else ''}): "
-                     f"even slots on a {bpm:.0f} BPM beat, not the template's own frames"]}
+    tpl = {
+        "name": name or _slug(meta.get("title"), fallback),
+        "source": meta.get("url") or meta.get("image") or "text",
+        "exact": False,
+        "meta": meta,
+        "techniques": tech,
+        "seconds": round(seconds, 3),
+        "fps": 30.0,
+        "aspect": f"{size[0]}x{size[1]}",
+        "portrait": size[1] > size[0],
+        "bpm": round(bpm, 1),
+        "beats": [round(i * beat, 3) for i in range(int(seconds / beat) + 1)],
+        "drop": drop,
+        "cuts_on_beat": 1.0,
+        "slots": slots,
+        "flashes": [],
+        "punches": punches,
+        "shakes": shakes,
+        "accents": [],
+        "counts": {
+            "slots": n,
+            "cuts": (n - 1) if not cut_kind else 0,
+            "flash_cuts": (n - 1) if cut_kind and cut_kind[0] == "flash" else 0,
+            "dissolves": (n - 1) if cut_kind and cut_kind[0] == "dissolve" else 0,
+            "motion_transitions": (n - 1) if cut_kind and cut_kind[0] in ("motion", "glitch") else 0,
+            "flashes": 0,
+            "punches": len(punches),
+            "shakes": len(shakes),
+        },
+        "look": {"letterbox": bool(st.get("letterbox")), "grain": 3.0 if st.get("grain") else 0.0, "vignette": 1.0},
+        "look_words": look_words,
+        "vision": {"slots": {}, "theme": meta.get("shows") or meta.get("title")},
+        "notes": [
+            f"made from the template's page ({n} clips, {seconds:.1f} s{', ' + ' '.join('#' + t for t in meta.get('tags') or []) if meta.get('tags') else ''}): "
+            f"even slots on a {bpm:.0f} BPM beat, not the template's own frames"
+        ],
+    }
     save(tpl, tpl["name"])
     log(f"  template {tpl['name']} (from its page): {n} slots in {tpl['seconds']} s at {bpm:.0f} BPM; {TR.explain(tech)}")
     return tpl
@@ -825,6 +949,7 @@ def resolve(src, planner=None, log=print, name=None):
     """A template from whatever the client gave: a library name, a video of it, a CapCut link, a screenshot of its page,
     or words ("SLOWMO HDR, 4 clips, 15 s, #slowmo #eid")."""
     from ai_pc.video import template_meta as TM
+
     s = str(src).strip()
     t = load(s)
     if t:
@@ -851,16 +976,19 @@ def resolve(src, planner=None, log=print, name=None):
                 return same
             name = f"{_slug(meta.get('title'))}_{meta['clips']}clips"
         return from_meta(meta, name, planner, log)
-    raise ValueError(f"no template '{s}' in the library ({', '.join(library()) or 'empty'}), and it is not a video, a link, "
-                     "a screenshot or a description (\"4 clips, 15 s, #slowmo\")")
+    raise ValueError(
+        f"no template '{s}' in the library ({', '.join(library()) or 'empty'}), and it is not a video, a link, "
+        'a screenshot or a description ("4 clips, 15 s, #slowmo")'
+    )
 
 
 def _read_slots(path, slots, planner, log):
     """One vision call per 20 slots: each slot's on-screen text (exact words, place, size, colour) and what it shows."""
     from ai_pc.llm.vlm import ask
+
     out = {"slots": {}}
     for g in range(0, len(slots), 20):
-        group = slots[g:g + 20]
+        group = slots[g : g + 20]
         imgs = F.frames_at(str(path), [round((s["start"] + s["end"]) / 2, 3) for s in group], width=360)
         cells = [(s, im) for s, im in zip(group, imgs) if im is not None]
         if not cells:
@@ -900,8 +1028,10 @@ def library():
 
 # ------------------------------------------------------------------------------------------------ filling a template
 SIZES = ["no-face", "wide-person", "medium", "close-up"]
-STOPW = set("a an the of and with in on at to from by for into over under near is are his her their its this that shot video "
-            "frame scene close up wide medium shows showing".split())
+STOPW = set(
+    "a an the of and with in on at to from by for into over under near is are his her their its this that shot video "
+    "frame scene close up wide medium shows showing".split()
+)
 
 
 def _size_of(area):
@@ -917,7 +1047,9 @@ class _Footage:
     the highlight of the nearest captioned moment, its words, and whether a camera cut inside the file falls in it."""
 
     def __init__(self, analyses):
-        self.files = [a for a in analyses.values() if a.get("kind") in ("video", "image") and not str(a.get("file", "")).startswith(("music_", "sfx_"))]
+        self.files = [
+            a for a in analyses.values() if a.get("kind") in ("video", "image") and not str(a.get("file", "")).startswith(("music_", "sfx_"))
+        ]
         mots = [m for a in self.files for m in (a.get("motion") or [])]
         self.mrank = np.sort(np.asarray(mots, np.float32)) if mots else np.zeros(1, np.float32)
         self._cache = {}
@@ -941,12 +1073,19 @@ class _Footage:
         if key in self._cache:
             return self._cache[key]
         if a.get("kind") == "image":
-            f = (a.get("faces") or [])
+            f = a.get("faces") or []
             area = max((x["box"][2] * x["box"][3] for x in f), default=0.0)
             cap = a.get("caption") or {}
-            out = {"face": area, "motion": 0.0, "mp": 0.0, "highlight": float(cap.get("highlight") or 5), "cut_inside": False,
-                   "words": _words(" ".join(str(cap.get(k) or "") for k in ("shot", "subject", "action", "setting"))),
-                   "brightness": 0.5, "shot": cap.get("shot")}
+            out = {
+                "face": area,
+                "motion": 0.0,
+                "mp": 0.0,
+                "highlight": float(cap.get("highlight") or 5),
+                "cut_inside": False,
+                "words": _words(" ".join(str(cap.get(k) or "") for k in ("shot", "subject", "action", "setting"))),
+                "brightness": 0.5,
+                "shot": cap.get("shot"),
+            }
             self._cache[key] = out
             return out
         t1 = t0 + need
@@ -959,10 +1098,18 @@ class _Footage:
         hl = max((float(m.get("highlight") or 5) for m in moms), default=5.0)
         cuts = [s["start"] for s in a.get("shots") or []][1:]
         shot = next((s for s in a.get("shots") or [] if s["start"] <= (t0 + t1) / 2 < s["end"]), {})
-        out = {"face": max(faces, default=0.0), "motion": motion, "mp": self.mpct(motion), "highlight": hl,
-               "cut_inside": any(t0 + 0.08 < c_ < t1 - 0.08 for c_ in cuts),
-               "words": _words(" ".join(str((near or {}).get(k) or "") for k in ("shot", "subject", "action", "setting")) + " " + str(a.get("summary") or "")),
-               "brightness": float((shot.get("look") or {}).get("brightness", 0.5)), "shot": (near or {}).get("shot")}
+        out = {
+            "face": max(faces, default=0.0),
+            "motion": motion,
+            "mp": self.mpct(motion),
+            "highlight": hl,
+            "cut_inside": any(t0 + 0.08 < c_ < t1 - 0.08 for c_ in cuts),
+            "words": _words(
+                " ".join(str((near or {}).get(k) or "") for k in ("shot", "subject", "action", "setting")) + " " + str(a.get("summary") or "")
+            ),
+            "brightness": float((shot.get("look") or {}).get("brightness", 0.5)),
+            "shot": (near or {}).get("shot"),
+        }
         self._cache[key] = out
         return out
 
@@ -1029,9 +1176,15 @@ def assign(tpl, analyses, pins=None, avoid=(), log=print):
                     if out.get(nb, (None,))[0] == a["file"]:
                         sc -= 1.0
                 if best is None or sc > best[2]:
-                    why = ", ".join(x for x in (f"{SIZES[ci]} for {SIZES[si]}" if si is not None else None,
-                                                f"motion {f['mp']:.0%} for {slot_mp:.0%}" if slot_mp is not None else None,
-                                                f"highlight {f['highlight']:.0f}") if x)
+                    why = ", ".join(
+                        x
+                        for x in (
+                            f"{SIZES[ci]} for {SIZES[si]}" if si is not None else None,
+                            f"motion {f['mp']:.0%} for {slot_mp:.0%}" if slot_mp is not None else None,
+                            f"highlight {f['highlight']:.0f}",
+                        )
+                        if x
+                    )
                     best = (a["file"], t0, sc, why)
         if best is None:  # every moment used: the longest file again from its start
             a = max(files, key=lambda a: float(a.get("seconds") or 0))
@@ -1047,17 +1200,32 @@ def _music_for(tpl, analyses, request, plan_music):
     where the template's is and its beats lined up with the template's cuts."""
     from ai_pc.media import music as MU
     from ai_pc.video import analyze as AN
+
     total = float(tpl["seconds"])
     if plan_music == "none":
         return None, {}, "no music (asked)"
     if isinstance(plan_music, dict) and plan_music.get("file"):
         a = next((a for a in analyses.values() if a.get("file", "").lower() == str(plan_music["file"]).lower()), None)
         if a:
-            return {"id": "music", "type": "audio", "file": a["file"], "at": 0, "from": float(plan_music.get("from", 0) or 0), "duration": total,
-                    "volume": 0.85, "fade_out": 1.0, "expect": "the client's music under the template"}, {}, f"your music {a['file']}"
+            return (
+                {
+                    "id": "music",
+                    "type": "audio",
+                    "file": a["file"],
+                    "at": 0,
+                    "from": float(plan_music.get("from", 0) or 0),
+                    "duration": total,
+                    "volume": 0.85,
+                    "fade_out": 1.0,
+                    "expect": "the client's music under the template",
+                },
+                {},
+                f"your music {a['file']}",
+            )
     cpm = (len(tpl["slots"]) - 1) / max(1e-3, total / 60)
     req = str(request or "").lower()
     from ai_pc.video.quick_edits import GENRE_RE
+
     genre = next((g for g, p in GENRE_RE.items() if p.search(req)), None) if req else None
     if isinstance(plan_music, dict) and plan_music.get("generate"):
         genre = plan_music["generate"]
@@ -1077,11 +1245,30 @@ def _music_for(tpl, analyses, request, plan_music):
             phase = (np.angle(z) % (2 * np.pi)) / (2 * np.pi) * beat
             off = round((beat - phase) % beat, 4)
     AN.analyze([str(path)], planner=None, log=lambda *a: None)
-    entry = {path.name: {"file": path.name, "path": str(path), "kind": "audio", "seconds": total + beat,
-                         "sound": {"kind": "music", "bpm": grid["bpm"], "beats": grid["beats"], "drop": grid["drop"]}}}
-    return ({"id": "music", "type": "audio", "file": path.name, "at": 0, "from": off, "duration": total, "volume": 0.85, "fade_out": 1.0,
-             "expect": f"a generated {genre} beat at {bpm} BPM, its beats on the template's cuts"}, entry,
-            f"generated {genre} at {bpm} BPM (a template's own song is licensed inside CapCut)")
+    entry = {
+        path.name: {
+            "file": path.name,
+            "path": str(path),
+            "kind": "audio",
+            "seconds": total + beat,
+            "sound": {"kind": "music", "bpm": grid["bpm"], "beats": grid["beats"], "drop": grid["drop"]},
+        }
+    }
+    return (
+        {
+            "id": "music",
+            "type": "audio",
+            "file": path.name,
+            "at": 0,
+            "from": off,
+            "duration": total,
+            "volume": 0.85,
+            "fade_out": 1.0,
+            "expect": f"a generated {genre} beat at {bpm} BPM, its beats on the template's cuts",
+        },
+        entry,
+        f"generated {genre} at {bpm} BPM (a template's own song is licensed inside CapCut)",
+    )
 
 
 def settings(tpl, request=""):
@@ -1089,7 +1276,9 @@ def settings(tpl, request=""):
     change: slow motion or a speed ramp asked for or refused, the occasion's greeting asked for or refused."""
     st = dict(((tpl.get("techniques") or {}).get("settings")) or {})
     req = str(request or "").lower()
-    if re.search(r"\b(?:no|without|skip|not in)\s+(?:the\s+|any\s+)?(?:slow ?-?mo(?:tion)?|speed ?ramps?|ramps?)\b|\bnormal speed\b|\breal ?-?time\b", req):
+    if re.search(
+        r"\b(?:no|without|skip|not in)\s+(?:the\s+|any\s+)?(?:slow ?-?mo(?:tion)?|speed ?ramps?|ramps?)\b|\bnormal speed\b|\breal ?-?time\b", req
+    ):
         st["normal_speed"] = True
     elif re.search(r"\bvelocity\b|\bspeed ?ramps?\b", req):
         st["speed_override"] = "ramp"
@@ -1101,6 +1290,7 @@ def settings(tpl, request=""):
         st["greeting_asked"] = True
         if not st.get("greeting"):  # the client's own occasion ("eid mubarak" on a template without that tag)
             from ai_pc.video import trends as TR
+
             g = TR.techniques("", (), request)["settings"].get("greeting")
             if g:
                 st["greeting"] = g
@@ -1128,6 +1318,7 @@ def fill(tpl, analyses, request="", music=None, canvas=None, pins=None, avoid=()
     from ai_pc.video import trends as TR
     from ai_pc.video.cutting import VEL, VEL_SPLIT
     from ai_pc.video.quick_edits import COLOURS, _effect_key, _font_for, _intro_for, _look_for, _texture_item, _transition_for
+
     ramp_factor = sum(v * f for v, f in zip(VEL, VEL_SPLIT))  # a fast-slow-fast ramp plays ~1.2x its length of the file
     st = settings(tpl, "" if chat else request)
     if speed == "normal":
@@ -1188,7 +1379,11 @@ def fill(tpl, analyses, request="", music=None, canvas=None, pins=None, avoid=()
                 fb = max(ff, key=lambda fr: fr["faces"][0]["box"][2] * fr["faces"][0]["box"][3])["faces"][0]["box"]
                 area = fb[2] * fb[3]
                 if 0.002 < area < 0.04:
-                    c["reframe"] = {"x": round(fb[0] + fb[2] / 2, 3), "y": round(fb[1] + fb[3] / 2, 3), "zoom": round(min(2.2, (0.06 / area) ** 0.5), 2)}
+                    c["reframe"] = {
+                        "x": round(fb[0] + fb[2] / 2, 3),
+                        "y": round(fb[1] + fb[3] / 2, 3),
+                        "zoom": round(min(2.2, (0.06 / area) ** 0.5), 2),
+                    }
         clips.append(c)
     names = {}
     for k, s in enumerate(slots[1:], start=1):  # transitions at the template's cuts
@@ -1203,48 +1398,120 @@ def fill(tpl, analyses, request="", music=None, canvas=None, pins=None, avoid=()
         if not name:
             approx.append(f"no free {fam} transition works here: hard cut at {s['start']:.1f} s")
             continue
-        edits.append({"id": f"tt{s['n']}", "type": "transition", "after": prev, "name": name,
-                      "duration": round(min(1.2, max(0.2, dur or d0)), 2), "expect": f"a {fam} transition into slot {s['n']}"})
+        edits.append(
+            {
+                "id": f"tt{s['n']}",
+                "type": "transition",
+                "after": prev,
+                "name": name,
+                "duration": round(min(1.2, max(0.2, dur or d0)), 2),
+                "expect": f"a {fam} transition into slot {s['n']}",
+            }
+        )
     wf = _effect_key("white flash", "flash")
     bw = None
     for s in slots:
         cid = f"t{s['n']}"
         for p in s.get("punches") or []:
-            edits.append({"id": f"tz{len(edits)}", "type": "zoom", "on": cid, "start": round(max(0.0, p["t"] - s["start"]), 3),
-                          "duration": round(min(0.6, max(0.2, p["dur"] * 2)), 3), "to": 1.18 if p.get("dir") == "in" else 1.12, "back": True,
-                          "expect": "a zoom punch where the template has one"})
+            edits.append(
+                {
+                    "id": f"tz{len(edits)}",
+                    "type": "zoom",
+                    "on": cid,
+                    "start": round(max(0.0, p["t"] - s["start"]), 3),
+                    "duration": round(min(0.6, max(0.2, p["dur"] * 2)), 3),
+                    "to": 1.18 if p.get("dir") == "in" else 1.12,
+                    "back": True,
+                    "expect": "a zoom punch where the template has one",
+                }
+            )
         for x in s.get("shakes") or []:
-            edits.append({"id": f"ts{len(edits)}", "type": "shake", "on": cid, "start": round(max(0.0, x["t"] - s["start"]), 3),
-                          "duration": round(min(1.2, max(0.25, x["dur"])), 3), "strength": 0.5, "expect": "the picture shakes where the template does"})
+            edits.append(
+                {
+                    "id": f"ts{len(edits)}",
+                    "type": "shake",
+                    "on": cid,
+                    "start": round(max(0.0, x["t"] - s["start"]), 3),
+                    "duration": round(min(1.2, max(0.25, x["dur"])), 3),
+                    "strength": 0.5,
+                    "expect": "the picture shakes where the template does",
+                }
+            )
         for fl in s.get("flashes") or []:
             if wf:
-                edits.append({"id": f"tf{len(edits)}", "type": "effect", "name": wf.split(":", 1)[1], "start": round(max(0.0, fl["start"]), 3),
-                              "duration": round(max(0.15, fl["end"] - fl["start"]), 3), "expect": "a white flash where the template has one"})
+                edits.append(
+                    {
+                        "id": f"tf{len(edits)}",
+                        "type": "effect",
+                        "name": wf.split(":", 1)[1],
+                        "start": round(max(0.0, fl["start"]), 3),
+                        "duration": round(max(0.15, fl["end"] - fl["start"]), 3),
+                        "expect": "a white flash where the template has one",
+                    }
+                )
         if s.get("bw"):
             bw = bw or _look_for("black and white monochrome gray classic")
             if bw:
-                edits.append({"id": f"tb{s['n']}", "type": "filter", "name": bw, "on": cid, "strength": 100, "expect": "this slot in black and white, as in the template"})
+                edits.append(
+                    {
+                        "id": f"tb{s['n']}",
+                        "type": "filter",
+                        "name": bw,
+                        "on": cid,
+                        "strength": 100,
+                        "expect": "this slot in black and white, as in the template",
+                    }
+                )
         # a slow push-in: the template's (3D zoom, photo dumps), or on a photo that would otherwise stand still
         image = byfile.get(picks[s["n"]][0], {}).get("kind") == "image"
         push = s.get("push") or (st.get("push") if image else None) or (1.06 if image and s["dur"] >= 1.0 else None)
         if push and not s.get("punches") and not s.get("shakes"):
-            edits.append({"id": f"tk{s['n']}", "type": "keyframes", "on": cid, "property": "scale", "points": [[0, 1.0], [round(s["dur"], 3), round(float(push), 3)]],
-                          "expect": "the shot slowly pushes in"})
+            edits.append(
+                {
+                    "id": f"tk{s['n']}",
+                    "type": "keyframes",
+                    "on": cid,
+                    "property": "scale",
+                    "points": [[0, 1.0], [round(s["dur"], 3), round(float(push), 3)]],
+                    "expect": "the shot slowly pushes in",
+                }
+            )
     look_words = tpl.get("look_words") or "natural"
     if st.get("look") and tpl.get("exact", True) and st["look"] not in look_words:  # the title's look (HDR, Eid...) with the measured one
         look_words = f"{st['look']} {look_words}"
     look = _look_for(look_words)  # the look over the whole video
     if look and not all(s.get("bw") for s in slots):
-        edits.append({"id": "tgrade", "type": "filter", "name": look, "start": 0, "duration": round(tpl["seconds"], 3), "strength": 60,
-                      "expect": f"the template's look ({look_words})"})
+        edits.append(
+            {
+                "id": "tgrade",
+                "type": "filter",
+                "name": look,
+                "start": 0,
+                "duration": round(tpl["seconds"], 3),
+                "strength": 60,
+                "expect": f"the template's look ({look_words})",
+            }
+        )
     lk = tpl.get("look") or {}
-    for what, on in (("letterbox", bool(lk.get("letterbox") or st.get("letterbox"))), ("grain", (lk.get("grain") or 0) >= 2.5 or bool(st.get("grain"))),
-                     ("vignette", (lk.get("vignette") or 1) < 0.8)):
+    for what, on in (
+        ("letterbox", bool(lk.get("letterbox") or st.get("letterbox"))),
+        ("grain", (lk.get("grain") or 0) >= 2.5 or bool(st.get("grain"))),
+        ("vignette", (lk.get("vignette") or 1) < 0.8),
+    ):
         if on:
             it = _texture_item(what)
             if it:
-                edits.append({"id": f"tx_{what}", "type": "effect", "name": it, "start": 0, "duration": round(tpl["seconds"], 3), "layer": "texture",
-                              "expect": f"{what} as in the template"})
+                edits.append(
+                    {
+                        "id": f"tx_{what}",
+                        "type": "effect",
+                        "name": it,
+                        "start": 0,
+                        "duration": round(tpl["seconds"], 3),
+                        "layer": "texture",
+                        "expect": f"{what} as in the template",
+                    }
+                )
     vis = (tpl.get("vision") or {}).get("slots") or {}  # texts where the template has them (its words, or the client's)
     runs = []
     for s in slots:
@@ -1266,31 +1533,67 @@ def fill(tpl, analyses, request="", music=None, canvas=None, pins=None, avoid=()
         hexc = next((h for name, h in COLOURS.items() if name in col), "#FFFFFF")
         words = own[k] if k < len(own) else r["text"]
         pos = str(v.get("text_position") or "center")
-        edits.append({"id": f"tw{k + 1}", "type": "text", "text": words, "start": round(r["start"], 3), "duration": round(max(0.6, r["end"] - r["start"]), 3),
-                      "position": pos if pos in ("top", "upper", "center", "lower", "bottom") else "center", "size": round(size, 1),
-                      "font": font, "color": hexc, "bold": True, "outline": {"color": "#000000", "width": 50},
-                      "expect": f"the text '{words[:30]}' where the template shows '{r['text'][:30]}'"})
+        edits.append(
+            {
+                "id": f"tw{k + 1}",
+                "type": "text",
+                "text": words,
+                "start": round(r["start"], 3),
+                "duration": round(max(0.6, r["end"] - r["start"]), 3),
+                "position": pos if pos in ("top", "upper", "center", "lower", "bottom") else "center",
+                "size": round(size, 1),
+                "font": font,
+                "color": hexc,
+                "bold": True,
+                "outline": {"color": "#000000", "width": 50},
+                "expect": f"the text '{words[:30]}' where the template shows '{r['text'][:30]}'",
+            }
+        )
     if runs and not own:
-        approx.append(f"the template's own words were kept ({', '.join(repr(r['text'][:20]) for r in runs[:3])}); give yours in quotes to replace them")
+        approx.append(
+            f"the template's own words were kept ({', '.join(repr(r['text'][:20]) for r in runs[:3])}); give yours in quotes to replace them"
+        )
     if own and not runs:  # the client's words, and the template shows none (or is not known to): a title over the opening
         s0 = slots[0]
-        edits.append({"id": "tw1", "type": "text", "text": own[0], "start": round(min(0.2, s0["dur"] / 5), 3),
-                      "duration": round(max(1.2, min(s0["dur"] - 0.2, 3.5)), 3), "position": "center",
-                      "size": round(12 * (1.0 if portrait else 0.75), 1), "font": _font_for((tpl.get("vision") or {}).get("font_style") or "bold sans"),
-                      "color": "#FFFFFF", "bold": True, "outline": {"color": "#000000", "width": 50}, "intro": _intro_for("pop in"),
-                      "expect": f"the text '{own[0][:30]}' over the opening"})
+        edits.append(
+            {
+                "id": "tw1",
+                "type": "text",
+                "text": own[0],
+                "start": round(min(0.2, s0["dur"] / 5), 3),
+                "duration": round(max(1.2, min(s0["dur"] - 0.2, 3.5)), 3),
+                "position": "center",
+                "size": round(12 * (1.0 if portrait else 0.75), 1),
+                "font": _font_for((tpl.get("vision") or {}).get("font_style") or "bold sans"),
+                "color": "#FFFFFF",
+                "bold": True,
+                "outline": {"color": "#000000", "width": 50},
+                "intro": _intro_for("pop in"),
+                "expect": f"the text '{own[0][:30]}' over the opening",
+            }
+        )
     g = st.get("greeting")
     if g and not runs and not (own and own[0].lower() == g.lower()):  # the occasion's greeting (#eid -> Eid Mubarak): only when asked for
         if st.get("greeting_asked"):
             s0 = slots[0] if not own else slots[-1]  # the client's title has the opening: the greeting closes
             festive = not re.search(r"birthday", g, re.I)
-            edits.append({"id": "tgreet", "type": "text", "text": g, "start": round(s0["start"] + min(0.3, s0["dur"] / 4), 3),
-                          "duration": round(max(1.0, min(tpl["seconds"] - s0["start"] - 0.3, max(s0["dur"] - 0.3, 2.5))), 3),
-                          "position": "lower", "size": round(13 * (1.0 if tpl.get("portrait") else 0.75), 1),
-                          "font": _font_for("elegant script" if festive else "playful rounded bold"),
-                          "color": "#F7D774" if festive else "#FFFFFF", "bold": not festive,
-                          "shadow": {"color": "#000000", "alpha": 0.7, "diffuse": 20}, "intro": _intro_for("fade in soft"),
-                          "expect": f"the greeting '{g}' over the opening"})
+            edits.append(
+                {
+                    "id": "tgreet",
+                    "type": "text",
+                    "text": g,
+                    "start": round(s0["start"] + min(0.3, s0["dur"] / 4), 3),
+                    "duration": round(max(1.0, min(tpl["seconds"] - s0["start"] - 0.3, max(s0["dur"] - 0.3, 2.5))), 3),
+                    "position": "lower",
+                    "size": round(13 * (1.0 if tpl.get("portrait") else 0.75), 1),
+                    "font": _font_for("elegant script" if festive else "playful rounded bold"),
+                    "color": "#F7D774" if festive else "#FFFFFF",
+                    "bold": not festive,
+                    "shadow": {"color": "#000000", "alpha": 0.7, "diffuse": 20},
+                    "intro": _intro_for("fade in soft"),
+                    "expect": f"the greeting '{g}' over the opening",
+                }
+            )
         elif not chat:
             offers.append(f"its tags suggest the greeting '{g}': say \"add {g}\" to put it on")
     m, entry, minfo = _music_for(tpl, analyses, request, music)
@@ -1299,43 +1602,97 @@ def fill(tpl, analyses, request="", music=None, canvas=None, pins=None, avoid=()
         edits.insert(0, m)
     exact = tpl.get("exact", True)
     if not exact:
-        approx.insert(0, "made from the template's page, not its video: the slot count and length are the template's, the cut frames are even "
-                         "beats and the moves come from its title and tags; give a video of it for an exact copy")
-    reqs = [{"ask": f"follow the template '{tpl.get('name')}'",
-             "how": f"{len(slots)} slots " + ("on its exact cut frames" if exact else "on the beat, as its page describes") + ", filled with your footage",
-             "edits": ["template_match"], "confidence": "high" if exact else "medium"}]  # evidence: the export's cuts against the plan's
+        approx.insert(
+            0,
+            "made from the template's page, not its video: the slot count and length are the template's, the cut frames are even "
+            "beats and the moves come from its title and tags; give a video of it for an exact copy",
+        )
+    reqs = [
+        {
+            "ask": f"follow the template '{tpl.get('name')}'",
+            "how": f"{len(slots)} slots "
+            + ("on its exact cut frames" if exact else "on the beat, as its page describes")
+            + ", filled with your footage",
+            "edits": ["template_match"],
+            "confidence": "high" if exact else "medium",
+        }
+    ]  # evidence: the export's cuts against the plan's
     if speeds:
         kinds = sorted({str(v) for v in speeds.values()})
-        reqs.append({"ask": "slow motion" if "ramp" not in kinds else "speed ramps",
-                     "how": "fast-slow-fast ramps" if kinds == ["ramp"] else f"slots at {', '.join(k + ('x' if k != 'ramp' else '') for k in kinds)}",
-                     "edits": [f"{cid}:speed" for cid in list(speeds)[:12]], "confidence": "high"})
+        reqs.append(
+            {
+                "ask": "slow motion" if "ramp" not in kinds else "speed ramps",
+                "how": "fast-slow-fast ramps" if kinds == ["ramp"] else f"slots at {', '.join(k + ('x' if k != 'ramp' else '') for k in kinds)}",
+                "edits": [f"{cid}:speed" for cid in list(speeds)[:12]],
+                "confidence": "high",
+            }
+        )
     if st.get("look") and any(e["id"] == "tgrade" for e in edits):
-        reqs.append({"ask": f"the look its title and tags ask for ({st['look']})", "how": f"filter {look}", "edits": ["tgrade"], "confidence": "medium"})
+        reqs.append(
+            {"ask": f"the look its title and tags ask for ({st['look']})", "how": f"filter {look}", "edits": ["tgrade"], "confidence": "medium"}
+        )
     if any(e["id"] == "tgreet" for e in edits):
         reqs.append({"ask": f"the greeting '{g}'", "how": "over the opening", "edits": ["tgreet"], "confidence": "high"})
     moves = [e["id"] for e in edits if e["type"] in ("transition", "zoom", "shake") or str(e["id"]).startswith("tf")]
     if moves:
-        reqs.append({"ask": "the template's transitions, flashes and moves", "how": "the same kinds at the same frames", "edits": moves[:12],
-                     "confidence": "medium"})
+        reqs.append(
+            {
+                "ask": "the template's transitions, flashes and moves",
+                "how": "the same kinds at the same frames",
+                "edits": moves[:12],
+                "confidence": "medium",
+            }
+        )
     tws = [e["id"] for e in edits if e["type"] == "text"]
     if own and tws:
-        reqs.append({"ask": f"text {', '.join(repr(x) for x in own[:3])}", "how": "where the template has its text", "edits": tws, "confidence": "high"})
+        reqs.append(
+            {"ask": f"text {', '.join(repr(x) for x in own[:3])}", "how": "where the template has its text", "edits": tws, "confidence": "high"}
+        )
     if m:
         reqs.append({"ask": "music", "how": minfo, "edits": ["music"], "confidence": "high"})
-    plan = {"name": f"tpl_{tpl.get('name', 'template')}"[:40], "canvas": canvas or ("9:16" if portrait else "16:9"),
-            "platform": None, "clips": clips, "layers": [], "edits": edits,
-            "think": {"concept": f"the template '{tpl.get('name')}' with the client's footage", "requirements": reqs},
-            "_template": {"name": tpl.get("name"), "slots": len(slots), "cuts": [s["start"] for s in slots[1:]], "exact": exact,
-                          "techniques": TR.explain(tpl.get("techniques") or {})},
-            "_rhythm": {"bpm": tpl.get("bpm"), "drop": tpl.get("drop"), "source": "template", "shots": len(slots),
-                        "sections": [{"name": "drop" if tpl.get("drop") is not None and s["start"] >= tpl["drop"] else "verse",
-                                      "start": s["start"], "end": s["end"]} for s in slots]}}
-    info = {"template": tpl.get("name"), "slots": len(slots), "music": minfo, "approximations": approx, "offers": offers, "exact": exact,
-            "techniques": TR.explain(tpl.get("techniques") or {}), "notes": list(tpl.get("notes") or []),
-            "assignments": [{"slot": n, "file": picks[n][0], "from": picks[n][1], "score": round(picks[n][2], 2), "why": picks[n][3]}
-                            for n in sorted(picks)]}
-    log(f"template {tpl.get('name')}: {len(slots)} slots filled from {len({p[0] for p in picks.values()})} files; music: {minfo}"
-        + (f"; approximations: {len(approx)}" if approx else ""))
+    plan = {
+        "name": f"tpl_{tpl.get('name', 'template')}"[:40],
+        "canvas": canvas or ("9:16" if portrait else "16:9"),
+        "platform": None,
+        "clips": clips,
+        "layers": [],
+        "edits": edits,
+        "think": {"concept": f"the template '{tpl.get('name')}' with the client's footage", "requirements": reqs},
+        "_template": {
+            "name": tpl.get("name"),
+            "slots": len(slots),
+            "cuts": [s["start"] for s in slots[1:]],
+            "exact": exact,
+            "techniques": TR.explain(tpl.get("techniques") or {}),
+        },
+        "_rhythm": {
+            "bpm": tpl.get("bpm"),
+            "drop": tpl.get("drop"),
+            "source": "template",
+            "shots": len(slots),
+            "sections": [
+                {"name": "drop" if tpl.get("drop") is not None and s["start"] >= tpl["drop"] else "verse", "start": s["start"], "end": s["end"]}
+                for s in slots
+            ],
+        },
+    }
+    info = {
+        "template": tpl.get("name"),
+        "slots": len(slots),
+        "music": minfo,
+        "approximations": approx,
+        "offers": offers,
+        "exact": exact,
+        "techniques": TR.explain(tpl.get("techniques") or {}),
+        "notes": list(tpl.get("notes") or []),
+        "assignments": [
+            {"slot": n, "file": picks[n][0], "from": picks[n][1], "score": round(picks[n][2], 2), "why": picks[n][3]} for n in sorted(picks)
+        ],
+    }
+    log(
+        f"template {tpl.get('name')}: {len(slots)} slots filled from {len({p[0] for p in picks.values()})} files; music: {minfo}"
+        + (f"; approximations: {len(approx)}" if approx else "")
+    )
     return plan, info
 
 
@@ -1345,6 +1702,7 @@ def suggest(request="", analyses=None, k=3):
     tags, other shared words, the number of clips asked for, the length asked for, the format, whether there is enough
     footage for its slots, a video-learned (exact) copy over one made from a page, and a little for popularity."""
     from ai_pc.video import trends as TR
+
     req = str(request or "")
     want = {m[1] for m in TR.techniques("", (), req)["matched"]}
     rw = _words(req) - {"template", "templates", "edit", "video", "clips", "clip", "seconds", "make", "want", "any", "use", "like"}
@@ -1352,8 +1710,13 @@ def suggest(request="", analyses=None, k=3):
     asked_clips = int(m.group(1)) if m else None
     m = re.search(r"\b(\d{1,3})\s*(?:s|sec|secs|seconds?)\b", req, re.I)
     asked_s = float(m.group(1)) if m else None
-    portrait = True if re.search(r"\b(?:9:16|tiktok|reels?|shorts|vertical|portrait|status)\b", req, re.I) else \
-        False if re.search(r"\b(?:16:9|youtube|horizontal|landscape)\b", req, re.I) else None
+    portrait = (
+        True
+        if re.search(r"\b(?:9:16|tiktok|reels?|shorts|vertical|portrait|status)\b", req, re.I)
+        else False
+        if re.search(r"\b(?:16:9|youtube|horizontal|landscape)\b", req, re.I)
+        else None
+    )
     moments = None
     if analyses:
         vids = [a for a in analyses.values() if a.get("kind") in ("video", "image") and not str(a.get("file", "")).startswith(("music_", "sfx_"))]
@@ -1366,8 +1729,16 @@ def suggest(request="", analyses=None, k=3):
         meta = t.get("meta") or {}
         tech = t.get("techniques") or TR.techniques(meta.get("title") or t["name"].replace("_", " "), meta.get("tags") or [])
         has = {x[1] for x in tech.get("matched") or []}
-        words = _words(" ".join([t["name"].replace("_", " "), str(meta.get("title") or ""), " ".join(meta.get("tags") or []),
-                                 str((t.get("vision") or {}).get("theme") or "")]))
+        words = _words(
+            " ".join(
+                [
+                    t["name"].replace("_", " "),
+                    str(meta.get("title") or ""),
+                    " ".join(meta.get("tags") or []),
+                    str((t.get("vision") or {}).get("theme") or ""),
+                ]
+            )
+        )
         n = len(t["slots"])
         sc, why = 0.0, []
         if want & has:
@@ -1395,8 +1766,18 @@ def suggest(request="", analyses=None, k=3):
         uses = int(meta.get("uses") or 0)
         if uses:
             sc += 0.1 * np.log10(uses + 1)
-        out.append({"name": name, "score": round(sc, 2), "why": "; ".join(why) or "no strong match", "clips": n,
-                    "seconds": t.get("seconds"), "exact": bool(t.get("exact", True)), "title": meta.get("title"), "uses": uses or None})
+        out.append(
+            {
+                "name": name,
+                "score": round(sc, 2),
+                "why": "; ".join(why) or "no strong match",
+                "clips": n,
+                "seconds": t.get("seconds"),
+                "exact": bool(t.get("exact", True)),
+                "title": meta.get("title"),
+                "uses": uses or None,
+            }
+        )
     out.sort(key=lambda x: -x["score"])
     return out[:k]
 
@@ -1416,8 +1797,14 @@ def match(tpl, video, cuts_planned=None):
         if j is not None:
             used.add(j)
             hits += 1
-    return {"template_cuts": len(want), "found_on_time": hits, "extra": len(got) - len(used),
-            "rhythm_match": round(hits / max(1, len(want)), 3), "length": round(float(info["seconds"]), 2), "template_length": tpl.get("seconds")}
+    return {
+        "template_cuts": len(want),
+        "found_on_time": hits,
+        "extra": len(got) - len(used),
+        "rhythm_match": round(hits / max(1, len(want)), 3),
+        "length": round(float(info["seconds"]), 2),
+        "template_length": tpl.get("seconds"),
+    }
 
 
 # ------------------------------------------------------------------------------------------------ follow-ups on a template edit
@@ -1427,6 +1814,7 @@ def apply_design(d, ops, ctx=None):
     import copy
 
     from ai_pc.video.quick_edits import describe
+
     d = copy.deepcopy(d)
     tpl = load(d["template"]) or {}
     slots = tpl.get("slots") or []
@@ -1449,7 +1837,10 @@ def apply_design(d, ops, ctx=None):
             elif op.get("generate"):
                 d["music"] = {"generate": op["generate"] if op["generate"] != "_next" else "pop"}
             elif op.get("bpm_mul"):
-                d["music"] = {**(d.get("music") if isinstance(d.get("music"), dict) else {}), "bpm": round(float(tpl.get("bpm") or 120) * op["bpm_mul"])}
+                d["music"] = {
+                    **(d.get("music") if isinstance(d.get("music"), dict) else {}),
+                    "bpm": round(float(tpl.get("bpm") or 120) * op["bpm_mul"]),
+                }
             done.append(f"music: {op.get('generate') or op.get('file') or ('tempo x%.2f' % op['bpm_mul'] if op.get('bpm_mul') else 'as before')}")
         elif k == "canvas":
             d["canvas"] = op["value"]
@@ -1465,14 +1856,19 @@ def apply_design(d, ops, ctx=None):
         elif k in ("shot_move", "more_of") and op.get("file") and slots:
             drop = tpl.get("drop")
             if k == "more_of":
-                free = [s for s in sorted(slots, key=lambda s: -s["dur"]) if str(s["n"]) not in pins][:int(op.get("n") or 2)]
+                free = [s for s in sorted(slots, key=lambda s: -s["dur"]) if str(s["n"]) not in pins][: int(op.get("n") or 2)]
                 for s in free:
                     pins[str(s["n"])] = op["file"]
                 done.append(f"more of {op['file']} ({len(free)} slot(s))")
                 continue
             to = op.get("to")
-            n = slots[0]["n"] if to == "first" else slots[-1]["n"] if to == "last" else \
-                next((s["n"] for s in slots if drop is not None and s["start"] - 0.05 <= drop < s["end"]), slots[len(slots) // 2]["n"])
+            n = (
+                slots[0]["n"]
+                if to == "first"
+                else slots[-1]["n"]
+                if to == "last"
+                else next((s["n"] for s in slots if drop is not None and s["start"] - 0.05 <= drop < s["end"]), slots[len(slots) // 2]["n"])
+            )
             pins[str(n)] = op["file"]
             done.append(f"{op['file']} in slot {n} ({to})")
         else:
@@ -1486,6 +1882,17 @@ def refill(d, analyses, request="", log=print, chat=False, with_info=False):
     tpl = load(d["template"])
     if tpl is None:
         raise ValueError(f"the template '{d['template']}' is not in the library any more")
-    plan, info = fill(tpl, analyses, request, music=d.get("music"), canvas=d.get("canvas"), pins=d.get("pins"),
-                      avoid=d.get("avoid_files") or (), texts=d.get("texts"), log=log, speed=d.get("speed"), chat=chat)
+    plan, info = fill(
+        tpl,
+        analyses,
+        request,
+        music=d.get("music"),
+        canvas=d.get("canvas"),
+        pins=d.get("pins"),
+        avoid=d.get("avoid_files") or (),
+        texts=d.get("texts"),
+        log=log,
+        speed=d.get("speed"),
+        chat=chat,
+    )
     return (plan, info) if with_info else plan

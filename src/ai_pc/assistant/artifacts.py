@@ -6,6 +6,7 @@ that can be handed to the next program ("add an effect to my video" ... "send it
   arts.add("media/me.mp4", "you")            arts.add("out/video/x.mp4", "video", note="glow effect")
   arts.resolve("send it to slack")  -> [the edited video]      arts.resolve("the original video") -> [me.mp4]
 """
+
 import re
 import time
 from pathlib import Path
@@ -32,7 +33,7 @@ EXT = {e: k for k, exts in KINDS.items() for e in exts}
 WORDS = {
     "video": r"videos?|clips?|reels?|movies?|footage|vlogs?|shorts?",
     "image": r"photos?|pictures?|pics?|images?|thumbnails?|posters?|screenshots?|logos?|(?:visiting |business )?cards?|flyers?|banners?|"
-             r"stor(?:y|ies)|certificates?|selfies?|wallpapers?|artwork|mock-?ups?|renders?",
+    r"stor(?:y|ies)|certificates?|selfies?|wallpapers?|artwork|mock-?ups?|renders?",
     "audio": r"audios?|sounds?|songs?|music|voice(?:[- ]?(?:notes?|overs?|recordings?))?|podcasts?|mp3s?|tracks?|recordings?",
     "pdf": r"pdfs?|invoices?|receipts?|quotations?|quotes?",
     "document": r"docs?|documents?|reports?|letters?|cvs?|resumes?|essays?|assignments?|applications?|word files?|ebooks?|notes?|proposals?",
@@ -46,8 +47,25 @@ WORDS = {
     "app": r"apks?|installers?|exes?",
     "code": r"code|scripts?|programs?|projects?|websites?|apps?",
 }
-RANK = {"video": 9, "image": 8, "audio": 8, "pdf": 7, "slides": 6, "sheet": 6, "document": 5, "drawing": 5, "model": 5, "music": 4,
-        "archive": 4, "app": 4, "subtitles": 3, "folder": 3, "code": 2, "data": 2, "file": 1}
+RANK = {
+    "video": 9,
+    "image": 8,
+    "audio": 8,
+    "pdf": 7,
+    "slides": 6,
+    "sheet": 6,
+    "document": 5,
+    "drawing": 5,
+    "model": 5,
+    "music": 4,
+    "archive": 4,
+    "app": 4,
+    "subtitles": 3,
+    "folder": 3,
+    "code": 2,
+    "data": 2,
+    "file": 1,
+}
 PREFER = {"pdf": [".pdf"], "drawing": [".pdf", ".png", ".dxf"], "model": [".glb", ".stl", ".png", ".mp4"]}  # the kind word's best file
 ORIGINAL = re.compile(r"\b(?:original|my own|the one i (?:sent|gave|shared|uploaded)|unedited|raw)\b", re.I)
 MADE = re.compile(r"\b(?:edited|new|result|output|final|finished|latest|converted|compressed|cleaned|fixed|you made|that you made|made|done)\b", re.I)
@@ -80,8 +98,16 @@ class Artifacts:
             if a["path"].lower() == str(p).lower():  # the same file again: it is now the latest
                 a.update(turn=turn, time=time.time(), note=note or a.get("note", ""), **({"from": origin} if origin != "you" else {}))
                 return a
-        a = {"id": len(self.items) + 1, "path": str(p), "name": p.name, "kind": kind_of(p), "from": origin, "turn": turn, "note": note,
-             "time": time.time()}
+        a = {
+            "id": len(self.items) + 1,
+            "path": str(p),
+            "name": p.name,
+            "kind": kind_of(p),
+            "from": origin,
+            "turn": turn,
+            "note": note,
+            "time": time.time(),
+        }
         self.items.append(a)
         return a
 
@@ -90,8 +116,11 @@ class Artifacts:
 
     def latest(self, kinds=None, origin=None, made=None):
         """The newest artifact (optionally of these kinds, from this origin, or only made by programs / only the person's)."""
-        pool = [a for a in self.alive() if (not kinds or a["kind"] in kinds) and (origin is None or a["from"] == origin)
-                and (made is None or (a["from"] != "you") == made)]
+        pool = [
+            a
+            for a in self.alive()
+            if (not kinds or a["kind"] in kinds) and (origin is None or a["from"] == origin) and (made is None or (a["from"] != "you") == made)
+        ]
         return max(pool, key=lambda a: (a["turn"], a["time"])) if pool else None
 
     def named(self, text):
@@ -101,8 +130,11 @@ class Artifacts:
             name, stem = a["name"].lower(), Path(a["name"]).stem.lower()
             if name in low:
                 hits.append(a)
-            elif len(stem) >= 4 and not any(re.fullmatch(pat, stem) for pat in WORDS.values()) and \
-                    re.search(rf"(?<![\w-]){re.escape(stem)}(?![\w-])", low):
+            elif (
+                len(stem) >= 4
+                and not any(re.fullmatch(pat, stem) for pat in WORDS.values())
+                and re.search(rf"(?<![\w-]){re.escape(stem)}(?![\w-])", low)
+            ):
                 hits.append(a)
         best = {}
         for a in hits:  # the same name in several formats: the most shareable one
@@ -140,5 +172,7 @@ class Artifacts:
 
     def describe(self, limit=12):
         """A short list for the model and for 'what have you made?'."""
-        return [f"#{a['id']} {a['name']} ({a['kind']}, {'you sent it' if a['from'] == 'you' else 'made by ' + a['from']})"
-                for a in sorted(self.alive(), key=lambda a: (a["turn"], a["time"]))[-limit:]]
+        return [
+            f"#{a['id']} {a['name']} ({a['kind']}, {'you sent it' if a['from'] == 'you' else 'made by ' + a['from']})"
+            for a in sorted(self.alive(), key=lambda a: (a["turn"], a["time"]))[-limit:]
+        ]

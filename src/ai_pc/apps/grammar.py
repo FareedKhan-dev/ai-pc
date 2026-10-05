@@ -6,6 +6,7 @@ kept; within a corrected paragraph, bold or italic words become plain.
 
   'check grammar in essay.docx'   'proofread letter.txt'
 """
+
 import re
 import time
 import urllib.parse
@@ -25,19 +26,30 @@ def check_text(text, lang="en-US"):
     """[{offset, length, message, replacement, category}] for one piece of text."""
     try:
         r = Api(URL, service="languagetool", transport=TRANSPORT).request(
-            "POST", URL, data=urllib.parse.urlencode({"text": text, "language": lang, "enabledOnly": "false"}).encode(),
-            headers={"Content-Type": "application/x-www-form-urlencoded"})
+            "POST",
+            URL,
+            data=urllib.parse.urlencode({"text": text, "language": lang, "enabledOnly": "false"}).encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
     except HubError as e:
         raise RuntimeError(f"LanguageTool: {e}") from e
-    return [{"offset": m["offset"], "length": m["length"], "message": m["message"], "replacement": (m.get("replacements") or [{}])[0].get("value"),
-             "category": ((m.get("rule") or {}).get("category") or {}).get("id", "")} for m in r.get("matches") or []]
+    return [
+        {
+            "offset": m["offset"],
+            "length": m["length"],
+            "message": m["message"],
+            "replacement": (m.get("replacements") or [{}])[0].get("value"),
+            "category": ((m.get("rule") or {}).get("category") or {}).get("id", ""),
+        }
+        for m in r.get("matches") or []
+    ]
 
 
 def fix(text, issues):
     out = text
     for m in sorted(issues, key=lambda x: -x["offset"]):
         if m["replacement"] is not None and m["category"] in APPLY:
-            out = out[:m["offset"]] + m["replacement"] + out[m["offset"] + m["length"]:]
+            out = out[: m["offset"]] + m["replacement"] + out[m["offset"] + m["length"] :]
     return out
 
 
@@ -45,12 +57,14 @@ def paragraphs(path):
     p = Path(path)
     if p.suffix.lower() == ".docx":
         from docx import Document
+
         return [x.text for x in Document(p).paragraphs]
     return p.read_text(encoding="utf-8", errors="replace").split("\n")
 
 
 def parse(text, ctx):
     from ai_pc.apps.appschat import find_file
+
     if not re.search(r"\b(?:grammar|spelling|proof-?read|spell-?check)\b", text, re.I):
         return None
     f = find_file(text, ctx, {".docx", ".txt", ".md"})
@@ -85,6 +99,7 @@ def run(op, ctx):
     dest = out / f"{p.stem}.corrected{p.suffix}"
     if p.suffix.lower() == ".docx":
         from docx import Document
+
         d = Document(p)
         for para, new in zip(d.paragraphs, fixed):
             if para.text != new and para.runs:
@@ -95,6 +110,11 @@ def run(op, ctx):
     else:
         dest.write_text("\n".join(fixed), encoding="utf-8")
     applied = sum(1 for _, m in found if m["replacement"] is not None and m["category"] in APPLY)
-    listed = "\n".join(f"- paragraph {i + 1}: {m['message']}" + (f" -> '{m['replacement']}'" if m["replacement"] is not None else "") for i, m in found[:20])
-    return (f"{len(found)} issue(s) found, {applied} fixed in {dest}" + (f"; {len(found) - applied} style hint(s) listed, not applied" if len(found) > applied else "") +
-            (f":\n{listed}" if found else ". No issues found."))
+    listed = "\n".join(
+        f"- paragraph {i + 1}: {m['message']}" + (f" -> '{m['replacement']}'" if m["replacement"] is not None else "") for i, m in found[:20]
+    )
+    return (
+        f"{len(found)} issue(s) found, {applied} fixed in {dest}"
+        + (f"; {len(found) - applied} style hint(s) listed, not applied" if len(found) > applied else "")
+        + (f":\n{listed}" if found else ". No issues found.")
+    )

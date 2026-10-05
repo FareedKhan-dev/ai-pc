@@ -1,7 +1,8 @@
 """Generalisation test on a classic Win32 app the agent has never seen: Character Map (harmless, multi-step).
 
-  python tests/integration/test_charmap.py
+python tests/integration/test_charmap.py
 """
+
 import shutil
 import sys
 import time
@@ -54,11 +55,13 @@ def close():
 
 
 def run(verbose):
-    a = Agent(planner=ChatPlanner(), grounder=Grounder(autostart=False), confirm=Confirmer("deny"), dry_run=False,
-              store=STORE, verbose=verbose)
+    a = Agent(planner=ChatPlanner(), grounder=Grounder(autostart=False), confirm=Confirmer("deny"), dry_run=False, store=STORE, verbose=verbose)
     r = a.run(GOAL, app="Character Map")
-    print(f"\n>>> lane={r.lane} ok={r.ok} answer={r.answer!r}\n    total {r.ms} ms | model calls {r.llm_calls} | steps {r.steps} | {r.timings}"
-          + (f"\n    error: {r.error}" if r.error else ""), flush=True)
+    print(
+        f"\n>>> lane={r.lane} ok={r.ok} answer={r.answer!r}\n    total {r.ms} ms | model calls {r.llm_calls} | steps {r.steps} | {r.timings}"
+        + (f"\n    error: {r.error}" if r.error else ""),
+        flush=True,
+    )
     return r
 
 
@@ -71,8 +74,13 @@ if __name__ == "__main__":
         print("=== first time (the agent has never seen Character Map)")
         run(True)
         for sk in STORE.list():
-            print(f"\n  learned skill '{sk['name']}': " + " -> ".join(
-                f"{st['op']}({(st.get('loc') or {}).get('name') or st.get('text') or st.get('keys') or st.get('target') or ''})" for st in sk["steps"]))
+            print(
+                f"\n  learned skill '{sk['name']}': "
+                + " -> ".join(
+                    f"{st['op']}({(st.get('loc') or {}).get('name') or st.get('text') or st.get('keys') or st.get('target') or ''})"
+                    for st in sk["steps"]
+                )
+            )
         print("\n=== same task again, from the same starting state (should replay the learned skill)")
         advanced_view_off()
         close()

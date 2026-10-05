@@ -7,6 +7,7 @@ server error ('500'), a limit ('429'), an expired sign-in ('401').
   fx = FakeXero(); conn = xero.System(fx.creds(), fx); fx.failing("PUT", "/Payments", "drop", times=4)
 Transports answer send(method, url, headers, data, timeout) -> (status, headers, bytes), like the hub's.
 """
+
 import base64
 import datetime as dt
 import json
@@ -80,19 +81,46 @@ class FakeXero(Fake):
         self.access, self.refresh, self.tenant, self.code = "xero-access-1", "xero-refresh-1", "tenant-khan", "good-code"
         self.idem, self.replays = {}, 0
         self.contacts, self.invoices, self.quotes, self.credits, self.payments, self.banktx = {}, {}, {}, {}, {}, {}
-        self.taxrates = [{"Name": "No Tax", "TaxType": "NONE", "EffectiveRate": 0, "Status": "ACTIVE", "CanApplyToRevenue": True, "CanApplyToExpenses": True},
-                         {"Name": "Tax on Imports 5%", "TaxType": "TAXIMP", "EffectiveRate": 5, "Status": "ACTIVE", "CanApplyToRevenue": False,
-                          "CanApplyToExpenses": True}]
-        self.accounts = [{"AccountID": f"a-{c}", "Code": c, "Name": n, "Type": t, "Status": "ACTIVE"} for c, n, t in (
-            ("200", "Sales", "REVENUE"), ("260", "Other Revenue", "REVENUE"), ("300", "Purchases", "DIRECTCOSTS"), ("310", "Cost of Goods Sold", "DIRECTCOSTS"),
-            ("404", "Bank Fees", "OVERHEADS"), ("429", "General Expenses", "OVERHEADS"), ("445", "Light, Power, Heating", "OVERHEADS"),
-            ("469", "Rent", "OVERHEADS"), ("477", "Wages and Salaries", "EXPENSE"), ("489", "Telephone & Internet", "OVERHEADS"))]
-        self.accounts += [{"AccountID": "bank-meezan", "Code": "", "Name": "Meezan Business Account", "Type": "BANK", "Status": "ACTIVE"},
-                          {"AccountID": "bank-petty", "Code": "", "Name": "Petty Cash", "Type": "BANK", "Status": "ACTIVE"}]
+        self.taxrates = [
+            {"Name": "No Tax", "TaxType": "NONE", "EffectiveRate": 0, "Status": "ACTIVE", "CanApplyToRevenue": True, "CanApplyToExpenses": True},
+            {
+                "Name": "Tax on Imports 5%",
+                "TaxType": "TAXIMP",
+                "EffectiveRate": 5,
+                "Status": "ACTIVE",
+                "CanApplyToRevenue": False,
+                "CanApplyToExpenses": True,
+            },
+        ]
+        self.accounts = [
+            {"AccountID": f"a-{c}", "Code": c, "Name": n, "Type": t, "Status": "ACTIVE"}
+            for c, n, t in (
+                ("200", "Sales", "REVENUE"),
+                ("260", "Other Revenue", "REVENUE"),
+                ("300", "Purchases", "DIRECTCOSTS"),
+                ("310", "Cost of Goods Sold", "DIRECTCOSTS"),
+                ("404", "Bank Fees", "OVERHEADS"),
+                ("429", "General Expenses", "OVERHEADS"),
+                ("445", "Light, Power, Heating", "OVERHEADS"),
+                ("469", "Rent", "OVERHEADS"),
+                ("477", "Wages and Salaries", "EXPENSE"),
+                ("489", "Telephone & Internet", "OVERHEADS"),
+            )
+        ]
+        self.accounts += [
+            {"AccountID": "bank-meezan", "Code": "", "Name": "Meezan Business Account", "Type": "BANK", "Status": "ACTIVE"},
+            {"AccountID": "bank-petty", "Code": "", "Name": "Petty Cash", "Type": "BANK", "Status": "ACTIVE"},
+        ]
 
     def creds(self):
-        return {"client_id": "xero-client", "access_token": self.access, "refresh_token": self.refresh, "expires_at": 9e12, "tenant": self.tenant,
-                "tenant_name": "Khan Electronics"}
+        return {
+            "client_id": "xero-client",
+            "access_token": self.access,
+            "refresh_token": self.refresh,
+            "expires_at": 9e12,
+            "tenant": self.tenant,
+            "tenant_name": "Khan Electronics",
+        }
 
     # ---------------------------------------------------------------- the wire
     def send(self, method, url, headers, data, timeout):
@@ -109,7 +137,9 @@ class FakeXero(Fake):
         if headers.get("Xero-tenant-id") != self.tenant:
             return self.js(403, {"Title": "Forbidden", "Detail": "AuthenticationUnsuccessful"})
         if how in ("429", "500"):
-            return self.js(int(how), {"Title": "Too Many Requests" if how == "429" else "Server error"}, {"Retry-After": "0", "X-Rate-Limit-Problem": "day"})
+            return self.js(
+                int(how), {"Title": "Too Many Requests" if how == "429" else "Server error"}, {"Retry-After": "0", "X-Rate-Limit-Problem": "day"}
+            )
         u = urllib.parse.urlparse(url)
         q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
         key = headers.get("Idempotency-Key")
@@ -120,8 +150,15 @@ class FakeXero(Fake):
             try:
                 res = self.js(200, self.route(method, u.path.split("/api.xro/2.0/")[1], q, body))
             except ValueError as e:
-                res = self.js(400, {"ErrorNumber": 10, "Type": "ValidationException", "Message": "A validation exception occurred",
-                                    "Elements": [{"ValidationErrors": [{"Message": str(e)}]}]})
+                res = self.js(
+                    400,
+                    {
+                        "ErrorNumber": 10,
+                        "Type": "ValidationException",
+                        "Message": "A validation exception occurred",
+                        "Elements": [{"ValidationErrors": [{"Message": str(e)}]}],
+                    },
+                )
             if key and res[0] < 400:
                 self.idem[key] = res
         if how == "drop":
@@ -166,7 +203,14 @@ class FakeXero(Fake):
         return D(t["EffectiveRate"])
 
     def _acct(self, ref):
-        a = next((a for a in self.accounts if (ref.get("AccountID") and a["AccountID"] == ref["AccountID"]) or (ref.get("Code") and a["Code"] == ref["Code"])), None)
+        a = next(
+            (
+                a
+                for a in self.accounts
+                if (ref.get("AccountID") and a["AccountID"] == ref["AccountID"]) or (ref.get("Code") and a["Code"] == ref["Code"])
+            ),
+            None,
+        )
         if not a:
             raise ValueError("Account could not be found")
         return a
@@ -194,7 +238,9 @@ class FakeXero(Fake):
             out = []
             for c in body["Contacts"]:
                 if any(x["Name"].lower() == c["Name"].lower() for x in self.contacts.values()):
-                    raise ValueError("The contact name is already assigned to another contact. The contact name must be unique across all active contacts.")
+                    raise ValueError(
+                        "The contact name is already assigned to another contact. The contact name must be unique across all active contacts."
+                    )
                 c = dict(c, ContactID=self.nid("contact"), ContactStatus="ACTIVE")
                 self.contacts[c["ContactID"]] = c
                 out.append(c)
@@ -205,8 +251,15 @@ class FakeXero(Fake):
             out = []
             for t in body["TaxRates"]:
                 rate = sum(D(c["Rate"]) for c in t["TaxComponents"])
-                t = dict(t, TaxType=f"TAX{len(self.taxrates):03d}", EffectiveRate=float(rate), DisplayTaxRate=float(rate), Status="ACTIVE",
-                         CanApplyToRevenue=True, CanApplyToExpenses=True)
+                t = dict(
+                    t,
+                    TaxType=f"TAX{len(self.taxrates):03d}",
+                    EffectiveRate=float(rate),
+                    DisplayTaxRate=float(rate),
+                    Status="ACTIVE",
+                    CanApplyToRevenue=True,
+                    CanApplyToExpenses=True,
+                )
                 self.taxrates.append(t)
                 out.append(t)
             return {"TaxRates": out}
@@ -229,7 +282,9 @@ class FakeXero(Fake):
             if rid:  # void
                 inv = self.invoices[rid]
                 if D(inv["AmountPaid"]) or D(inv["AmountCredited"]):
-                    raise ValueError("Invoice not of valid status for modification. This document cannot be edited as it has a payment or credit note allocated to it.")
+                    raise ValueError(
+                        "Invoice not of valid status for modification. This document cannot be edited as it has a payment or credit note allocated to it."
+                    )
                 inv["Status"] = "VOIDED"
                 return {"Invoices": [inv]}
             out = []
@@ -237,8 +292,10 @@ class FakeXero(Fake):
                 errs = []
                 if x["Contact"]["ContactID"] not in self.contacts:
                     errs.append("The contact does not exist")
-                if x["Type"] == "ACCREC" and any(i["InvoiceNumber"] == x["InvoiceNumber"] and i["Type"] == "ACCREC" and i["Status"] not in ("VOIDED", "DELETED")
-                                                 for i in self.invoices.values()):
+                if x["Type"] == "ACCREC" and any(
+                    i["InvoiceNumber"] == x["InvoiceNumber"] and i["Type"] == "ACCREC" and i["Status"] not in ("VOIDED", "DELETED")
+                    for i in self.invoices.values()
+                ):
                     errs.append("Invoice # must be unique.")
                 if not errs:
                     try:
@@ -248,7 +305,15 @@ class FakeXero(Fake):
                 if errs:
                     out.append(dict(x, HasErrors=True, StatusAttributeString="ERROR", ValidationErrors=[{"Message": m} for m in errs]))
                     continue
-                x = dict(x, InvoiceID=self.nid("inv"), AmountDue=x["Total"], AmountPaid=0.0, AmountCredited=0.0, StatusAttributeString="OK", HasErrors=False)
+                x = dict(
+                    x,
+                    InvoiceID=self.nid("inv"),
+                    AmountDue=x["Total"],
+                    AmountPaid=0.0,
+                    AmountCredited=0.0,
+                    StatusAttributeString="OK",
+                    HasErrors=False,
+                )
                 self.invoices[x["InvoiceID"]] = x
                 out.append(x)
             return {"Invoices": out}
@@ -300,7 +365,11 @@ class FakeXero(Fake):
                 p = self.payments[rid]
                 if p["Status"] != "DELETED":
                     inv = self.invoices[p["Invoice"]["InvoiceID"]]
-                    inv["AmountDue"], inv["AmountPaid"], inv["Status"] = num(D(inv["AmountDue"]) + D(p["Amount"])), num(D(inv["AmountPaid"]) - D(p["Amount"])), "AUTHORISED"
+                    inv["AmountDue"], inv["AmountPaid"], inv["Status"] = (
+                        num(D(inv["AmountDue"]) + D(p["Amount"])),
+                        num(D(inv["AmountPaid"]) - D(p["Amount"])),
+                        "AUTHORISED",
+                    )
                     p["Status"] = "DELETED"
                 return {"Payments": [p]}
             out = []
@@ -345,10 +414,24 @@ class FakeXero(Fake):
 class FakeZoho(Fake):
     ACCOUNTS = "https://accounts.zoho.com/oauth/v2/token"
     API = "https://www.zohoapis.com/books/v3/"
-    ONE = {"invoices": "invoice", "estimates": "estimate", "creditnotes": "creditnote", "bills": "bill", "expenses": "expense",
-           "customerpayments": "payment", "vendorpayments": "vendorpayment"}
-    IDS = {"invoices": "invoice_id", "estimates": "estimate_id", "creditnotes": "creditnote_id", "bills": "bill_id", "expenses": "expense_id",
-           "customerpayments": "payment_id", "vendorpayments": "payment_id"}
+    ONE = {
+        "invoices": "invoice",
+        "estimates": "estimate",
+        "creditnotes": "creditnote",
+        "bills": "bill",
+        "expenses": "expense",
+        "customerpayments": "payment",
+        "vendorpayments": "vendorpayment",
+    }
+    IDS = {
+        "invoices": "invoice_id",
+        "estimates": "estimate_id",
+        "creditnotes": "creditnote_id",
+        "bills": "bill_id",
+        "expenses": "expense_id",
+        "customerpayments": "payment_id",
+        "vendorpayments": "payment_id",
+    }
 
     def __init__(self):
         super().__init__()
@@ -356,14 +439,38 @@ class FakeZoho(Fake):
         self.contacts, self.items = {}, {}
         self.docs = {k: {} for k in self.ONE}
         self.taxes = [{"tax_id": "tax-vat5", "tax_name": "VAT 5%", "tax_percentage": 5, "tax_type": "tax"}]
-        self.chart = [{"account_id": f"z-{i}", "account_name": n, "account_type": t, "is_active": True} for i, (n, t) in enumerate((
-            ("Sales", "income"), ("General Income", "income"), ("Cost of Goods Sold", "cost_of_goods_sold"), ("Utility Expense", "expense"),
-            ("Rent Expense", "expense"), ("Salaries and Employee Wages", "expense"), ("Telephone Expense", "expense"), ("Other Expenses", "expense"),
-            ("Bank Fees and Charges", "expense"), ("HBL Current Account", "bank"), ("Petty Cash", "cash"), ("Undeposited Funds", "cash")))]
+        self.chart = [
+            {"account_id": f"z-{i}", "account_name": n, "account_type": t, "is_active": True}
+            for i, (n, t) in enumerate(
+                (
+                    ("Sales", "income"),
+                    ("General Income", "income"),
+                    ("Cost of Goods Sold", "cost_of_goods_sold"),
+                    ("Utility Expense", "expense"),
+                    ("Rent Expense", "expense"),
+                    ("Salaries and Employee Wages", "expense"),
+                    ("Telephone Expense", "expense"),
+                    ("Other Expenses", "expense"),
+                    ("Bank Fees and Charges", "expense"),
+                    ("HBL Current Account", "bank"),
+                    ("Petty Cash", "cash"),
+                    ("Undeposited Funds", "cash"),
+                )
+            )
+        ]
 
     def creds(self):
-        return {"client_id": "zoho-client", "client_secret": "zoho-secret", "accounts": "https://accounts.zoho.com", "api": "https://www.zohoapis.com",
-                "refresh_token": self.refresh, "access_token": self.access, "expires_at": 9e12, "org": self.org, "org_name": "Khan Electronics"}
+        return {
+            "client_id": "zoho-client",
+            "client_secret": "zoho-secret",
+            "accounts": "https://accounts.zoho.com",
+            "api": "https://www.zohoapis.com",
+            "refresh_token": self.refresh,
+            "access_token": self.access,
+            "expires_at": 9e12,
+            "org": self.org,
+            "org_name": "Khan Electronics",
+        }
 
     def send(self, method, url, headers, data, timeout):
         body = self.record(method, url, headers, data)
@@ -373,18 +480,31 @@ class FakeZoho(Fake):
                 if f.get("code") != self.code or f.get("client_secret") != "zoho-secret":
                     return self.js(200, {"error": "invalid_code"})
                 self.code = None
-                return self.js(200, {"access_token": self.access, "refresh_token": self.refresh, "api_domain": "https://www.zohoapis.com",
-                                     "token_type": "Bearer", "expires_in": 3600})
+                return self.js(
+                    200,
+                    {
+                        "access_token": self.access,
+                        "refresh_token": self.refresh,
+                        "api_domain": "https://www.zohoapis.com",
+                        "token_type": "Bearer",
+                        "expires_in": 3600,
+                    },
+                )
             if f.get("grant_type") == "refresh_token" and f.get("refresh_token") == self.refresh:
                 self.access = f"zoho-access-{int(self.access.rsplit('-', 1)[1]) + 1}"
-                return self.js(200, {"access_token": self.access, "api_domain": "https://www.zohoapis.com", "token_type": "Bearer", "expires_in": 3600})
+                return self.js(
+                    200, {"access_token": self.access, "api_domain": "https://www.zohoapis.com", "token_type": "Bearer", "expires_in": 3600}
+                )
             return self.js(200, {"error": "invalid_client"})
         how = self._rule(method, url)
         if how == "401" or headers.get("Authorization") != f"Zoho-oauthtoken {self.access}":
             return self.js(401, {"code": 57, "message": "You are not authorized to perform this operation"})
         if how in ("429", "500"):
-            return self.js(int(how), {"code": 44 if how == "429" else 500, "message": "Too many requests" if how == "429" else "Internal error"},
-                           {"Retry-After": "0"})
+            return self.js(
+                int(how),
+                {"code": 44 if how == "429" else 500, "message": "Too many requests" if how == "429" else "Internal error"},
+                {"Retry-After": "0"},
+            )
         u = urllib.parse.urlparse(url)
         q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
         path = u.path.split("/books/v3/")[1].strip("/")
@@ -437,9 +557,16 @@ class FakeZoho(Fake):
             return {"organizations": [{"organization_id": self.org, "name": "Khan Electronics", "currency_code": "PKR", "is_default_org": True}]}
         if what == "contacts":
             if method == "GET":
-                return {"contacts": [c for c in self.contacts.values() if not q.get("contact_name") or c["contact_name"].lower() == q["contact_name"].lower()]}
-            if any(c["contact_name"].lower() == body["contact_name"].lower() and c["contact_type"] == body["contact_type"] for c in self.contacts.values()):
-                raise ValueError(f"The {body['contact_type']} \"{body['contact_name']}\" already exists.")
+                return {
+                    "contacts": [
+                        c for c in self.contacts.values() if not q.get("contact_name") or c["contact_name"].lower() == q["contact_name"].lower()
+                    ]
+                }
+            if any(
+                c["contact_name"].lower() == body["contact_name"].lower() and c["contact_type"] == body["contact_type"]
+                for c in self.contacts.values()
+            ):
+                raise ValueError(f'The {body["contact_type"]} "{body["contact_name"]}" already exists.')
             c = dict(body, contact_id=self.nid("contact"))
             self.contacts[c["contact_id"]] = c
             return {"contact": c}
@@ -457,8 +584,13 @@ class FakeZoho(Fake):
             return {"tax": t}
         if what == "settings" and rid == "taxgroups":
             comps = [next(t for t in self.taxes if t["tax_id"] == i) for i in body["taxes"].split(",")]
-            g = {"tax_id": self.nid("taxgroup"), "tax_name": body["tax_group_name"], "tax_percentage": float(sum(D(c["tax_percentage"]) for c in comps)),
-                 "tax_type": "tax_group", "components": comps}
+            g = {
+                "tax_id": self.nid("taxgroup"),
+                "tax_name": body["tax_group_name"],
+                "tax_percentage": float(sum(D(c["tax_percentage"]) for c in comps)),
+                "tax_type": "tax_group",
+                "components": comps,
+            }
             self.taxes.append(g)
             return {"tax_group": {"tax_group_id": g["tax_id"], "tax_group_name": g["tax_name"], "taxes": comps}}
         if what == "chartofaccounts":
@@ -514,7 +646,7 @@ class FakeZoho(Fake):
             if x.get(field) and q.get("ignore_auto_number_generation") != "true":
                 raise ValueError(f"{field} is generated automatically: pass ignore_auto_number_generation=true to give your own")
             if any(r.get(field) == x.get(field) and r.get("status") != "void" for r in store.values()):
-                raise ValueError(f"{one.title()} \"{x.get(field)}\" already exists.")
+                raise ValueError(f'{one.title()} "{x.get(field)}" already exists.')
             self._totals(x)
             x["status"] = "open" if what == "creditnotes" else "draft"
         elif what == "bills":
@@ -552,9 +684,28 @@ class FakeZoho(Fake):
 
 
 # ==================================================================== TallyPrime
-GROUPS = ("Sundry Debtors", "Sundry Creditors", "Sales Accounts", "Purchase Accounts", "Duties & Taxes", "Indirect Expenses", "Indirect Incomes",
-          "Direct Expenses", "Direct Incomes", "Bank Accounts", "Cash-in-Hand", "Current Assets", "Current Liabilities", "Loans & Advances (Asset)",
-          "Capital Account", "Fixed Assets", "Stock-in-Hand", "Suspense A/c", "Provisions", "Bank OD A/c")
+GROUPS = (
+    "Sundry Debtors",
+    "Sundry Creditors",
+    "Sales Accounts",
+    "Purchase Accounts",
+    "Duties & Taxes",
+    "Indirect Expenses",
+    "Indirect Incomes",
+    "Direct Expenses",
+    "Direct Incomes",
+    "Bank Accounts",
+    "Cash-in-Hand",
+    "Current Assets",
+    "Current Liabilities",
+    "Loans & Advances (Asset)",
+    "Capital Account",
+    "Fixed Assets",
+    "Stock-in-Hand",
+    "Suspense A/c",
+    "Provisions",
+    "Bank OD A/c",
+)
 VTYPES = ("Sales", "Purchase", "Receipt", "Payment", "Journal", "Contra", "Credit Note", "Debit Note")
 
 
@@ -562,14 +713,19 @@ class FakeTally(Fake):
     """TallyPrime's XML gateway: UTF-16 in and out, the company must be loaded, masters by name (a Create on an existing
     ledger silently alters it, as Tally does), vouchers upserted by REMOTEID, refused when they do not balance, when a
     flag disagrees with its sign or a ledger or item is missing; automatic voucher numbering; Day Book export."""
+
     URL = "http://127.0.0.1:9000/"
 
     def __init__(self, company="Khan Electronics", manual_numbers=False):
         super().__init__()
         self.company, self.manual = company, manual_numbers
-        self.ledgers = {"Cash": {"PARENT": "Cash-in-Hand"}, "Profit & Loss A/c": {"PARENT": "Primary"},
-                        "HBL Current A/c": {"PARENT": "Bank Accounts"}, "Electricity Charges": {"PARENT": "Indirect Expenses"},
-                        "Ali Traders": {"PARENT": "Sundry Debtors", "ISBILLWISEON": "Yes"}}
+        self.ledgers = {
+            "Cash": {"PARENT": "Cash-in-Hand"},
+            "Profit & Loss A/c": {"PARENT": "Primary"},
+            "HBL Current A/c": {"PARENT": "Bank Accounts"},
+            "Electricity Charges": {"PARENT": "Indirect Expenses"},
+            "Ali Traders": {"PARENT": "Sundry Debtors", "ISBILLWISEON": "Yes"},
+        }
         self.units, self.items, self.vouchers, self.altered_masters = {}, {}, {}, []
         self.mid, self.seq, self.down = 100, {}, False
 
@@ -602,10 +758,16 @@ class FakeTally(Fake):
 
     @staticmethod
     def _result(**kw):
-        c = {k: kw.get(k, 0) for k in ("CREATED", "ALTERED", "DELETED", "LASTVCHID", "LASTMID", "COMBINED", "IGNORED", "ERRORS", "CANCELLED", "EXCEPTIONS")}
+        c = {
+            k: kw.get(k, 0)
+            for k in ("CREATED", "ALTERED", "DELETED", "LASTVCHID", "LASTMID", "COMBINED", "IGNORED", "ERRORS", "CANCELLED", "EXCEPTIONS")
+        }
         line = f"<LINEERROR>{escape_xml(kw['LINEERROR'])}</LINEERROR>" if kw.get("LINEERROR") else ""
-        return ("<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC></DESC><DATA><IMPORTRESULT>" +
-                "".join(f"<{k}>{v}</{k}>" for k, v in c.items()) + f"</IMPORTRESULT>{line}</DATA></BODY></ENVELOPE>")
+        return (
+            "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC></DESC><DATA><IMPORTRESULT>"
+            + "".join(f"<{k}>{v}</{k}>" for k, v in c.items())
+            + f"</IMPORTRESULT>{line}</DATA></BODY></ENVELOPE>"
+        )
 
     # ---------------------------------------------------------------- imports
     def _import(self, env, comp):
@@ -640,8 +802,14 @@ class FakeTally(Fake):
             return f"Voucher Type '{vtype}' does not exist!"
         if v.get("ACTION") == "Cancel":
             day = dt.datetime.strptime(v.get("DATE"), "%d-%b-%Y").strftime("%Y%m%d")
-            hit = next((x for x in self.vouchers.values() if x["VOUCHERNUMBER"] == v.get("TAGVALUE") and x["VOUCHERTYPENAME"] == vtype
-                        and x["DATE"] == day and x["ISCANCELLED"] == "No"), None)
+            hit = next(
+                (
+                    x
+                    for x in self.vouchers.values()
+                    if x["VOUCHERNUMBER"] == v.get("TAGVALUE") and x["VOUCHERTYPENAME"] == vtype and x["DATE"] == day and x["ISCANCELLED"] == "No"
+                ),
+                None,
+            )
             if not hit:
                 return f"Voucher '{v.get('TAGVALUE')}' does not exist!"
             hit["ISCANCELLED"] = "Yes"
@@ -651,12 +819,29 @@ class FakeTally(Fake):
         if not view:
             return "No Entries in Voucher!"
         ledger_tag = "LEDGERENTRIES.LIST" if view == "Invoice Voucher View" else "ALLLEDGERENTRIES.LIST"
-        lines = [{"LEDGERNAME": e.findtext("LEDGERNAME"), "ISDEEMEDPOSITIVE": e.findtext("ISDEEMEDPOSITIVE"), "ISPARTYLEDGER": e.findtext("ISPARTYLEDGER") or "No",
-                  "AMOUNT": D(e.findtext("AMOUNT")), "BILLS": [{"NAME": x.findtext("NAME"), "BILLTYPE": x.findtext("BILLTYPE"), "AMOUNT": D(x.findtext("AMOUNT"))}
-                                                               for x in e.findall("BILLALLOCATIONS.LIST")]}
-                 for e in v.findall(ledger_tag)]  # the other list is silently dropped, as Tally does
-        inv = [{"STOCKITEMNAME": e.findtext("STOCKITEMNAME"), "ISDEEMEDPOSITIVE": e.findtext("ISDEEMEDPOSITIVE"), "AMOUNT": D(e.findtext("AMOUNT")),
-                "ACTUALQTY": e.findtext("ACTUALQTY"), "LEDGER": e.findtext("ACCOUNTINGALLOCATIONS.LIST/LEDGERNAME")} for e in v.findall("ALLINVENTORYENTRIES.LIST")]
+        lines = [
+            {
+                "LEDGERNAME": e.findtext("LEDGERNAME"),
+                "ISDEEMEDPOSITIVE": e.findtext("ISDEEMEDPOSITIVE"),
+                "ISPARTYLEDGER": e.findtext("ISPARTYLEDGER") or "No",
+                "AMOUNT": D(e.findtext("AMOUNT")),
+                "BILLS": [
+                    {"NAME": x.findtext("NAME"), "BILLTYPE": x.findtext("BILLTYPE"), "AMOUNT": D(x.findtext("AMOUNT"))}
+                    for x in e.findall("BILLALLOCATIONS.LIST")
+                ],
+            }
+            for e in v.findall(ledger_tag)
+        ]  # the other list is silently dropped, as Tally does
+        inv = [
+            {
+                "STOCKITEMNAME": e.findtext("STOCKITEMNAME"),
+                "ISDEEMEDPOSITIVE": e.findtext("ISDEEMEDPOSITIVE"),
+                "AMOUNT": D(e.findtext("AMOUNT")),
+                "ACTUALQTY": e.findtext("ACTUALQTY"),
+                "LEDGER": e.findtext("ACCOUNTINGALLOCATIONS.LIST/LEDGERNAME"),
+            }
+            for e in v.findall("ALLINVENTORYENTRIES.LIST")
+        ]
         for x in lines + inv:
             if (x["ISDEEMEDPOSITIVE"] == "Yes") != (x["AMOUNT"] < 0):
                 return "ISDEEMEDPOSITIVE does not agree with the sign of the amount"
@@ -685,9 +870,20 @@ class FakeTally(Fake):
         for x in lines:  # bill by bill only on ledgers that have it on
             if self.ledgers[x["LEDGERNAME"]].get("ISBILLWISEON") != "Yes":
                 x["BILLS"] = []
-        self.vouchers[mid] = {"MASTERID": mid, "REMOTEID": rid, "VOUCHERTYPENAME": vtype, "DATE": v.findtext("DATE"), "VOUCHERNUMBER": number,
-                              "REFERENCE": v.findtext("REFERENCE") or "", "NARRATION": v.findtext("NARRATION") or "", "VIEW": view,
-                              "PARTYLEDGERNAME": v.findtext("PARTYLEDGERNAME") or "", "ISCANCELLED": "No", "LINES": lines, "INV": inv}
+        self.vouchers[mid] = {
+            "MASTERID": mid,
+            "REMOTEID": rid,
+            "VOUCHERTYPENAME": vtype,
+            "DATE": v.findtext("DATE"),
+            "VOUCHERNUMBER": number,
+            "REFERENCE": v.findtext("REFERENCE") or "",
+            "NARRATION": v.findtext("NARRATION") or "",
+            "VIEW": view,
+            "PARTYLEDGERNAME": v.findtext("PARTYLEDGERNAME") or "",
+            "ISCANCELLED": "No",
+            "LINES": lines,
+            "INV": inv,
+        }
         out["LASTVCHID"] = mid
         return None
 
@@ -712,13 +908,17 @@ class FakeTally(Fake):
             if ctype == "Company":
                 rows = f'<COMPANY NAME="{escape_xml(self.company)}"><NAME>{escape_xml(self.company)}</NAME></COMPANY>'
             elif ctype == "Ledger":
-                rows = "".join(f'<LEDGER NAME="{escape_xml(n)}"><PARENT TYPE="String">&#4; {escape_xml(f["PARENT"])}</PARENT></LEDGER>'
-                               for n, f in self.ledgers.items())
+                rows = "".join(
+                    f'<LEDGER NAME="{escape_xml(n)}"><PARENT TYPE="String">&#4; {escape_xml(f["PARENT"])}</PARENT></LEDGER>'
+                    for n, f in self.ledgers.items()
+                )
             elif ctype == "Unit":
                 rows = "".join(f'<UNIT NAME="{escape_xml(n)}"><NAME>{escape_xml(n)}</NAME></UNIT>' for n in self.units)
             elif ctype == "StockItem":
-                rows = "".join(f'<STOCKITEM NAME="{escape_xml(n)}"><BASEUNITS>{escape_xml(f.get("BASEUNITS", ""))}</BASEUNITS></STOCKITEM>'
-                               for n, f in self.items.items())
+                rows = "".join(
+                    f'<STOCKITEM NAME="{escape_xml(n)}"><BASEUNITS>{escape_xml(f.get("BASEUNITS", ""))}</BASEUNITS></STOCKITEM>'
+                    for n, f in self.items.items()
+                )
             else:
                 return "<RESPONSE>Unknown Request, cannot be processed</RESPONSE>"
             return f"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC></DESC><DATA><COLLECTION>{rows}</COLLECTION></DATA></BODY></ENVELOPE>"
@@ -729,12 +929,17 @@ class FakeTally(Fake):
                 if not a <= x["DATE"] <= z:
                     continue
                 tag = "LEDGERENTRIES.LIST" if x["VIEW"] == "Invoice Voucher View" else "ALLLEDGERENTRIES.LIST"
-                ents = "".join(f"<{tag}><LEDGERNAME>{escape_xml(ln['LEDGERNAME'])}</LEDGERNAME><ISDEEMEDPOSITIVE>{ln['ISDEEMEDPOSITIVE']}</ISDEEMEDPOSITIVE>"
-                               f"<ISPARTYLEDGER>{ln['ISPARTYLEDGER']}</ISPARTYLEDGER><AMOUNT>{ln['AMOUNT']:.2f}</AMOUNT></{tag}>" for ln in x["LINES"])
-                out.append(f'<TALLYMESSAGE><VOUCHER REMOTEID="tally-{x["MASTERID"]}" VCHTYPE="{escape_xml(x["VOUCHERTYPENAME"])}">'
-                           f"<DATE>{x['DATE']}</DATE><VOUCHERTYPENAME>{escape_xml(x['VOUCHERTYPENAME'])}</VOUCHERTYPENAME>"
-                           f"<VOUCHERNUMBER>{escape_xml(x['VOUCHERNUMBER'])}</VOUCHERNUMBER><REFERENCE>{escape_xml(x['REFERENCE'])}</REFERENCE>"
-                           f"<NARRATION>{escape_xml(x['NARRATION'])}</NARRATION><ISCANCELLED>{x['ISCANCELLED']}</ISCANCELLED>{ents}</VOUCHER></TALLYMESSAGE>")
+                ents = "".join(
+                    f"<{tag}><LEDGERNAME>{escape_xml(ln['LEDGERNAME'])}</LEDGERNAME><ISDEEMEDPOSITIVE>{ln['ISDEEMEDPOSITIVE']}</ISDEEMEDPOSITIVE>"
+                    f"<ISPARTYLEDGER>{ln['ISPARTYLEDGER']}</ISPARTYLEDGER><AMOUNT>{ln['AMOUNT']:.2f}</AMOUNT></{tag}>"
+                    for ln in x["LINES"]
+                )
+                out.append(
+                    f'<TALLYMESSAGE><VOUCHER REMOTEID="tally-{x["MASTERID"]}" VCHTYPE="{escape_xml(x["VOUCHERTYPENAME"])}">'
+                    f"<DATE>{x['DATE']}</DATE><VOUCHERTYPENAME>{escape_xml(x['VOUCHERTYPENAME'])}</VOUCHERTYPENAME>"
+                    f"<VOUCHERNUMBER>{escape_xml(x['VOUCHERNUMBER'])}</VOUCHERNUMBER><REFERENCE>{escape_xml(x['REFERENCE'])}</REFERENCE>"
+                    f"<NARRATION>{escape_xml(x['NARRATION'])}</NARRATION><ISCANCELLED>{x['ISCANCELLED']}</ISCANCELLED>{ents}</VOUCHER></TALLYMESSAGE>"
+                )
             return f"<ENVELOPE><BODY><DATA>{''.join(out)}</DATA></BODY></ENVELOPE>"
         return "<RESPONSE>Unknown Request, cannot be processed</RESPONSE>"
 
@@ -751,10 +956,26 @@ class FakeQbo(Fake):
     changes; SQL-like queries; customers and vendors sharing one name space; tax codes made through taxservice; Amount
     must equal Qty x UnitPrice; DocNumber unique; payments applied to invoices and credit memos; SyncToken on deletes;
     a requestid answered again with its first answer (refusals too, which is why a refused write needs a new one)."""
+
     TOKEN = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer"
     BASE = "https://sandbox-quickbooks.api.intuit.com/v3/company/"
-    TABLES = ("Customer", "Vendor", "Item", "Account", "TaxAgency", "TaxCode", "TaxRate", "Invoice", "Estimate", "CreditMemo", "Bill", "Purchase", "Payment",
-              "BillPayment", "JournalEntry")
+    TABLES = (
+        "Customer",
+        "Vendor",
+        "Item",
+        "Account",
+        "TaxAgency",
+        "TaxCode",
+        "TaxRate",
+        "Invoice",
+        "Estimate",
+        "CreditMemo",
+        "Bill",
+        "Purchase",
+        "Payment",
+        "BillPayment",
+        "JournalEntry",
+    )
 
     def __init__(self):
         super().__init__()
@@ -762,14 +983,30 @@ class FakeQbo(Fake):
         self.cid, self.secret, self.using_tax = "qbo-client", "qbo-secret", True
         self.requests, self.replays = {}, 0
         self.t = {k: {} for k in self.TABLES}
-        for name, typ in (("Sales of Product Income", "Income"), ("Services", "Income"), ("Cost of Goods Sold", "Cost of Goods Sold"),
-                          ("Utilities", "Expense"), ("Rent or Lease", "Expense"), ("Miscellaneous", "Expense"), ("Meezan Current", "Bank"),
-                          ("Accounts Payable (A/P)", "Accounts Payable"), ("Accounts Receivable (A/R)", "Accounts Receivable")):
+        for name, typ in (
+            ("Sales of Product Income", "Income"),
+            ("Services", "Income"),
+            ("Cost of Goods Sold", "Cost of Goods Sold"),
+            ("Utilities", "Expense"),
+            ("Rent or Lease", "Expense"),
+            ("Miscellaneous", "Expense"),
+            ("Meezan Current", "Bank"),
+            ("Accounts Payable (A/P)", "Accounts Payable"),
+            ("Accounts Receivable (A/R)", "Accounts Receivable"),
+        ):
             self._add("Account", {"Name": name, "AccountType": typ, "Active": True})
 
     def creds(self):
-        return {"client_id": self.cid, "client_secret": self.secret, "env": "sandbox", "realm": self.realm, "access_token": self.access,
-                "refresh_token": self.refresh, "expires_at": 9e12, "company_name": "Khan Electronics"}
+        return {
+            "client_id": self.cid,
+            "client_secret": self.secret,
+            "env": "sandbox",
+            "realm": self.realm,
+            "access_token": self.access,
+            "refresh_token": self.refresh,
+            "expires_at": 9e12,
+            "company_name": "Khan Electronics",
+        }
 
     def _add(self, table, obj):
         obj = dict(obj, Id=str(len(self.t[table]) + 1 + 100 * self.TABLES.index(table)), SyncToken="0")
@@ -784,8 +1021,11 @@ class FakeQbo(Fake):
         if how == "401" or headers.get("Authorization") != f"Bearer {self.access}":
             return self.js(401, {"fault": {"error": [{"message": "message=AuthenticationFailed; errorCode=003200; statusCode=401"}]}})
         if how == "429":
-            return self.js(429, {"Fault": {"Error": [{"Message": "message=ThrottleExceeded; errorCode=003001; statusCode=429", "code": "003001"}]}},
-                           {"Retry-After": "0"})
+            return self.js(
+                429,
+                {"Fault": {"Error": [{"Message": "message=ThrottleExceeded; errorCode=003001; statusCode=429", "code": "003001"}]}},
+                {"Retry-After": "0"},
+            )
         u = urllib.parse.urlparse(url)
         q = {k: v[0] for k, v in urllib.parse.parse_qs(u.query).items()}
         realm, _, path = u.path.split("/v3/company/")[1].partition("/")
@@ -817,8 +1057,16 @@ class FakeQbo(Fake):
             return self.js(400, {"error": "invalid_grant"})
         n = int(self.refresh.rsplit("-", 1)[1]) + 1
         self.access, self.refresh = f"qbo-access-{n}", f"qbo-refresh-{n}"
-        return self.js(200, {"access_token": self.access, "refresh_token": self.refresh, "expires_in": 3600, "x_refresh_token_expires_in": 8640000,
-                             "token_type": "bearer"})
+        return self.js(
+            200,
+            {
+                "access_token": self.access,
+                "refresh_token": self.refresh,
+                "expires_in": 3600,
+                "x_refresh_token_expires_in": 8640000,
+                "token_type": "bearer",
+            },
+        )
 
     # ---------------------------------------------------------------- queries
     def query(self, sql):
@@ -866,7 +1114,9 @@ class FakeQbo(Fake):
 
     def _unique_doc(self, table, x):
         if x.get("DocNumber") and any(r.get("DocNumber") == x["DocNumber"] and not r.get("Voided") for r in self.t[table].values()):
-            raise QboFault("6140", "Duplicate Document Number Error", f"Duplicate Document Number Error : You must specify a different number. {x['DocNumber']}")
+            raise QboFault(
+                "6140", "Duplicate Document Number Error", f"Duplicate Document Number Error : You must specify a different number. {x['DocNumber']}"
+            )
 
     def route(self, method, path, q, body):
         parts = path.split("/")
@@ -883,7 +1133,9 @@ class FakeQbo(Fake):
         if what == "taxservice":
             if not self.using_tax:
                 raise QboFault("6000", "A business validation error has occurred", "Set up sales tax in QuickBooks first")
-            code = self._add("TaxCode", {"Name": body["TaxCode"], "SalesTaxRateList": {"TaxRateDetail": []}, "PurchaseTaxRateList": {"TaxRateDetail": []}})
+            code = self._add(
+                "TaxCode", {"Name": body["TaxCode"], "SalesTaxRateList": {"TaxRateDetail": []}, "PurchaseTaxRateList": {"TaxRateDetail": []}}
+            )
             for d in body["TaxRateDetails"]:
                 rate = self._add("TaxRate", {"Name": d["TaxRateName"], "RateValue": d["RateValue"], "AgencyRef": {"value": d["TaxAgencyId"]}})
                 code[f"{d['TaxApplicableOn']}TaxRateList"]["TaxRateDetail"].append({"TaxRateRef": {"value": rate["Id"]}})
@@ -974,6 +1226,7 @@ class FakeQbo(Fake):
 class FakeFbr(Fake):
     """PRAL's DI API v1.12: the Bearer token, validate (no number) and post (a number: seller + 'DI' + time), each line
     checked (HS code, rate, the tax worked out from the value), the reference list of provinces."""
+
     GW = "https://gw.fbr.gov.pk"
 
     def __init__(self):
@@ -1004,15 +1257,33 @@ class FakeFbr(Fake):
                 e = ("0046", "Provide rate.")
             elif r2(D(it["valueSalesExcludingST"]) * D(it["rate"].rstrip("%")) / 100) != r2(it["salesTaxApplicable"]):
                 e = ("0102", "The calculated sales tax does not match the provided sales tax")
-            lines.append({"itemSNo": str(i), "statusCode": "01" if e else "00", "status": "Invalid" if e else "Valid", "invoiceNo": None,
-                          "errorCode": e[0] if e else "", "error": e[1] if e else ""})
+            lines.append(
+                {
+                    "itemSNo": str(i),
+                    "statusCode": "01" if e else "00",
+                    "status": "Invalid" if e else "Valid",
+                    "invoiceNo": None,
+                    "errorCode": e[0] if e else "",
+                    "error": e[1] if e else "",
+                }
+            )
         if errs:
-            res = {"dated": "2026-10-04 10:00:00", "validationResponse": {"statusCode": "01", "status": "Invalid", "errorCode": errs[0][0], "error": errs[0][1],
-                                                                          "invoiceStatuses": None}}
+            res = {
+                "dated": "2026-10-04 10:00:00",
+                "validationResponse": {
+                    "statusCode": "01",
+                    "status": "Invalid",
+                    "errorCode": errs[0][0],
+                    "error": errs[0][1],
+                    "invoiceStatuses": None,
+                },
+            }
         else:
             ok = all(x["status"] == "Valid" for x in lines)
-            res = {"dated": "2026-10-04 10:00:00", "validationResponse": {"statusCode": "00", "status": "Valid" if ok else "invalid", "error": "",
-                                                                          "invoiceStatuses": lines}}
+            res = {
+                "dated": "2026-10-04 10:00:00",
+                "validationResponse": {"statusCode": "00", "status": "Valid" if ok else "invalid", "error": "", "invoiceStatuses": lines},
+            }
             if ok and "postinvoicedata" in path:
                 self.clock += 1
                 number = f"{body['sellerNTNCNIC']}DI{self.clock}"

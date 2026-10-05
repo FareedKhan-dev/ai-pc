@@ -7,6 +7,7 @@ chat; only files that belong to the chat (sent or made) can be opened through it
 
   serve(AIPCChat.start(), port=8770)        (ai-pc web)
 """
+
 import html
 import json
 import secrets
@@ -164,6 +165,7 @@ def serve(chat, port=8770, open_browser=False, ready=None):
         ready(url, token, srv)
     if open_browser:
         import webbrowser
+
         webbrowser.open(url)
     try:
         srv.serve_forever()

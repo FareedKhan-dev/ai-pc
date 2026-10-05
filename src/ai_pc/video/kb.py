@@ -12,6 +12,7 @@ planner gets the top candidates WITH descriptions and picks from them, so it can
 Files (all inside the project): kb/<engine>/items.json (facts), kb/<engine>/notes.json (descriptions, resumable),
 kb/<engine>/params.json (what each tunable parameter does).
 """
+
 import json
 import math
 import re
@@ -25,22 +26,22 @@ KB = ROOT / "kb"
 
 # category key -> (enum name in the engine, what it is / where it goes)
 CATEGORIES = {
-    "filter":           ("FilterType", "colour grade / look applied to one clip or, on a filter track, to everything below it"),
-    "transition":       ("TransitionType", "transition between two neighbouring clips on the main video track"),
-    "scene_effect":     ("VideoSceneEffectType", "full-frame visual effect on a clip, or on an effect track over a time range"),
+    "filter": ("FilterType", "colour grade / look applied to one clip or, on a filter track, to everything below it"),
+    "transition": ("TransitionType", "transition between two neighbouring clips on the main video track"),
+    "scene_effect": ("VideoSceneEffectType", "full-frame visual effect on a clip, or on an effect track over a time range"),
     "character_effect": ("VideoCharacterEffectType", "effect that tracks a person (face, eyes, body, hands) in a clip"),
-    "clip_intro":       ("IntroType", "how a video clip enters (plays at the clip's start)"),
-    "clip_outro":       ("OutroType", "how a video clip leaves (plays at the clip's end)"),
-    "clip_combo":       ("GroupAnimationType", "animation that runs over a whole video clip (in + out together)"),
-    "text_intro":       ("TextIntro", "how a text enters"),
-    "text_outro":       ("TextOutro", "how a text leaves"),
-    "text_loop":        ("TextLoopAnim", "looping animation while a text is on screen"),
-    "font":             ("FontType", "font for titles and subtitles"),
-    "mask":             ("MaskType", "shape mask that cuts a video clip"),
-    "blend":            ("MixModeType", "blend mode of a video clip over the tracks below it"),
-    "audio_effect":     ("AudioSceneEffectType", "sound effect / processing applied to an audio clip"),
-    "voice":            ("ToneEffectType", "voice changer for speech in an audio clip"),
-    "speech_to_song":   ("SpeechToSongType", "turns speech into a sung melody in a style"),
+    "clip_intro": ("IntroType", "how a video clip enters (plays at the clip's start)"),
+    "clip_outro": ("OutroType", "how a video clip leaves (plays at the clip's end)"),
+    "clip_combo": ("GroupAnimationType", "animation that runs over a whole video clip (in + out together)"),
+    "text_intro": ("TextIntro", "how a text enters"),
+    "text_outro": ("TextOutro", "how a text leaves"),
+    "text_loop": ("TextLoopAnim", "looping animation while a text is on screen"),
+    "font": ("FontType", "font for titles and subtitles"),
+    "mask": ("MaskType", "shape mask that cuts a video clip"),
+    "blend": ("MixModeType", "blend mode of a video clip over the tracks below it"),
+    "audio_effect": ("AudioSceneEffectType", "sound effect / processing applied to an audio clip"),
+    "voice": ("ToneEffectType", "voice changer for speech in an audio clip"),
+    "speech_to_song": ("SpeechToSongType", "turns speech into a sung melody in a style"),
 }
 # what the model must add per category, besides en / desc / tags / conf
 EXTRA = {
@@ -61,22 +62,30 @@ EXTRA = {
 }
 # small, fixed sets: described by hand (exact)
 HAND = {
-    "mask": {"线性": ("Linear", "straight-line split: one side visible, the other hidden", "linear split half line divide"),
-             "镜面": ("Mirror strip", "band between two parallel lines stays visible", "mirror band strip letterbox stripe"),
-             "圆形": ("Circle", "circle or ellipse window", "circle round oval ellipse spotlight vignette"),
-             "矩形": ("Rectangle", "rectangle window, corners can be rounded", "rectangle box frame rounded square window pip"),
-             "爱心": ("Heart", "heart-shaped window", "heart love romantic shape"),
-             "星形": ("Star", "star-shaped window", "star shape sparkle")},
-    "blend": {"正片叠底": ("Multiply", "darkens: multiplies colours with the layers below", "multiply darken shadow"),
-              "颜色减淡": ("Color dodge", "brightens strongly where the layer is light", "color dodge brighten glow"),
-              "颜色加深": ("Color burn", "darkens strongly with more contrast", "color burn darken contrast"),
-              "线性加深": ("Linear burn", "darkens by subtracting brightness", "linear burn darken"),
-              "柔光": ("Soft light", "gentle contrast/light overlay", "soft light overlay gentle"),
-              "强光": ("Hard light", "strong contrast overlay", "hard light contrast overlay"),
-              "滤色": ("Screen", "brightens: black disappears, light parts show (good for light leaks, fire, sparks on black)", "screen lighten remove black light leak overlay"),
-              "叠加": ("Overlay", "contrast overlay: darks darker, lights lighter", "overlay contrast"),
-              "变亮": ("Lighten", "keeps the lighter pixel of the two layers", "lighten brighter"),
-              "变暗": ("Darken", "keeps the darker pixel of the two layers", "darken darker")},
+    "mask": {
+        "线性": ("Linear", "straight-line split: one side visible, the other hidden", "linear split half line divide"),
+        "镜面": ("Mirror strip", "band between two parallel lines stays visible", "mirror band strip letterbox stripe"),
+        "圆形": ("Circle", "circle or ellipse window", "circle round oval ellipse spotlight vignette"),
+        "矩形": ("Rectangle", "rectangle window, corners can be rounded", "rectangle box frame rounded square window pip"),
+        "爱心": ("Heart", "heart-shaped window", "heart love romantic shape"),
+        "星形": ("Star", "star-shaped window", "star shape sparkle"),
+    },
+    "blend": {
+        "正片叠底": ("Multiply", "darkens: multiplies colours with the layers below", "multiply darken shadow"),
+        "颜色减淡": ("Color dodge", "brightens strongly where the layer is light", "color dodge brighten glow"),
+        "颜色加深": ("Color burn", "darkens strongly with more contrast", "color burn darken contrast"),
+        "线性加深": ("Linear burn", "darkens by subtracting brightness", "linear burn darken"),
+        "柔光": ("Soft light", "gentle contrast/light overlay", "soft light overlay gentle"),
+        "强光": ("Hard light", "strong contrast overlay", "hard light contrast overlay"),
+        "滤色": (
+            "Screen",
+            "brightens: black disappears, light parts show (good for light leaks, fire, sparks on black)",
+            "screen lighten remove black light leak overlay",
+        ),
+        "叠加": ("Overlay", "contrast overlay: darks darker, lights lighter", "overlay contrast"),
+        "变亮": ("Lighten", "keeps the lighter pixel of the two layers", "lighten brighter"),
+        "变暗": ("Darken", "keeps the darker pixel of the two layers", "darken darker"),
+    },
 }
 
 
@@ -98,10 +107,15 @@ def extract(engine="jianying"):
             continue
         for member in enum:
             v = member.value
-            it = {"key": f"{cat}:{member.name}", "category": cat, "name": member.name,
-                  "pro": bool(getattr(v, "is_vip", False)),
-                  "resource_id": getattr(v, "resource_id", None), "effect_id": getattr(v, "effect_id", None),
-                  "md5": getattr(v, "md5", None)}
+            it = {
+                "key": f"{cat}:{member.name}",
+                "category": cat,
+                "name": member.name,
+                "pro": bool(getattr(v, "is_vip", False)),
+                "resource_id": getattr(v, "resource_id", None),
+                "effect_id": getattr(v, "effect_id", None),
+                "md5": getattr(v, "md5", None),
+            }
             if getattr(v, "params", None):
                 it["params"] = [{"name": p.name, "min": p.min_value, "max": p.max_value, "default": p.default_value} for p in v.params]
             if getattr(v, "duration", None):
@@ -137,8 +151,12 @@ def load_notes(engine="jianying"):
 
 def _annotate_batch(planner, cat, batch, tier):
     from ai_pc.core.util import parse_json
-    lines = "\n".join(f"{i}. {it['name']}" + (f"  [params: {', '.join(p['name'].replace('effects_adjust_', '') for p in it.get('params', []))}]" if it.get("params") else "")
-                      for i, it in enumerate(batch))
+
+    lines = "\n".join(
+        f"{i}. {it['name']}"
+        + (f"  [params: {', '.join(p['name'].replace('effects_adjust_', '') for p in it.get('params', []))}]" if it.get("params") else "")
+        for i, it in enumerate(batch)
+    )
     system = NOTE_SYSTEM.replace("<EXTRA>", EXTRA.get(cat, ""))
     user = f"CATEGORY: {cat} - {CATEGORIES[cat][1]}\nITEMS:\n{lines}\n\nReply with the JSON object only."
     r = planner._call(tier, [{"role": "system", "content": system}, {"role": "user", "content": user}])
@@ -158,6 +176,7 @@ def _annotate_batch(planner, cat, batch, tier):
 def annotate(engine="jianying", tier="annotate", batch_size=40, workers=8, categories=None, limit=None, log=print):
     """Describe every item that has no description yet (resumable: saved after every batch)."""
     from ai_pc.llm.planner import ChatPlanner
+
     items_path = KB / engine / "items.json"
     items = json.loads(items_path.read_text(encoding="utf-8")) if items_path.exists() else extract(engine)
     notes = load_notes(engine)
@@ -170,7 +189,7 @@ def annotate(engine="jianying", tier="annotate", batch_size=40, workers=8, categ
     batches = []
     for cat in dict.fromkeys(it["category"] for it in todo):
         group = [it for it in todo if it["category"] == cat]
-        batches += [(cat, group[i:i + batch_size]) for i in range(0, len(group), batch_size)]
+        batches += [(cat, group[i : i + batch_size]) for i in range(0, len(group), batch_size)]
     log(f"{len(todo)} items to describe in {len(batches)} batches ({workers} at a time)")
     planner, t0, done = ChatPlanner(), time.perf_counter(), 0
     with ThreadPoolExecutor(max_workers=workers) as ex:
@@ -198,6 +217,7 @@ Reply with ONE JSON object mapping each parameter name to a short English explan
 def describe_params(engine="jianying", tier="annotate"):
     from ai_pc.core.util import parse_json
     from ai_pc.llm.planner import ChatPlanner
+
     items = json.loads((KB / engine / "items.json").read_text(encoding="utf-8"))
     names = sorted({p["name"] for it in items for p in it.get("params", [])})
     r = ChatPlanner()._call(tier, [{"role": "system", "content": PARAM_SYSTEM}, {"role": "user", "content": "\n".join(names)}])
@@ -217,14 +237,15 @@ def describe_api(engine="jianying", tier="annotate", chunk=24, log=print):
     """English capability manifest of the engine's API (kb/<engine>/capabilities.json)."""
     from ai_pc.core.util import parse_json
     from ai_pc.llm.planner import ChatPlanner
+
     raw = json.loads((KB / engine / "api_raw.json").read_text(encoding="utf-8"))
     planner = ChatPlanner()
-    parts = [raw[i:i + chunk] for i in range(0, len(raw), chunk)]
+    parts = [raw[i : i + chunk] for i in range(0, len(raw), chunk)]
 
     def one(part):
-        r = planner._call(tier, [{"role": "system", "content": API_SYSTEM},
-                                 {"role": "user", "content": json.dumps(part, ensure_ascii=False)}])
+        r = planner._call(tier, [{"role": "system", "content": API_SYSTEM}, {"role": "user", "content": json.dumps(part, ensure_ascii=False)}])
         return (parse_json(r.text) or {}).get("entries") or []
+
     entries = []
     with ThreadPoolExecutor(max_workers=len(parts)) as ex:
         for got in ex.map(one, parts):
@@ -233,8 +254,17 @@ def describe_api(engine="jianying", tier="annotate", chunk=24, log=print):
     out = []
     for x in raw:
         e = by.get(x["name"], {})
-        out.append({"name": x["name"], "kind": x["kind"], "signature": x.get("signature"), "values": x.get("values"),
-                    "what": e.get("what", ""), "args": e.get("args", {}), "rules": e.get("rules", [])})
+        out.append(
+            {
+                "name": x["name"],
+                "kind": x["kind"],
+                "signature": x.get("signature"),
+                "values": x.get("values"),
+                "what": e.get("what", ""),
+                "args": e.get("args", {}),
+                "rules": e.get("rules", []),
+            }
+        )
     (KB / engine / "capabilities.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     log(f"described {sum(1 for o in out if o['what'])} of {len(out)} API entries")
     return out
@@ -266,8 +296,13 @@ class Index:
             n = self.notes.get(k, {})
             extra = " ".join(str(v) for kk, v in n.items() if kk not in ("en", "desc", "tags", "conf", "by"))
             tf = Counter()
-            for field, text in (("en", n.get("en", "")), ("tags", " ".join(n.get("tags", []))), ("name", it["name"]),
-                                ("desc", n.get("desc", "")), ("extra", extra)):
+            for field, text in (
+                ("en", n.get("en", "")),
+                ("tags", " ".join(n.get("tags", []))),
+                ("name", it["name"]),
+                ("desc", n.get("desc", "")),
+                ("extra", extra),
+            ):
                 for tok in _toks(text):
                     tf[tok] += self.FIELD_WEIGHT[field]
             self.docs[k] = tf
@@ -307,8 +342,11 @@ class Index:
             if f in n:
                 c[f] = n[f]
         if it.get("params"):  # the engine takes every parameter as 0-100 (mapped onto the item's own range)
-            c["params"] = {p["name"]: f"{self.params.get(p['name'], p['name'])} (0-100, default "
-                           f"{round(100 * (p['default'] - p['min']) / ((p['max'] - p['min']) or 1))})" for p in it["params"]}
+            c["params"] = {
+                p["name"]: f"{self.params.get(p['name'], p['name'])} (0-100, default "
+                f"{round(100 * (p['default'] - p['min']) / ((p['max'] - p['min']) or 1))})"
+                for p in it["params"]
+            }
         if it.get("default_duration_s"):
             c["default_duration_s"] = it["default_duration_s"]
         if it["pro"]:

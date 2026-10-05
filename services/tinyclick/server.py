@@ -5,6 +5,7 @@
 * Listens on 127.0.0.1 only. It never clicks or moves anything on your screen: it only *predicts* a click point.
 * Uses only the Python standard library for the web part (no extra installs).
 """
+
 import ctypes
 import io
 import json
@@ -75,8 +76,7 @@ def set_image(img):
         img.save(buf, "PNG")
         S.img, S.png, S.pv, S.feats = img, buf.getvalue(), pv, feats
         S.id += 1
-        return {"id": S.id, "width": img.width, "height": img.height,
-                "preprocess_ms": round((t1 - t0) * 1000), "encode_ms": round((t2 - t1) * 1000)}
+        return {"id": S.id, "width": img.width, "height": img.height, "preprocess_ms": round((t1 - t0) * 1000), "encode_ms": round((t2 - t1) * 1000)}
 
 
 def find(cmd, beams):
@@ -93,8 +93,7 @@ def find(cmd, beams):
             ids = processor.tokenizer(prompt(cmd), return_tensors="pt")["input_ids"].to(DEV)
             t1 = time.perf_counter()
             with torch.inference_mode():
-                out = model.generate(input_ids=ids, pixel_values=S.pv, num_beams=max(1, min(int(beams), 5)),
-                                     max_new_tokens=16, do_sample=False)
+                out = model.generate(input_ids=ids, pixel_values=S.pv, num_beams=max(1, min(int(beams), 5)), max_new_tokens=16, do_sample=False)
             sync()
             t2 = time.perf_counter()
         finally:
@@ -102,8 +101,15 @@ def find(cmd, beams):
         raw = processor.batch_decode(out.cpu(), skip_special_tokens=False)[0]
         m = re.search(r"</s><s>(<[^>]+>|[^<\s]+)\s*([^<]*?)(<loc_\d+>.*)", raw)
         pt = re.findall(r"<loc_(\d+)><loc_(\d+)>", raw)
-        res = {"ok": True, "prompt": prompt(cmd), "raw": raw, "ms": round((t2 - t0) * 1000),
-               "decode_ms": round((t2 - t1) * 1000), "action": m.group(1) if m else None, "point": None}
+        res = {
+            "ok": True,
+            "prompt": prompt(cmd),
+            "raw": raw,
+            "ms": round((t2 - t0) * 1000),
+            "decode_ms": round((t2 - t1) * 1000),
+            "action": m.group(1) if m else None,
+            "point": None,
+        }
         if m and m.group(1) == "click" and pt:
             nx, ny = int(pt[0][0]), int(pt[0][1])
             res["norm"] = [nx, ny]
@@ -151,9 +157,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             return self._send(200, open(PAGE, "rb").read(), "text/html; charset=utf-8")
         if path == "/api/info":
-            return self._json({"device": DEVNAME, "dtype": str(DT).split(".")[-1],
-                               "params_m": round(sum(p.numel() for p in model.parameters()) / 1e6),
-                               "loaded": S.img is not None, "shots": list_shots()})
+            return self._json(
+                {
+                    "device": DEVNAME,
+                    "dtype": str(DT).split(".")[-1],
+                    "params_m": round(sum(p.numel() for p in model.parameters()) / 1e6),
+                    "loaded": S.img is not None,
+                    "shots": list_shots(),
+                }
+            )
         if path == "/current.png" and S.png:
             return self._send(200, S.png, "image/png")
         self._json({"error": "not found"}, 404)

@@ -8,6 +8,7 @@ Steps, each verified, with screenshots kept in runs/export_<time>/:
   4. wait for the new video file to appear and stop growing, move it into out/video/ and check it with ffprobe.
 Clicks outside CapCut's window are refused; the kill switch (Ctrl+Alt+Q) aborts between steps.
 """
+
 import json
 import subprocess
 import time
@@ -39,6 +40,7 @@ def _windows():
         if win32gui.IsWindowVisible(h) and win32process.GetWindowThreadProcessId(h)[1] in pids:
             r = win32gui.GetWindowRect(h)
             res.append((h, r, max(0, r[2] - r[0]) * max(0, r[3] - r[1])))
+
     win32gui.EnumWindows(cb, None)
     return sorted(res, key=lambda x: -x[2])
 
@@ -188,6 +190,7 @@ class Exporter:
 def explore(name):
     """Stage 1 only: home -> open the project -> Ctrl+M, then stop (nothing is exported)."""
     from ai_pc.desktop.grounder import make_grounder
+
     g = make_grounder()
     g.ensure()
     ex = Exporter(g)
@@ -228,12 +231,20 @@ def _find_export(name, since, roots):
 
 def probe(path):
     """Duration and picture size of a video, read with ffprobe."""
-    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type,width,height",
-                          "-of", "json", str(path)], capture_output=True, text=True, timeout=60).stdout
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type,width,height", "-of", "json", str(path)],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    ).stdout
     d = json.loads(out or "{}")
     v = next((s for s in d.get("streams", []) if s.get("codec_type") == "video"), {})
-    return {"seconds": round(float(d.get("format", {}).get("duration", 0)), 2), "width": v.get("width"),
-            "height": v.get("height"), "audio": any(s.get("codec_type") == "audio" for s in d.get("streams", []))}
+    return {
+        "seconds": round(float(d.get("format", {}).get("duration", 0)), 2),
+        "width": v.get("width"),
+        "height": v.get("height"),
+        "audio": any(s.get("codec_type") == "audio" for s in d.get("streams", [])),
+    }
 
 
 def _open_dialog(self, name):
@@ -274,9 +285,16 @@ def _wait_export(self, name, since, timeout=600, appear_s=None):
     """Until CapCut has written the video and it stopped growing; returns its path. With `appear_s`, gives up
     (returns None) if no file has appeared by then."""
     import os
+
     home = Path(os.environ["USERPROFILE"])
-    roots = [Path(os.environ["LOCALAPPDATA"]) / "CapCut" / "Videos",  # CapCut 9.5's default "Export to" folder
-             home / "Videos", home / "Videos" / "CapCut", home / "Desktop", home / "Documents", home / "Downloads"]
+    roots = [
+        Path(os.environ["LOCALAPPDATA"]) / "CapCut" / "Videos",  # CapCut 9.5's default "Export to" folder
+        home / "Videos",
+        home / "Videos" / "CapCut",
+        home / "Desktop",
+        home / "Documents",
+        home / "Downloads",
+    ]
     t, last, stable, seen = time.time(), -1, 0, False
     while time.time() - t < timeout:
         self.kill.check()
@@ -311,6 +329,7 @@ def _finish(self, name, src):
     """Close the share dialog, COPY the video into the project (out/video/), verify the copy, then remove CapCut's
     original once CapCut has let go of it (it may keep the file open for its preview; then it is left in place)."""
     import shutil
+
     self._shot("export_done")
     h, _ = _dialog(name, timeout=2)
     if h:
@@ -343,6 +362,7 @@ def export(name, grounder=None, restart=True):
     """The whole export: home -> open project -> Ctrl+M -> file -> out/video/. Falls back to the Export dialog when
     Ctrl+M produced nothing. Returns (path, info, seconds, steps)."""
     from ai_pc.desktop.grounder import make_grounder
+
     g = grounder or make_grounder()
     g.ensure()
     ex = Exporter(g)
