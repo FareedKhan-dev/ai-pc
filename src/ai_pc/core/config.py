@@ -11,7 +11,7 @@ SKILLS_DIR = STATE / "skills"
 # hedge_s: if a call has not answered after this many seconds, an identical backup request is sent and the first
 # answer wins (provider latency has long tails: DeepSeek-V4.1-Flash went from 2-3.5 s to a 39.8 s median on 2026-10-01)
 # Every tier runs on GLM-5.3-Flash, the cheapest model on the account that also reads images (0.15 / 0.50 USD per
-# million tokens; the user's choice on 2026-10-02). Earlier picks, faster but 3-20x dearer: fast + annotate =
+# million tokens; chosen for cost on 2026-10-02). Earlier picks, faster but 3-20x dearer: fast + annotate =
 # Qwen/Qwen3.8-27B (thinking off), deep = moonshotai/Kimi-K3. GLM needs reasoning_effort "low": "none" or thinking off
 # made it ramble to the token limit (brief: 20-68 s instead of 6-10 s; tested 2026-10-02).
 MODELS = {

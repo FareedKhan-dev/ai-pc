@@ -27,7 +27,7 @@ FIT_TYPES = {"cv", "letter", "application", "invoice", "quotation", "notice", "m
 
 def _norm(s):
     s = plain(str(s or "")).lower().replace("­", "").replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
-    s = re.sub("[‐‑‒–—−]", "-", s)
+    s = re.sub("[\u2010\u2011\u2012\u2013\u2014\u2212]", "-", s)
     s = " ".join(re.sub(r"[^\w%'.,:;!?&/()+-]+", " ", s).split())
     return re.sub(r"\s*-\s*", "-", s)  # "well-installed", "well - installed" and "well- installed" (a line break) alike
 

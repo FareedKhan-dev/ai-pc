@@ -59,7 +59,7 @@ def deck_and_book():
             {
                 "layout": "stats",
                 "title": "At a glance",
-                "stats": [{"value": "Rs 9–11 lakh", "label": "installed cost"}, {"value": "3.5 yrs", "label": "payback"}],
+                "stats": [{"value": "Rs 9\u201311 lakh", "label": "installed cost"}, {"value": "3.5 yrs", "label": "payback"}],
             },
             {
                 "layout": "chart",

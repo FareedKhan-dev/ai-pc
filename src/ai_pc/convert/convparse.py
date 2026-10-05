@@ -81,7 +81,7 @@ def _pair(a, b):
 def ranges(c):
     """Every 'A to B' / 'A-B' / 'between A and B' span in the text, as (a, b) seconds."""
     out = []
-    for m in re.finditer(r"(?:\b(?:from|between)\s+)?" + T1 + r"\s*(?:to|till|until|through|-|–|and)\s*" + T1, c):
+    for m in re.finditer(r"(?:\b(?:from|between)\s+)?" + T1 + r"\s*(?:to|till|until|through|-|\u2013|and)\s*" + T1, c):
         a, b = m.group(1), m.group(2)
         bare = _unitless(a) and _unitless(b)  # '10 to 20' without units: only in a sentence about cutting
         if bare and not re.search(r"\b(?:cut|keep|remove|delete|trim|only|gif|clip|part|section|bit|portion|from|between)\b", c):

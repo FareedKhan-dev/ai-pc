@@ -462,7 +462,7 @@ class _Builder:
         bdr.append(e)
         ppr.append(bdr)
         if b.get("by"):
-            self.para(f"— {b['by']}", align="right", base={"size": self.th["size"] - 1, "color": self.th["muted"]})
+            self.para(f"{b['by']}", align="right", base={"size": self.th["size"] - 1, "color": self.th["muted"]})
 
     def bullets(self, b):
         style = "List Number" if b["numbered"] else "List Bullet"

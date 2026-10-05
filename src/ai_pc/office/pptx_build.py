@@ -307,7 +307,7 @@ class _Deck:
         font = etree.SubElement(ppr, qn("a:buFont"))
         font.set("typeface", "Arial")
         ch = etree.SubElement(ppr, qn("a:buChar"))
-        ch.set("char", "•" if level == 0 else "–")
+        ch.set("char", "•" if level == 0 else "\u2013")
 
     def new_slide(self, s, title=None, number=True):
         slide = self.prs.slides.add_slide(self.blank)
@@ -738,7 +738,7 @@ class _Deck:
             name="Quote",
         )
         if s.get("by"):
-            self.text(slide, M + 1.2, 5.2, W - 2 * M - 2.0, 0.5, [f"— {s['by']}"], 18, th["muted"], gap=0, name="By")
+            self.text(slide, M + 1.2, 5.2, W - 2 * M - 2.0, 0.5, [f"{s['by']}"], 18, th["muted"], gap=0, name="By")
 
     def l_closing(self, s):
         th = self.th

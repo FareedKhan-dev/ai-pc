@@ -363,7 +363,7 @@ def claim_word(module):
 
 
 def pick(message, files=(), active=None, apps_claim=None, planner=None, catalogue="", arts_text="", log=None, refs=(), editing=None, known=()):
-    """One step's program: (lane or None, why, asked) — 'asked' is a question when nothing fits."""
+    """One step's program: (lane or None, why, asked); 'asked' is a question when nothing fits."""
     s, why = score(message, files, active, apps_claim, refs, editing, known)
     ranked = sorted(s.items(), key=lambda kv: -kv[1])
     best = ranked[0] if ranked else (None, 0)

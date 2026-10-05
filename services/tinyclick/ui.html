@@ -97,13 +97,13 @@
 
     <section class="card">
       <h2>3 · Result</h2>
-      <div class="big" id="big">–</div>
+      <div class="big" id="big">-</div>
       <div class="kv">
-        <div>Model said</div><div><code id="raw">–</code></div>
-        <div>Scale 0–1000</div><div id="norm">–</div>
-        <div>Time</div><div id="time">–</div>
-        <div>Prompt sent</div><div><code id="prompt">–</code></div>
-        <div>You vs model</div><div id="diff">–</div>
+        <div>Model said</div><div><code id="raw">-</code></div>
+        <div>Scale 0-1000</div><div id="norm">-</div>
+        <div>Time</div><div id="time">-</div>
+        <div>Prompt sent</div><div><code id="prompt">-</code></div>
+        <div>You vs model</div><div id="diff">-</div>
       </div>
       <div style="margin-top:10px"><canvas id="zoom" width="220" height="220"></canvas>
         <div class="caption">What the model pointed at (zoom).</div></div>
@@ -146,7 +146,7 @@ function showImage(i) {
   $("pins").innerHTML = "";
   $("go").disabled = false;
   renderHistory();
-  ["big", "raw", "norm", "time", "prompt", "diff"].forEach(k => $(k).textContent = "–");
+  ["big", "raw", "norm", "time", "prompt", "diff"].forEach(k => $(k).textContent = "-");
   $("caption").textContent = `${i.width}×${i.height}px · image read once in ${i.preprocess_ms + i.encode_ms} ms (preprocess ${i.preprocess_ms} + encode ${i.encode_ms}). Every command on it now reuses that.`;
   setErr("");
 }
@@ -188,7 +188,7 @@ function renderHistory() {
 function showResult(h, fromHistory) {
   $("big").textContent = h.point ? `Click at (${h.point[0]}, ${h.point[1]}) px` : "No click predicted";
   $("raw").textContent = h.raw.replace(/<\/?s>|<pad>/g, "").trim();
-  $("norm").textContent = h.norm ? `x ${h.norm[0]}, y ${h.norm[1]}  →  ×${info.width}/1000, ×${info.height}/1000 = pixels` : "–";
+  $("norm").textContent = h.norm ? `x ${h.norm[0]}, y ${h.norm[1]}  →  ×${info.width}/1000, ×${info.height}/1000 = pixels` : "-";
   $("time").textContent = `${h.ms} ms total (${h.decode_ms} ms model). The image was already encoded.`;
   $("prompt").textContent = h.prompt;
   if (!fromHistory) return;

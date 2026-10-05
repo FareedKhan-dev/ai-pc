@@ -159,14 +159,14 @@ def t_cite():
         got
         == [
             "Goodfellow, I. (2016). Deep Learning. MIT Press.",
-            "LeCun, Y., Bengio, Y., & Hinton, G. (2015). Deep learning. Nature, 521(7553), 436–444. https://doi.org/10.1038/nature14539",
+            "LeCun, Y., Bengio, Y., & Hinton, G. (2015). Deep learning. Nature, 521(7553), 436\u2013444. https://doi.org/10.1038/nature14539",
         ],
         got,
     )
     recs, refs, files = cite.make([("doi", "10.1038/nature14539")], "ieee", OUT / "cite_ieee")
     check(
         "cite: IEEE numbered",
-        cite.text_of(refs[0]) == '[1] Y. LeCun, Y. Bengio, and G. Hinton, "Deep learning," Nature, vol. 521, no. 7553, pp. 436–444, '
+        cite.text_of(refs[0]) == '[1] Y. LeCun, Y. Bengio, and G. Hinton, "Deep learning," Nature, vol. 521, no. 7553, pp. 436\u2013444, '
         "2015, doi: 10.1038/nature14539.",
         cite.text_of(refs[0]),
     )
@@ -177,7 +177,7 @@ def t_cite():
     reply = chat().say("cite 10.1038/nature14539 in mla")
     check(
         "cite: by chat, MLA, the Word file read back",
-        'LeCun, Yann, et al. "Deep learning." Nature, vol. 521, no. 7553, 2015, pp. 436–444.' in reply and "checked" in reply,
+        'LeCun, Yann, et al. "Deep learning." Nature, vol. 521, no. 7553, 2015, pp. 436\u2013444.' in reply and "checked" in reply,
         reply,
     )
 

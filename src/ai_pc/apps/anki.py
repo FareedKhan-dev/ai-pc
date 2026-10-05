@@ -24,7 +24,7 @@ EXAMPLES = [
     "anki cloze: The {mitochondria} is the powerhouse of the cell",
 ]
 SOURCES = {".txt", ".md", ".csv", ".tsv", ".xlsx"}
-SEPS = r"\s*::\s*|\s+=\s+|\s+[-–—]\s+|\t|:\s+"
+SEPS = r"\s*::\s*|\s+=\s+|\s+[-\u2013\u2014]\s+|\t|:\s+"
 HEADER = re.compile(r"^(?:front|question|term|word|q)$", re.I)
 
 

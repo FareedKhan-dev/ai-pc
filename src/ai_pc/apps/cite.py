@@ -28,7 +28,7 @@ def doi_lookup(doi):
         "journal": (x.get("container-title") or [""])[0],
         "volume": x.get("volume"),
         "issue": x.get("issue"),
-        "pages": (x.get("page") or "").replace("-", "–"),
+        "pages": (x.get("page") or "").replace("-", "\u2013"),
         "publisher": x.get("publisher"),
         "doi": x.get("DOI", doi),
     }
@@ -174,7 +174,7 @@ def bibtex(r, key):
         "journal": r.get("journal") if r["kind"] != "book" else None,
         "volume": r.get("volume"),
         "number": r.get("issue"),
-        "pages": (r.get("pages") or "").replace("–", "--") or None,
+        "pages": (r.get("pages") or "").replace("\u2013", "--") or None,
         "publisher": r.get("publisher") if r["kind"] == "book" else None,
         "doi": r.get("doi"),
         "isbn": r.get("isbn"),
@@ -193,7 +193,7 @@ def ris(r):
         if r.get(k):
             lines.append(f"{tag}  - {r[k]}")
     if r.get("pages"):
-        sp, _, ep = r["pages"].partition("–")
+        sp, _, ep = r["pages"].partition("\u2013")
         lines += [f"SP  - {sp}"] + ([f"EP  - {ep}"] if ep else [])
     return "\n".join(lines + ["ER  - ", ""])
 

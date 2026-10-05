@@ -251,7 +251,7 @@ def design(request, inputs, planner, log=print, theme=None, pages=None):
         d = _ask(
             planner,
             SECTION_SYSTEM,
-            head + f"\n\nWRITE SECTION {i + 1}: '{s['heading']}' — {s.get('goal', '')}\n"
+            head + f"\n\nWRITE SECTION {i + 1}: '{s['heading']}': {s.get('goal', '')}\n"
             f"About {s['words']} words. Elements wanted: {', '.join(s.get('elements') or ['paragraphs'])}.",
             log=log,
         )
@@ -295,7 +295,7 @@ def design(request, inputs, planner, log=print, theme=None, pages=None):
 EXPAND_SYSTEM = (
     """You lengthen one section of a document that came out shorter than the client asked. Keep everything that
 is there (same facts, same structure) and add substance: examples, explanation, implications, a table or list where it
-helps. Reply with ONE JSON object: {"blocks": [...]} — the WHOLE section again, without its heading.
+helps. Reply with ONE JSON object: {"blocks": [...]}: the WHOLE section again, without its heading.
 """
     + BLOCK_GUIDE
     + "\n"
@@ -304,7 +304,7 @@ helps. Reply with ONE JSON object: {"blocks": [...]} — the WHOLE section again
 
 SHORTEN_SYSTEM = (
     """You shorten one section of a document that came out longer than the client asked. Keep the key points,
-data, tables and charts; cut repetition and padding. Reply with ONE JSON object: {"blocks": [...]} — the WHOLE section
+data, tables and charts; cut repetition and padding. Reply with ONE JSON object: {"blocks": [...]}: the WHOLE section
 again, without its heading.
 """
     + BLOCK_GUIDE
