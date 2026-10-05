@@ -19,8 +19,9 @@ All notable changes to this project are written down here. The format follows
 - The `ai-pc` command, with a subcommand per program, and `ai-pc keys` for the encrypted key vault; options with no
   command go to the chat (`ai-pc -m "make my photo brighter" --file car.jpg`).
 - Keys from the environment, a `.env` file or the vault; all data paths in one place with `AI_PC_HOME`.
-- Packaging (`pyproject.toml`, `uv.lock`), pytest (unit and integration suites), ruff, pre-commit, GitHub Actions
-  (lint, tests, build, releases), Dependabot, documentation in `docs/`.
+- Packaging (`pyproject.toml`, `uv.lock`), pytest (unit and integration suites), ruff, mypy (strict for the typed
+  core), pre-commit, GitHub Actions (lint, type check, tests, gitleaks secret scan, build, releases), Dependabot,
+  documentation in `docs/` with architecture decision records, and `THIRD_PARTY_NOTICES.md`.
 
 ### Changed
 
@@ -34,6 +35,7 @@ All notable changes to this project are written down here. The format follows
 - Two chats started in the same second shared one folder.
 - The Vocaela click model's prompt was read when the module was imported, so the package failed to import on a PC
   without the model.
+- `scripts/safe_wheels.py` refused stable-ABI wheels (for example `cp39-abi3`) that work on this Python.
 
 [Unreleased]: https://github.com/FareedKhan-dev/ai-pc/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/FareedKhan-dev/ai-pc/releases/tag/v0.1.0
