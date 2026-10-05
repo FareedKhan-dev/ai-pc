@@ -3,7 +3,7 @@
 ## Video agent (JianYing 5.9, code-first)
 
 Video editing does not go through the screen. The agent writes the JianYing project as code (pyJianYingDraft), lets
-JianYing render it in the background, and then checks the export **at each edit's own moment**.
+JianYing render it in the background, and then checks the export at each edit's own moment.
 
 ```powershell
 ai-pc video new "edit this for instagram: lightning on my eye, shaky boss entrance" --media media\clip1.mp4 media\clip2.mp4
@@ -25,12 +25,12 @@ request + media ─► analyse media (faces/eyes, shots, motion, green screen, b
 
 | Step | Measured (this PC, 15 s Instagram reel, 3 source clips) |
 |---|---|
-| media analysis (first time / cached) | 4–9 s / 0 s |
-| brief + plan | 1.5 s + 8–15 s |
-| resolve + build | 0.4–1 s |
-| export (JianYing behind other windows) | 25–40 s (render ~15–25 s) |
-| verification of ~25 edit points | 12–15 s |
-| whole run incl. 2 fix rounds | 125–190 s |
+| media analysis (first time / cached) | 4-9 s / 0 s |
+| brief + plan | 1.5 s + 8-15 s |
+| resolve + build | 0.4-1 s |
+| export (JianYing behind other windows) | 25-40 s (render ~15-25 s) |
+| verification of ~25 edit points | 12-15 s |
+| whole run incl. 2 fix rounds | 125-190 s |
 
 Knowledge (`kb/jianying/`): 4,541 catalogue items with English descriptions, 40 parameters, 70 API functions, and
 `availability.json`. That file is learned from real exports: proven, downloaded, missing, needs-login, or invisible.
@@ -41,41 +41,41 @@ Knowledge (`kb/jianying/`): 4,541 catalogue items with English descriptions, 40 
 - 3,163 are CapCut-only. JianYing cannot fetch them (0 of 19 downloaded in a probe, `src/ai_pc/video/ccbridge.py`), so they need the CapCut app.
 
 Beyond the catalogue:
-- **Sound design** (`src/ai_pc/media/sfx.py`): impact, hit, whoosh, swoosh, riser, sub-drop, thunder and glitch, synthesised into `media/derived/`. A riser ends on its moment; the others start there.
-- **Template mode**: copy an existing JianYing project, replace its media by name, rewrite its texts, and add edits on top.
-- **Clip and text options**: stretch (x≠y), pitch-with-speed, blur strength, vertical text, line width, and text-background size and offset.
-- **Revisions** (`ai-pc video revise`): the model sees the edit as an absolute timeline, so "when his eyes light up" lands on the right second.
+- Sound design (`src/ai_pc/media/sfx.py`): impact, hit, whoosh, swoosh, riser, sub-drop, thunder and glitch, synthesised into `media/derived/`. A riser ends on its moment; the others start there.
+- Template mode: copy an existing JianYing project, replace its media by name, rewrite its texts, and add edits on top.
+- Clip and text options: stretch (x≠y), pitch-with-speed, blur strength, vertical text, line width, and text-background size and offset.
+- Revisions (`ai-pc video revise`): the model sees the edit as an absolute timeline, so "when his eyes light up" lands on the right second.
 
 Measured runs:
 
 | Run | Time | Edit points |
 |---|---|---|
-| Revision | 49–66 s | changed points only, all passing |
+| Revision | 49-66 s | changed points only, all passing |
 | Calm 12-s "Golden Hour" reel | 59 s | 13 of 14 passing |
 
 ### Editor's Mind: think before rendering, reflect after
 
-1. **Awareness** (`src/ai_pc/video/awareness.py`, ~20 ms) works out what is possible for this request, right now:
+1. Awareness (`src/ai_pc/video/awareness.py`, ~20 ms) works out what is possible for this request, right now:
    - each need is direct, approximate, built-in, or not possible (with what to do instead);
    - how reliable each catalogue item is here;
    - where the usable faces are, whether there is music or speech, and the hard limits.
-2. **Treatment.** The plan opens with a `think` section: concept, hook, arc, climax, pacing, look, sound, and a requirement map (each ask → technique → edit ids → confidence → fallback).
-3. **Critic** (`src/ai_pc/video/critic.py`, ~1.5–3 s) runs before any render:
+2. Treatment: The plan opens with a `think` section: concept, hook, arc, climax, pacing, look, sound, and a requirement map (each ask → technique → edit ids → confidence → fallback).
+3. Critic (`src/ai_pc/video/critic.py`, ~1.5-3 s) runs before any render:
    - ~15 rule checks, plus one fast model review of the absolute timeline;
    - its patch operations are applied only if the checks don't get worse;
    - a render costs ~30 s, so catching a mistake here is ~10× cheaper.
-4. **Render, verify, repair**, as described above.
-5. **Report** (`src/ai_pc/video/report.py` → `out/video/reports/<draft>.md`):
+4. Render, verify, repair, as described above.
+5. Report (`src/ai_pc/video/report.py` → `out/video/reports/<draft>.md`):
    - asked vs delivered, with the verifier's evidence;
    - what was substituted and why, quality, remaining flags;
    - the best next improvements.
-6. **Lessons** (`src/ai_pc/video/lessons.py` → `kb/jianying/lessons.json`): repairs and the user's follow-ups become rules that the planner and critic read on the next run.
+6. Lessons (`src/ai_pc/video/lessons.py` → `kb/jianying/lessons.json`): repairs and the user's follow-ups become rules that the planner and critic read on the next run.
 
-Exports run **off-screen**: JianYing's windows are parked beyond your monitors and put back afterwards, and JianYing pre-starts while the plan is written.
+Exports run off-screen: JianYing's windows are parked beyond your monitors and put back afterwards, and JianYing pre-starts while the plan is written.
 
 ### Editing like a pro: design → rhythm → recipes
 
-The planner no longer hand-writes every edit. It **designs**:
+The planner no longer hand-writes every edit. It designs:
 - a style: hype/velocity, cinematic, montage, talking-head, meme or product;
 - music: a given file, or a generated bed (hype, phonk, epic, pop, chill or cinematic, built with intro, build, drop and outro);
 - a shot list in beats (normal / slow / fast / velocity / freeze);
@@ -85,7 +85,7 @@ Code then writes the dense, frame-accurate timeline:
 
 | Module | Job |
 |---|---|
-| `music.py` | music beds in 1–1.5 s, with an exact beat grid |
+| `music.py` | music beds in 1-1.5 s, with an exact beat grid |
 | `cutting.py` | every shot a whole number of beats; best moments by highlight, face and motion; no repeats; velocity ramps (1.8×→0.35×→1.8×) on the key moment; long shots split to the style's pacing |
 | `recipes.py` | zoom punches, shakes, flashes, RGB hits, transitions, Ken Burns, grade (+ grain, vignette, letterbox, light leaks), hook, kinetic titles, captions, sound design, jump-cut zooms, meme face punches |
 | `styles.py` | pacing, default recipes, transitions, type, look and music per style |
@@ -93,7 +93,7 @@ Code then writes the dense, frame-accurate timeline:
 
 Talking-head edits built on `speech.py`:
 - jump cuts that drop pauses and filler words;
-- 1–3-word captions that never cross a cut, with key-word lines in the accent colour;
+- 1-3-word captions that never cross a cut, with key-word lines in the accent colour;
 - punch-ins and pops on key words;
 - b-roll when a word is spoken;
 - music ducked under the voice.
@@ -102,17 +102,17 @@ Measured, live:
 
 | Request | Points checked | Pass | Time | AI cost |
 |---|---|---|---|---|
-| "Lightning on my eye, boss entrance" (hype) | 55 | 52 (0 fail) | — | — |
+| "Lightning on my eye, boss entrance" (hype) | 55 | 52 (0 fail) | n/a | n/a |
 | "Phonk velocity edit, zooms on beats, flashes on the drop, NO DAYS OFF slamming, freeze ending" | 46 | 46 | 61 s | $0.009 |
-| "YouTube Short: cut pauses, word captions, zoom key words, b-roll on 'evening', quiet music" | — | — | — | — |
+| "YouTube Short: cut pauses, word captions, zoom key words, b-roll on 'evening', quiet music" | n/a | n/a | n/a | n/a |
 
 The YouTube Short request went through: 28 words, 1.8 s of pauses removed, b-roll and captions verified.
 
 Measured on the lightning/boss request: 24 of 24 edit points pass after one critic patch. All 6 asks are reported "met", with evidence. One plan + critic + export + verify pass is ~100 s and $0.008; a re-render pass is ~45 s and $0.0007.
 
 Facts found by checking exports (all handled in code):
-- JianYing places keyframes at **file time**: source start + seconds × speed.
-- Scale is capped at **500%**.
+- JianYing places keyframes at file time: source start + seconds × speed.
+- Scale is capped at 500%.
 - Some free catalogue items never download, need an account, or never render here.
 - The export dialog's drop-downs need the real mouse, so the remembered settings are used.
 - UI Automation calls from two threads of one process deadlock.
@@ -175,7 +175,7 @@ How changes are made:
 - Text, colour and effect changes go into the plan as a list of overrides. The list is applied again after any re-cut, so "title red" survives a later "make it 30 s".
 - Each change is checked on the new timeline before the reply. The reply says what was done, what wasn't, and why.
 
-Measured (2026-10-03): 287 conversation turns over the 10 batch edits, about 0.5–1.2 s per turn, $0.0016 per 50 turns.
+Measured (2026-10-03): 287 conversation turns over the 10 batch edits, about 0.5-1.2 s per turn, $0.0016 per 50 turns.
 - `tests/integration/conversations.py`: 117 turns, the set the rules were tuned on.
 - `tests/conversations_holdout*.py`: 4 further sets, each written after a round of fixes and first run untouched:
 
@@ -186,7 +186,7 @@ Measured (2026-10-03): 287 conversation turns over the 10 batch edits, about 0.5
 | holdout3 (40 turns) | 75% | 100% |
 | holdout4 (30 turns) | 83% | 100% |
 
-The first-run column is the honest estimate for new phrasing: about 75–85% of turns fully right. Each turn checks:
+The first-run column is the honest estimate for new phrasing: about 75-85% of turns fully right. Each turn checks:
 - the kind of turn taken;
 - the change on the new timeline, or the answer;
 - invariants: the music never disappears unless asked, no missing items or broken shot references appear, and a question never changes the edit.
@@ -202,7 +202,7 @@ ai-pc video talk <the new draft>                               # follow-ups: foo
 
 [template.py](../../src/ai_pc/video/template.py) has three steps.
 
-**Learn.** It reads the video frame by frame:
+Learn. It reads the video frame by frame:
 - cuts, typed as hard cut, cut under a flash, dissolve, or motion transition;
 - flashes, zoom punches and shakes;
 - each slot's shot size (faces), motion, colour, and whether it is black and white;
@@ -216,14 +216,14 @@ How cuts are found:
 
 Templates are saved in `state/templates/`.
 
-**Fill.** Each slot gets the best unused moment of your footage:
+Fill. Each slot gets the best unused moment of your footage:
 - matched on shot size, motion, highlight and what it shows;
 - hero slots (the drop, the longest late slot, the opening) are filled first;
 - no moment is used twice, and the same file rarely appears twice in a row.
 
 On top of that, the template is rebuilt from items that work here: its transitions, flashes, zooms, shakes, black-and-white slots, grade, grain or letterbox, and texts. Your words in quotes replace the template's. The music is generated at the template's tempo, its drop is placed where the template's is, and its beats are shifted onto the template's cuts. The template's own song is licensed inside CapCut, so it is never reused.
 
-**Check.** The usual edit-point checks and fix rounds run. In a template edit the fixer never changes the template's transition lengths. Then the exported video's cuts are detected again and compared with the plan's.
+Check. The usual edit-point checks and fix rounds run. In a template edit the fixer never changes the template's transition lengths. Then the exported video's cuts are detected again and compared with the plan's.
 
 Measured (2026-10-03):
 
@@ -256,7 +256,7 @@ A tag the dictionary does not know is mapped once by the cheap model. Only known
 
 Without a video of the template, the slots are even and on the beat, so the result is not exact (marked "from its page"). With a video, the page's clip count makes the learned slots exactly that many: the least sure extra cuts are left out, missed cuts between look-alike shots are taken back, and a cut the preview does not show is put on a beat and marked "guessed".
 
-**Staying within CapCut's rules** (robots.txt and llms.txt, checked 2026-10-03):
+Staying within CapCut's rules (robots.txt and llms.txt, checked 2026-10-03):
 - only a page you point at is read, never listings like /templates/ or /explore/;
 - the link is cleaned to `/template-detail/<id>` (CapCut asks agents not to fetch links with tracking parameters) and checked against robots.txt;
 - the page is fetched once and cached for a day;
@@ -278,4 +278,4 @@ Measured (2026-10-03):
 | Chat (`tests/integration/conversations_explorer.py`) | 15/15; all 296 earlier chat turns still pass |
 | Live: `new --template <SLOWMO HDR link>` with 7 wedding clips | 4 slots at 0.45x, HDR filter, Eid Mubarak, 100 BPM bed; 14.61 s for 14.58 s; 3/3 cuts on the planned frames; checks 12 pass, 1 warn (a face near the edge), 0 fail; all 5 asks met; 31 s with JianYing warm (72 s cold); AI $0.0002 |
 
-The verifier now checks speed too. Inside a slowed slot, the render must show the take's moment at the planned speed (2 s into a 0.45x slot is 0.9 s into the take), not the 1x moment. On the live export the render matched the 0.45x moment at a correlation of about 0.98, against 0.0–0.74 for the 1x moment. A 1x export whose map claims 0.45x fails this check.
+The verifier now checks speed too. Inside a slowed slot, the render must show the take's moment at the planned speed (2 s into a 0.45x slot is 0.9 s into the take), not the 1x moment. On the live export the render matched the 0.45x moment at a correlation of about 0.98, against 0.0-0.74 for the 1x moment. A 1x export whose map claims 0.45x fails this check.

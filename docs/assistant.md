@@ -40,24 +40,24 @@ it to slack" then offered that edited video (not the original) and waited for a 
 
 ### The command bar: Ctrl+Alt+Space anywhere
 
-Double-click **AI PC.lnk** (or run `ai-pc bar`) once. Nothing opens: the AI PC waits in the background with an icon in
+Double-click AI PC.lnk (or run `ai-pc bar`) once. Nothing opens: the AI PC waits in the background with an icon in
 the tray. Then, in any program:
 
-- **Ctrl+Alt+Space** opens the bar in the middle of the screen you are working on, ready to type. Enter sends, Esc (or a
+- Ctrl+Alt+Space opens the bar in the middle of the screen you are working on, ready to type. Enter sends, Esc (or a
   click elsewhere) hides it, Ctrl+Alt+Space again closes it. The conversation is the same one chat as above.
-- **Hold Ctrl+Alt+Space and talk**; let go to send (or click the mic, Ctrl+M). Whisper on this PC hears it.
-- **What you are looking at comes along.** Files selected in the File Explorer window in front (or on the desktop), or
+- Hold Ctrl+Alt+Space and talk; let go to send (or click the mic, Ctrl+M). Whisper on this PC hears it.
+- What you are looking at comes along: Files selected in the File Explorer window in front (or on the desktop), or
   the document open in Word, Excel or PowerPoint in front, appear as chips ("From File Explorer: clip.mp4") and are
   'it' / 'this video' for the request, so selecting a video and saying "add a glow effect" just works. A request about
   something else ("turn on dark mode") is not handed them; several selected files go with "these" / "them" / "all".
   Files can also be dropped on the bar, attached (Ctrl+O), or pasted (Ctrl+V pastes copied files or a copied picture).
-- **While it works** a thin line moves under the box and the bottom line says which program is busy and what it is
+- While it works a thin line moves under the box and the bottom line says which program is busy and what it is
   doing ("Photos · Brighter ... · 0:04"). Close the bar and keep working: a notification says when it is done.
-- **Results** come with a picture (photos, a frame of a video) and their files: click to open, show in the folder, or
+- Results come with a picture (photos, a frame of a video) and their files: click to open, show in the folder, or
   copy to paste anywhere (WhatsApp, an email, Explorer). Files leave with clear names (car_edited.png, not v3.png).
-- **Anything others will see waits for Yes**: Yes / No buttons (Alt+Y / Alt+N). Ctrl+N starts a new chat; the bar
+- Anything others will see waits for Yes: Yes / No buttons (Alt+Y / Alt+N). Ctrl+N starts a new chat; the bar
   carries on today's chat and starts afresh after 6 hours. Up recalls what you sent before. The pin keeps it open.
-- **Tray icon menu**: Open, New chat, Start with Windows (off until you turn it on), Open the chats folder, Quit.
+- Tray icon menu: Open, New chat, Start with Windows (off until you turn it on), Open the chats folder, Quit.
 
 How it stays fast and safe ([src/ai_pc/assistant/bar.py](../src/ai_pc/assistant/bar.py), [shell.py](../src/ai_pc/assistant/shell.py),
 [agent.py](../src/ai_pc/assistant/agent.py), [mic.py](../src/ai_pc/assistant/mic.py)):

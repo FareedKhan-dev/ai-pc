@@ -4,68 +4,75 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![Windows 11](https://img.shields.io/badge/platform-Windows%2011-0078d4)
 
-An assistant for Windows that does real work in desktop programs, by code. Ask in one chat (typed, spoken, from a
-Ctrl+Alt+Space command bar, the browser or Telegram) and it edits the video in JianYing, writes the Word report,
-fixes the photo, draws the house plan, posts to Slack after your yes, and works with 100+ more programs.
+AI PC is a Windows assistant that does work in desktop programs through code. You ask for something in a chat (in the
+terminal, in a pop-up bar opened with Ctrl+Alt+Space, on a local web page or from Telegram) and it hands the request
+to the program that can do it: JianYing for video, Word, PowerPoint and Excel for documents, Blender for 3D, and about
+a hundred others.
 
-- **One conversation for everything.** "Add a glow effect to my video", then "send it to Slack #team": 'it' is the
-  edited video, handed from one program to the next.
-- **Code, not clicks.** Each program writes the application's own files or calls its official interface, and the
-  application only renders. Nothing appears on your screen; the mouse and keyboard are never touched.
-- **Checked, versioned, undoable.** Every change is measured on the result; 'undo' goes back a step; anything others
-  will see waits for your yes.
-- **Fast and cheap.** Requests are read by rules first; a low-cost model is asked only when the rules cannot tell.
+Programs are driven through their own file formats and official interfaces rather than by clicking on the screen, and
+they run on a hidden desktop, so you can keep using the PC. Each result is checked after it is made. Anything that
+other people will see (a Slack message, an email, a social media post) is shown to you first and waits for a yes.
 
-## Quick start
+## Requirements
+
+- Windows 11, 64-bit
+- [uv](https://docs.astral.sh/uv/) and Git
+- A Nebius API key for the requests that need a language model (most are handled by rules)
+- The programs you want it to drive; see [docs/tools.md](docs/tools.md)
+
+## Install
 
 ```powershell
 git clone https://github.com/FareedKhan-dev/ai-pc.git
 cd ai-pc
-uv sync                                     # Python 3.12 and the locked dependencies
-uv run ai-pc keys set NEBIUS_API_KEY        # your model key, kept in the encrypted vault
-uv run ai-pc chat                           # talk to it
-uv run ai-pc bar                            # or press Ctrl+Alt+Space anywhere
+uv sync
+uv run ai-pc keys set NEBIUS_API_KEY
 ```
 
-Full set-up, including the programs it drives: [docs/getting-started.md](docs/getting-started.md).
+`uv sync` creates `.venv` with Python 3.12 and the exact versions in `uv.lock`. The key goes into an encrypted vault
+on this PC; a `.env` file works too (see [docs/configuration.md](docs/configuration.md)).
 
-## Commands
+## Usage
 
-| Command | What it does |
+```powershell
+uv run ai-pc chat                                           # interactive chat
+uv run ai-pc chat -m "make my photo brighter" --file car.jpg
+uv run ai-pc bar                                            # background bar, opened with Ctrl+Alt+Space
+uv run ai-pc video --help                                   # each program also has its own command
+```
+
+| Command | Purpose |
 |---|---|
-| `ai-pc chat` | the one AI PC chat: type requests, send files and voice notes |
-| `ai-pc bar` | the Ctrl+Alt+Space command bar (waits in the background; hold the combo to talk) |
-| `ai-pc web`, `ai-pc telegram` | the chat in your browser (this PC only), or from your phone through your Telegram bot |
-| `ai-pc video`, `office`, `photo`, `sound`, `design`, `cad`, `3d`, `convert`, `windows`, `code`, `accounts`, `hub`, `social`, `apps` | each program on its own |
-| `ai-pc agent` | operate any desktop program through its user interface |
-| `ai-pc keys` | API keys in this PC's encrypted vault |
-
-`ai-pc --help` lists them all; `ai-pc <command> --help` shows a command's options.
+| `ai-pc chat` | The chat: requests, files and voice notes |
+| `ai-pc bar` | The Ctrl+Alt+Space bar (hold the keys to talk) |
+| `ai-pc web`, `ai-pc telegram` | The chat in a browser on this PC, or through your own Telegram bot |
+| `ai-pc video`, `office`, `photo`, `sound`, `design`, `cad`, `3d`, `convert`, `windows`, `code`, `accounts`, `hub`, `social`, `apps` | One program at a time |
+| `ai-pc agent` | The desktop agent, for programs that can only be used through their interface |
+| `ai-pc keys` | API keys in the encrypted vault |
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md) and [configuration](docs/configuration.md)
-- [Architecture](docs/architecture.md): how the pieces fit, the repository layout
-- [The chat and the command bar](docs/assistant.md), [the desktop agent](docs/desktop-agent.md), [safety](docs/safety.md)
-- [Every program](docs/README.md#the-programs) and [the portable programs it drives](docs/tools.md)
-- [Development](docs/development.md): tests, code style, adding a program, releases
+Start with [getting started](docs/getting-started.md) and [configuration](docs/configuration.md). The
+[architecture](docs/architecture.md) page explains how the code is organised, and [docs/README.md](docs/README.md)
+lists a page for each program.
 
 ## Development
 
 ```powershell
-uv run pytest                    # unit tests (CI)
-uv run pytest -m integration     # the suites that drive real programs on this PC
-uv run ruff check . ; uv run ruff format --check .
+uv run pytest                     # unit tests, about 15 s
+uv run pytest -m integration      # suites that drive the real programs (slow)
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md).
 
 ## Security
 
-Keys stay in the environment, a git-ignored `.env`, or the DPAPI-encrypted vault; they are never logged or sent to a
-model. Local servers listen on 127.0.0.1 only. Report problems privately: [SECURITY.md](SECURITY.md).
+Please report security problems privately; see [SECURITY.md](SECURITY.md).
 
-## Licence
+## License
 
-Copyright (c) 2026 FareedKhan-dev. All rights reserved; see [LICENSE](LICENSE). Third-party components keep their own
-licences.
+Copyright (c) 2026 FareedKhan-dev. All rights reserved. See [LICENSE](LICENSE). Third-party components are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

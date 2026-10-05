@@ -23,13 +23,13 @@ ai-pc office check some.docx                                                    
 | Check | frames at every edit point | [verify.py](../../src/ai_pc/office/verify.py): every element on the rendered pages |
 | Fix | fix rounds | length, a heading alone at a page's foot, an almost-empty last page, a table too wide, slide text overflowing |
 
-**What code guarantees (never left to the model):**
+What code guarantees (never left to the model):
 - Invoice and table totals are computed by code.
 - Spreadsheet formulas are written by code. The model names columns (`[Qty] * [Price]`) and code writes `=B2*C2`, SUMIFS summaries and totals.
 - Table and figure numbering, academic heading numbers (1, 1.1), and restarted numbered lists.
 - Words per page come from the theme (Times 12 pt at 1.5 lines holds about 270, Calibri 11 pt about 420).
 
-**Professional defaults:**
+Professional defaults:
 - real Word styles, so the navigation pane and contents page work;
 - headings kept with their text;
 - table header rows repeated on every page, numbers right-aligned, rows never split;
@@ -39,7 +39,7 @@ ai-pc office check some.docx                                                    
 - slides drawn on blank 16:9 pages with text sized to fit and message-style titles;
 - workbooks with frozen headers, filters, dropdowns, highlights, summaries and charts.
 
-**What is checked:**
+What is checked:
 
 | Format | Checks |
 |---|---|
@@ -54,11 +54,11 @@ Measured (2026-10-03, GLM-5.3-Flash for all model calls):
 |---|---|
 | Offline engine tests (`tests/integration/test_docs.py`, no model) | 23/23: totals, a 70-row table repeating its header, contents page numbers, native charts, list numbering, fonts, academic numbering, one-page fitting, deck rendering and overflow, Excel formulas and values |
 | 5-page solar report (cover, contents, table, chart) | 5 body pages for 5 asked; 14/14 checks; the vision look found no problems; about 45 s; $0.009 |
-| University assignment, leave application, invoice, CV, notice | 63 s, 12 s, 11 s, 13 s, 16 s; $0.0004–0.005 each. The invoice arithmetic was exact. A CV that spilled onto a second page is now tightened onto one |
+| University assignment, leave application, invoice, CV, notice | 63 s, 12 s, 11 s, 13 s, 16 s; $0.0004-0.005 each. The invoice arithmetic was exact. A CV that spilled onto a second page is now tightened onto one |
 | 10-slide deck from one request | 22 s; 11/11 slide checks; $0.0018 |
 | Excel sales workbook | 15/15 values Excel computed equal Python's; no error cells; 2 charts |
 
-The renders take 6–8 s each, mostly Word or PowerPoint starting. Writing takes 2 s for a letter, about 10 s for a deck and about 20 s for a long report. Model latency spikes happen (one reply took 86 s on 2026-10-03), so the vision look runs on a time budget.
+The renders take 6-8 s each, mostly Word or PowerPoint starting. Writing takes 2 s for a letter, about 10 s for a deck and about 20 s for a long report. Model latency spikes happen (one reply took 86 s on 2026-10-03), so the vision look runs on a time budget.
 
 ### Editing existing files by conversation
 
@@ -79,9 +79,9 @@ Each message makes one version; v0 is a copy of the client's file, which is neve
 | Edit | python-docx in place (parts it does not know are kept) | python-pptx in place (masters, layouts and animations are kept) | [xlsx_com.py](../../src/ai_pc/office/xlsx_com.py): Excel itself, in the background worker. Charts, pivots, validation and highlights are kept, and references follow moved rows and columns |
 | Check | each edit on the document before and after; Word renders it; fonts drawn, contents page filled, page numbers on the pages | PowerPoint measures the changed slides. Text too big for its box is shrunk by that measure and measured again, up to three rounds; a number goes onto one line and is sized by its width rather than breaking. Text contrast is checked against what is behind it | each result against Python: a new column's values, a sort's order, the rows a filter shows, the cells Excel paints (DisplayFormat), totals, summary and pivot groups; no new error cells |
 
-**Edits it understands (examples):**
-- **Word (29 operations):** styles and themes; page setup and page numbers; header and footer; contents page and cover; heading numbers; lists; find and replace across formatted runs; bolding the key terms; deleting or moving sections; inserting sections the model writes in the document's own style; rewriting, shortening or translating (Urdu is set right to left); summaries; table sort, rows, columns, formulas and totals; native charts; images.
-- **PowerPoint (15):** slides:
+Edits it understands (examples):
+- Word (29 operations): styles and themes; page setup and page numbers; header and footer; contents page and cover; heading numbers; lists; find and replace across formatted runs; bolding the key terms; deleting or moving sections; inserting sections the model writes in the document's own style; rewriting, shortening or translating (Urdu is set right to left); summaries; table sort, rows, columns, formulas and totals; native charts; images.
+- PowerPoint (15): slides:
   - delete, move, swap or duplicate a slide;
   - add a slide about a topic (the model writes it; it is drawn in the deck's own look).
 
@@ -96,7 +96,7 @@ Each message makes one version; v0 is a copy of the client's file, which is neve
   - styles for titles, body text or table text;
   - backgrounds (text that would no longer read is recoloured; cards and charts follow);
   - shrink text to fit, by PowerPoint's own measurement.
-- **Excel (32):** clean-up:
+- Excel (32): clean-up:
   - "clean up the data" in one request: dates typed as text in any style, prices written as "Rs 42,000", one city spelled four ways, extra spaces, empty rows, repeated rows.
 
   Formula columns from words:
@@ -120,7 +120,7 @@ Each message makes one version; v0 is a copy of the client's file, which is neve
   - freeze panes, dropdowns, hiding, renaming, moving and splitting columns;
   - sheets.
 
-**Guard rails:**
+Guard rails:
 - Excel will not delete a column or sheet that other formulas use. It names those cells, and deletes only on "… anyway", keeping those cells as their current values.
 - Slide numbers in one message mean the deck as the client saw it, even after earlier deletions and moves in the same message.
 - A colour request that makes text unreadable is done but flagged ("hard to read: … on slide 7").
@@ -135,7 +135,7 @@ Measured (2026-10-03, GLM-5.3-Flash):
 | Word chats ([tests/integration/doc_conversations.py](../../tests/integration/doc_conversations.py): a report, an assignment, a hand-typed messy essay) | 38/38 | 1 | 2.5 s | $0.0023 |
 | PowerPoint chats ([tests/integration/deck_conversations.py](../../tests/integration/deck_conversations.py): the agent's deck, a client deck in PowerPoint's default template) | 36/36 | 1 | 2.1 s | $0.0009 |
 | Excel chats ([tests/integration/book_conversations.py](../../tests/integration/book_conversations.py): a messy client sales workbook, the class marks workbook) | 33/33 | 2 | 1.3 s | $0.0006 |
-| Excel operations alone on the messy workbook (one Excel job each) | 30/30, every result equal to Python's | none | 0.5–3.6 s | none |
+| Excel operations alone on the messy workbook (one Excel job each) | 30/30, every result equal to Python's | none | 0.5-3.6 s | none |
 
 ### Projects: several files together, data flowing between them
 

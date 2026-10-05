@@ -30,11 +30,11 @@ signs in with a device code.
 | Figma, Canva | See [Designs to code](design-to-code.md): frames, colours, exports and comments; designs, imports, exports and uploads. |
 
 How it behaves:
-- **Reads run at once:** a channel, your inbox, your calendar, your tasks.
-- **Anything other people will see waits for your yes:** a post, an email, an invite, a shared task, a CRM record, a shared file. The preview says exactly what will go where. "Change the text to ..." edits the draft; "no" drops it.
-- **Emails are drafts first.** "Send" sends the draft.
-- **Every action is read back from the service**, written to `state/hub/audit.jsonl`, and can be undone where the service allows it: a post deleted, a card moved back, a task reopened, an event deleted. Sent emails and WhatsApp messages cannot be unsent, and the reply says so.
-- **"Brief me"** gathers today's calendar, unread mail, the last 24 hours of the Slack channels the bot is in, and late cards and tasks. The cheap model sums up what needs you, and the briefing can go to your Telegram. This sends message text to the model provider; use `--offline` to keep it on the PC.
+- Reads run at once: a channel, your inbox, your calendar, your tasks.
+- Anything other people will see waits for your yes: a post, an email, an invite, a shared task, a CRM record, a shared file. The preview says exactly what will go where. "Change the text to ..." edits the draft; "no" drops it.
+- Emails are drafts first: "Send" sends the draft.
+- Every action is read back from the service, written to `state/hub/audit.jsonl`, and can be undone where the service allows it: a post deleted, a card moved back, a task reopened, an event deleted. Sent emails and WhatsApp messages cannot be unsent, and the reply says so.
+- "Brief me" gathers today's calendar, unread mail, the last 24 hours of the Slack channels the bot is in, and late cards and tasks. The cheap model sums up what needs you, and the briefing can go to your Telegram. This sends message text to the model provider; use `--offline` to keep it on the PC.
 
 Measured (2026-10-04): [tests/integration/test_hub.py](../../tests/integration/test_hub.py) runs with no network and no keys, against canned answers for 8 services, in 0.2 s, and passes 58/58. It covers:
 - the exact requests sent, with secrets never in addresses;

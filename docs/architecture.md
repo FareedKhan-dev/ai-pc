@@ -1,92 +1,87 @@
 # Architecture
 
-## In one picture
+## Overview
 
 ```
-   you:   ai-pc chat     Ctrl+Alt+Space bar     the web page      Telegram       ai-pc <program> ...
-             |                  |                    |                |                 |
-             +------------------+------ the one chat (assistant) -----+                 |
-                                |   which program? (rules first, the model only when unsure)
-                                |   'it', 'this video', 'the original' -> real files
-                                v                                                       v
-   programs:  video  office  photo  sound  design  cad  3d  convert  windows  coding  accounts  hub  social  apps (88)  desktop
-                |  each writes the app's own files or calls its official interface; the app only renders
-                |  every step checked; versions and undo; a yes before anything others will see
-                v
-   shared:    llm (the model client, planners)   media (audio, speech, frames)   core (config, paths, keys, hidden desktop)
-                |
-   on this PC: the programs themselves (Office, JianYing, Blender, GIMP ... in tools/), run on a hidden desktop
+ entry points    ai-pc chat | Ctrl+Alt+Space bar | web page | Telegram        ai-pc <program>
+                        \            |             /                               |
+ the chat              assistant: route the request, resolve "it" to a file        |
+                                     |                                             |
+ programs        video  office  photo  sound  design  cad  three  convert  windows  coding
+                 accounts  hub  social  apps (88 small programs)  desktop (UI agent)
+                                     |
+ shared          llm (model client, planners)   media (audio, speech, frames)   core
+                                     |
+ on the PC       JianYing, Office, Blender, GIMP, ... (tools/), run on a hidden desktop
 ```
 
-## Principles every program follows
+A request comes in through one of the entry points. The assistant decides which program it is for, using rules first
+and the language model only when the rules cannot tell. It also works out which file "it" or "this video" refers to.
+The program then does the work by writing the application's own files or calling its official interface, checks the
+result, and saves a new version that can be undone.
+
+## Design rules
 
 The reasons behind these are in the [decision records](adr/README.md).
 
-1. **Code first, not clicks.** A program writes the application's own file format (a JianYing draft, a .docx, a
-   DXF, a Blender scene) or calls its official command line or API, then lets the application render. Driving a
-   user interface is the last resort, used only by the desktop agent.
-2. **Every step is checked.** Each change is measured on the result (the exported video at the edit points, the
-   rendered PDF page, the photo's histogram), and a failed check is said, never hidden.
-3. **Versions and undo.** Each program keeps its own conversation with versions; 'undo' goes back a step.
-4. **A yes before anything others will see.** Posting, sending, uploading or emailing is previewed first and waits.
-5. **Nothing on your screen.** Programs run on a hidden Windows desktop; the mouse and keyboard are never used.
-6. **Rules first, the model when needed.** Requests are read by rules; the (cheap) model is asked only when the rules
-   cannot tell, and never sees keys.
-7. **Everything stays in the project folder.** Programs, models, outputs and state live inside it
-   ([configuration](configuration.md)).
+1. Drive programs through their files and official interfaces. The desktop agent, which works through the user
+   interface, is only for programs that offer nothing else.
+2. Check every result: measure the exported video at the edit points, read back the rendered PDF, compare the photo
+   before and after. A failed check is reported, not hidden.
+3. Keep versions, so "undo" works in every program.
+4. Ask before anything that other people will see: posts, messages, emails, uploads.
+5. Never use the user's screen, mouse or keyboard. Programs run on a separate hidden desktop.
+6. Keep everything in the project folder, and verify every download ([configuration](configuration.md)).
 
 ## Repository layout
 
 ```
 ai-pc/
-├── src/ai_pc/              the package (installed as `ai-pc`)
-│   ├── cli/                the ai-pc command: one subcommand per program
-│   ├── assistant/          the one chat: router, artifacts, program adapters, command bar, web page, Telegram, voice
+├── src/ai_pc/
+│   ├── cli/            the ai-pc command, one module per subcommand
+│   ├── assistant/      the chat, routing, file references, the bar, the web page, Telegram, voice notes
 │   ├── video/ office/ photo/ sound/ design/ cad/ three/ convert/ windows/ coding/ accounts/ hub/ social/
-│   │                       one package per program, each with its parser (rules), chat (versions, undo) and checks
-│   ├── apps/               88 smaller programs, one module each, found by name
-│   ├── desktop/            the desktop agent: UI Automation, skills, safety, vision grounding
-│   ├── llm/                the model client, planners, prompts
-│   ├── media/              audio, speech (local Whisper), frames, music and sound effects
-│   └── core/               configuration, paths, keys and the encrypted vault, the hidden desktop, headless browser
+│   │                   one package per program: request rules, a chat with versions, checks
+│   ├── apps/           88 smaller programs, one module each, found by name
+│   ├── desktop/        the UI agent: UI Automation, skills, safety checks, click models
+│   ├── llm/            model client, planners, prompts
+│   ├── media/          audio, speech (local Whisper), frames, generated music and sound effects
+│   └── core/           configuration, paths, keys and the vault, the hidden desktop, headless browser
 ├── tests/
-│   ├── unit/               fast tests, no programs or media needed (CI)
-│   └── integration/        suites that drive real programs and media on this PC (pytest -m integration)
-├── services/tinyclick/     the TinyClick click-model server (its own GPU environment)
-├── scripts/                maintenance: model benchmarks, stock media, safe downloads, stress runs
-├── docs/                   this documentation
-├── pyproject.toml          package metadata, dependencies, tool settings
-└── uv.lock                 the exact versions, for every machine and CI
+│   ├── unit/           fast tests that need none of the programs or media
+│   └── integration/    suites that run the real programs (pytest -m integration)
+├── services/tinyclick/ the TinyClick click-model server, in its own GPU environment
+├── scripts/            benchmarks, test media download, wheel review, stress runs
+├── docs/
+├── pyproject.toml
+└── uv.lock
 ```
 
 ## Layers
 
-Dependencies only point downwards, and a unit test ([tests/unit/test_layers.py](../tests/unit/test_layers.py))
-keeps it that way:
+Imports only go down this list. `tests/unit/test_layers.py` fails if one goes up.
 
-| Layer | May use |
+| Package | Can import |
 |---|---|
-| `cli` | everything |
+| `cli` | anything |
 | `assistant` | the programs, `llm`, `media`, `core` |
-| programs (`video`, `office` ... `apps`, `desktop`) | each other, `llm`, `media`, `core` |
+| the programs, `apps`, `desktop` | each other, `llm`, `media`, `core` |
 | `llm`, `media` | `core` |
 | `core` | nothing else in the package |
 
-Imports are absolute (`from ai_pc.core.config import ROOT`).
+All imports are absolute, for example `from ai_pc.core.config import ROOT`.
 
-## The one chat
+## The chat
 
-[src/ai_pc/assistant/](../src/ai_pc/assistant/) turns a message into work:
+The code is in [src/ai_pc/assistant/](../src/ai_pc/assistant/):
 
-| Part | Role |
+| Module | Job |
 |---|---|
-| `chat.py` | the conversation: files sent and made, steps, a pending yes, saved chats |
-| `router.py` | which program a message is for: words, file kinds, the programs' own rules, the conversation in progress |
-| `artifacts.py` | 'it', 'this video', 'the original', 'the plan' and file names, resolved to real files |
-| `lanes.py` | an adapter per program: open its conversation, pass the message, list what it made |
-| `agent.py`, `bar.py`, `shell.py`, `mic.py` | the command bar: the worker, the window, the global hotkey and tray, the microphone |
-| `web.py`, `telegram.py`, `voice.py` | the browser page (127.0.0.1), the Telegram bridge, voice notes |
+| `chat.py` | The conversation: files sent and made, multi-step requests, pending confirmations, saving |
+| `router.py` | Picks the program for a message from its words, the kinds of files, each program's rules and the conversation so far |
+| `artifacts.py` | Resolves "it", "this video", "the original", "the plan" and file names to real files |
+| `lanes.py` | One adapter per program: start its conversation, pass the message, list the files it made |
+| `agent.py`, `bar.py`, `shell.py`, `mic.py` | The bar: worker thread, window, global hotkey and tray icon, microphone |
+| `web.py`, `telegram.py`, `voice.py` | The local web page, the Telegram bridge, voice note transcription |
 
-Adding a program: a package (or an `apps/` module whose `parse()` claims requests), an adapter in `lanes.py` if it
-keeps its own conversation, routing words in `router.py`, and a routing case in
-[tests/unit/test_routing.py](../tests/unit/test_routing.py). See [development](development.md).
+[docs/development.md](development.md) describes how to add a program.
