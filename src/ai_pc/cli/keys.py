@@ -12,7 +12,7 @@ import getpass
 import sys
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="ai-pc keys", description="API keys in this PC's encrypted vault")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("set", help="store a key (typed at a hidden prompt)")

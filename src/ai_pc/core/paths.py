@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 
 
-def _find_root():
+def _find_root() -> Path:
     env = os.environ.get("AI_PC_HOME")
     if env:
         return Path(env).resolve()

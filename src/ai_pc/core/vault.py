@@ -7,24 +7,29 @@ user, or a copy of the file on another PC, cannot read them. Keys are typed by t
 
 import json
 import threading
+from typing import Any
 
-from ai_pc.core.config import ROOT
+from ai_pc.core.paths import STATE
 
-FILE = ROOT / "state" / "hub" / "vault.bin"
+FILE = STATE / "hub" / "vault.bin"
 _LOCK = threading.Lock()
 _ENTROPY = b"aipc-hub-vault-v1"
 
 
-def _load():
+Entries = dict[str, dict[str, Any]]  # service -> its values (keys, tokens, ids)
+
+
+def _load() -> Entries:
     if not FILE.exists():
         return {}
     import win32crypt
 
     raw = win32crypt.CryptUnprotectData(FILE.read_bytes(), _ENTROPY, None, None, 0)[1]
-    return json.loads(raw.decode("utf-8"))
+    entries: Entries = json.loads(raw.decode("utf-8"))
+    return entries
 
 
-def _save(d):
+def _save(d: Entries) -> None:
     import win32crypt
 
     FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -34,24 +39,24 @@ def _save(d):
     tmp.replace(FILE)
 
 
-def put(service, values):
+def put(service: str, values: dict[str, Any]) -> None:
     with _LOCK:
         d = _load()
         d[service] = {**d.get(service, {}), **values}
         _save(d)
 
 
-def get(service):
+def get(service: str) -> dict[str, Any] | None:
     with _LOCK:
         return _load().get(service)
 
 
-def names():
+def names() -> list[str]:
     with _LOCK:
         return sorted(_load())
 
 
-def remove(service):
+def remove(service: str) -> bool:
     with _LOCK:
         d = _load()
         if d.pop(service, None) is not None:
@@ -60,7 +65,7 @@ def remove(service):
         return False
 
 
-def redact(text, service=None):
+def redact(text: object, service: str | None = None) -> str:
     """Any stored secret that appears in text, replaced by '***' (for logs and error messages)."""
     s = str(text)
     with _LOCK:

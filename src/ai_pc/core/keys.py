@@ -8,16 +8,17 @@ A key is looked up in this order:
 """
 
 import os
+from pathlib import Path
 
 from ai_pc.core.paths import ROOT
 
 VAULT_ENTRY = "keys"  # the vault entry that holds API keys by their environment name
 
 
-def dotenv(path=None):
+def dotenv(path: Path | None = None) -> dict[str, str]:
     """KEY=value pairs from a .env file (comments, blank lines and 'export ' allowed; quotes stripped)."""
     path = path or ROOT / ".env"
-    out = {}
+    out: dict[str, str] = {}
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
@@ -36,7 +37,7 @@ def dotenv(path=None):
     return out
 
 
-def from_vault(env_name):
+def from_vault(env_name: str) -> str:
     try:
         from ai_pc.core import vault
 
@@ -45,7 +46,7 @@ def from_vault(env_name):
         return ""
 
 
-def get_key(env_name="NEBIUS_API_KEY", filename="my_nebius.txt"):
+def get_key(env_name: str = "NEBIUS_API_KEY", filename: str | None = "my_nebius.txt") -> str:
     k = os.environ.get(env_name, "").strip() or dotenv().get(env_name, "").strip() or from_vault(env_name)
     if not k and filename:
         path = ROOT / filename

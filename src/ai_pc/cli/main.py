@@ -5,6 +5,7 @@ Each command lives in its own module and is imported only when it runs, so the c
 
 import difflib
 import importlib
+import io
 import sys
 
 from ai_pc import __version__
@@ -36,7 +37,7 @@ COMMANDS = {
 ALIASES = {"three": "3d", "win": "windows", "docs": "office", "coder": "code", "talk": "chat"}
 
 
-def usage():
+def usage() -> str:
     width = max(map(len, COMMANDS))
     lines = [
         f"ai-pc {__version__}: the AI PC from the command line",
@@ -49,15 +50,13 @@ def usage():
     return "\n".join(lines)
 
 
-def _utf8_console():
+def _utf8_console() -> None:
     for stream in (sys.stdout, sys.stderr):  # replies carry names and symbols the console's code page may not have
-        try:
+        if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, ValueError):
-            pass
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     _utf8_console()
     if not argv or (argv[0].startswith("-") and argv[0] not in ("-h", "--help", "-V", "--version")):

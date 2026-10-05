@@ -49,6 +49,12 @@ dependencies = [
     "uiautomation>=2.0.29",
 ]
 
+[project.urls]
+Repository = "https://github.com/FareedKhan-dev/ai-pc"
+Documentation = "https://github.com/FareedKhan-dev/ai-pc/tree/main/docs"
+Issues = "https://github.com/FareedKhan-dev/ai-pc/issues"
+Changelog = "https://github.com/FareedKhan-dev/ai-pc/blob/main/CHANGELOG.md"
+
 [project.scripts]
 ai-pc = "ai_pc.cli.main:main"
 
@@ -57,6 +63,8 @@ ai-pc-bar = "ai_pc.assistant.bar:main"
 
 [dependency-groups]
 dev = [
+    "mypy>=2.4",
+    "pre-commit>=4.6",
     "pytest>=9.1",
     "ruff>=0.16",
 ]
@@ -112,6 +120,18 @@ known-first-party = ["ai_pc"]
 [tool.ruff.format]
 line-ending = "lf"
 
+
+[tool.mypy]
+python_version = "3.12"
+# Typed so far; add modules here as they get annotations (strict for these, imports analysed but not reported)
+files = ["src/ai_pc/core/paths.py", "src/ai_pc/core/keys.py", "src/ai_pc/core/vault.py", "src/ai_pc/cli/main.py", "src/ai_pc/cli/keys.py"]
+strict = true
+warn_unreachable = true
+follow_imports = "silent"
+
+[[tool.mypy.overrides]]
+module = ["win32crypt", "pycapcut.*", "pyJianYingDraft.*", "uiautomation.*", "comtypes.*", "ezdxf.*", "genanki.*", "segno.*", "ifcopenshell.*", "faster_whisper.*"]
+ignore_missing_imports = true
 
 [tool.uv]
 environments = ["sys_platform == 'win32'"]  # a Windows program: lock for Windows only
