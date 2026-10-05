@@ -22,6 +22,7 @@ import winreg
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from packaging.requirements import Requirement
 
@@ -505,6 +506,16 @@ def unused_tool_folders(results: list[Result], tools: Path | None = None) -> lis
     return sorted(d.name for d in tools.iterdir() if d.is_dir() and d.name not in used and d.name not in HELPERS)
 
 
+def language_model() -> dict[str, Any]:
+    """The provider and model the requests that need a model will use, and whether its key is here (never the key)."""
+    from ai_pc.llm import providers
+
+    try:
+        return providers.describe()
+    except ValueError as e:  # an unknown provider named in the environment or the settings
+        return {"name": "(not set up)", "problem": str(e), "key_status": "missing"}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="ai-pc doctor", description="check that every program, model and environment AI PC uses is present")
     ap.add_argument("--json", action="store_true", help="print the results as JSON, with paths")
@@ -513,6 +524,7 @@ def main(argv: list[str] | None = None) -> int:
     spare = unused_tool_folders(results)
     required = [r for r in results if not r.tool.optional]
     extras = [r for r in results if r.tool.optional]
+    lm = language_model()
     if a.json:
         rows = [
             {
@@ -528,7 +540,7 @@ def main(argv: list[str] | None = None) -> int:
             }
             for r in results
         ]
-        print(json.dumps({"results": rows, "unused_tool_folders": spare}, indent=1))
+        print(json.dumps({"results": rows, "unused_tool_folders": spare, "language_model": lm}, indent=1))
     else:
         width = max(len(r.tool.name) for r in results)
         for group in GROUPS:
@@ -541,6 +553,10 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"  {'':<9} {'':<{width}}  {problem}")
         if spare:
             print(f"\nFolders in tools/ that no code uses: {', '.join(spare)}")
+        if lm.get("problem"):
+            print(f"\nLanguage model: {lm['name']}: {lm['problem']}")
+        else:
+            print(f"\nLanguage model: {lm['name']}, {lm['models']['fast']}, key {lm['key_status']} (change it with 'ai-pc models use ...')")
         print(f"\n{sum(r.ok for r in required)} of {len(required)} required present; {sum(r.ok for r in extras)} of {len(extras)} optional present.")
     return 0 if all(r.ok for r in required) else 1
 

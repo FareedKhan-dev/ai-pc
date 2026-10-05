@@ -9,3 +9,4 @@ gets the next number; a reversed one is marked superseded, not deleted.
 | [0002](0002-drive-programs-by-code.md) | Drive programs through their files and official interfaces, not the screen | Accepted |
 | [0003](0003-rules-first-cheap-model.md) | Read requests by rules first; a low-cost model only when the rules cannot tell | Accepted |
 | [0004](0004-one-package-one-command.md) | One installable package (`src/ai_pc`) and one command (`ai-pc`) | Accepted |
+| [0005](0005-any-openai-compatible-provider.md) | Any OpenAI-compatible model provider, chosen by the user; Nebius stays the default | Accepted |

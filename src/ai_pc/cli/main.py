@@ -34,6 +34,7 @@ COMMANDS = {
     "agent": ("ai_pc.desktop.cli", "main", "operate any desktop program through its user interface"),
     "keys": ("ai_pc.cli.keys", "main", "API keys in this PC's encrypted vault"),
     "doctor": ("ai_pc.cli.doctor", "main", "check that every program, model and environment it uses is present"),
+    "models": ("ai_pc.cli.models", "main", "choose the language-model provider and model (OpenAI, Gemini, Groq, OpenRouter, Ollama ...)"),
 }
 ALIASES = {"three": "3d", "win": "windows", "docs": "office", "coder": "code", "talk": "chat"}
 

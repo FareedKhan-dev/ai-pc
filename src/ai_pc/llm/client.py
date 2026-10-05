@@ -9,6 +9,7 @@ import threading
 import time
 import urllib.parse
 from dataclasses import dataclass, field
+from typing import Any
 
 NEBIUS_BASE = "https://api.tokenfactory.nebius.com/v1"
 
@@ -63,8 +64,22 @@ class _HTTPSConn(http.client.HTTPSConnection):
 class Chat:
     RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504}
 
-    def __init__(self, api_key, base_url=NEBIUS_BASE, timeout=90, deadline=240):
+    OPTIONAL = ("stream_options", "response_format", "temperature")  # fields a provider may refuse; the request works without them
+
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = NEBIUS_BASE,
+        timeout: float = 90,
+        deadline: float = 240,
+        headers: dict[str, str] | None = None,
+        skip: tuple[str, ...] = (),
+        max_tokens_field: str = "max_tokens",
+    ) -> None:
         self._key = api_key
+        self._headers = dict(headers or {})  # extra headers a provider asks for
+        self._skip = set(skip)  # optional fields not to send: known for some providers, learned the first time one refuses
+        self._max_field = max_tokens_field  # newer OpenAI models take max_completion_tokens instead
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout  # idle seconds on the socket
         self.deadline = deadline  # whole answer, per attempt
@@ -95,10 +110,20 @@ class Chat:
                 pass
         self._local.conn = None
 
-    def complete(self, model, messages, *, max_tokens=800, temperature=0.0, json_mode=False, extra=None, retries=5):
+    def complete(
+        self,
+        model: str,
+        messages: list[dict[str, Any]],
+        *,
+        max_tokens: int = 800,
+        temperature: float = 0.0,
+        json_mode: bool = False,
+        extra: dict[str, Any] | None = None,
+        retries: int = 5,
+    ) -> LLMResult:
         """One chat completion over a reused connection. Transient failures (DNS/connection errors, dropped keep-alive
         connections, timeouts, 429 and 5xx) are retried with exponential backoff and jitter; other 4xx are raised."""
-        body = {
+        body: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "max_tokens": max_tokens,
@@ -110,12 +135,24 @@ class Chat:
             body["response_format"] = {"type": "json_object"}
         if extra:
             body.update(extra)
-        data = json.dumps(body).encode()
         for attempt in range(retries + 1):
             delay = (0.05 if attempt == 0 else min(8.0, 0.5 * 2**attempt)) + random.uniform(0, 0.25)
+            sent = {k: v for k, v in body.items() if k not in self._skip}
+            if self._max_field != "max_tokens":
+                sent[self._max_field] = sent.pop("max_tokens")
+            data = json.dumps(sent).encode()
             try:
                 return self._once(model, data, extra)
             except _Status as e:
+                if e.code in (400, 422) and attempt < retries:
+                    # an optional field this provider does not take: drop it, here and for every later request
+                    refused = [k for k in self.OPTIONAL if k in sent and k.encode() in e.body]
+                    if refused:
+                        self._skip.update(refused)
+                        continue
+                    if self._max_field == "max_tokens" and b"max_completion_tokens" in e.body:
+                        self._max_field = "max_completion_tokens"
+                        continue
                 if e.code in self.RETRY_STATUS and attempt < retries:
                     ra = e.headers.get("retry-after") if e.headers else None
                     time.sleep(float(ra) if ra and ra.replace(".", "", 1).isdigit() else delay)
@@ -131,7 +168,9 @@ class Chat:
 
     def _once(self, model, data, extra):
         conn = self._conn()
-        hdrs = {"Authorization": "Bearer " + self._key, "Content-Type": "application/json", "Accept": "text/event-stream", "User-Agent": "ai-pc/0.1"}
+        hdrs = {"Content-Type": "application/json", "Accept": "text/event-stream", "User-Agent": "ai-pc/0.1", **self._headers}
+        if self._key:  # a local server may need no key
+            hdrs["Authorization"] = "Bearer " + self._key
         res = LLMResult(model=model, extras_used=dict(extra or {}))
         t0 = time.perf_counter()
         conn.request("POST", self._prefix + "/chat/completions", body=data, headers=hdrs)

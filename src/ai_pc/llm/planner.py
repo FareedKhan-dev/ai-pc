@@ -1,6 +1,6 @@
 """Planners turn (goal, observation, history[, screenshot]) into the next actions.
 
-ChatPlanner     real model calls through the OpenAI-compatible API (Nebius): fast / vision / deep tiers (see config.MODELS)
+ChatPlanner     real model calls through the OpenAI-compatible API of the chosen provider (llm/providers.py; Nebius by default)
 ScriptedPlanner deterministic test double (used by the test-suite to exercise the loop without a network)
 FilePlanner     requests are written to files and answered by a person or an assistant (demonstration / debugging)
 """
@@ -14,10 +14,9 @@ from concurrent.futures import TimeoutError as FuturesTimeout
 from dataclasses import dataclass, field
 
 from ai_pc.core.config import MODELS, PRICES, RUNS
-from ai_pc.core.keys import get_key
 from ai_pc.core.util import parse_json
-from ai_pc.llm import prompts
-from ai_pc.llm.client import Chat, LLMError
+from ai_pc.llm import prompts, providers
+from ai_pc.llm.client import LLMError
 
 
 class PlannerError(Exception):
@@ -67,7 +66,10 @@ def to_plan(d, raw="", model="", ms=0.0, usage=None):
 
 class ChatPlanner:
     def __init__(self, chat=None):
-        self.chat = chat or Chat(get_key())
+        # the provider and the model for each role (providers.py: AI_PC_PROVIDER, 'ai-pc models use ...'); default Nebius
+        self.provider = providers.active()
+        self.roles = {r: providers.role(r, self.provider) for r in MODELS}
+        self.chat = chat or providers.chat(self.provider)
         # persistent workers keep their keep-alive connections (a fresh TLS handshake to the EU costs ~0.3-0.5 s)
         self._pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="planner")
         self.hedges = 0
@@ -84,10 +86,11 @@ class ChatPlanner:
             x["hedged"] += int(hedged)  # a hedged call ran twice: the backup is billed too (counted below)
 
     def cost(self):
-        """{model: {..., "usd"}} and the total, from config.PRICES (USD per million tokens, input / output)."""
+        """{model: {..., "usd"}} and the total, from config.PRICES or a price saved with 'ai-pc models use ... --price'
+        (USD per million tokens, input / output); a model with no known price counts as free."""
         out, total = {}, 0.0
         for m, x in self.usage.items():
-            pin, pout = PRICES.get(m, (0.0, 0.0))
+            pin, pout = PRICES.get(m) or providers.price(m) or (0.0, 0.0)
             factor = 1 + x["hedged"] / max(1, x["calls"])  # assume the losing backup cost as much as the winner
             usd = (x["in"] * pin + x["out"] * pout) / 1e6 * factor
             out[m] = {**x, "usd": round(usd, 5)}
@@ -97,7 +100,7 @@ class ChatPlanner:
     def _call(self, tier, messages):
         """One model call. If it is slower than the tier's hedge_s, an identical backup request is sent and the first
         answer wins: cheap insurance against provider latency spikes (seen: 14-64 s for a normally 2-4 s call)."""
-        cfg = MODELS[tier]
+        cfg = self.roles[tier]
 
         def go():
             return self.chat.complete_with_fallback(cfg["model"], messages, [cfg["extra"] or {}, {}], max_tokens=cfg["max_tokens"])
@@ -144,7 +147,7 @@ class ChatPlanner:
             d, r = parse_json(r2.text), r2
         if d is None:
             raise PlannerError("planner returned no valid JSON")
-        return to_plan(d, r.text, MODELS[tier]["model"] + (" (hedged)" if getattr(r, "hedged", False) else ""), r.total_ms, r.usage)
+        return to_plan(d, r.text, self.roles[tier]["model"] + (" (hedged)" if getattr(r, "hedged", False) else ""), r.total_ms, r.usage)
 
     def deep_plan(self, goal, context):
         messages = [

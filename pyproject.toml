@@ -125,7 +125,7 @@ line-ending = "lf"
 [tool.mypy]
 python_version = "3.12"
 # Typed so far; add modules here as they get annotations (strict for these, imports analysed but not reported)
-files = ["src/ai_pc/core/paths.py", "src/ai_pc/core/keys.py", "src/ai_pc/core/vault.py", "src/ai_pc/cli/main.py", "src/ai_pc/cli/keys.py", "src/ai_pc/cli/doctor.py"]
+files = ["src/ai_pc/core/paths.py", "src/ai_pc/core/keys.py", "src/ai_pc/core/vault.py", "src/ai_pc/cli/main.py", "src/ai_pc/cli/keys.py", "src/ai_pc/cli/doctor.py", "src/ai_pc/llm/providers.py", "src/ai_pc/cli/models.py"]
 strict = true
 warn_unreachable = true
 follow_imports = "silent"
