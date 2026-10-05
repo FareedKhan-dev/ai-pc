@@ -1,0 +1,36 @@
+name: Bug report
+description: Something did not work as it should
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you asked for (the exact words), what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The command or program, e.g. `ai-pc chat`, the command bar, `ai-pc video`, the photo program.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      placeholder: |
+        1. ai-pc chat -m "..." --file ...
+        2. ...
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or log
+      description: The reply, the error, or the end of out/aipc/bar.log. Remove any keys or personal details first.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `ai-pc --version`, and your Windows version.

@@ -1,0 +1,21 @@
+name: Feature request
+description: A program to drive, or something the assistant should do
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: request
+    attributes:
+      label: What you would say
+      description: The request in your own words, as you would type or say it to AI PC.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: Who needs it and how often.
+  - type: textarea
+    id: how
+    attributes:
+      label: The program and its interface
+      description: For a new program, how it can be driven by code (its file format, command line, or official API).
