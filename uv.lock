@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.12.*"
 resolution-markers = [
     "sys_platform == 'win32'",
@@ -439,7 +439,7 @@ wheels = [
 
 [[package]]
 name = "ifcopenshell"
-version = "0.9.0"
+version = "0.9.0.post1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "isodate" },
@@ -451,12 +451,12 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/e3/ed5f387d3a780b9ed1a7b25e0129e9dd3b3de890d5c5d0c7ac7f498661f7/ifcopenshell-0.9.0-py310-none-win_amd64.whl", hash = "sha256:5b0e560f93b6d5310b77cad1276ac71f7947d3241358d96bc552b7dd0cfc32a5", size = 49333517, upload-time = "2026-09-29T07:48:50.059Z" },
-    { url = "https://files.pythonhosted.org/packages/7f/8a/06a1f3d9d46f8523416a033ff9f1cd0d23015a11d69c8d1bcc00c51d49ab/ifcopenshell-0.9.0-py310-none-win_arm64.whl", hash = "sha256:a35cec25b2ec7b67d50db933ae043363846ebce8e23b913b5110fc0a8262070b", size = 49541502, upload-time = "2026-09-29T07:46:42.102Z" },
-    { url = "https://files.pythonhosted.org/packages/f6/8e/9a94e6f8c9626fb4cefc5027e4197474a0759b4f8211ff319fc7625d3920/ifcopenshell-0.9.0-py311-none-win_amd64.whl", hash = "sha256:82939fe4e85ce6880d94804b041af1c930f7991569346e3eba4bb92021dfdfc3", size = 49658230, upload-time = "2026-09-29T07:56:50.007Z" },
-    { url = "https://files.pythonhosted.org/packages/7d/c1/95283d826ab1283d536c41a1606f0550f992ed18d55d9300190979e9cd2c/ifcopenshell-0.9.0-py311-none-win_arm64.whl", hash = "sha256:560dfbb27b5272b8414e8ea2c32a1e4a3c10bc45393822207aa1880b8717ee22", size = 49988558, upload-time = "2026-09-29T07:57:15.692Z" },
-    { url = "https://files.pythonhosted.org/packages/a9/58/e65703e1436e5aa7e55733a212b5b5b9a00f2ce65cba9f5e9aa4bfb2a9f8/ifcopenshell-0.9.0-py312-none-win_amd64.whl", hash = "sha256:29e0954d664ae9ef11928634079abf855ff2c8e78d75a018bc8c6922cfc06445", size = 49960512, upload-time = "2026-09-29T07:56:32.951Z" },
-    { url = "https://files.pythonhosted.org/packages/b2/ad/beb2d0079d55c2ea1270171828c880b6fd9ca2235ed641985715cd29de31/ifcopenshell-0.9.0-py312-none-win_arm64.whl", hash = "sha256:6271a605535b075caa16cb8d1b5daac2595666c670ddd8ca465324a506f94437", size = 50240255, upload-time = "2026-09-29T07:56:41.729Z" },
+    { url = "https://files.pythonhosted.org/packages/61/a1/87ee326d4ae5a15aad0a883db22ccc9b74b9861a78eb2610662640c4f75d/ifcopenshell-0.9.0.post1-py310-none-win_amd64.whl", hash = "sha256:68176638ebed3668d42620a1b579a0bbe4bdd57e7e37147134a9131662f272b5", size = 42201493, upload-time = "2026-10-15T11:38:00.901Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/87/e32f6f0056d7de1d4073e4d050e372db11d5744166e5ed87cee8085b1d48/ifcopenshell-0.9.0.post1-py310-none-win_arm64.whl", hash = "sha256:3b49a727b1060a729afd096baa9256949bbc83b21db65643de10ee231e270ec6", size = 42047262, upload-time = "2026-10-15T11:38:00.896Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/e5/bb4d3e27855e4cf4727062cad28985ae412dd1b61d0a54dae874177fbdeb/ifcopenshell-0.9.0.post1-py311-none-win_amd64.whl", hash = "sha256:6888fbe969d6327192b306babc688011ddb0fdc49d909bb70c359f35da535a15", size = 42525243, upload-time = "2026-10-15T11:38:00.311Z" },
+    { url = "https://files.pythonhosted.org/packages/97/b3/f956aaf746cb5d11b29e4842ca63aadd7f2e1771ac1b688c73aabd1b2f16/ifcopenshell-0.9.0.post1-py311-none-win_arm64.whl", hash = "sha256:85d71393ab12e3aad0f77684ec8b7355ad80587502aab5f6b0c5cc9ff0476289", size = 42493744, upload-time = "2026-10-15T11:39:03.749Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/fb/97c538b094dad06191169b0edee6fdf8fdd87d98a9cb58c85535c8cb2e0c/ifcopenshell-0.9.0.post1-py312-none-win_amd64.whl", hash = "sha256:290acc68c564b5393785deb67818191481181eda8c409c141fd37081fb3361f0", size = 42827327, upload-time = "2026-10-15T11:38:05.533Z" },
+    { url = "https://files.pythonhosted.org/packages/59/6e/a05f0b7db91aef51035227956bc21fa255acb82519233955fbea25d005f8/ifcopenshell-0.9.0.post1-py312-none-win_arm64.whl", hash = "sha256:a05fbe87d0f4a6a2f762945cf8808629de4f29ca0ac2618f74429b7318cb900a", size = 42746355, upload-time = "2026-10-15T11:38:02.892Z" },
 ]
 
 [[package]]
